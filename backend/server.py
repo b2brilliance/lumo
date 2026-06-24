@@ -1,89 +1,1030 @@
-from fastapi import FastAPI, APIRouter
+"""Lumo backend — single-file FastAPI server."""
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+import os
+import uuid
+import logging
+import asyncio
+import math
+import secrets
+import requests
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Literal
+
+import jwt
+import bcrypt
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Header, Response
+from fastapi.responses import Response as FastApiResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field, ConfigDict
+
+from emergentintegrations.payments.stripe.checkout import (
+    StripeCheckout, CheckoutSessionRequest
+)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Setup
+# ────────────────────────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("lumo")
+
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_client = AsyncIOMotorClient(mongo_url)
+db = mongo_client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+JWT_SECRET = os.environ['JWT_SECRET']
+JWT_ALGORITHM = "HS256"
+APP_NAME = os.environ.get('APP_NAME', 'lumo')
+STRIPE_API_KEY = os.environ['STRIPE_API_KEY']
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+REMOTE_FRIENDLY_CATEGORIES = {
+    "digital_tech", "marketing", "business_admin", "education",
+    "legal", "financial", "remote_work", "research"
+}
 
+ALL_CATEGORIES = [
+    # delivery
+    "delivery", "courier", "moving",
+    # local services
+    "handyman", "cleaning", "landscaping", "auto", "pet_care", "personal_care", "events",
+    # tech/digital + remote
+    "digital_tech", "marketing", "business_admin", "education",
+    "legal", "financial", "remote_work", "research",
+]
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+def category_group(cat: str) -> str:
+    if cat in REMOTE_FRIENDLY_CATEGORIES:
+        return "remote_jobs"
+    if cat in {"delivery", "courier", "moving"}:
+        return "physical_delivery"
+    if cat in {"digital_tech", "marketing", "business_admin", "education", "legal", "financial", "research"}:
+        return "tech_digital"
+    return "local_services"
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+# ────────────────────────────────────────────────────────────────────────────
+# Storage helpers (Emergent Object Storage)
+# ────────────────────────────────────────────────────────────────────────────
+storage_key: Optional[str] = None
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
+def init_storage() -> Optional[str]:
+    global storage_key
+    if storage_key:
+        return storage_key
+    if not EMERGENT_LLM_KEY:
+        logger.warning("EMERGENT_LLM_KEY not set — storage disabled")
+        return None
+    try:
+        resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
+        resp.raise_for_status()
+        storage_key = resp.json()["storage_key"]
+        return storage_key
+    except Exception as e:
+        logger.error(f"Storage init failed: {e}")
+        return None
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=503, detail="Storage unavailable")
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path: str):
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=503, detail="Storage unavailable")
+    resp = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60,
+    )
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail="File not found")
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+# ────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ────────────────────────────────────────────────────────────────────────────
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+def create_access_token(user_id: str, email: str, role: str) -> str:
+    payload = {
+        "sub": user_id, "email": email, "role": role,
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "type": "access",
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def haversine_miles(lat1, lng1, lat2, lng2) -> float:
+    R = 3958.8
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = math.sin(dlat/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dlng/2)**2
+    return 2 * R * math.asin(math.sqrt(a))
+
+def clean_doc(doc: dict) -> dict:
+    if doc is None:
+        return doc
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    return doc
+
+# ────────────────────────────────────────────────────────────────────────────
+# Models
+# ────────────────────────────────────────────────────────────────────────────
+Role = Literal["customer", "provider", "retailer", "restaurant", "admin"]
+PayUnit = Literal["hour", "day", "week", "flat"]
+PaymentMethod = Literal["app", "cash", "card"]
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: Role = "customer"
+    phone: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    phone: Optional[str] = None
+    wallet_balance: float = 0.0
+    location: Optional[dict] = None
+    service_radius_miles: float = 25.0
+    categories: List[str] = []
+    storefront: Optional[dict] = None
+    created_at: str
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    location: Optional[dict] = None  # {lat, lng, address}
+    service_radius_miles: Optional[float] = None
+    categories: Optional[List[str]] = None
+    storefront: Optional[dict] = None
+
+class JobCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+    pickup_location: Optional[dict] = None  # {lat, lng, address}
+    dropoff_location: Optional[dict] = None
+    pay_rate: float
+    pay_unit: PayUnit = "flat"
+    estimated_units: float = 1.0  # e.g. 2 hours -> hourly
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None  # image/jpeg, video/mp4
+    is_remote: Optional[bool] = None
+    payment_terms: Optional[str] = None  # free text terms
+    allowed_payment_methods: Optional[List[PaymentMethod]] = None
+
+class JobAccept(BaseModel):
+    job_id: str
+    quoted_pay_rate: Optional[float] = None
+    notes: Optional[str] = None
+
+class MarketplaceListingCreate(BaseModel):
+    title: str
+    description: str
+    price: float
+    category: str = "other"
+    location: Optional[dict] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    delivery_available: bool = True
+
+class StorefrontUpsert(BaseModel):
+    name: str
+    logo_url: Optional[str] = None
+    hours: Optional[str] = None  # human-readable
+    address: str
+    location: Optional[dict] = None  # {lat, lng}
+    description: Optional[str] = None
+    cuisine: Optional[str] = None  # restaurants
+    category: Optional[str] = None  # retailers
+
+class InventoryItemCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    stock: int = 0
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    category: Optional[str] = None
+
+class CheckoutCreate(BaseModel):
+    """Bundled 10% deposit checkout — item + delivery."""
+    item_price: float
+    delivery_fee: float
+    listing_id: Optional[str] = None
+    inventory_item_id: Optional[str] = None
+    store_id: Optional[str] = None
+    quantity: int = 1
+    delivery_address: Optional[dict] = None
+    notes: Optional[str] = None
+    origin_url: str
+    allowed_payment_methods: Optional[List[PaymentMethod]] = None
+    payment_terms: Optional[str] = None
+
+class FinalPaymentCreate(BaseModel):
+    """Customer pays remaining balance — credits provider wallet."""
+    order_id: str
+    origin_url: str
+
+class WithdrawRequest(BaseModel):
+    amount: float
+    method: str = "bank_transfer"
+    notes: Optional[str] = None
+
+# ────────────────────────────────────────────────────────────────────────────
+# Auth dependency
+# ────────────────────────────────────────────────────────────────────────────
+security = HTTPBearer(auto_error=False)
+
+async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
+    if not creds:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = creds.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = await db.users.find_one({"id": payload["sub"]})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    user = clean_doc(user)
+    user.pop("password_hash", None)
+    return user
+
+def require_role(*roles: str):
+    async def checker(user: dict = Depends(get_current_user)) -> dict:
+        if user.get("role") not in roles:
+            raise HTTPException(status_code=403, detail=f"Requires role {roles}")
+        return user
+    return checker
+
+# ────────────────────────────────────────────────────────────────────────────
+# App & router
+# ────────────────────────────────────────────────────────────────────────────
+app = FastAPI(title="Lumo API")
+api = APIRouter(prefix="/api")
+
+# ────────────────────────────────────────────────────────────────────────────
+# Auth routes
+# ────────────────────────────────────────────────────────────────────────────
+@api.post("/auth/register")
+async def register(body: UserCreate):
+    email = body.email.lower()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "name": body.name,
+        "role": body.role,
+        "phone": body.phone,
+        "password_hash": hash_password(body.password),
+        "wallet_balance": 0.0,
+        "location": None,
+        "service_radius_miles": 25.0,
+        "categories": [],
+        "storefront": None,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(user_doc)
+    token = create_access_token(user_doc["id"], email, body.role)
+    out = clean_doc(user_doc)
+    out.pop("password_hash", None)
+    return {"token": token, "user": out}
+
+@api.post("/auth/login")
+async def login(body: UserLogin):
+    email = body.email.lower()
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token(user["id"], email, user["role"])
+    out = clean_doc(user)
+    out.pop("password_hash", None)
+    return {"token": token, "user": out}
+
+@api.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return user
+
+@api.patch("/auth/me")
+async def update_me(body: UserUpdate, user: dict = Depends(get_current_user)):
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if update:
+        await db.users.update_one({"id": user["id"]}, {"$set": update})
+    fresh = await db.users.find_one({"id": user["id"]})
+    fresh = clean_doc(fresh)
+    fresh.pop("password_hash", None)
+    return fresh
+
+# ────────────────────────────────────────────────────────────────────────────
+# Media upload
+# ────────────────────────────────────────────────────────────────────────────
+@api.post("/media/upload")
+async def upload_media(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    ext = (file.filename or "bin").rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "bin"
+    media_type = file.content_type or "application/octet-stream"
+    path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (25MB max)")
+    result = put_object(path, data, media_type)
+    media_doc = {
+        "id": str(uuid.uuid4()),
+        "storage_path": result["path"],
+        "media_type": media_type,
+        "size": result.get("size", len(data)),
+        "owner_id": user["id"],
+        "is_deleted": False,
+        "created_at": now_iso(),
+    }
+    await db.media.insert_one(media_doc)
+    return {"media_url": f"/api/media/{media_doc['id']}", "media_type": media_type, "id": media_doc["id"]}
+
+@api.get("/media/{media_id}")
+async def get_media(media_id: str):
+    rec = await db.media.find_one({"id": media_id, "is_deleted": False})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Media not found")
+    data, content_type = get_object(rec["storage_path"])
+    return FastApiResponse(content=data, media_type=rec.get("media_type", content_type))
+
+# ────────────────────────────────────────────────────────────────────────────
+# Jobs (service requests posted by customers; providers accept)
+# ────────────────────────────────────────────────────────────────────────────
+@api.post("/jobs")
+async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
+    is_remote = body.is_remote if body.is_remote is not None else (body.category in REMOTE_FRIENDLY_CATEGORIES)
+    job = {
+        "id": str(uuid.uuid4()),
+        "customer_id": user["id"],
+        "customer_name": user["name"],
+        "title": body.title,
+        "description": body.description,
+        "category": body.category,
+        "category_group": category_group(body.category),
+        "is_remote": is_remote,
+        "pickup_location": body.pickup_location,
+        "dropoff_location": body.dropoff_location,
+        "pay_rate": body.pay_rate,
+        "pay_unit": body.pay_unit,
+        "estimated_units": body.estimated_units,
+        "media_url": body.media_url,
+        "media_type": body.media_type,
+        "payment_terms": body.payment_terms or "",
+        "allowed_payment_methods": body.allowed_payment_methods or ["app", "cash", "card"],
+        "status": "open",
+        "provider_id": None,
+        "deposit_paid": False,
+        "deposit_amount": 0.0,
+        "total_estimate": body.pay_rate * body.estimated_units,
+        "created_at": now_iso(),
+    }
+    await db.jobs.insert_one(job)
+    return clean_doc(job)
+
+@api.get("/jobs")
+async def list_jobs(
+    status: Optional[str] = None,
+    category_group_filter: Optional[str] = None,
+    remote_only: bool = False,
+    customer_id: Optional[str] = None,
+    provider_id: Optional[str] = None,
+):
+    q: dict = {}
+    if status:
+        q["status"] = status
+    if category_group_filter:
+        q["category_group"] = category_group_filter
+    if remote_only:
+        q["is_remote"] = True
+    if customer_id:
+        q["customer_id"] = customer_id
+    if provider_id:
+        q["provider_id"] = provider_id
+    docs = await db.jobs.find(q).sort("created_at", -1).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/jobs/{job_id}")
+async def get_job(job_id: str):
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    return clean_doc(j)
+
+@api.post("/jobs/{job_id}/accept")
+async def accept_job(job_id: str, user: dict = Depends(require_role("provider"))):
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if j["status"] != "open":
+        raise HTTPException(400, "Job is not open")
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"status": "accepted", "provider_id": user["id"], "provider_name": user["name"], "accepted_at": now_iso()}}
+    )
+    j = await db.jobs.find_one({"id": job_id})
+    return clean_doc(j)
+
+@api.post("/jobs/{job_id}/complete")
+async def complete_job(job_id: str, user: dict = Depends(get_current_user)):
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if user["id"] not in (j.get("provider_id"), j.get("customer_id")):
+        raise HTTPException(403, "Not your job")
+    await db.jobs.update_one({"id": job_id}, {"$set": {"status": "completed", "completed_at": now_iso()}})
+    j = await db.jobs.find_one({"id": job_id})
+    return clean_doc(j)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Provider opportunity polling — toast feed (filtered by radius + categories)
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/provider/opportunities")
+async def provider_opportunities(
+    since: Optional[str] = None,
+    user: dict = Depends(require_role("provider")),
+):
+    q: dict = {"status": "open"}
+    if since:
+        q["created_at"] = {"$gt": since}
+    docs = await db.jobs.find(q).sort("created_at", -1).to_list(200)
+    results = []
+    provider_loc = user.get("location") or {}
+    radius = user.get("service_radius_miles") or 25.0
+    categories = set(user.get("categories") or [])
+    for d in docs:
+        d = clean_doc(d)
+        miles = None
+        # remote jobs always pass
+        if d.get("is_remote"):
+            miles = 0.0
+        else:
+            pl = d.get("pickup_location") or d.get("dropoff_location") or {}
+            if provider_loc.get("lat") is not None and pl.get("lat") is not None:
+                miles = haversine_miles(provider_loc["lat"], provider_loc["lng"], pl["lat"], pl["lng"])
+                if miles > radius:
+                    continue
+            else:
+                miles = None
+        if categories and d.get("category") not in categories and not d.get("is_remote"):
+            # if provider specified categories, filter
+            continue
+        d["distance_miles"] = round(miles, 1) if miles is not None else None
+        results.append(d)
+    return results
+
+# ────────────────────────────────────────────────────────────────────────────
+# Marketplace listings
+# ────────────────────────────────────────────────────────────────────────────
+@api.post("/marketplace/listings")
+async def create_listing(body: MarketplaceListingCreate, user: dict = Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "seller_id": user["id"],
+        "seller_name": user["name"],
+        "title": body.title,
+        "description": body.description,
+        "price": body.price,
+        "category": body.category,
+        "location": body.location,
+        "media_url": body.media_url,
+        "media_type": body.media_type,
+        "delivery_available": body.delivery_available,
+        "status": "active",
+        "created_at": now_iso(),
+    }
+    await db.listings.insert_one(doc)
+    return clean_doc(doc)
+
+@api.get("/marketplace/listings")
+async def list_listings(seller_id: Optional[str] = None):
+    q = {"status": "active"}
+    if seller_id:
+        q["seller_id"] = seller_id
+    docs = await db.listings.find(q).sort("created_at", -1).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/marketplace/listings/{listing_id}")
+async def get_listing(listing_id: str):
+    d = await db.listings.find_one({"id": listing_id})
+    if not d:
+        raise HTTPException(404, "Listing not found")
+    return clean_doc(d)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Storefronts (retailers & restaurants)
+# ────────────────────────────────────────────────────────────────────────────
+@api.put("/storefront")
+async def upsert_storefront(body: StorefrontUpsert, user: dict = Depends(require_role("retailer", "restaurant"))):
+    sf = body.model_dump()
+    sf["owner_id"] = user["id"]
+    sf["role"] = user["role"]
+    sf["updated_at"] = now_iso()
+    await db.users.update_one({"id": user["id"]}, {"$set": {"storefront": sf, "name": body.name}})
+    return sf
+
+@api.get("/stores")
+async def list_stores():
+    docs = await db.users.find({"role": "retailer", "storefront": {"$ne": None}}).to_list(500)
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        d.pop("password_hash", None)
+        out.append({"id": d["id"], "name": d["name"], "storefront": d.get("storefront")})
+    return out
+
+@api.get("/restaurants")
+async def list_restaurants():
+    docs = await db.users.find({"role": "restaurant", "storefront": {"$ne": None}}).to_list(500)
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        d.pop("password_hash", None)
+        out.append({"id": d["id"], "name": d["name"], "storefront": d.get("storefront")})
+    return out
+
+@api.get("/storefronts/{store_id}")
+async def get_storefront(store_id: str):
+    d = await db.users.find_one({"id": store_id})
+    if not d or not d.get("storefront"):
+        raise HTTPException(404, "Storefront not found")
+    d = clean_doc(d)
+    d.pop("password_hash", None)
+    return {"id": d["id"], "name": d["name"], "role": d["role"], "storefront": d.get("storefront")}
+
+# Inventory
+@api.post("/inventory")
+async def create_inventory(body: InventoryItemCreate, user: dict = Depends(require_role("retailer", "restaurant"))):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "owner_id": user["id"],
+        "owner_role": user["role"],
+        "store_name": user["name"],
+        "name": body.name,
+        "description": body.description,
+        "price": body.price,
+        "stock": body.stock,
+        "media_url": body.media_url,
+        "media_type": body.media_type,
+        "category": body.category,
+        "status": "active",
+        "created_at": now_iso(),
+    }
+    await db.inventory.insert_one(doc)
+    return clean_doc(doc)
+
+@api.get("/inventory")
+async def list_inventory(owner_id: Optional[str] = None, user: Optional[dict] = None):
+    q = {"status": "active"}
+    if owner_id:
+        q["owner_id"] = owner_id
+    docs = await db.inventory.find(q).sort("created_at", -1).to_list(1000)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/inventory/mine")
+async def my_inventory(user: dict = Depends(require_role("retailer", "restaurant"))):
+    docs = await db.inventory.find({"owner_id": user["id"], "status": "active"}).sort("created_at", -1).to_list(1000)
+    return [clean_doc(d) for d in docs]
+
+@api.patch("/inventory/{item_id}")
+async def update_inventory(item_id: str, body: InventoryItemCreate, user: dict = Depends(require_role("retailer", "restaurant"))):
+    item = await db.inventory.find_one({"id": item_id, "owner_id": user["id"]})
+    if not item:
+        raise HTTPException(404, "Item not found")
+    update = body.model_dump(exclude_none=True)
+    await db.inventory.update_one({"id": item_id}, {"$set": update})
+    item = await db.inventory.find_one({"id": item_id})
+    return clean_doc(item)
+
+@api.delete("/inventory/{item_id}")
+async def delete_inventory(item_id: str, user: dict = Depends(require_role("retailer", "restaurant"))):
+    res = await db.inventory.update_one({"id": item_id, "owner_id": user["id"]}, {"$set": {"status": "deleted"}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Item not found")
+    return {"deleted": True}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Orders + Bundled 10% Stripe deposit checkout
+# ────────────────────────────────────────────────────────────────────────────
+async def _get_stripe(req: Request) -> StripeCheckout:
+    host_url = str(req.base_url).rstrip("/")
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    return StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+
+@api.post("/checkout/deposit")
+async def checkout_deposit(body: CheckoutCreate, req: Request, user: dict = Depends(get_current_user)):
+    """Create order + Stripe checkout for 10% bundled deposit (item + delivery)."""
+    item_total = round(body.item_price * body.quantity, 2)
+    delivery_fee = round(body.delivery_fee, 2)
+    item_deposit = round(item_total * 0.10, 2)
+    delivery_deposit = round(delivery_fee * 0.10, 2)
+    deposit_total = round(item_deposit + delivery_deposit, 2)
+    remaining = round(item_total + delivery_fee - deposit_total, 2)
+    if deposit_total <= 0:
+        raise HTTPException(400, "Invalid amounts")
+
+    order_id = str(uuid.uuid4())
+    order_doc = {
+        "id": order_id,
+        "customer_id": user["id"],
+        "customer_name": user["name"],
+        "listing_id": body.listing_id,
+        "inventory_item_id": body.inventory_item_id,
+        "store_id": body.store_id,
+        "quantity": body.quantity,
+        "item_total": item_total,
+        "delivery_fee": delivery_fee,
+        "item_deposit": item_deposit,
+        "delivery_deposit": delivery_deposit,
+        "deposit_total": deposit_total,
+        "remaining_total": remaining,
+        "delivery_address": body.delivery_address,
+        "notes": body.notes,
+        "allowed_payment_methods": body.allowed_payment_methods or ["app", "cash", "card"],
+        "payment_terms": body.payment_terms or "",
+        "status": "deposit_pending",
+        "provider_id": None,
+        "created_at": now_iso(),
+    }
+    await db.orders.insert_one(order_doc)
+
+    stripe = await _get_stripe(req)
+    success_url = f"{body.origin_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order_id}"
+    cancel_url = f"{body.origin_url}/checkout/cancel?order_id={order_id}"
+    metadata = {
+        "order_id": order_id, "customer_id": user["id"], "type": "deposit",
+        "item_deposit": str(item_deposit), "delivery_deposit": str(delivery_deposit),
+    }
+    session = await stripe.create_checkout_session(CheckoutSessionRequest(
+        amount=float(deposit_total), currency="usd",
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata,
+    ))
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "order_id": order_id,
+        "user_id": user["id"],
+        "amount": float(deposit_total),
+        "currency": "usd",
+        "type": "deposit",
+        "status": "initiated",
+        "payment_status": "unpaid",
+        "metadata": metadata,
+        "created_at": now_iso(),
+    })
+    return {"url": session.url, "session_id": session.session_id, "order_id": order_id}
+
+@api.post("/checkout/final")
+async def checkout_final(body: FinalPaymentCreate, req: Request, user: dict = Depends(get_current_user)):
+    order = await db.orders.find_one({"id": body.order_id})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order["customer_id"] != user["id"]:
+        raise HTTPException(403, "Not your order")
+    if order["status"] not in ("deposit_paid", "in_progress", "completed"):
+        raise HTTPException(400, "Deposit must be paid first")
+    amount = float(order["remaining_total"])
+    if amount <= 0:
+        raise HTTPException(400, "Nothing remaining to pay")
+    stripe = await _get_stripe(req)
+    success_url = f"{body.origin_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order['id']}"
+    cancel_url = f"{body.origin_url}/checkout/cancel?order_id={order['id']}"
+    metadata = {"order_id": order["id"], "customer_id": user["id"], "type": "final"}
+    session = await stripe.create_checkout_session(CheckoutSessionRequest(
+        amount=amount, currency="usd",
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata,
+    ))
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "order_id": order["id"],
+        "user_id": user["id"],
+        "amount": amount,
+        "currency": "usd",
+        "type": "final",
+        "status": "initiated",
+        "payment_status": "unpaid",
+        "metadata": metadata,
+        "created_at": now_iso(),
+    })
+    return {"url": session.url, "session_id": session.session_id}
+
+@api.get("/checkout/status/{session_id}")
+async def checkout_status(session_id: str, req: Request):
+    stripe = await _get_stripe(req)
+    status = await stripe.get_checkout_status(session_id)
+    tx = await db.payment_transactions.find_one({"session_id": session_id})
+    if not tx:
+        return {"payment_status": status.payment_status, "status": status.status}
+    # Idempotent finalize
+    if status.payment_status == "paid" and tx["payment_status"] != "paid":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"status": status.status, "payment_status": status.payment_status, "paid_at": now_iso()}}
+        )
+        order = await db.orders.find_one({"id": tx["order_id"]})
+        if order:
+            if tx["type"] == "deposit":
+                await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "deposit_paid", "deposit_paid_at": now_iso()}})
+            elif tx["type"] == "final":
+                # Credit provider wallet with the final amount (minus 10% platform cut already kept as deposit)
+                await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "completed", "final_paid_at": now_iso()}})
+                provider_id = order.get("provider_id")
+                if provider_id:
+                    credit = float(tx["amount"])
+                    await db.users.update_one({"id": provider_id}, {"$inc": {"wallet_balance": credit}})
+                    await db.wallet_transactions.insert_one({
+                        "id": str(uuid.uuid4()), "user_id": provider_id, "amount": credit,
+                        "type": "credit", "reason": f"Order {order['id']} final payment",
+                        "order_id": order["id"], "created_at": now_iso(),
+                    })
+    elif status.status == "expired" and tx["status"] != "expired":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"status": "expired", "payment_status": status.payment_status}}
+        )
+    return {
+        "payment_status": status.payment_status,
+        "status": status.status,
+        "amount_total": status.amount_total,
+        "currency": status.currency,
+        "metadata": status.metadata,
+    }
+
+@api.post("/webhook/stripe")
+async def stripe_webhook(req: Request):
+    body = await req.body()
+    sig = req.headers.get("Stripe-Signature", "")
+    stripe = await _get_stripe(req)
+    try:
+        evt = await stripe.handle_webhook(body, sig)
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        raise HTTPException(400, "Webhook error")
+    # We rely on polling to finalize order; just log and return
+    return {"received": True, "type": evt.event_type}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Orders queries
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/orders")
+async def list_orders(user: dict = Depends(get_current_user)):
+    q = {"$or": [{"customer_id": user["id"]}, {"provider_id": user["id"]}, {"store_id": user["id"]}]}
+    docs = await db.orders.find(q).sort("created_at", -1).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/orders/{order_id}")
+async def get_order(order_id: str, user: dict = Depends(get_current_user)):
+    d = await db.orders.find_one({"id": order_id})
+    if not d:
+        raise HTTPException(404, "Order not found")
+    return clean_doc(d)
+
+@api.post("/orders/{order_id}/accept_delivery")
+async def accept_order_delivery(order_id: str, user: dict = Depends(require_role("provider"))):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(404, "Order not found")
+    if o["status"] != "deposit_paid" or o.get("provider_id"):
+        raise HTTPException(400, "Order not available")
+    await db.orders.update_one({"id": order_id}, {"$set": {"provider_id": user["id"], "provider_name": user["name"], "status": "in_progress"}})
+    o = await db.orders.find_one({"id": order_id})
+    return clean_doc(o)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Wallet & withdrawals
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/wallet")
+async def wallet(user: dict = Depends(get_current_user)):
+    txns = await db.wallet_transactions.find({"user_id": user["id"]}).sort("created_at", -1).to_list(200)
+    return {"balance": user.get("wallet_balance", 0.0), "transactions": [clean_doc(t) for t in txns]}
+
+@api.post("/wallet/withdraw")
+async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)):
+    bal = float(user.get("wallet_balance", 0.0))
+    if body.amount <= 0 or body.amount > bal:
+        raise HTTPException(400, "Invalid amount")
+    wr = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"], "user_name": user["name"], "user_email": user["email"],
+        "amount": body.amount, "method": body.method, "notes": body.notes,
+        "status": "pending", "created_at": now_iso(),
+    }
+    await db.withdrawal_requests.insert_one(wr)
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"wallet_balance": -body.amount}})
+    await db.wallet_transactions.insert_one({
+        "id": str(uuid.uuid4()), "user_id": user["id"], "amount": -body.amount,
+        "type": "debit", "reason": "Withdrawal requested",
+        "withdrawal_id": wr["id"], "created_at": now_iso(),
+    })
+    return clean_doc(wr)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Map data
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/map/jobs")
+async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None):
+    q = {"status": "open"}
+    if remote_only:
+        q["is_remote"] = True
+    if category_group_filter:
+        q["category_group"] = category_group_filter
+    docs = await db.jobs.find(q).to_list(500)
+    pins = []
+    for d in docs:
+        d = clean_doc(d)
+        loc = d.get("pickup_location") or d.get("dropoff_location")
+        if not loc or loc.get("lat") is None:
+            # remote without explicit loc — give a default
+            if d.get("is_remote"):
+                loc = {"lat": 39.8283, "lng": -98.5795, "address": "Remote"}
+            else:
+                continue
+        pins.append({
+            "id": d["id"], "title": d["title"], "category": d["category"],
+            "category_group": d["category_group"], "is_remote": d["is_remote"],
+            "lat": loc["lat"], "lng": loc["lng"], "address": loc.get("address"),
+            "pay_rate": d["pay_rate"], "pay_unit": d["pay_unit"],
+        })
+    return pins
+
+@api.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"app": "lumo", "status": "ok"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+@api.get("/health")
+async def health():
+    return {"ok": True}
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+# ────────────────────────────────────────────────────────────────────────────
+# Seeding
+# ────────────────────────────────────────────────────────────────────────────
+SEED_USERS = [
+    {"email": "customer@lumo.test", "password": "password123", "name": "Casey Customer", "role": "customer"},
+    {"email": "provider@lumo.test", "password": "password123", "name": "Pat Provider", "role": "provider",
+     "location": {"lat": 40.7128, "lng": -74.0060, "address": "New York, NY"},
+     "service_radius_miles": 50.0, "categories": ["delivery", "handyman", "cleaning", "digital_tech"]},
+    {"email": "retailer@lumo.test", "password": "password123", "name": "Ramona's Boutique", "role": "retailer",
+     "storefront": {
+         "name": "Ramona's Boutique", "address": "123 Market St, Brooklyn, NY",
+         "hours": "Mon–Sat 10am–8pm", "category": "Apparel",
+         "location": {"lat": 40.6782, "lng": -73.9442},
+         "logo_url": "https://images.pexels.com/photos/12791209/pexels-photo-12791209.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+         "description": "Curated fashion & home goods.",
+     }},
+    {"email": "restaurant@lumo.test", "password": "password123", "name": "Cafe Lumière", "role": "restaurant",
+     "storefront": {
+         "name": "Cafe Lumière", "address": "55 Bedford Ave, Brooklyn, NY",
+         "hours": "Daily 7am–10pm", "cuisine": "French Bistro",
+         "location": {"lat": 40.7170, "lng": -73.9560},
+         "logo_url": "https://images.pexels.com/photos/15101682/pexels-photo-15101682.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+         "description": "Light pastries, espresso, and seasonal mains.",
+     }},
+]
 
-# Include the router in the main app
-app.include_router(api_router)
+async def seed():
+    await db.users.create_index("email", unique=True)
+    await db.jobs.create_index("created_at")
+    await db.jobs.create_index("status")
+    for s in SEED_USERS:
+        if await db.users.find_one({"email": s["email"]}):
+            continue
+        doc = {
+            "id": str(uuid.uuid4()),
+            "email": s["email"], "name": s["name"], "role": s["role"],
+            "password_hash": hash_password(s["password"]),
+            "phone": None, "wallet_balance": 0.0,
+            "location": s.get("location"),
+            "service_radius_miles": s.get("service_radius_miles", 25.0),
+            "categories": s.get("categories", []),
+            "storefront": s.get("storefront"),
+            "created_at": now_iso(),
+        }
+        await db.users.insert_one(doc)
+        logger.info(f"Seeded {s['role']}: {s['email']}")
+    # Seed a few sample inventory + jobs once
+    retailer = await db.users.find_one({"email": "retailer@lumo.test"})
+    if retailer and await db.inventory.count_documents({"owner_id": retailer["id"]}) == 0:
+        for it in [
+            {"name": "Vintage Denim Jacket", "price": 89.0, "stock": 4, "category": "Apparel",
+             "media_url": "https://images.pexels.com/photos/12791209/pexels-photo-12791209.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940", "media_type": "image/jpeg",
+             "description": "Lightly worn, size M."},
+            {"name": "Cotton Tote Bag", "price": 24.0, "stock": 12, "category": "Accessories",
+             "media_url": None, "media_type": None, "description": "Hand-printed local design."},
+        ]:
+            await db.inventory.insert_one({
+                "id": str(uuid.uuid4()), "owner_id": retailer["id"], "owner_role": "retailer",
+                "store_name": retailer["name"], **it, "status": "active", "created_at": now_iso(),
+            })
+    restaurant = await db.users.find_one({"email": "restaurant@lumo.test"})
+    if restaurant and await db.inventory.count_documents({"owner_id": restaurant["id"]}) == 0:
+        for it in [
+            {"name": "Croissant", "price": 4.50, "stock": 30, "category": "Pastry",
+             "media_url": None, "media_type": None, "description": "Buttery, flaky, baked at 5am."},
+            {"name": "Nicoise Salad", "price": 16.0, "stock": 10, "category": "Mains",
+             "media_url": None, "media_type": None, "description": "Tuna, egg, olives, haricots verts."},
+        ]:
+            await db.inventory.insert_one({
+                "id": str(uuid.uuid4()), "owner_id": restaurant["id"], "owner_role": "restaurant",
+                "store_name": restaurant["name"], **it, "status": "active", "created_at": now_iso(),
+            })
+    # Seed sample jobs (only first time)
+    customer = await db.users.find_one({"email": "customer@lumo.test"})
+    if customer and await db.jobs.count_documents({}) == 0:
+        samples = [
+            {"title": "Deliver groceries to Park Slope", "description": "2 bags from Whole Foods to my apt.",
+             "category": "delivery", "pay_rate": 25.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_location": {"lat": 40.7180, "lng": -73.9920, "address": "Whole Foods, Brooklyn"},
+             "dropoff_location": {"lat": 40.6700, "lng": -73.9800, "address": "Park Slope, Brooklyn"}},
+            {"title": "Fix leaking kitchen faucet", "description": "Drip getting worse. Need a handyman.",
+             "category": "handyman", "pay_rate": 60.0, "pay_unit": "hour", "estimated_units": 2.0,
+             "pickup_location": {"lat": 40.7128, "lng": -74.0060, "address": "Lower Manhattan"}},
+            {"title": "React landing page redesign", "description": "Modernize hero + nav. Remote OK.",
+             "category": "digital_tech", "pay_rate": 75.0, "pay_unit": "hour", "estimated_units": 10.0},
+            {"title": "Weekly social media management", "description": "Schedule posts, light copy.",
+             "category": "marketing", "pay_rate": 350.0, "pay_unit": "week", "estimated_units": 4.0},
+            {"title": "Tutor 7th-grader in math", "description": "2x/week, algebra basics.",
+             "category": "education", "pay_rate": 45.0, "pay_unit": "hour", "estimated_units": 8.0},
+            {"title": "Walk my golden retriever", "description": "Mornings, ~45 minutes.",
+             "category": "pet_care", "pay_rate": 22.0, "pay_unit": "day", "estimated_units": 5.0,
+             "pickup_location": {"lat": 40.7300, "lng": -73.9950, "address": "East Village, NY"}},
+        ]
+        for s in samples:
+            is_remote = s["category"] in REMOTE_FRIENDLY_CATEGORIES
+            await db.jobs.insert_one({
+                "id": str(uuid.uuid4()),
+                "customer_id": customer["id"], "customer_name": customer["name"],
+                "title": s["title"], "description": s["description"], "category": s["category"],
+                "category_group": category_group(s["category"]), "is_remote": is_remote,
+                "pickup_location": s.get("pickup_location"), "dropoff_location": s.get("dropoff_location"),
+                "pay_rate": s["pay_rate"], "pay_unit": s["pay_unit"], "estimated_units": s["estimated_units"],
+                "media_url": None, "media_type": None,
+                "payment_terms": "", "allowed_payment_methods": ["app", "cash", "card"],
+                "status": "open", "provider_id": None,
+                "deposit_paid": False, "deposit_amount": 0.0,
+                "total_estimate": s["pay_rate"] * s["estimated_units"],
+                "created_at": now_iso(),
+            })
+
+@app.on_event("startup")
+async def on_startup():
+    try:
+        init_storage()
+    except Exception as e:
+        logger.warning(f"Storage init deferred: {e}")
+    try:
+        await seed()
+    except Exception as e:
+        logger.error(f"Seed failed: {e}")
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    mongo_client.close()
+
+# Mount router
+app.include_router(api)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()

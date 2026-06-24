@@ -1,0 +1,42 @@
+{
+  "summary": "Tested Lumo (Jan 2026) full-stack: 24/24 backend pytest passes (auth, jobs+remote auto-flag, provider opportunities w/ since polling, marketplace+Stripe deposit, stores/restaurants directories, inventory CRUD, map, wallet). Frontend flows verified: customer post-job, marketplace buy deposit dialog ($5.00 for $50 item), store profile order dialog with bundled deposit, provider hub renders 11 opportunities incl. polled new job, settings page renders Google Maps key guide, wallet page loads. One frontend bug found: post-login/register redirect always goes to '/' (Landing) instead of role-based hub (/customer, /provider, /retailer, /restaurant).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Login.jsx", "issue": "After successful login, navigates to '/' regardless of user.role — review request requires role-based redirect to /customer, /provider, /retailer, /restaurant", "selector": "[data-testid=\"login-submit\"]", "priority": "HIGH"},
+      {"component": "Register.jsx", "issue": "Same issue — nav('/') instead of role-based redirect after register", "selector": "[data-testid=\"register-submit\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Marketplace buy dialog & Store order dialog", "issues": ["Radix DialogContent missing aria-describedby / Description (a11y warning in console). Non-blocking but should add DialogDescription for screen readers."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lumo_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix Login.jsx (line 24) and Register.jsx (line 28): after success, navigate to role-based hub. Example: const dest = {customer:'/customer', provider:'/provider', retailer:'/retailer', restaurant:'/restaurant'}[user.role] || '/'; nav(dest); (need to read user from login result, login() in auth context should return user).",
+    "Add DialogDescription / aria-describedby to deposit dialogs in Marketplace.jsx and StoreProfile.jsx to silence Radix a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1030 lines — fine for now but approaching the 700-line guideline; consider splitting into routers (auth, jobs, marketplace, stores, payments, wallet) for maintainability.",
+    "checkout_status auto-credits provider wallet using the full final-payment amount; depending on business intent, platform fee handling may need explicit accounting (currently the deposit is kept by platform implicitly and final amount goes 100% to provider — verify this matches the 10% bundled-deposit business model).",
+    "Webhook endpoint /api/webhook/stripe receives events but does nothing — relying on polling is OK but webhook should at least mark transactions paid for resilience if polling misses.",
+    "CORS allow_origins='*' with allow_credentials=False is fine, but consider tightening origins for production.",
+    "No rate-limiting on /auth/login — brute force possible. Not in scope of this review_request but worth flagging."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lumo_backend.py (new)"
+  ],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "90% (login-redirect bug)"},
+  "test_credentials": "customer@lumo.test / provider@lumo.test / retailer@lumo.test / restaurant@lumo.test all with password123 (seeded). Stripe test key sk_test_emergent works — session creation verified.",
+  "seed_data_creation": "Tests created TEST_-prefixed users, jobs, listings, and a TEST_widget inventory item (soft-deleted after). All under TEST_ prefix for easy cleanup.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite at /app/backend/tests/test_lumo_backend.py covers all critical flows — re-run with `pytest backend/tests/test_lumo_backend.py -v`. Frontend redirect bug is the only functional issue; after fix, retest login flow for each of 4 seed roles and verify URL lands on the correct hub. Polling toast (15s interval) was not directly observed in UI but the underlying /api/provider/opportunities?since= endpoint correctly returns newly-posted jobs (verified in test_provider_opportunities_since).",
+  "rca of the issue": "Login.jsx and Register.jsx hardcode nav('/') after auth success. The AuthProvider/login() in /app/frontend/src/lib/auth.jsx returns {ok, user/error} — main agent should use user.role to compute the redirect target. Fix is 3 lines per file."
+}
