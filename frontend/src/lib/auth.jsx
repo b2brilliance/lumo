@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
       const { data } = await api.post("/auth/login", { email, password });
       localStorage.setItem("lumo_token", data.token);
       setUser(data.user);
-      return { ok: true };
+      return { ok: true, user: data.user };
     } catch (e) {
       return { ok: false, error: formatApiError(e) };
     }
@@ -43,7 +43,7 @@ export function AuthProvider({ children }) {
       const { data } = await api.post("/auth/register", payload);
       localStorage.setItem("lumo_token", data.token);
       setUser(data.user);
-      return { ok: true };
+      return { ok: true, user: data.user };
     } catch (e) {
       return { ok: false, error: formatApiError(e) };
     }

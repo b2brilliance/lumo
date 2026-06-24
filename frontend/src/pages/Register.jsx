@@ -25,7 +25,11 @@ export default function Register() {
     setBusy(true); setErr("");
     const r = await register(form);
     setBusy(false);
-    if (r.ok) { toast.success("Account created"); nav("/"); } else setErr(r.error);
+    if (r.ok) {
+      toast.success("Account created");
+      const dest = { customer: "/customer", provider: "/provider", retailer: "/retailer", restaurant: "/restaurant" }[r.user.role] || "/";
+      nav(dest);
+    } else setErr(r.error);
   };
 
   return (

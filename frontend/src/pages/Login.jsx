@@ -21,7 +21,8 @@ export default function Login() {
     setBusy(false);
     if (r.ok) {
       toast.success("Welcome back");
-      nav("/");
+      const dest = { customer: "/customer", provider: "/provider", retailer: "/retailer", restaurant: "/restaurant" }[r.user.role] || "/";
+      nav(dest);
     } else setErr(r.error);
   };
 

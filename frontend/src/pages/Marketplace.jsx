@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function Marketplace() {
   const { user } = useAuth();
@@ -108,7 +108,7 @@ export default function Marketplace() {
       {/* Create listing */}
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent data-testid="listing-dialog">
-          <DialogHeader><DialogTitle className="font-display">New listing</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display">New listing</DialogTitle><DialogDescription>Create a P2P marketplace listing with optional photo or video.</DialogDescription></DialogHeader>
           <form onSubmit={create} className="space-y-4">
             <div>
               <Label className="overline">Title</Label>
@@ -139,7 +139,7 @@ export default function Marketplace() {
       {/* Buy listing */}
       <Dialog open={!!orderTarget} onOpenChange={(o) => !o && setOrderTarget(null)}>
         <DialogContent data-testid="buy-dialog">
-          <DialogHeader><DialogTitle className="font-display">Buy: {orderTarget?.title}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display">Buy: {orderTarget?.title}</DialogTitle><DialogDescription>10% bundled deposit on item and delivery. Remaining balance settled on delivery.</DialogDescription></DialogHeader>
           {orderTarget && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">

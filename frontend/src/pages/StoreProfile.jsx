@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -122,6 +122,7 @@ export default function StoreProfile({ role }) {
         <DialogContent data-testid="order-dialog" className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display tracking-tight">Order: {target?.name}</DialogTitle>
+            <DialogDescription>10% bundled deposit on item and delivery. Set your payment terms below.</DialogDescription>
           </DialogHeader>
           {target && (
             <div className="space-y-4">
