@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 7 P2 items: (1) shadcn Calendar migration on /rentals/:id and (2) new /rentals/inbox owner page. Backend: 93/93 tests pass (full regression including 17 in test_lumo_admin_and_overlap.py + 11 in test_lumo_rentals.py + 30 across other suites). The newly enriched GET /api/rental-bookings/mine?role=owner endpoint returns rental{title,category,media_url} on every booking — verified via curl as provider@lumo.test (8 bookings, 8/8 enriched, sample: 'TEST_overlap_rental' / category 'tools_equipment' / media_url populated). Frontend code review of /app/frontend/src/pages/RentalDetail.jsx, /app/frontend/src/pages/RentalInbox.jsx, /app/frontend/src/components/NavBar.jsx, and /app/frontend/src/App.js confirms all 12 acceptance criteria from the request are wired correctly (testids match the spec, Protected wrapper on /rentals/inbox, react-day-picker disabled matcher uses both blocked-dates API + past-day check, end-date matcher additionally guards against ranges spanning a blocked window starting after start_date). End-to-end playwright UI verification could NOT be completed because the preview URL returns the Emergent 'Preview Unavailable!!!' (Sherpa anti-bot) page only when accessed by the playwright/Chromium tool (curl returns 200 OK on the same URL). Tried 3 times with reloads + 30s/60s waits. Recommend main agent verify the new Calendar popover + Inbox UI in a real browser session — code-level correctness has been confirmed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iter7_regression.xml",
+    "/app/backend/tests/test_lumo_admin_and_overlap.py",
+    "/app/backend/tests/test_lumo_rentals.py"
+  ],
+  "action_items": [
+    "Main agent: please manually verify in a real browser (not the testing tool) that (a) the Jan-2099 booked range 10-14 on TEST_overlap_rental rental id a31a6ef4-ef01-48e3-9690-0707ae32097f shows greyed-out dates inside the Calendar popover and (b) clicking the navbar Inbox icon as provider@lumo.test routes to /rentals/inbox with 8 rows. Backend behaviour and component wiring are confirmed correct via curl + code review."
+  ],
+  "critical_code_review_comments": [
+    "RentalDetail.jsx 33-65: toISO/fromISO helpers are correct (local-tz, padded). dayDisabled = past || in any blocked range using half-open [start,end) interval — matches backend overlap query. endDayDisabled additionally rejects end <= start and any range whose start_date falls within [start_date, end) — correctly preventing a booking from spanning across a blocked window. After picking a new start_date, end_date is cleared if it was on/before the new start (line 224) — good.",
+    "RentalDetail.jsx 210-230: shadcn Popover + CalendarPicker integration is idiomatic; trigger Button retains data-testid='rental-start-date' so existing tests still target it; same for rental-end-date at 236.",
+    "RentalInbox.jsx 176 lines, well under 700; all required data-testids present (inbox-back, inbox-host-cta, inbox-stats, inbox-tabs, inbox-filter-{6}, inbox-list, inbox-empty, inbox-row-{id}, inbox-rental-link-{id}, inbox-approve-{id}, inbox-decline-{id}). useAuth guards correctly: user===undefined shows loading, !user/false redirects via Navigate.",
+    "RentalInbox.jsx 89-98: pending-tab amber badge only renders when count > 0 — correct.",
+    "RentalInbox.jsx 117: media_url path is normalised to absolute URL only when relative — handles both inline-uploaded and external picsum URLs.",
+    "server.py 1565: rentals lookup uses projection that explicitly excludes _id ({'_id': 0}), so the embedded rental object never leaks Mongo ObjectId — good.",
+    "server.py 1570: media_url falls back from media[0].media_url to legacy media_url field — backwards compatible.",
+    "NavBar.jsx 101: nav-rental-inbox NavLink is rendered conditionally (only when user is signed in via the surrounding render block) — correct gating.",
+    "App.js route uses <Protected> wrapper around <RentalInbox/> — consistent with other auth-gated routes."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (93/93 regression incl. 30 directly relevant: 17 admin/overlap + 11 rental booking flow + 2 multi-media)",
+    "frontend": "code-review only (100% wiring correctness on all touched files). Live playwright run blocked by Sherpa anti-bot — see action items."
+  },
+  "test_credentials": "provider@lumo.test, customer@lumo.test, admin@lumo.test — all password123 (seeded)",
+  "seed_data_creation": "No new seed. Used existing TEST_overlap_rental (id a31a6ef4-...) and its 2 deposit_pending bookings (2099-01-10→01-15 and 2099-02-01→02-05) from iteration_6 to validate blocked-dates payload for Calendar disabled matcher.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is solid (93/93). For frontend the playwright tool was being blocked by 'Preview Unavailable!!!' (Sherpa bot detection) even though curl shows HTTP 200 — if this recurs, try waiting 60-120s between runs or run the script with longer initial wait_for_timeout(8000) before first action. Calendar popover root uses '[class*=\"rdp\"]' (react-day-picker v8). Caption can be found via '[class*=\"caption_label\"]'. Disabled day buttons use any of: 'button.rdp-day[disabled]', 'button.rdp-day_disabled', 'button.rdp-day[aria-disabled=true]'. Use rental id a31a6ef4-ef01-48e3-9690-0707ae32097f to verify Jan-2099 disabled dates; navigate calendar with 'button[name=next-month]'.",
+  "rca of the issue": "No bugs found in the new code. Only environmental: the Emergent preview gateway intermittently serves the 'Preview Unavailable!!!' page to the playwright/Chromium browser tool (Sherpa anti-bot fingerprint), while plain curl gets through. Mitigation: retry with delays, or main agent verifies in a real browser session."
+}

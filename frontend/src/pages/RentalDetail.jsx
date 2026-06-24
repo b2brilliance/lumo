@@ -6,11 +6,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { RENTAL_CATEGORIES, RENTAL_PRICING_LABEL } from "@/lib/rentalCategories";
 import { useLocale } from "@/lib/locale";
 import { useAuth } from "@/lib/auth";
-import { MapPin, ShieldCheck, Sparkles, ChevronLeft, Calendar } from "lucide-react";
+import { MapPin, ShieldCheck, ChevronLeft, Calendar } from "lucide-react";
 import { toast } from "sonner";
+
+const toISO = (d) => {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+const fromISO = (s) => {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
 
 export default function RentalDetail() {
   const { id } = useParams();
@@ -33,6 +48,20 @@ export default function RentalDetail() {
   const isDateBlocked = (iso) => {
     if (!iso) return false;
     return blocked.some((b) => iso >= b.start_date && iso < b.end_date);
+  };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // Matcher used by react-day-picker via shadcn Calendar to grey-out individual days
+  const dayDisabled = (date) => {
+    if (date < today) return true;
+    return isDateBlocked(toISO(date));
+  };
+  // For end-date: also block dates that would cross over a blocked range starting after start_date
+  const endDayDisabled = (date) => {
+    if (dayDisabled(date)) return true;
+    if (!form.start_date) return false;
+    if (toISO(date) <= form.start_date) return true;
+    // Ensure no booked range falls inside [start_date, date)
+    return blocked.some((b) => b.start_date >= form.start_date && b.start_date < toISO(date));
   };
 
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
@@ -178,31 +207,48 @@ export default function RentalDetail() {
             <div className="mt-5 grid grid-cols-2 gap-2">
               <div>
                 <Label className="overline">Start</Label>
-                <Input
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (isDateBlocked(v)) { toast.error("That date is already booked. Pick another."); return; }
-                    setForm({ ...form, start_date: v });
-                  }}
-                  className="mt-1"
-                  data-testid="rental-start-date"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="mt-1 w-full justify-start font-mono text-sm h-10" data-testid="rental-start-date">
+                      <Calendar className="w-3.5 h-3.5 mr-2 text-slate-500" />
+                      {form.start_date || <span className="text-slate-400">Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={fromISO(form.start_date)}
+                      onSelect={(d) => {
+                        if (!d) return;
+                        const iso = toISO(d);
+                        setForm({ ...form, start_date: iso, end_date: form.end_date && form.end_date <= iso ? "" : form.end_date });
+                      }}
+                      disabled={dayDisabled}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label className="overline">End</Label>
-                <Input
-                  type="date"
-                  value={form.end_date}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (isDateBlocked(v)) { toast.error("That date is already booked. Pick another."); return; }
-                    setForm({ ...form, end_date: v });
-                  }}
-                  className="mt-1"
-                  data-testid="rental-end-date"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" disabled={!form.start_date} className="mt-1 w-full justify-start font-mono text-sm h-10" data-testid="rental-end-date">
+                      <Calendar className="w-3.5 h-3.5 mr-2 text-slate-500" />
+                      {form.end_date || <span className="text-slate-400">Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={fromISO(form.end_date)}
+                      onSelect={(d) => { if (d) setForm({ ...form, end_date: toISO(d) }); }}
+                      disabled={endDayDisabled}
+                      defaultMonth={fromISO(form.start_date) || undefined}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             {blocked.length > 0 && (

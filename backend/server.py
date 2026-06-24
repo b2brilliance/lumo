@@ -1559,7 +1559,18 @@ async def book_rental(rental_id: str, body: RentalBookingCreate, req: Request, u
 async def my_rental_bookings(role: Literal["renter", "owner"] = "renter", user: dict = Depends(get_current_user)):
     f = {"renter_id" if role == "renter" else "owner_id": user["id"]}
     docs = await db.rental_bookings.find(f).sort("created_at", -1).to_list(100)
-    return [clean_doc(d) for d in docs]
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        r = await db.rentals.find_one({"id": d.get("rental_id")}, {"title": 1, "media_url": 1, "media": 1, "category": 1, "_id": 0})
+        if r:
+            d["rental"] = {
+                "title": r.get("title"),
+                "category": r.get("category"),
+                "media_url": (r.get("media") or [{}])[0].get("media_url") if r.get("media") else r.get("media_url"),
+            }
+        out.append(d)
+    return out
 
 @api.post("/rental-bookings/{booking_id}/approve")
 async def approve_rental_booking(booking_id: str, req: Request, user: dict = Depends(get_current_user)):

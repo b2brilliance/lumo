@@ -32,6 +32,7 @@ import Cart from "@/pages/Cart";
 import Rentals from "@/pages/Rentals";
 import RentalDetail from "@/pages/RentalDetail";
 import RentalHost from "@/pages/RentalHost";
+import RentalInbox from "@/pages/RentalInbox";
 import AdminConsole from "@/pages/AdminConsole";
 
 function Protected({ children, roles }) {
@@ -82,6 +83,7 @@ function App() {
             <Route path="/cart" element={<Protected><Cart /></Protected>} />
             <Route path="/rentals" element={<Rentals />} />
             <Route path="/rentals/host" element={<Protected><RentalHost /></Protected>} />
+            <Route path="/rentals/inbox" element={<Protected><RentalInbox /></Protected>} />
             <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />
             <Route path="/settings" element={<Settings />} />

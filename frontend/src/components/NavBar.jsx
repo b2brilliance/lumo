@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox } from "lucide-react";
 
 const MARKETPLACE_LINKS = [
   { to: "/marketplace",  label: "Marketplace",  icon: ShoppingBag,      blurb: "P2P listings, used goods, gear", testId: "nav-mp-marketplace" },
@@ -98,6 +98,7 @@ export default function NavBar() {
                 </NavLink>
               )}
               <NavLink to="/chats" className="text-slate-500 hover:text-slate-900" data-testid="nav-chats" title="Messages"><MessageSquare className="w-4 h-4" /></NavLink>
+              <NavLink to="/rentals/inbox" className="text-slate-500 hover:text-slate-900" data-testid="nav-rental-inbox" title="Rental booking inbox"><Inbox className="w-4 h-4" /></NavLink>
               <NavLink to="/cart" className="relative text-slate-500 hover:text-slate-900" data-testid="nav-cart" title="Cart">
                 <ShoppingCart className="w-4 h-4" />
                 {cart && cart.total_items > 0 && (
