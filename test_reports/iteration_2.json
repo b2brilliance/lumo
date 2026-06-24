@@ -1,0 +1,40 @@
+{
+  "summary": "Backend chat + anti-poach sanitizer tested end-to-end. Added 19 new pytest cases in test_lumo_chat.py covering sanitizer regex (phones, emails, URLs, contact keywords), thread resolution, since-polling, threads listing, /chats inbox, and role-based 403 permissions. Total suite: 43/43 PASS (24 prior + 19 new). All review-requested chat scenarios verified including thread-locking after provider acceptance and retailer-blocked access.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lumo_chat.py",
+    "/app/backend/tests/test_lumo_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: GET /api/jobs/{job_id}/messages?since=ISO_with_+offset — server uses lexicographic string $gt comparison on created_at. If a caller forgets to URL-encode '+' as '%2B', the server decodes it as a space, the filter silently no-ops, and ALL messages are returned. The frontend ChatPanel.jsx correctly uses URLSearchParams (encodes %2B) so this is safe in production, but the endpoint is brittle for any future hand-built URL caller. Consider: (a) accept ISO without offset via query, (b) re-parse 'since' on the server to a datetime and compare as a date, or (c) document the encoding requirement.",
+    "OPTIONAL: /api/chats/inbox 'job_status' uses job.status verbatim ('open'/'accepted'/'completed'). Confirm UI does not assume any additional status values.",
+    "Carryover from iteration_1 (still applies): Login.jsx / Register.jsx hardcode nav('/') instead of role-based redirect."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1185 lines (was 1030). With chat added, it crosses the 700-line guideline by a wide margin. Strongly recommend splitting into routers: auth.py, jobs.py, marketplace.py, stores.py, payments.py, wallet.py, chat.py.",
+    "sanitize_message: the long-digit-sequence regex `(?:\\b\\d[\\s\\-.]?){7,}` is anchored on word boundaries only at the start (the trailing `\\b` is missing) — works fine for the tested inputs but is a stylistic nit.",
+    "/api/chats/inbox: only the latest message per (job_id, thread_provider_id) is returned — no unread counters. If UX needs unread badges later, this aggregation needs to also track 'last_read_at' per user per thread.",
+    "_job_chat_allowed: for an OPEN job, any user with role=='provider' can read/post (not just providers who already messaged). That's by design for inquiries but means any provider can enumerate any job's messages even if they didn't start the thread. Currently mitigated because list_messages picks tpid = sender's own id, so they only see their own thread. Still, worth a comment for future maintainers.",
+    "Provider2 trying to post on an accepted job correctly returns 403 (verified). But Provider2 could still GET messages on an OPEN job via tpid=self even though they never messaged — returns empty array, low risk.",
+    "POST /api/jobs/{job_id}/messages does not enforce a per-thread block on customer when they POST with thread_provider_id pointing at a provider who never messaged them — server accepts and creates a phantom thread. Low severity; the customer is already authorized on their own job."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lumo_chat.py (new, 19 tests)"
+  ],
+  "success_rate": {"backend": "100% (43/43)", "frontend": "not tested this iteration (backend-only request)"},
+  "test_credentials": "customer@lumo.test, provider@lumo.test, retailer@lumo.test, restaurant@lumo.test — all password123 (seeded).",
+  "seed_data_creation": "Tests create TEST_-prefixed jobs and TEST_provider_* users via /auth/register. Messages persist (no cleanup endpoint exists). Safe because each job_id is unique.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Full pytest suite at /app/backend/tests/ — run with `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d'=' -f2) pytest backend/tests/ -v`. Chat endpoints: POST/GET /api/jobs/{id}/messages, GET /api/jobs/{id}/threads, GET /api/chats/inbox. Sanitizer is in server.py lines 275-294 (_PHONE_RE, _EMAIL_RE, _URL_RE, _CONTACT_WORDS). Thread-resolution rules: provider_id if assigned → sender_id if sender is provider → body.thread_provider_id else 400. Frontend Maps + ChatPanel UI not tested this iteration (review requested backend-only).",
+  "rca of the issue": "No bugs found in chat or sanitizer. One transient test-author issue (initial since-poll test failed due to my test client building f-string URLs with unescaped '+' in ISO offset → server decoded as space → filter no-op → returned all messages). Fixed in test by using requests `params=` kwarg which percent-encodes '+'. The frontend ChatPanel uses URLSearchParams.toString() which also percent-encodes, so production is unaffected — documented as a brittleness concern in action_items."
+}

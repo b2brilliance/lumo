@@ -2,7 +2,7 @@ import React from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare } from "lucide-react";
 
 export default function NavBar() {
   const { user, logout } = useAuth();
@@ -47,6 +47,7 @@ export default function NavBar() {
                   <Wallet className="inline w-3.5 h-3.5 mr-1" /> ${Number(user.wallet_balance || 0).toFixed(2)}
                 </NavLink>
               )}
+              <NavLink to="/chats" className="text-slate-500 hover:text-slate-900" data-testid="nav-chats" title="Messages"><MessageSquare className="w-4 h-4" /></NavLink>
               <NavLink to="/settings" className="text-slate-500 hover:text-slate-900" data-testid="nav-settings"><Settings className="w-4 h-4" /></NavLink>
               <span className="text-sm text-slate-700 hidden md:inline" data-testid="nav-user-name">{user.name}</span>
               <Button variant="ghost" size="sm" onClick={() => { logout(); nav("/"); }} data-testid="nav-logout">

@@ -12,6 +12,7 @@ import asyncio
 import math
 import secrets
 import requests
+import re
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
@@ -263,6 +264,34 @@ class WithdrawRequest(BaseModel):
     amount: float
     method: str = "bank_transfer"
     notes: Optional[str] = None
+
+class MessageCreate(BaseModel):
+    body: str
+    thread_provider_id: Optional[str] = None
+
+# ────────────────────────────────────────────────────────────────────────────
+# Anti-poach message sanitizer
+# ────────────────────────────────────────────────────────────────────────────
+_PHONE_RE = re.compile(r"(?:\+?\d[\d\s\-().]{7,}\d)")
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_URL_RE = re.compile(r"(?i)\b(?:https?://|www\.)\S+")
+_CONTACT_WORDS = re.compile(
+    r"(?i)\b(whats?app|telegram|signal|wechat|viber|imessage|messenger|"
+    r"venmo|cash\s?app|zelle|paypal|stripe|insta(?:gram)?|snap(?:chat)?|"
+    r"tiktok|twitter|facebook|fb|linkedin|discord|skype|email|e-mail|phone|"
+    r"call\s?me|text\s?me|dm\s?me|reach\s?out|off\s?platform|off\s?the\s?app)\b"
+)
+
+def sanitize_message(text: str) -> tuple[str, bool]:
+    """Returns (cleaned_text, was_redacted)."""
+    original = text
+    text = _PHONE_RE.sub("[hidden]", text)
+    text = _EMAIL_RE.sub("[hidden]", text)
+    text = _URL_RE.sub("[hidden]", text)
+    text = _CONTACT_WORDS.sub("[hidden]", text)
+    # Long digit sequences (like "five five five one two three four")
+    text = re.sub(r"(?:\b\d[\s\-.]?){7,}", "[hidden]", text)
+    return text, text != original
 
 # ────────────────────────────────────────────────────────────────────────────
 # Auth dependency
@@ -888,6 +917,131 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
 @api.get("/")
 async def root():
     return {"app": "lumo", "status": "ok"}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Chat messages (job-scoped, with anti-poach sanitizer)
+# ────────────────────────────────────────────────────────────────────────────
+async def _job_chat_allowed(job: dict, user: dict) -> bool:
+    """Customer of job, provider already assigned, OR (status=open AND user is provider)."""
+    if job["customer_id"] == user["id"]:
+        return True
+    if job.get("provider_id") == user["id"]:
+        return True
+    if job["status"] == "open" and user["role"] == "provider":
+        return True
+    return False
+
+@api.post("/jobs/{job_id}/messages")
+async def post_message(job_id: str, body: MessageCreate, user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not await _job_chat_allowed(job, user):
+        raise HTTPException(403, "Not allowed to message on this job")
+    text = (body.body or "").strip()
+    if not text:
+        raise HTTPException(400, "Empty message")
+    if len(text) > 2000:
+        raise HTTPException(400, "Message too long")
+    cleaned, redacted = sanitize_message(text)
+    # Determine the "thread" — customer ↔ a specific provider.
+    # If job has an assigned provider, that's the thread. Else thread = sender provider (so open-job inquiries are 1-on-1).
+    if job.get("provider_id"):
+        thread_provider_id = job["provider_id"]
+    elif user["role"] == "provider":
+        thread_provider_id = user["id"]
+    elif body.thread_provider_id:
+        thread_provider_id = body.thread_provider_id
+    else:
+        raise HTTPException(400, "No provider thread yet — wait for a provider to message first")
+    msg = {
+        "id": str(uuid.uuid4()),
+        "job_id": job_id,
+        "thread_provider_id": thread_provider_id,
+        "customer_id": job["customer_id"],
+        "sender_id": user["id"],
+        "sender_name": user["name"],
+        "sender_role": user["role"],
+        "body": cleaned,
+        "redacted": redacted,
+        "created_at": now_iso(),
+    }
+    await db.messages.insert_one(msg)
+    return clean_doc(msg)
+
+@api.get("/jobs/{job_id}/messages")
+async def list_messages(job_id: str, since: Optional[str] = None, thread_provider_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not await _job_chat_allowed(job, user):
+        raise HTTPException(403, "Not allowed")
+    # Determine which thread to show
+    if job.get("provider_id"):
+        tpid = job["provider_id"]
+    elif user["role"] == "provider":
+        tpid = user["id"]
+    elif thread_provider_id:
+        tpid = thread_provider_id
+    else:
+        tpid = None  # customer with no inquiries yet
+    q: dict = {"job_id": job_id}
+    if tpid:
+        q["thread_provider_id"] = tpid
+    if since:
+        q["created_at"] = {"$gt": since}
+    docs = await db.messages.find(q).sort("created_at", 1).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/jobs/{job_id}/threads")
+async def list_job_threads(job_id: str, user: dict = Depends(get_current_user)):
+    """Customer view: list of provider threads on an open job."""
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if job["customer_id"] != user["id"]:
+        raise HTTPException(403, "Not your job")
+    # Aggregate distinct thread_provider_id and last message
+    msgs = await db.messages.find({"job_id": job_id}).sort("created_at", -1).to_list(1000)
+    seen: dict = {}
+    for m in msgs:
+        tpid = m["thread_provider_id"]
+        if tpid not in seen:
+            # find provider name
+            seen[tpid] = {"provider_id": tpid, "last_message": m["body"], "last_at": m["created_at"]}
+    return list(seen.values())
+
+@api.get("/chats/inbox")
+async def chat_inbox(user: dict = Depends(get_current_user)):
+    """All threads this user is part of, with latest message + counts."""
+    # Find all messages where user is customer, provider, or sender
+    q: dict
+    if user["role"] == "provider":
+        q = {"$or": [{"thread_provider_id": user["id"]}, {"customer_id": user["id"]}]}
+    else:
+        q = {"customer_id": user["id"]}
+    docs = await db.messages.find(q).sort("created_at", -1).to_list(1000)
+    threads: dict = {}
+    for m in docs:
+        key = f"{m['job_id']}:{m['thread_provider_id']}"
+        if key in threads:
+            continue
+        threads[key] = {
+            "job_id": m["job_id"],
+            "thread_provider_id": m["thread_provider_id"],
+            "last_message": m["body"],
+            "last_at": m["created_at"],
+            "last_sender": m["sender_name"],
+        }
+    # Hydrate job titles
+    job_ids = list({t["job_id"] for t in threads.values()})
+    jobs = await db.jobs.find({"id": {"$in": job_ids}}).to_list(500)
+    job_map = {j["id"]: j for j in jobs}
+    out = []
+    for t in threads.values():
+        j = job_map.get(t["job_id"], {})
+        out.append({**t, "job_title": j.get("title"), "job_status": j.get("status")})
+    return sorted(out, key=lambda x: x["last_at"], reverse=True)
 
 @api.get("/health")
 async def health():
