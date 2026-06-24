@@ -32,6 +32,7 @@ import Cart from "@/pages/Cart";
 import Rentals from "@/pages/Rentals";
 import RentalDetail from "@/pages/RentalDetail";
 import RentalHost from "@/pages/RentalHost";
+import AdminConsole from "@/pages/AdminConsole";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();

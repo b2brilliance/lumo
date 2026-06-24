@@ -20,14 +20,25 @@ export default function RentalDetail() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [blocked, setBlocked] = useState([]);
+  const [activePhoto, setActivePhoto] = useState(0);
   const [form, setForm] = useState({ start_date: "", end_date: "", pricing_unit: "daily", notes: "" });
 
   useEffect(() => {
     api.get(`/rentals/${id}`).then(({ data }) => { setR(data); setLoading(false); }).catch(() => setLoading(false));
+    api.get(`/rentals/${id}/blocked-dates`).then(({ data }) => setBlocked(data || [])).catch(() => {});
   }, [id]);
+
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const isDateBlocked = (iso) => {
+    if (!iso) return false;
+    return blocked.some((b) => iso >= b.start_date && iso < b.end_date);
+  };
 
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
   if (!r) return <div className="p-12 text-red-600">Rental not found.</div>;
+
+  const photos = r.media && r.media.length > 0 ? r.media : (r.media_url ? [{ media_url: r.media_url, media_type: r.media_type }] : []);
 
   const cat = RENTAL_CATEGORIES[r.category] || {};
   const Icon = cat.icon;
@@ -75,9 +86,46 @@ export default function RentalDetail() {
 
       <div className="grid lg:grid-cols-12 gap-10 mt-4">
         <div className="lg:col-span-7">
-          <div className={`aspect-[16/10] flex items-center justify-center ${cat.color || "bg-slate-100"}`}>
-            {Icon && <Icon className="w-24 h-24 opacity-40" />}
-          </div>
+          {photos.length > 0 ? (
+            <>
+              <div className="aspect-[16/10] bg-slate-100 overflow-hidden relative" data-testid="rental-gallery-main">
+                {(() => {
+                  const p = photos[activePhoto] || photos[0];
+                  const url = p.media_url?.startsWith("http") ? p.media_url : `${BACKEND_URL}${p.media_url}`;
+                  return p.media_type?.startsWith("video")
+                    ? <video src={url} className="w-full h-full object-cover" controls />
+                    : <img src={url} alt="" className="w-full h-full object-cover" />;
+                })()}
+                {photos.length > 1 && (
+                  <div className="absolute bottom-3 right-3 text-[10px] font-mono uppercase tracking-widest bg-slate-900/80 text-white px-2 py-1">
+                    {activePhoto + 1} / {photos.length}
+                  </div>
+                )}
+              </div>
+              {photos.length > 1 && (
+                <div className="grid grid-cols-6 gap-2 mt-2" data-testid="rental-gallery-thumbs">
+                  {photos.map((p, i) => {
+                    const u = p.media_url?.startsWith("http") ? p.media_url : `${BACKEND_URL}${p.media_url}`;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setActivePhoto(i)}
+                        className={`aspect-square overflow-hidden border-2 ${i === activePhoto ? "border-slate-900" : "border-transparent hover:border-slate-300"}`}
+                        data-testid={`rental-thumb-${i}`}
+                      >
+                        <img src={u} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className={`aspect-[16/10] flex items-center justify-center ${cat.color || "bg-slate-100"}`}>
+              {Icon && <Icon className="w-24 h-24 opacity-40" />}
+            </div>
+          )}
           <div className="mt-6">
             <div className="overline">{cat.label}</div>
             <h1 className="font-display text-4xl font-black tracking-tighter mt-2">{r.title}</h1>
@@ -130,13 +178,40 @@ export default function RentalDetail() {
             <div className="mt-5 grid grid-cols-2 gap-2">
               <div>
                 <Label className="overline">Start</Label>
-                <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="mt-1" data-testid="rental-start-date" />
+                <Input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (isDateBlocked(v)) { toast.error("That date is already booked. Pick another."); return; }
+                    setForm({ ...form, start_date: v });
+                  }}
+                  className="mt-1"
+                  data-testid="rental-start-date"
+                />
               </div>
               <div>
                 <Label className="overline">End</Label>
-                <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="mt-1" data-testid="rental-end-date" />
+                <Input
+                  type="date"
+                  value={form.end_date}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (isDateBlocked(v)) { toast.error("That date is already booked. Pick another."); return; }
+                    setForm({ ...form, end_date: v });
+                  }}
+                  className="mt-1"
+                  data-testid="rental-end-date"
+                />
               </div>
             </div>
+            {blocked.length > 0 && (
+              <div className="mt-2 text-[10px] font-mono uppercase tracking-widest text-amber-700 border border-amber-200 bg-amber-50 px-2 py-1.5" data-testid="rental-blocked-dates">
+                {blocked.length} booked range{blocked.length === 1 ? "" : "s"} ·{" "}
+                {blocked.slice(0, 3).map((b) => `${b.start_date}→${b.end_date}`).join(", ")}
+                {blocked.length > 3 ? ` +${blocked.length - 3} more` : ""}
+              </div>
+            )}
             <div className="mt-3">
               <Label className="overline">Pricing</Label>
               <Select value={form.pricing_unit} onValueChange={(v) => setForm({ ...form, pricing_unit: v })}>

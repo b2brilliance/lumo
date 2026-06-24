@@ -38,7 +38,7 @@ function Wizard({ onDone }) {
     subcategory: "",
     title: "",
     description: "",
-    media: null,                                  // { id, media_url, media_type }
+    media: [],                                    // array of { id, media_url, media_type }
     pricing: { hourly: "", daily: "", weekly: "", monthly: "", weekend: "", security_deposit: "" },
     booking_mode: "instant",
     attributes: {},
@@ -72,9 +72,9 @@ function Wizard({ onDone }) {
         title: form.title.trim(),
         description: form.description.trim(),
         location: form.address ? { address: form.address, lat: form.lat, lng: form.lng } : null,
-        media_url: form.media?.media_url || null,
-        media_type: form.media?.media_type || null,
-        media: form.media ? [{ media_url: form.media.media_url, media_type: form.media.media_type, id: form.media.id }] : [],
+        media_url: form.media?.[0]?.media_url || null,
+        media_type: form.media?.[0]?.media_type || null,
+        media: (form.media || []).map((m) => ({ media_url: m.media_url, media_type: m.media_type, id: m.id })),
         pricing,
         attributes: form.attributes,
         booking_mode: form.booking_mode,
@@ -170,9 +170,32 @@ function Wizard({ onDone }) {
               </Select>
             </div>
             <div>
-              <Label className="overline">Photo (recommended)</Label>
-              <div className="mt-1">
-                <MediaUpload value={form.media} onChange={(v) => setForm({ ...form, media: v.media_url ? v : null })} label="" aiCheck />
+              <Label className="overline">Photos (up to 6 — first one is the cover)</Label>
+              <div className="mt-1 grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="host-media-grid">
+                {form.media.map((m, i) => (
+                  <div key={i} className="relative">
+                    <MediaUpload
+                      value={m}
+                      onChange={(v) => {
+                        const next = [...form.media];
+                        if (!v.media_url) next.splice(i, 1);
+                        else next[i] = v;
+                        setForm({ ...form, media: next });
+                      }}
+                      label=""
+                      aiCheck
+                    />
+                    {i === 0 && <span className="absolute top-2 left-2 text-[10px] font-mono uppercase tracking-widest bg-slate-900 text-white px-2 py-0.5">Cover</span>}
+                  </div>
+                ))}
+                {form.media.length < 6 && (
+                  <MediaUpload
+                    value={null}
+                    onChange={(v) => v.media_url && setForm({ ...form, media: [...form.media, v] })}
+                    label=""
+                    aiCheck={false}
+                  />
+                )}
               </div>
             </div>
           </>

@@ -1379,6 +1379,17 @@ async def get_rental(rental_id: str):
         raise HTTPException(404, "Rental not found")
     return clean_doc(r)
 
+@api.get("/rentals/{rental_id}/blocked-dates")
+async def rental_blocked_dates(rental_id: str):
+    """Returns confirmed/pending bookings as blocked date ranges so the calendar
+    UI can disable those dates. Excludes declined / cancelled bookings."""
+    r = await db.rentals.find_one({"id": rental_id})
+    if not r:
+        raise HTTPException(404, "Rental not found")
+    blocking_statuses = {"pending_approval", "deposit_pending", "deposit_paid", "confirmed", "in_progress"}
+    docs = await db.rental_bookings.find({"rental_id": rental_id, "status": {"$in": list(blocking_statuses)}}).to_list(500)
+    return [{"start_date": d["start_date"], "end_date": d["end_date"], "status": d["status"]} for d in docs]
+
 @api.post("/rentals")
 async def create_rental(body: RentalCreate, user: dict = Depends(get_current_user)):
     if body.category not in RENTAL_TAXONOMY:
@@ -1440,6 +1451,16 @@ async def book_rental(rental_id: str, body: RentalBookingCreate, req: Request, u
         raise HTTPException(400, "Invalid start_date / end_date (use YYYY-MM-DD or ISO 8601)")
     if ed <= sd:
         raise HTTPException(400, "end_date must be after start_date")
+    # Block overlapping dates with existing live bookings
+    blocking_statuses = ["pending_approval", "deposit_pending", "deposit_paid", "confirmed", "in_progress"]
+    overlapping = await db.rental_bookings.find_one({
+        "rental_id": rental_id,
+        "status": {"$in": blocking_statuses},
+        "start_date": {"$lt": body.end_date},
+        "end_date": {"$gt": body.start_date},
+    })
+    if overlapping:
+        raise HTTPException(409, f"Those dates conflict with an existing booking ({overlapping['start_date']} → {overlapping['end_date']}). Pick different dates.")
     pricing = r.get("pricing") or {}
     if body.pricing_unit not in pricing or not pricing[body.pricing_unit]:
         raise HTTPException(400, f"Rental does not offer {body.pricing_unit} pricing")
@@ -1586,6 +1607,101 @@ async def decline_rental_booking(booking_id: str, user: dict = Depends(get_curre
         "created_at": now_iso(),
     })
     return {"declined": True}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Admin / Operator console — credential review, withdrawal approvals, review
+# moderation, rental booking inbox. Everything gated to role='admin'.
+# ────────────────────────────────────────────────────────────────────────────
+def _is_admin(user: dict) -> bool:
+    return user.get("role") == "admin"
+
+async def _require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if not _is_admin(user):
+        raise HTTPException(403, "Admin only")
+    return user
+
+@api.get("/admin/credentials")
+async def admin_credentials(status: Optional[str] = None, user: dict = Depends(_require_admin)):
+    """List credentials by status (default: pending submitted + ai_pending_review)."""
+    f = {}
+    if status:
+        f["status"] = status
+    else:
+        f["status"] = {"$in": ["submitted", "ai_pending_review", "pending_review"]}
+    docs = await db.credentials.find(f).sort("created_at", -1).to_list(200)
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        owner = await db.users.find_one({"id": d.get("user_id")}, {"name": 1, "email": 1, "role": 1, "_id": 0})
+        d["owner"] = owner
+        out.append(d)
+    return out
+
+@api.post("/admin/credentials/{cred_id}/verify")
+async def admin_credentials_verify(cred_id: str, user: dict = Depends(_require_admin)):
+    res = await db.credentials.update_one(
+        {"id": cred_id},
+        {"$set": {"status": "verified", "verified_at": now_iso(), "verified_by": user["id"]}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Credential not found")
+    return {"verified": True}
+
+@api.post("/admin/credentials/{cred_id}/reject")
+async def admin_credentials_reject(cred_id: str, reason: Optional[str] = None, user: dict = Depends(_require_admin)):
+    res = await db.credentials.update_one(
+        {"id": cred_id},
+        {"$set": {"status": "rejected", "rejected_at": now_iso(), "rejected_by": user["id"], "rejection_reason": reason}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Credential not found")
+    return {"rejected": True}
+
+@api.get("/admin/withdrawals")
+async def admin_withdrawals(status: Optional[str] = None, user: dict = Depends(_require_admin)):
+    f = {}
+    if status:
+        f["status"] = status
+    docs = await db.withdrawals.find(f).sort("created_at", -1).to_list(200)
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        owner = await db.users.find_one({"id": d.get("user_id")}, {"name": 1, "email": 1, "wallet_balance": 1, "_id": 0})
+        d["owner"] = owner
+        out.append(d)
+    return out
+
+@api.get("/admin/reviews")
+async def admin_reviews(user: dict = Depends(_require_admin)):
+    docs = await db.reviews.find().sort("created_at", -1).to_list(200)
+    return [clean_doc(d) for d in docs]
+
+@api.delete("/admin/reviews/{review_id}")
+async def admin_review_delete(review_id: str, user: dict = Depends(_require_admin)):
+    res = await db.reviews.delete_one({"id": review_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Review not found")
+    return {"deleted": True}
+
+@api.get("/admin/rental-bookings")
+async def admin_rental_bookings(status: Optional[str] = None, user: dict = Depends(_require_admin)):
+    f = {}
+    if status:
+        f["status"] = status
+    docs = await db.rental_bookings.find(f).sort("created_at", -1).to_list(300)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/admin/stats")
+async def admin_stats(user: dict = Depends(_require_admin)):
+    return {
+        "pending_credentials": await db.credentials.count_documents({"status": {"$in": ["submitted", "ai_pending_review", "pending_review"]}}),
+        "pending_withdrawals": await db.withdrawals.count_documents({"status": {"$in": ["pending", "initiated", "completed"]}}),
+        "total_reviews": await db.reviews.count_documents({}),
+        "active_rentals": await db.rentals.count_documents({"status": "active"}),
+        "pending_rental_bookings": await db.rental_bookings.count_documents({"status": "pending_approval"}),
+        "total_users": await db.users.count_documents({}),
+        "total_jobs_open": await db.jobs.count_documents({"status": "open"}),
+    }
 
 # ────────────────────────────────────────────────────────────────────────────
 # Orders + Bundled 10% Stripe deposit checkout
@@ -2952,6 +3068,7 @@ async def translate(body: TranslateRequest):
 # Seeding
 # ────────────────────────────────────────────────────────────────────────────
 SEED_USERS = [
+    {"email": "admin@lumo.test", "password": "password123", "name": "Alex Admin", "role": "admin"},
     {"email": "customer@lumo.test", "password": "password123", "name": "Casey Customer", "role": "customer"},
     {"email": "provider@lumo.test", "password": "password123", "name": "Pat Provider", "role": "provider",
      "location": {"lat": 40.7128, "lng": -74.0060, "address": "New York, NY"},
