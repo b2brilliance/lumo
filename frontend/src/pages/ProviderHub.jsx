@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/lib/auth";
 import MapView from "@/components/MapView";
 import CategoryBadge from "@/components/CategoryBadge";
+import QuoteDialog from "@/components/QuoteDialog";
 import { toast } from "sonner";
 import { Wallet, MapPin, Briefcase } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -22,6 +23,8 @@ export default function ProviderHub() {
   const seenIdsRef = useRef(new Set());
   const lastPollRef = useRef(new Date().toISOString());
   const [profileBusy, setProfileBusy] = useState(false);
+  const [quoteTarget, setQuoteTarget] = useState(null);
+  const [myQuotes, setMyQuotes] = useState([]);
   const [profile, setProfile] = useState({
     address: user.location?.address || "",
     lat: user.location?.lat || 40.7128,
@@ -43,6 +46,13 @@ export default function ProviderHub() {
     setOpps(data);
     // initial baseline = don't toast existing
     data.forEach((o) => seenIdsRef.current.add(o.id));
+  };
+
+  const loadMyQuotes = async () => {
+    try {
+      const { data } = await api.get("/quotes/mine");
+      setMyQuotes(data);
+    } catch (_) { /* ignore */ }
   };
 
   const pollNew = async () => {
@@ -83,6 +93,7 @@ export default function ProviderHub() {
   useEffect(() => {
     loadOpps();
     loadPins();
+    loadMyQuotes();
     const t = setInterval(pollNew, 15000);
     return () => clearInterval(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -92,10 +103,15 @@ export default function ProviderHub() {
     try {
       await api.post(`/jobs/${id}/accept`);
       toast.success("Job accepted");
-      loadOpps(); loadPins();
+      loadOpps(); loadPins(); loadMyQuotes();
     } catch (e) {
       toast.error(formatApiError(e));
     }
+  };
+
+  const withdrawQuote = async (qid) => {
+    try { await api.delete(`/quotes/${qid}`); toast.success("Quote withdrawn"); loadMyQuotes(); }
+    catch (e) { toast.error(formatApiError(e)); }
   };
 
   const saveProfile = async (e) => {
@@ -149,8 +165,7 @@ export default function ProviderHub() {
 
       <div className="grid lg:grid-cols-12 gap-8 mt-8">
         <div className="lg:col-span-8">
-          <div className="overline">Opportunities in your radius ({opps.length})</div>
-          <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="opportunities-list">
+          <div className="overline">Opportunities in your radius ({opps.length})</div>          <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="opportunities-list">
             {opps.length === 0 && <div className="p-6 text-sm text-slate-500">No matches right now. Toast will fire when a new job lands.</div>}
             {opps.map((j) => (
               <div
@@ -171,9 +186,12 @@ export default function ProviderHub() {
                   <div className="font-display text-base font-bold text-slate-900">${j.pay_rate.toFixed(2)}</div>
                   <div className="text-slate-500 uppercase">per {j.pay_unit}</div>
                 </div>
-                <div className="col-span-1 text-right">
-                  <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800" data-testid={`accept-job-${j.id}`}>
+                <div className="col-span-1 text-right flex flex-col gap-1">
+                  <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800 h-7 px-2 text-xs" data-testid={`accept-job-${j.id}`}>
                     Accept
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuoteTarget(j); }} className="h-7 px-2 text-xs" data-testid={`quote-job-${j.id}`}>
+                    Quote
                   </Button>
                 </div>
               </div>
@@ -218,6 +236,43 @@ export default function ProviderHub() {
           </Button>
         </form>
       </div>
+
+      {/* My quotes */}
+      <div className="mt-12">
+        <div className="overline">My quotes ({myQuotes.length})</div>
+        <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="my-quotes-list">
+          {myQuotes.length === 0 && <div className="p-6 text-sm text-slate-500">You have not sent any quotes yet.</div>}
+          {myQuotes.map((q) => (
+            <div key={q.id} className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`my-quote-${q.id}`}>
+              <div className="col-span-5">
+                <div className="font-display font-bold truncate">{q.job_title || "Job"}</div>
+                <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">{q.notes || "—"}</div>
+              </div>
+              <div className="col-span-3 font-mono text-xs">
+                <div>Asking: ${q.asking_pay_rate?.toFixed(2)} / {q.asking_pay_unit}</div>
+                <div className="text-teal-700 font-bold">You: ${q.quoted_pay_rate?.toFixed(2)} / {q.quoted_pay_unit}</div>
+              </div>
+              <div className="col-span-2 text-xs font-mono uppercase tracking-widest">
+                <span className={q.status === "accepted" ? "text-teal-700" : q.status === "declined" ? "text-red-600" : "text-slate-500"}>
+                  {q.status}
+                </span>
+              </div>
+              <div className="col-span-2 text-right">
+                {q.status === "pending" && (
+                  <Button size="sm" variant="outline" onClick={() => withdrawQuote(q.id)} className="h-7 px-2 text-xs" data-testid={`withdraw-quote-${q.id}`}>Withdraw</Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <QuoteDialog
+        open={!!quoteTarget}
+        onOpenChange={(o) => !o && setQuoteTarget(null)}
+        job={quoteTarget}
+        onSubmitted={() => { loadMyQuotes(); }}
+      />
     </div>
   );
 }

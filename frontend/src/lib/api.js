@@ -27,22 +27,42 @@ export const CATEGORY_COLORS = {
 };
 
 export const ALL_CATEGORIES = [
-  { value: "delivery", label: "Delivery", group: "physical_delivery" },
-  { value: "courier", label: "Courier", group: "physical_delivery" },
-  { value: "moving", label: "Moving", group: "physical_delivery" },
-  { value: "handyman", label: "Handyman", group: "local_services" },
-  { value: "cleaning", label: "Cleaning", group: "local_services" },
-  { value: "landscaping", label: "Landscaping", group: "local_services" },
-  { value: "auto", label: "Auto", group: "local_services" },
-  { value: "pet_care", label: "Pet Care", group: "local_services" },
-  { value: "personal_care", label: "Personal Care", group: "local_services" },
-  { value: "events", label: "Events", group: "local_services" },
-  { value: "digital_tech", label: "Digital & Tech", group: "remote_jobs" },
-  { value: "marketing", label: "Marketing", group: "remote_jobs" },
-  { value: "business_admin", label: "Business / Admin", group: "remote_jobs" },
-  { value: "education", label: "Education", group: "remote_jobs" },
-  { value: "legal", label: "Legal", group: "remote_jobs" },
-  { value: "financial", label: "Financial", group: "remote_jobs" },
-  { value: "remote_work", label: "Remote Work", group: "remote_jobs" },
-  { value: "research", label: "Research", group: "remote_jobs" },
+  { value: "delivery", label: "Delivery", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "courier", label: "Courier", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "moving", label: "Moving", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "handyman", label: "Handyman", group: "local_services", location_mode: "onsite" },
+  { value: "cleaning", label: "Cleaning", group: "local_services", location_mode: "onsite" },
+  { value: "landscaping", label: "Landscaping", group: "local_services", location_mode: "onsite" },
+  { value: "auto", label: "Auto", group: "local_services", location_mode: "onsite" },
+  { value: "pet_care", label: "Pet Care", group: "local_services", location_mode: "onsite" },
+  { value: "personal_care", label: "Personal Care", group: "local_services", location_mode: "onsite" },
+  { value: "events", label: "Events", group: "local_services", location_mode: "onsite" },
+  { value: "digital_tech", label: "Digital & Tech", group: "remote_jobs", location_mode: "remote" },
+  { value: "marketing", label: "Marketing", group: "remote_jobs", location_mode: "remote" },
+  { value: "business_admin", label: "Business / Admin", group: "remote_jobs", location_mode: "remote" },
+  { value: "education", label: "Education", group: "remote_jobs", location_mode: "remote" },
+  { value: "legal", label: "Legal", group: "remote_jobs", location_mode: "remote" },
+  { value: "financial", label: "Financial", group: "remote_jobs", location_mode: "remote" },
+  { value: "remote_work", label: "Remote Work", group: "remote_jobs", location_mode: "remote" },
+  { value: "research", label: "Research", group: "remote_jobs", location_mode: "remote" },
 ];
+
+export const LOCATION_COPY = {
+  pickup_dropoff: {
+    title: "Pickup & drop-off",
+    pickup_label: "Pickup address",
+    dropoff_label: "Drop-off address",
+    pickup_placeholder: "Where to collect the item",
+    dropoff_placeholder: "Where to deliver it",
+  },
+  onsite: {
+    title: "Where the work happens",
+    pickup_label: "Service address",
+    pickup_placeholder: "The address where the service is performed",
+  },
+  remote: { title: "Remote — no location needed" },
+};
+
+export function locationModeFor(category) {
+  return ALL_CATEGORIES.find((c) => c.value === category)?.location_mode || "onsite";
+}

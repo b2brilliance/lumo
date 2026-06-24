@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, locationModeFor, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
 import ChatPanel from "@/components/ChatPanel";
+import QuoteDialog from "@/components/QuoteDialog";
 import { toast } from "sonner";
 
 export default function JobDetail() {
@@ -13,10 +14,20 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [threads, setThreads] = useState([]);
   const [selectedThread, setSelectedThread] = useState(null);
+  const [quotes, setQuotes] = useState([]);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   const load = () => api.get(`/jobs/${id}`).then(({ data }) => setJob(data));
+  const loadQuotes = () => api.get(`/jobs/${id}/quotes`).then(({ data }) => setQuotes(data)).catch(() => {});
   useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    if (!user || user === false || !job) return;
+    if (job.customer_id === user.id || (user.role === "provider")) {
+      loadQuotes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id, user?.id]);
 
   // For the customer on an open job, list provider threads
   useEffect(() => {
@@ -44,6 +55,18 @@ export default function JobDetail() {
     catch { toast.error("Failed to accept"); }
   };
 
+  const acceptQuote = async (qid) => {
+    try { await api.post(`/quotes/${qid}/accept`); toast.success("Quote accepted — provider assigned."); load(); loadQuotes(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const declineQuote = async (qid) => {
+    try { await api.post(`/quotes/${qid}/decline`); toast.success("Quote declined"); loadQuotes(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const isCustomer = user && user !== false && user.id === job.customer_id;
+  const myProviderQuote = isProvider ? quotes.find((q) => q.provider_id === user.id) : null;
+
   return (
     <div className="max-w-screen-xl mx-auto px-6 py-10 grid lg:grid-cols-12 gap-10">
       <div className="lg:col-span-7">
@@ -69,9 +92,21 @@ export default function JobDetail() {
         )}
 
         <div className="grid grid-cols-2 gap-4 mt-6 text-sm font-mono">
-          {job.pickup_location && <div><div className="overline">Pickup</div>{job.pickup_location.address}</div>}
-          {job.dropoff_location && <div><div className="overline">Dropoff</div>{job.dropoff_location.address}</div>}
-          {job.is_remote && <div><div className="overline">Location</div>Remote</div>}
+          {(() => {
+            const mode = locationModeFor(job.category);
+            if (mode === "pickup_dropoff") {
+              return (
+                <>
+                  {job.pickup_location && <div><div className="overline">Pickup</div>{job.pickup_location.address}</div>}
+                  {job.dropoff_location && <div><div className="overline">Dropoff</div>{job.dropoff_location.address}</div>}
+                </>
+              );
+            }
+            if (mode === "onsite") {
+              return job.pickup_location ? <div className="col-span-2"><div className="overline">Service location</div>{job.pickup_location.address}</div> : null;
+            }
+            return <div><div className="overline">Location</div>Remote</div>;
+          })()}
         </div>
 
         {job.allowed_payment_methods?.length > 0 && (
@@ -83,7 +118,49 @@ export default function JobDetail() {
         )}
 
         {isProvider && job.status === "open" && (
-          <Button onClick={accept} className="mt-8 bg-teal-700 hover:bg-teal-800" data-testid="job-detail-accept">Accept this job</Button>
+          <div className="flex gap-3 mt-8" data-testid="provider-actions">
+            <Button onClick={accept} className="bg-teal-700 hover:bg-teal-800" data-testid="job-detail-accept">Accept at asking rate</Button>
+            <Button onClick={() => setQuoteOpen(true)} variant="outline" data-testid="job-detail-quote">
+              {myProviderQuote ? "Update your quote" : "Send a counter-quote"}
+            </Button>
+          </div>
+        )}
+        {isProvider && myProviderQuote && (
+          <div className="mt-4 border border-slate-200 p-4 text-sm" data-testid="my-quote-status">
+            <div className="overline">Your quote</div>
+            <div className="font-mono mt-1">
+              ${myProviderQuote.quoted_pay_rate.toFixed(2)} / {myProviderQuote.quoted_pay_unit} · status: <span className={myProviderQuote.status === "accepted" ? "text-teal-700" : myProviderQuote.status === "declined" ? "text-red-600" : "text-slate-700"}>{myProviderQuote.status}</span>
+            </div>
+          </div>
+        )}
+
+        {isCustomer && job.status === "open" && quotes.length > 0 && (
+          <div className="mt-8" data-testid="customer-quotes-section">
+            <div className="overline">Provider quotes ({quotes.length})</div>
+            <div className="mt-3 border border-slate-200 divide-y divide-slate-200">
+              {quotes.map((q) => (
+                <div key={q.id} className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`quote-${q.id}`}>
+                  <div className="col-span-4">
+                    <div className="font-display font-bold">{q.provider_name}</div>
+                    <div className="text-xs text-slate-500 line-clamp-2 mt-0.5">{q.notes || "No notes"}</div>
+                  </div>
+                  <div className="col-span-4 font-mono text-sm">
+                    <div className="font-display text-lg font-black">${q.quoted_pay_rate.toFixed(2)}</div>
+                    <div className="text-slate-500 text-xs uppercase">per {q.quoted_pay_unit}{q.quoted_pay_unit !== "flat" && ` · est. ${q.quoted_estimated_units} ${q.quoted_pay_unit}s`}</div>
+                  </div>
+                  <div className="col-span-1 text-xs font-mono uppercase tracking-widest">{q.status}</div>
+                  <div className="col-span-3 text-right flex gap-2 justify-end">
+                    {q.status === "pending" && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => declineQuote(q.id)} className="h-7 px-2 text-xs" data-testid={`decline-quote-${q.id}`}>Decline</Button>
+                        <Button size="sm" onClick={() => acceptQuote(q.id)} className="bg-teal-700 hover:bg-teal-800 h-7 px-2 text-xs" data-testid={`accept-quote-${q.id}`}>Accept</Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -119,6 +196,7 @@ export default function JobDetail() {
           </div>
         )}
       </aside>
+      <QuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} job={job} onSubmitted={() => loadQuotes()} />
     </div>
   );
 }

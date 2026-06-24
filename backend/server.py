@@ -269,6 +269,12 @@ class MessageCreate(BaseModel):
     body: str
     thread_provider_id: Optional[str] = None
 
+class QuoteCreate(BaseModel):
+    quoted_pay_rate: float
+    quoted_pay_unit: PayUnit
+    quoted_estimated_units: float = 1.0
+    notes: Optional[str] = None
+
 # ────────────────────────────────────────────────────────────────────────────
 # Anti-poach message sanitizer
 # ────────────────────────────────────────────────────────────────────────────
@@ -1046,6 +1052,128 @@ async def chat_inbox(user: dict = Depends(get_current_user)):
 @api.get("/health")
 async def health():
     return {"ok": True}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Provider quotes (counter-offers)
+# ────────────────────────────────────────────────────────────────────────────
+@api.post("/jobs/{job_id}/quotes")
+async def create_quote(job_id: str, body: QuoteCreate, user: dict = Depends(require_role("provider"))):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if job["status"] != "open":
+        raise HTTPException(400, "Job is not open")
+    # one active quote per provider per job
+    existing = await db.quotes.find_one({"job_id": job_id, "provider_id": user["id"], "status": "pending"})
+    if existing:
+        await db.quotes.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "quoted_pay_rate": body.quoted_pay_rate,
+                "quoted_pay_unit": body.quoted_pay_unit,
+                "quoted_estimated_units": body.quoted_estimated_units,
+                "notes": body.notes, "updated_at": now_iso(),
+            }}
+        )
+        q = await db.quotes.find_one({"id": existing["id"]})
+        return clean_doc(q)
+    q = {
+        "id": str(uuid.uuid4()),
+        "job_id": job_id,
+        "provider_id": user["id"],
+        "provider_name": user["name"],
+        "customer_id": job["customer_id"],
+        "quoted_pay_rate": body.quoted_pay_rate,
+        "quoted_pay_unit": body.quoted_pay_unit,
+        "quoted_estimated_units": body.quoted_estimated_units,
+        "asking_pay_rate": job["pay_rate"],
+        "asking_pay_unit": job["pay_unit"],
+        "notes": body.notes,
+        "status": "pending",
+        "created_at": now_iso(),
+    }
+    await db.quotes.insert_one(q)
+    return clean_doc(q)
+
+@api.get("/jobs/{job_id}/quotes")
+async def list_job_quotes(job_id: str, user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if user["id"] == job["customer_id"]:
+        docs = await db.quotes.find({"job_id": job_id}).sort("created_at", -1).to_list(200)
+    elif user["role"] == "provider":
+        # provider only sees their own
+        docs = await db.quotes.find({"job_id": job_id, "provider_id": user["id"]}).sort("created_at", -1).to_list(50)
+    else:
+        raise HTTPException(403, "Not allowed")
+    return [clean_doc(d) for d in docs]
+
+@api.get("/quotes/mine")
+async def my_quotes(user: dict = Depends(require_role("provider"))):
+    docs = await db.quotes.find({"provider_id": user["id"]}).sort("created_at", -1).to_list(200)
+    out = []
+    for q in docs:
+        q = clean_doc(q)
+        job = await db.jobs.find_one({"id": q["job_id"]})
+        if job:
+            q["job_title"] = job["title"]
+            q["job_status"] = job["status"]
+        out.append(q)
+    return out
+
+@api.post("/quotes/{quote_id}/accept")
+async def accept_quote(quote_id: str, user: dict = Depends(get_current_user)):
+    q = await db.quotes.find_one({"id": quote_id})
+    if not q:
+        raise HTTPException(404, "Quote not found")
+    if q["customer_id"] != user["id"]:
+        raise HTTPException(403, "Not your job")
+    job = await db.jobs.find_one({"id": q["job_id"]})
+    if not job or job["status"] != "open":
+        raise HTTPException(400, "Job is not open")
+    # Assign job to this provider at the quoted rate
+    await db.jobs.update_one({"id": job["id"]}, {"$set": {
+        "status": "accepted",
+        "provider_id": q["provider_id"],
+        "provider_name": q["provider_name"],
+        "accepted_at": now_iso(),
+        "pay_rate": q["quoted_pay_rate"],
+        "pay_unit": q["quoted_pay_unit"],
+        "estimated_units": q["quoted_estimated_units"],
+        "accepted_quote_id": q["id"],
+    }})
+    await db.quotes.update_one({"id": quote_id}, {"$set": {"status": "accepted"}})
+    # Decline all other quotes
+    await db.quotes.update_many(
+        {"job_id": job["id"], "id": {"$ne": quote_id}, "status": "pending"},
+        {"$set": {"status": "declined"}}
+    )
+    job = await db.jobs.find_one({"id": job["id"]})
+    return clean_doc(job)
+
+@api.post("/quotes/{quote_id}/decline")
+async def decline_quote(quote_id: str, user: dict = Depends(get_current_user)):
+    q = await db.quotes.find_one({"id": quote_id})
+    if not q:
+        raise HTTPException(404, "Quote not found")
+    if q["customer_id"] != user["id"]:
+        raise HTTPException(403, "Not your job")
+    if q["status"] != "pending":
+        raise HTTPException(400, "Quote already resolved")
+    await db.quotes.update_one({"id": quote_id}, {"$set": {"status": "declined"}})
+    return {"ok": True}
+
+@api.delete("/quotes/{quote_id}")
+async def withdraw_quote(quote_id: str, user: dict = Depends(require_role("provider"))):
+    q = await db.quotes.find_one({"id": quote_id})
+    if not q:
+        raise HTTPException(404, "Quote not found")
+    if q["provider_id"] != user["id"]:
+        raise HTTPException(403, "Not yours")
+    await db.quotes.delete_one({"id": quote_id})
+    return {"ok": True}
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # Seeding

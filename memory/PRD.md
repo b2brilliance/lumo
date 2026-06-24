@@ -45,6 +45,8 @@ Also: restrict Google Maps API key in Cloud Console (Settings page).
 - Object storage backed media upload (25MB cap)
 - **Real Google Maps integration** via @react-google-maps/api with restricted REACT_APP_GOOGLE_MAPS_API_KEY; custom SVG drop-pin markers in 4 category colors + InfoWindow on click
 - **Job-scoped real-time chat** (3s polling) with anti-poach sanitizer (phone, email, URL, contact-word redaction → `[hidden]`); per-job per-provider threads; customer thread tabs on open jobs; `/chats` inbox
+- **Adaptive service-request form** — location fields change based on category: pickup+dropoff for delivery/courier/moving, single "Service address" for handyman/cleaning/landscaping/auto/pet_care/personal_care/events, no location for remote/digital roles
+- **Provider counter-offers** — `POST /api/jobs/{id}/quotes` lets providers propose their own rate / unit / units / notes; one active quote per provider per job. Customer sees all quotes on the job detail page with Accept/Decline. Accepting locks the job at the quoted rate + assigns the provider and auto-declines other pending quotes. Providers see their `/quotes/mine` list on Provider Hub with withdraw support.
 
 ## Tested
 - Backend pytest **43/43** (24 prior + 19 new chat tests). Sanitizer covers international phone formats, obfuscated emails, off-platform contact words. Role-based redirect after login/register fixed.

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api, ALL_CATEGORIES, formatApiError } from "@/lib/api";
+import { api, ALL_CATEGORIES, LOCATION_COPY, locationModeFor, formatApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ export default function CustomerHub() {
     pickup_address: "", dropoff_address: "",
     media_url: null, media_type: null,
   });
+  const locMode = locationModeFor(form.category);
+  const locCopy = LOCATION_COPY[locMode];
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -54,9 +56,15 @@ export default function CustomerHub() {
         payment_terms: form.payment_terms,
         allowed_payment_methods: form.allowed_payment_methods,
         media_url: form.media_url, media_type: form.media_type,
-        pickup_location: form.pickup_address ? { lat: 40.7128, lng: -74.006, address: form.pickup_address } : null,
-        dropoff_location: form.dropoff_address ? { lat: 40.7128, lng: -74.006, address: form.dropoff_address } : null,
+        pickup_location: null,
+        dropoff_location: null,
       };
+      if (locMode === "pickup_dropoff") {
+        body.pickup_location = form.pickup_address ? { lat: 40.7128, lng: -74.006, address: form.pickup_address } : null;
+        body.dropoff_location = form.dropoff_address ? { lat: 40.7128, lng: -74.006, address: form.dropoff_address } : null;
+      } else if (locMode === "onsite") {
+        body.pickup_location = form.pickup_address ? { lat: 40.7128, lng: -74.006, address: form.pickup_address } : null;
+      }
       await api.post("/jobs", body);
       toast.success("Service request posted");
       setForm({ ...form, title: "", description: "", pay_rate: "", media_url: null, media_type: null });
@@ -116,17 +124,35 @@ export default function CustomerHub() {
               <Input type="number" step="0.5" value={form.estimated_units} onChange={(e) => set("estimated_units", e.target.value)} disabled={form.pay_unit === "flat"} data-testid="job-estimated-units" className="mt-1" />
             </div>
           </div>
-          {!ALL_CATEGORIES.find((c) => c.value === form.category)?.group.includes("remote") && (
-            <>
-              <div>
-                <Label className="overline">Pickup address (optional)</Label>
-                <Input value={form.pickup_address} onChange={(e) => set("pickup_address", e.target.value)} data-testid="job-pickup-address" className="mt-1" />
+          {locMode === "pickup_dropoff" && (
+            <div className="border-l-2 border-red-500 pl-3">
+              <div className="overline text-red-700 mb-2">{locCopy.title}</div>
+              <div className="space-y-3">
+                <div>
+                  <Label className="overline">{locCopy.pickup_label}</Label>
+                  <Input value={form.pickup_address} onChange={(e) => set("pickup_address", e.target.value)} placeholder={locCopy.pickup_placeholder} data-testid="job-pickup-address" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="overline">{locCopy.dropoff_label}</Label>
+                  <Input value={form.dropoff_address} onChange={(e) => set("dropoff_address", e.target.value)} placeholder={locCopy.dropoff_placeholder} data-testid="job-dropoff-address" className="mt-1" />
+                </div>
               </div>
+            </div>
+          )}
+          {locMode === "onsite" && (
+            <div className="border-l-2 border-blue-500 pl-3">
+              <div className="overline text-blue-700 mb-2">{locCopy.title}</div>
               <div>
-                <Label className="overline">Drop-off address (optional)</Label>
-                <Input value={form.dropoff_address} onChange={(e) => set("dropoff_address", e.target.value)} data-testid="job-dropoff-address" className="mt-1" />
+                <Label className="overline">{locCopy.pickup_label}</Label>
+                <Input value={form.pickup_address} onChange={(e) => set("pickup_address", e.target.value)} placeholder={locCopy.pickup_placeholder} data-testid="job-service-address" className="mt-1" required />
               </div>
-            </>
+            </div>
+          )}
+          {locMode === "remote" && (
+            <div className="border-l-2 border-teal-500 pl-3 py-2">
+              <div className="overline text-teal-700">{locCopy.title}</div>
+              <p className="text-xs text-slate-500 mt-1 font-mono">Remote-friendly — providers anywhere can apply.</p>
+            </div>
           )}
           <div>
             <Label className="overline">Allowed payment methods (terms)</Label>
