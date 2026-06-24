@@ -265,13 +265,32 @@ export default function CustomerHub() {
           <MediaUpload value={form} onChange={(v) => set("media_url", v.media_url) || setForm((f) => ({ ...f, ...v }))} />
           {isDeliveryCat && deliveryQuote && (
             <div className="border border-teal-700/40 bg-teal-50/40 p-4" data-testid="delivery-quote">
-              <div className="overline text-teal-800">Driver quote · auto-calculated</div>
+              <div className="flex items-center justify-between">
+                <div className="overline text-teal-800">Driver quote · auto-calculated</div>
+                {deliveryQuote.is_long_distance && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider border border-amber-400 bg-amber-50 text-amber-800 px-1.5 py-0.5">Long-distance</span>
+                )}
+              </div>
               <div className="font-mono text-sm mt-3 space-y-1">
-                <div className="flex justify-between"><span>Base fee</span><span>${deliveryQuote.base_fee.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Distance ({deliveryQuote.miles} mi × $1.50)</span><span>${deliveryQuote.distance_fee.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Item size ({form.details?.item_size || "other"})</span><span>${deliveryQuote.size_fee.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Base fee · {deliveryQuote.size_label}</span><span>${deliveryQuote.base_fee.toFixed(2)}</span></div>
+                <div className="flex justify-between">
+                  <span>First {deliveryQuote.short_distance_miles} mi × ${deliveryQuote.short_per_mile.toFixed(2)}</span>
+                  <span>${deliveryQuote.short_distance_fee.toFixed(2)}</span>
+                </div>
+                {deliveryQuote.is_long_distance && (
+                  <>
+                    <div className="flex justify-between text-amber-800">
+                      <span>Long-haul {deliveryQuote.long_distance_miles} mi × ${deliveryQuote.long_per_mile.toFixed(2)}</span>
+                      <span>${deliveryQuote.long_distance_fee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-800">
+                      <span>Long-haul surcharge (50+ mi)</span>
+                      <span>${deliveryQuote.long_haul_surcharge.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
                 {deliveryQuote.extra_items_fee > 0 && <div className="flex justify-between"><span>Extra items ({(form.details?.quantity || 1) - 1})</span><span>${deliveryQuote.extra_items_fee.toFixed(2)}</span></div>}
-                {deliveryQuote.weight_fee > 0 && <div className="flex justify-between"><span>Weight surcharge</span><span>${deliveryQuote.weight_fee.toFixed(2)}</span></div>}
+                {deliveryQuote.weight_fee > 0 && <div className="flex justify-between"><span>Weight surcharge (over 5 lb)</span><span>${deliveryQuote.weight_fee.toFixed(2)}</span></div>}
                 {deliveryQuote.fragile_multiplier > 1 && <div className="flex justify-between text-amber-700"><span>Fragile handling (+20%)</span><span>×{deliveryQuote.fragile_multiplier}</span></div>}
                 <div className="flex justify-between font-display text-base font-black border-t border-teal-700/30 pt-2 mt-2 text-teal-900">
                   <span>Driver receives</span><span data-testid="delivery-quote-total">${deliveryQuote.total.toFixed(2)}</span>
