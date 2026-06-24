@@ -30,6 +30,8 @@ export const ALL_CATEGORIES = [
   { value: "delivery", label: "Delivery", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "courier", label: "Courier", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "moving", label: "Moving", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "ride_share", label: "Ride / Rideshare", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "towing", label: "Towing / Roadside", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "handyman", label: "Handyman", group: "local_services", location_mode: "onsite" },
   { value: "cleaning", label: "Cleaning", group: "local_services", location_mode: "onsite" },
   { value: "landscaping", label: "Landscaping", group: "local_services", location_mode: "onsite" },

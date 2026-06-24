@@ -27,6 +27,21 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Ride + Towing service categories (Feb 2026)
+- Added `ride_share` and `towing` to `ALL_CATEGORIES` in both backend (`server.py`) and frontend (`api.js`), both in the `physical_delivery` group (red color)
+- New `ride_share` schema: subcategories (standard / XL / premium / WAV / airport / long-distance) + 9 fields (passengers, luggage, vehicle class, timing now-vs-scheduled, scheduled_for datetime-local, extra stops, child seat, pet, special requests)
+- New `towing` schema: 10 subcategories (breakdown, accident, flat tire, jump start, fuel delivery, lockout, winch pull-out, heavy duty, motorcycle, long distance) + 15 fields (vehicle type, make/model/year, drivetrain, wheels-turn, transmission, key availability, tow method, winch needed, urgency, scheduled_for, incident type, location type, distance, passengers, notes)
+- `ServiceDetailsForm` now renders `textarea` and `datetime-local` field types
+
+### Bug fix — rental booking decline (Feb 2026)
+- `POST /api/rental-bookings/{id}/decline` now returns **403 if the booking is not in `pending_approval` status**, preventing a contradictory "declined an approved booking" state (caught by testing agent in iteration_4.json)
+
+### Capacitor — native iOS + Android wrapping (Feb 2026)
+- Installed `@capacitor/core@^7 @capacitor/cli@^7 @capacitor/ios@^7 @capacitor/android@^7` (v7 used because container runs Node 20; v8 needs Node 22+)
+- Created `/app/frontend/capacitor.config.ts` (appId `com.lumo.app`, appName `Lumo`, `webDir: build`, live-reload server block commented in for easy enabling)
+- Created `/app/CAPACITOR_SETUP.md` — step-by-step guide for adding iOS/Android platforms, live-reload, plugin recommendations (camera, geolocation, push, biometrics), and App-Store/Play-Store publishing checklist
+- Native platforms (`ios/`, `android/`) NOT generated in this container (needs macOS + Xcode / Android Studio); user runs `npx cap add ios && npx cap add android` on their local dev machine
+
 ### Rentals marketplace (Feb 2026)
 - 11 consolidated categories: Property & Stays, Venues, Vehicles, Tools & Equipment, Photo Video & AV, Outdoor & Sports, Furniture Appliances & Electronics, Medical Mobility & Baby, Events Parties & Weddings, Storage & Containers, Site Services
 - Per-category subcategories + per-category filter schema (in both backend `RENTAL_TAXONOMY` and frontend `RENTAL_CATEGORIES`)

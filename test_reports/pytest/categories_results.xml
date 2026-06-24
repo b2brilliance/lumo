@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="6" time="2.056" timestamp="2026-06-24T22:29:11.768887+00:00" hostname="agent-env-db358817-76d9-4c47-9ee7-c7d67f4854e7"><testcase classname="tests.test_lumo_categories.TestNewJobCategories" name="test_create_ride_share_job" time="0.747" /><testcase classname="tests.test_lumo_categories.TestNewJobCategories" name="test_create_towing_job" time="0.215" /><testcase classname="tests.test_lumo_categories.TestNewJobCategories" name="test_categories_in_feed" time="0.378" /><testcase classname="tests.test_lumo_categories.TestNewJobCategories" name="test_filter_by_physical_delivery_group" time="0.113" /><testcase classname="tests.test_lumo_categories.TestDeclineGuards" name="test_decline_missing_booking_404" time="0.098" /><testcase classname="tests.test_lumo_categories.TestDeclineGuards" name="test_decline_non_owner_forbidden" time="0.417"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;missing&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;pricing&quot;],&quot;msg&quot;:&quot;Field required&quot;,&quot;input&quot;:{&quot;title&quot;:&quot;TEST_cat_rental_89891805&quot;,&quot;description&quot;:&quot;Test rental for decline-guard non-owner check&quot;,&quot;category&quot;:&quot;tools_equipment&quot;,&quot;daily_price&quot;:&quot;30&quot;,&quot;currency&quot;:&quot;USD&quot;,&quot;booking_mode&quot;:&quot;request&quot;,&quot;city&quot;:&quot;Test City&quot;,&quot;country&quot;:&quot;US&quot;,&quot;us_state&quot;:&quot;CA&quot;,&quot;photos&quot;:[]},&quot;url&quot;:&quot;https://errors.pydantic.dev/2.13/v/missing&quot;}]}&#10;assert 422 == 200&#10; +  where 422 = &lt;Response [422]&gt;.status_code">self = &lt;test_lumo_categories.TestDeclineGuards object at 0xf87990b15d90&gt;
+customer_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlN2JmM2FkMC0zMGMyLTQxZmEtODEwNi05MjE3NmQyZTFkZTEiLCJlbWFpbCI6ImN1c3Rv...VzdCIsInJvbGUiOiJjdXN0b21lciIsImV4cCI6MTc4Mjk0NDk1MiwidHlwZSI6ImFjY2VzcyJ9.iM2TxwdAaRCgAgJpvU87Q5vjNwrVFARSoxfPMsu20ng'
+provider_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzExODMxMi0yMWYwLTQwN2UtYmZkZS01NTc5NDZiYWUyZTIiLCJlbWFpbCI6InByb3Zp...VzdCIsInJvbGUiOiJwcm92aWRlciIsImV4cCI6MTc4Mjk0NDk1MywidHlwZSI6ImFjY2VzcyJ9.VnEUPRH6LmdR6TTRk7ZhZ-JQQs99b_2Mq2yViRk3Bqw'
+
+    def test_decline_non_owner_forbidden(self, customer_token, provider_token):
+        # 1) Create a request-mode rental as customer (owner)
+        rental_body = {
+            "title": f"TEST_cat_rental_{uuid.uuid4().hex[:8]}",
+            "description": "Test rental for decline-guard non-owner check",
+            "category": "tools_equipment",
+            "daily_price": "30",
+            "currency": "USD",
+            "booking_mode": "request",
+            "city": "Test City",
+            "country": "US",
+            "us_state": "CA",
+            "photos": [],
+        }
+        cr = requests.post(f"{API}/rentals", json=rental_body, headers=_h(customer_token), timeout=15)
+&gt;       assert cr.status_code == 200, cr.text
+E       AssertionError: {"detail":[{"type":"missing","loc":["body","pricing"],"msg":"Field required","input":{"title":"TEST_cat_rental_89891805","description":"Test rental for decline-guard non-owner check","category":"tools_equipment","daily_price":"30","currency":"USD","booking_mode":"request","city":"Test City","country":"US","us_state":"CA","photos":[]},"url":"https://errors.pydantic.dev/2.13/v/missing"}]}
+E       assert 422 == 200
+E        +  where 422 = &lt;Response [422]&gt;.status_code
+
+tests/test_lumo_categories.py:143: AssertionError</failure></testcase></testsuite></testsuites>

@@ -55,10 +55,10 @@ REMOTE_FRIENDLY_CATEGORIES = {
 }
 
 ALL_CATEGORIES = [
-    # delivery
-    "delivery", "courier", "moving",
+    # delivery / transport
+    "delivery", "courier", "moving", "ride_share", "towing",
     # local services
-    "handyman", "cleaning", "landscaping", "auto", "pet_care", "personal_care", "events",
+    "handyman", "cleaning", "landscaping", "auto", "pet_care", "personal_care", "events", "medical",
     # tech/digital + remote
     "digital_tech", "marketing", "business_admin", "education",
     "legal", "financial", "remote_work", "research",
@@ -67,7 +67,7 @@ ALL_CATEGORIES = [
 def category_group(cat: str) -> str:
     if cat in REMOTE_FRIENDLY_CATEGORIES:
         return "remote_jobs"
-    if cat in {"delivery", "courier", "moving"}:
+    if cat in {"delivery", "courier", "moving", "ride_share", "towing"}:
         return "physical_delivery"
     if cat in {"digital_tech", "marketing", "business_admin", "education", "legal", "financial", "research"}:
         return "tech_digital"
@@ -1571,6 +1571,8 @@ async def decline_rental_booking(booking_id: str, user: dict = Depends(get_curre
         raise HTTPException(404, "Booking not found")
     if b["owner_id"] != user["id"]:
         raise HTTPException(403, "Not allowed")
+    if b["status"] != "pending_approval":
+        raise HTTPException(403, f"Booking is not awaiting approval (status: {b['status']})")
     await db.rental_bookings.update_one({"id": booking_id}, {"$set": {"status": "declined", "declined_at": now_iso()}})
     await db.notifications.insert_one({
         "id": str(uuid.uuid4()),

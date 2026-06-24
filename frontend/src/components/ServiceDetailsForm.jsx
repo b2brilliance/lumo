@@ -54,6 +54,29 @@ function FieldRenderer({ field, value, onChange }) {
       </div>
     );
   }
+  if (field.type === "textarea") {
+    return (
+      <textarea
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        rows={3}
+        className="mt-1 w-full border border-slate-300 px-3 py-2 text-sm"
+        data-testid={`detail-${field.name}`}
+      />
+    );
+  }
+  if (field.type === "datetime-local") {
+    return (
+      <Input
+        type="datetime-local"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1"
+        data-testid={`detail-${field.name}`}
+      />
+    );
+  }
   // text fallback
   return (
     <Input
