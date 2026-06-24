@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { api, ALL_CATEGORIES, LOCATION_COPY, locationModeFor, formatApiError } from "@/lib/api";
+import React, { useEffect, useMemo, useState } from "react";
+import { api, ALL_CATEGORIES, LOCATION_COPY, locationModeFor, locationLabelsFor, formatApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import MediaUpload from "@/components/MediaUpload";
 import AddressInput from "@/components/AddressInput";
+import MapPickerButton from "@/components/MapPickerButton";
 import ServiceDetailsForm from "@/components/ServiceDetailsForm";
+import { computeDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
@@ -29,7 +31,35 @@ export default function CustomerHub() {
     details: {},
   });
   const locMode = locationModeFor(form.category);
-  const locCopy = LOCATION_COPY[locMode];
+  const locCopy = locationLabelsFor(form.category, form.details?.subcategory) || LOCATION_COPY[locMode];
+
+  // Delivery / courier auto-quote
+  const isDeliveryCat = form.category === "delivery" || form.category === "courier";
+  const deliveryQuote = useMemo(() => {
+    if (!isDeliveryCat) return null;
+    if (form.pickup_lat == null || form.dropoff_lat == null) return null;
+    const miles = milesBetween(
+      { lat: form.pickup_lat, lng: form.pickup_lng },
+      { lat: form.dropoff_lat, lng: form.dropoff_lng }
+    );
+    return computeDeliveryQuote({
+      miles,
+      item_size: form.details?.item_size || "other",
+      quantity: form.details?.quantity || 1,
+      weight_estimate: form.details?.weight_estimate || 0,
+      fragile: form.details?.fragile === "yes",
+    });
+  }, [isDeliveryCat, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.item_size, form.details?.quantity, form.details?.weight_estimate, form.details?.fragile]);
+
+  // Auto-fill pay_rate from quote
+  useEffect(() => {
+    if (deliveryQuote && deliveryQuote.total > 0) {
+      setForm((f) => {
+        if (f.category !== "delivery" && f.category !== "courier") return f;
+        return { ...f, pay_rate: deliveryQuote.total.toFixed(2), pay_unit: "flat", estimated_units: "1" };
+      });
+    }
+  }, [deliveryQuote]);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -67,6 +97,7 @@ export default function CustomerHub() {
         pickup_location: null,
         dropoff_location: null,
         details: form.details || {},
+        delivery_quote: deliveryQuote || null,
       };
       if (locMode === "pickup_dropoff") {
         body.pickup_location = form.pickup_address ? { lat: form.pickup_lat ?? 40.7128, lng: form.pickup_lng ?? -74.006, address: form.pickup_address } : null;
@@ -129,7 +160,12 @@ export default function CustomerHub() {
               <Input type="number" step="0.01" value={form.pay_rate} onChange={(e) => set("pay_rate", e.target.value)} required data-testid="job-pay-rate" className="mt-1" />
             </div>
             <div>
-              <Label className="overline">Est. units{form.pay_unit !== "flat" && ` (${form.pay_unit}s)`}</Label>
+              <Label className="overline">
+                {form.pay_unit === "flat" ? "Estimated time" :
+                 form.pay_unit === "hour" ? "How many hours?" :
+                 form.pay_unit === "day" ? "How many days?" :
+                 form.pay_unit === "week" ? "How many weeks?" : "Estimated units"}
+              </Label>
               <Input type="number" step="0.5" value={form.estimated_units} onChange={(e) => set("estimated_units", e.target.value)} disabled={form.pay_unit === "flat"} data-testid="job-estimated-units" className="mt-1" />
             </div>
           </div>
@@ -144,25 +180,37 @@ export default function CustomerHub() {
               <div className="space-y-3">
                 <div>
                   <Label className="overline">{locCopy.pickup_label}</Label>
-                  <div className="mt-1">
-                    <AddressInput
-                      value={form.pickup_address}
-                      onChange={(v) => set("pickup_address", v)}
-                      onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
-                      placeholder={locCopy.pickup_placeholder}
-                      data-testid="job-pickup-address"
+                  <div className="mt-1 flex gap-2 items-start">
+                    <div className="flex-1">
+                      <AddressInput
+                        value={form.pickup_address}
+                        onChange={(v) => set("pickup_address", v)}
+                        onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
+                        placeholder={locCopy.pickup_placeholder}
+                        data-testid="job-pickup-address"
+                      />
+                    </div>
+                    <MapPickerButton
+                      value={{ lat: form.pickup_lat, lng: form.pickup_lng, address: form.pickup_address }}
+                      onPick={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
                     />
                   </div>
                 </div>
                 <div>
                   <Label className="overline">{locCopy.dropoff_label}</Label>
-                  <div className="mt-1">
-                    <AddressInput
-                      value={form.dropoff_address}
-                      onChange={(v) => set("dropoff_address", v)}
-                      onPlace={(p) => setForm((f) => ({ ...f, dropoff_address: p.address, dropoff_lat: p.lat, dropoff_lng: p.lng }))}
-                      placeholder={locCopy.dropoff_placeholder}
-                      data-testid="job-dropoff-address"
+                  <div className="mt-1 flex gap-2 items-start">
+                    <div className="flex-1">
+                      <AddressInput
+                        value={form.dropoff_address}
+                        onChange={(v) => set("dropoff_address", v)}
+                        onPlace={(p) => setForm((f) => ({ ...f, dropoff_address: p.address, dropoff_lat: p.lat, dropoff_lng: p.lng }))}
+                        placeholder={locCopy.dropoff_placeholder}
+                        data-testid="job-dropoff-address"
+                      />
+                    </div>
+                    <MapPickerButton
+                      value={{ lat: form.dropoff_lat, lng: form.dropoff_lng, address: form.dropoff_address }}
+                      onPick={(p) => setForm((f) => ({ ...f, dropoff_address: p.address, dropoff_lat: p.lat, dropoff_lng: p.lng }))}
                     />
                   </div>
                 </div>
@@ -174,14 +222,20 @@ export default function CustomerHub() {
               <div className="overline text-blue-700 mb-2">{locCopy.title}</div>
               <div>
                 <Label className="overline">{locCopy.pickup_label}</Label>
-                <div className="mt-1">
-                  <AddressInput
-                    value={form.pickup_address}
-                    onChange={(v) => set("pickup_address", v)}
-                    onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
-                    placeholder={locCopy.pickup_placeholder}
-                    data-testid="job-service-address"
-                    required
+                <div className="mt-1 flex gap-2 items-start">
+                  <div className="flex-1">
+                    <AddressInput
+                      value={form.pickup_address}
+                      onChange={(v) => set("pickup_address", v)}
+                      onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
+                      placeholder={locCopy.pickup_placeholder}
+                      data-testid="job-service-address"
+                      required
+                    />
+                  </div>
+                  <MapPickerButton
+                    value={{ lat: form.pickup_lat, lng: form.pickup_lng, address: form.pickup_address }}
+                    onPick={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
                   />
                 </div>
               </div>
@@ -209,6 +263,25 @@ export default function CustomerHub() {
             <Textarea value={form.payment_terms} onChange={(e) => set("payment_terms", e.target.value)} placeholder="e.g. Pay after delivery, half cash half app" data-testid="job-payment-terms" className="mt-1" />
           </div>
           <MediaUpload value={form} onChange={(v) => set("media_url", v.media_url) || setForm((f) => ({ ...f, ...v }))} />
+          {isDeliveryCat && deliveryQuote && (
+            <div className="border border-teal-700/40 bg-teal-50/40 p-4" data-testid="delivery-quote">
+              <div className="overline text-teal-800">Driver quote · auto-calculated</div>
+              <div className="font-mono text-sm mt-3 space-y-1">
+                <div className="flex justify-between"><span>Base fee</span><span>${deliveryQuote.base_fee.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Distance ({deliveryQuote.miles} mi × $1.50)</span><span>${deliveryQuote.distance_fee.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Item size ({form.details?.item_size || "other"})</span><span>${deliveryQuote.size_fee.toFixed(2)}</span></div>
+                {deliveryQuote.extra_items_fee > 0 && <div className="flex justify-between"><span>Extra items ({(form.details?.quantity || 1) - 1})</span><span>${deliveryQuote.extra_items_fee.toFixed(2)}</span></div>}
+                {deliveryQuote.weight_fee > 0 && <div className="flex justify-between"><span>Weight surcharge</span><span>${deliveryQuote.weight_fee.toFixed(2)}</span></div>}
+                {deliveryQuote.fragile_multiplier > 1 && <div className="flex justify-between text-amber-700"><span>Fragile handling (+20%)</span><span>×{deliveryQuote.fragile_multiplier}</span></div>}
+                <div className="flex justify-between font-display text-base font-black border-t border-teal-700/30 pt-2 mt-2 text-teal-900">
+                  <span>Driver receives</span><span data-testid="delivery-quote-total">${deliveryQuote.total.toFixed(2)}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2 leading-snug">
+                This is what the driver sees. You can adjust the rate above if your job is unusual.
+              </p>
+            </div>
+          )}
           <Button type="submit" disabled={busy} className="w-full bg-slate-900 hover:bg-slate-800" data-testid="post-job-submit">
             {busy ? "Posting…" : "Post request"}
           </Button>

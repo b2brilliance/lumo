@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { AuthProvider, useAuth } from "@/lib/auth";
 import NavBar from "@/components/NavBar";
 import NotificationsBridge from "@/components/NotificationsBridge";
+import AssistantWidget from "@/components/AssistantWidget";
 import { Toaster } from "@/components/ui/sonner";
 
 import Landing from "@/pages/Landing";
@@ -68,6 +69,7 @@ function App() {
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />
+          <AssistantWidget />
         </AuthProvider>
       </BrowserRouter>
     </div>

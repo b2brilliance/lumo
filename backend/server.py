@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest
 )
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 # ────────────────────────────────────────────────────────────────────────────
 # Setup
@@ -207,6 +208,7 @@ class JobCreate(BaseModel):
     payment_terms: Optional[str] = None  # free text terms
     allowed_payment_methods: Optional[List[PaymentMethod]] = None
     details: Optional[dict] = None  # schema-driven subcategory + fields
+    delivery_quote: Optional[dict] = None  # breakdown of delivery pricing (P2P only)
 
 class JobAccept(BaseModel):
     job_id: str
@@ -222,6 +224,7 @@ class MarketplaceListingCreate(BaseModel):
     media_url: Optional[str] = None
     media_type: Optional[str] = None
     delivery_available: bool = True
+    attributes: Optional[dict] = None
 
 class StorefrontUpsert(BaseModel):
     name: str
@@ -265,6 +268,9 @@ class WithdrawRequest(BaseModel):
     amount: float
     method: str = "bank_transfer"
     notes: Optional[str] = None
+
+class AssistantChat(BaseModel):
+    message: str
 
 class MessageCreate(BaseModel):
     body: str
@@ -446,6 +452,7 @@ async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
         "payment_terms": body.payment_terms or "",
         "allowed_payment_methods": body.allowed_payment_methods or ["app", "cash", "card"],
         "details": body.details or {},
+        "delivery_quote": body.delivery_quote or None,
         "status": "open",
         "provider_id": None,
         "deposit_paid": False,
@@ -564,6 +571,7 @@ async def create_listing(body: MarketplaceListingCreate, user: dict = Depends(ge
         "media_url": body.media_url,
         "media_type": body.media_type,
         "delivery_available": body.delivery_available,
+        "attributes": body.attributes or {},
         "status": "active",
         "created_at": now_iso(),
     }
@@ -1073,6 +1081,80 @@ async def chat_inbox(user: dict = Depends(get_current_user)):
 
 @api.get("/health")
 async def health():
+    return {"ok": True}
+
+# ────────────────────────────────────────────────────────────────────────────
+# AI Assistant (Claude Sonnet via Emergent LLM key)
+# ────────────────────────────────────────────────────────────────────────────
+ASSISTANT_SYSTEM_PROMPT = """You are Lumi, the friendly in-app assistant for Lumo — a multi-category marketplace that connects customers with providers for deliveries, local services (handyman, cleaning, landscaping, auto, pet care, personal care, events), digital/remote work, and orders from local stores and restaurants.
+
+Your job is to help users:
+- Understand how Lumo works (posting requests, accepting quotes, payments, wallets, deliveries).
+- Walk them through ordering, pricing, and choosing the right category.
+- Answer questions about payment terms: a 10% bundled deposit on item + 10% delivery is collected at checkout, held by Lumo until the work is done. The remaining balance is paid via app, card, or cash by mutual agreement.
+- Explain that providers can accept at the asking rate OR send a counter-offer (quote). Pay units are per hour, day, week, or flat.
+- Help fill out the right details for the service category (e.g., for cleaning: rooms, tasks, # bathrooms, laundry loads; for auto roadside: gas/battery/tire + vehicle make/model/year; for moving: from/to addresses + property size).
+- Help customers describe what they need clearly.
+
+Tone: warm, concise, plain-spoken. No emojis. Use short paragraphs and bullet lists when it helps. Never ask for or display phone numbers, emails, or off-platform contact details — keep everything on Lumo.
+If asked something you genuinely don't know, say so and suggest the user post a service request or message a provider directly.
+Keep replies under ~180 words unless the user clearly needs more.
+"""
+
+@api.post("/assistant/chat")
+async def assistant_chat(body: AssistantChat, user: dict = Depends(get_current_user)):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "Assistant unavailable")
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(400, "Empty message")
+    if len(text) > 2000:
+        raise HTTPException(400, "Message too long")
+    session_id = f"lumo-asst-{user['id']}"
+    # Load saved history doc (one per user)
+    history_doc = await db.assistant_chats.find_one({"user_id": user["id"]}) or {
+        "user_id": user["id"], "messages": [], "created_at": now_iso()
+    }
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=session_id,
+        system_message=ASSISTANT_SYSTEM_PROMPT,
+    ).with_model("anthropic", "claude-sonnet-4-6")
+    # Replay prior turns into the LlmChat instance
+    for m in history_doc.get("messages", [])[-20:]:  # cap context
+        if m["role"] == "user":
+            try:
+                await chat.send_message(UserMessage(text=m["content"]))
+            except Exception:
+                break
+    try:
+        reply = await chat.send_message(UserMessage(text=text))
+    except Exception as e:
+        logger.error(f"Assistant error: {e}")
+        raise HTTPException(502, "Assistant temporarily unavailable")
+    # Persist turns
+    ts = now_iso()
+    new_msgs = history_doc.get("messages", []) + [
+        {"role": "user", "content": text, "ts": ts},
+        {"role": "assistant", "content": reply, "ts": now_iso()},
+    ]
+    await db.assistant_chats.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"user_id": user["id"], "messages": new_msgs[-40:], "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"reply": reply}
+
+@api.get("/assistant/history")
+async def assistant_history(user: dict = Depends(get_current_user)):
+    doc = await db.assistant_chats.find_one({"user_id": user["id"]})
+    if not doc:
+        return {"messages": []}
+    return {"messages": doc.get("messages", [])}
+
+@api.post("/assistant/clear")
+async def assistant_clear(user: dict = Depends(get_current_user)):
+    await db.assistant_chats.delete_one({"user_id": user["id"]})
     return {"ok": True}
 
 # ────────────────────────────────────────────────────────────────────────────

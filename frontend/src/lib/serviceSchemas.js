@@ -314,6 +314,90 @@ export const SERVICE_SCHEMAS = {
     ],
   },
 
+  medical: {
+    subcategoryLabel: "Care needed",
+    subcategories: {
+      // Licensed medical
+      nursing: { label: "Skilled nursing visit (RN/LPN)" },
+      home_health_aide: { label: "Home health aide" },
+      iv_infusion: { label: "IV therapy / infusion" },
+      wound_care: { label: "Wound care" },
+      medication_admin: { label: "Medication administration" },
+      blood_draw: { label: "Blood draw / mobile phlebotomy" },
+      vaccination: { label: "Vaccination / immunization" },
+      mobile_imaging: { label: "Mobile imaging (X-ray / ultrasound)" },
+      // Therapies
+      physical_therapy: { label: "Physical therapy" },
+      occupational_therapy: { label: "Occupational therapy" },
+      speech_therapy: { label: "Speech therapy" },
+      respiratory_therapy: { label: "Respiratory therapy" },
+      // Mental & specialty
+      mental_health: { label: "Mental health visit (LCSW / LMFT / psychiatrist)" },
+      hospice_palliative: { label: "Hospice / palliative care" },
+      lactation: { label: "Lactation consultant (IBCLC)" },
+      doula: { label: "Doula (birth / postpartum)" },
+      // ADL support (CNA / HHA)
+      bathing: { label: "ADL: Bathing assistance" },
+      dressing: { label: "ADL: Dressing assistance" },
+      toileting: { label: "ADL: Toileting / continence care" },
+      transferring: { label: "ADL: Transfer / mobility assistance" },
+      feeding: { label: "ADL: Feeding assistance" },
+      meal_prep: { label: "Meal prep & feeding support" },
+      med_reminders: { label: "Medication reminders" },
+      companion_care: { label: "Companion care" },
+      respite: { label: "Respite care (relief for family caregiver)" },
+      dementia_care: { label: "Dementia / Alzheimer's care" },
+    },
+    baseFields: [
+      { name: "license_required", label: "License required (we will verify)", type: "select", required: true, options: [
+        { value: "rn_lpn", label: "RN / LPN (nursing)" },
+        { value: "cna_hha", label: "CNA / HHA (aide)" },
+        { value: "pt", label: "Physical therapist (DPT / PT)" },
+        { value: "ot", label: "Occupational therapist (OT)" },
+        { value: "slp", label: "Speech-language pathologist (SLP)" },
+        { value: "rt", label: "Respiratory therapist (RT)" },
+        { value: "phlebotomist", label: "Phlebotomist (CPT)" },
+        { value: "mental_health", label: "LCSW / LMFT / psychologist / psychiatrist" },
+        { value: "ibclc", label: "IBCLC (lactation)" },
+        { value: "doula", label: "Certified doula" },
+        { value: "md_do_np_pa", label: "Physician / NP / PA" },
+        { value: "rad_tech", label: "Radiologic technologist" },
+        { value: "other", label: "Other / unsure" },
+      ]},
+      { name: "patient_age", label: "Patient age", type: "select", options: [
+        { value: "infant", label: "Infant (< 1)" },
+        { value: "child", label: "Child (1–12)" },
+        { value: "teen", label: "Teen (13–17)" },
+        { value: "adult", label: "Adult (18–64)" },
+        { value: "senior", label: "Senior (65+)" },
+      ]},
+      { name: "visit_type", label: "Visit type", type: "select", options: [
+        { value: "one_time", label: "One-time visit" },
+        { value: "short_term", label: "Short-term (a few visits)" },
+        { value: "ongoing", label: "Ongoing / weekly" },
+        { value: "24_7", label: "24/7 / live-in" },
+      ]},
+      { name: "duration_hours", label: "Approx. visit length (hours)", type: "number", min: 0.5, step: 0.5, default: 1 },
+      { name: "mobility", label: "Patient mobility", type: "select", options: [
+        { value: "ambulatory", label: "Ambulatory / independent" },
+        { value: "assist", label: "Needs some assistance" },
+        { value: "wheelchair", label: "Wheelchair" },
+        { value: "bedbound", label: "Bedbound" },
+      ]},
+      { name: "conditions", label: "Relevant conditions (optional)", type: "text", placeholder: "Diabetes, Parkinson's, post-surgery, etc." },
+      { name: "equipment_provided", label: "Equipment / supplies", type: "select", options: [
+        { value: "provider", label: "Provider brings" },
+        { value: "customer", label: "Customer has on hand" },
+        { value: "either", label: "Either is fine" },
+      ]},
+      { name: "background_check", label: "Background check required", type: "select", options: [
+        { value: "required", label: "Yes — required" },
+        { value: "preferred", label: "Preferred" },
+        { value: "not_needed", label: "Not needed" },
+      ], default: "required" },
+    ],
+  },
+
   // Digital / remote
   digital_tech: {
     subcategoryLabel: "Service area",

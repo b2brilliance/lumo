@@ -9,6 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import AddressInput from "@/components/AddressInput";
+import MapPickerButton from "@/components/MapPickerButton";
+import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 
 export default function StoreProfile({ role }) {
@@ -19,7 +21,8 @@ export default function StoreProfile({ role }) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState(null);
   const [order, setOrder] = useState({
-    quantity: 1, delivery_address: "", delivery_fee: "9.99", notes: "",
+    quantity: 1, delivery_address: "", delivery_fee: "0", notes: "",
+    delivery_lat: null, delivery_lng: null,
     payment_methods: ["app", "cash", "card"], terms: "",
   });
   const [busy, setBusy] = useState(false);
@@ -40,9 +43,20 @@ export default function StoreProfile({ role }) {
       return;
     }
     setTarget(it);
-    setOrder((o) => ({ ...o, quantity: 1, delivery_address: "" }));
+    setOrder((o) => ({ ...o, quantity: 1, delivery_address: "", delivery_lat: null, delivery_lng: null }));
     setOpen(true);
   };
+
+  const storeLoc = store?.storefront?.location;
+  const storeMiles = storeLoc && order.delivery_lat != null
+    ? milesBetween({ lat: storeLoc.lat, lng: storeLoc.lng }, { lat: order.delivery_lat, lng: order.delivery_lng })
+    : null;
+  const storeQuote = storeMiles != null ? computeStoreDeliveryQuote({ miles: storeMiles }) : null;
+
+  React.useEffect(() => {
+    if (storeQuote) setOrder((o) => ({ ...o, delivery_fee: storeQuote.total.toFixed(2) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeMiles]);
 
   const togglePM = (m) => setOrder((o) => ({
     ...o, payment_methods: o.payment_methods.includes(m) ? o.payment_methods.filter((x) => x !== m) : [...o.payment_methods, m]
@@ -127,6 +141,24 @@ export default function StoreProfile({ role }) {
           </DialogHeader>
           {target && (
             <div className="space-y-4">
+              <div>
+                <Label className="overline">Delivery address</Label>
+                <div className="mt-1 flex gap-2 items-start">
+                  <div className="flex-1">
+                    <AddressInput
+                      value={order.delivery_address}
+                      onChange={(v) => setOrder({ ...order, delivery_address: v })}
+                      onPlace={(p) => setOrder((o) => ({ ...o, delivery_address: p.address, delivery_lat: p.lat, delivery_lng: p.lng }))}
+                      placeholder="Where should we deliver?"
+                      data-testid="order-delivery-address"
+                    />
+                  </div>
+                  <MapPickerButton
+                    value={{ lat: order.delivery_lat, lng: order.delivery_lng, address: order.delivery_address }}
+                    onPick={(p) => setOrder((o) => ({ ...o, delivery_address: p.address, delivery_lat: p.lat, delivery_lng: p.lng }))}
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="overline">Quantity</Label>
@@ -137,17 +169,14 @@ export default function StoreProfile({ role }) {
                   <Input type="number" step="0.01" value={order.delivery_fee} onChange={(e) => setOrder({ ...order, delivery_fee: e.target.value })} data-testid="order-delivery-fee" className="mt-1" />
                 </div>
               </div>
-              <div>
-                <Label className="overline">Delivery address</Label>
-                <div className="mt-1">
-                  <AddressInput
-                    value={order.delivery_address}
-                    onChange={(v) => setOrder({ ...order, delivery_address: v })}
-                    placeholder="Where should we deliver?"
-                    data-testid="order-delivery-address"
-                  />
+              {storeQuote && (
+                <div className="border border-teal-700/40 bg-teal-50/40 p-3 text-xs font-mono space-y-0.5" data-testid="store-delivery-quote">
+                  <div className="overline text-teal-800 mb-1">Delivery from {store.storefront.name}</div>
+                  <div className="flex justify-between"><span>Base</span><span>${storeQuote.base_fee.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span>{storeQuote.miles} mi × $1.50</span><span>${storeQuote.distance_fee.toFixed(2)}</span></div>
+                  <div className="flex justify-between font-bold text-teal-900 border-t border-teal-700/30 pt-1 mt-1"><span>Auto-quote</span><span>${storeQuote.total.toFixed(2)}</span></div>
                 </div>
-              </div>
+              )}
               <div>
                 <Label className="overline">Payment methods accepted (for balance)</Label>
                 <div className="flex gap-4 mt-2 text-sm">

@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
 import AddressInput from "@/components/AddressInput";
+import { MARKETPLACE_CATEGORY_OPTIONS, MARKETPLACE_SCHEMAS } from "@/lib/marketplaceSchemas";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -35,12 +38,18 @@ export default function Marketplace() {
       await api.post("/marketplace/listings", { ...form, price: parseFloat(form.price) });
       toast.success("Listing created");
       setOpenCreate(false);
-      setForm({ title: "", description: "", price: "", category: "other", media_url: null, media_type: null, delivery_available: true });
+      setForm({ title: "", description: "", price: "", category: "other", media_url: null, media_type: null, delivery_available: true, attributes: { subcategory: "" } });
       load();
     } catch (e) {
       toast.error(formatApiError(e));
     }
   };
+
+  const catSchema = MARKETPLACE_SCHEMAS[form.category];
+  const subFields = catSchema?.subcategories?.[form.attributes?.subcategory]?.fields || [];
+  const allFields = [...(catSchema?.baseFields || []), ...subFields];
+  const setAttr = (k, v) => setForm((f) => ({ ...f, attributes: { ...(f.attributes || {}), [k]: v } }));
+  const visible = (field) => !field.showIf || Object.entries(field.showIf).every(([k, v]) => form.attributes?.[k] === v);
 
   const checkout = async () => {
     if (!user || user === false) { window.location.href = "/login"; return; }
@@ -126,9 +135,49 @@ export default function Marketplace() {
               </div>
               <div>
                 <Label className="overline">Category</Label>
-                <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="listing-category" className="mt-1" />
+                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v, attributes: { subcategory: "" } })}>
+                  <SelectTrigger className="mt-1" data-testid="listing-category"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {MARKETPLACE_CATEGORY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+            {catSchema && (
+              <div className="space-y-3 border border-slate-200 p-3 bg-slate-50/40" data-testid="listing-attributes">
+                <div className="overline">Item details</div>
+                <div>
+                  <Label className="overline">{catSchema.subcategoryLabel || "Type"}</Label>
+                  <Select value={form.attributes?.subcategory || ""} onValueChange={(v) => setAttr("subcategory", v)}>
+                    <SelectTrigger className="mt-1" data-testid="listing-subcategory"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(catSchema.subcategories).map(([v, opt]) => (
+                        <SelectItem key={v} value={v}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {allFields.filter(visible).map((f) => (
+                  <div key={f.name}>
+                    <Label className="overline">{f.label}{f.required && <span className="text-red-600 ml-0.5">*</span>}</Label>
+                    {f.type === "select" ? (
+                      <Select value={form.attributes?.[f.name] || ""} onValueChange={(v) => setAttr(f.name, v)}>
+                        <SelectTrigger className="mt-1" data-testid={`listing-attr-${f.name}`}><SelectValue placeholder="Choose…" /></SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {f.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : f.type === "number" ? (
+                      <Input type="number" min={f.min} max={f.max} step={f.step || 1} value={form.attributes?.[f.name] ?? ""} onChange={(e) => setAttr(f.name, e.target.value === "" ? null : parseFloat(e.target.value))} className="mt-1" data-testid={`listing-attr-${f.name}`} />
+                    ) : (
+                      <Input value={form.attributes?.[f.name] || ""} onChange={(e) => setAttr(f.name, e.target.value)} placeholder={f.placeholder} className="mt-1" data-testid={`listing-attr-${f.name}`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <MediaUpload value={form} onChange={(v) => setForm((f) => ({ ...f, ...v }))} />
             <DialogFooter>
               <Button type="submit" className="bg-slate-900 hover:bg-slate-800" data-testid="listing-submit">Create</Button>
