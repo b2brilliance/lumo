@@ -27,6 +27,13 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Calendar polish + Rental owner inbox (Feb 2026)
+- Replaced native `<input type="date">` on `/rentals/:id` with **shadcn Popover + Calendar** (react-day-picker) — individual booked days now visually greyed-out via `disabled={dayDisabled}` matcher (past + every blocked range). End-date matcher additionally blocks ranges that would span a booked window starting after `start_date`.
+- New **Rental owner inbox** at `/rentals/inbox` (`RentalInbox.jsx`) — stat tiles + 6 filter tabs (All / Pending / Awaiting payment / Confirmed / Completed / Declined) + per-row rental thumbnail + Approve/Decline actions for `pending_approval` bookings.
+- `GET /api/rental-bookings/mine` (and admin variant) now enriches each booking with `rental{title, category, media_url}` so the inbox can render thumbnails without N+1 round-trips client-side.
+- Navbar adds an `Inbox` icon next to chats (`nav-rental-inbox`) for signed-in users.
+- Verified by testing agent iteration_7: 93/93 backend tests pass; code-review confirmed all 12 acceptance criteria wired correctly.
+
 ### Admin / Operator console + Rental availability calendar + Multi-photo gallery (Feb 2026)
 - **Admin Console** at `/admin` (gated `role==='admin'`) — `AdminConsole.jsx` with 4 stat tiles + 4 tabs:
   - Credentials: list pending creds w/ owner info → Verify / Reject buttons
@@ -110,8 +117,6 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## Backlog
 - **P1**: Re-run /app/backend/tests/test_lumo_new_features.py and clean up the `used_model` field shape (strip provider prefix OR document it)
-- **P2**: Migrate `/rentals/:id` date pickers from native `<input type="date">` to shadcn `Calendar` w/ `disabledMatcher` so individual booked dates are visually greyed-out (currently min/max only)
-- **P2**: Rental owner dashboard (bookings inbox, approve/decline UI for request-mode rentals) — backend done; need dedicated host UI
 - **P2**: Rename `admin_stats.pending_withdrawals` (currently counts pending+initiated+completed)
 - **P3**: Brute-force rate limiting on `/auth/login`
 - **P3**: Split `server.py` into routers — now ~3400 lines (flagged in 4 consecutive iterations)
@@ -123,5 +128,3 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## Next Tasks
 - Split `server.py` (3530 lines) into `APIRouter`-based modules (`routes/admin.py`, `routes/rentals.py`, `routes/cart.py`, `routes/auth.py`)
-- shadcn Calendar upgrade on rental date pickers (P2)
-- Rental owner-facing booking inbox UI (P2)
