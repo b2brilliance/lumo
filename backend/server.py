@@ -13,6 +13,8 @@ import math
 import secrets
 import requests
 import re
+import json
+import base64
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
@@ -28,7 +30,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest
 )
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 # ────────────────────────────────────────────────────────────────────────────
 # Setup
@@ -1812,6 +1814,310 @@ async def credentials_country_requirements(country: Optional[str] = None):
         c = country.upper()
         return {"country": c, "credentials": COUNTRY_BUSINESS_CREDENTIALS.get(c, [])}
     return {"profiles": COUNTRY_BUSINESS_CREDENTIALS}
+
+# ────────────────────────────────────────────────────────────────────────────
+# AI-powered document verification (Claude → Gemini fallback, vision).
+# Reads any uploaded image/PDF, extracts key fields, cross-checks against a
+# regex/format whitelist for the expected credential kind, and returns a
+# verdict + confidence + plain-English explanation. Confidence ≥ 0.90 auto-
+# verifies the credential; anything lower queues for human review.
+# ────────────────────────────────────────────────────────────────────────────
+AI_VERIFY_AUTO_THRESHOLD = 0.90
+_VISION_MIME_OK = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
+
+class CredentialVerifyRequest(BaseModel):
+    """Optional override context — normally inferred from the credential record."""
+    notes: Optional[str] = None
+
+class MediaVerifyRequest(BaseModel):
+    purpose: Literal["content_moderation", "license_doc", "id_doc", "business_doc"] = "content_moderation"
+    expected_kind: Optional[str] = None      # e.g. "siret"
+    country: Optional[str] = None
+    expected_regex: Optional[str] = None
+    notes: Optional[str] = None
+
+def _find_country_for_kind(kind: str) -> Optional[str]:
+    for cc, creds in COUNTRY_BUSINESS_CREDENTIALS.items():
+        for c in creds:
+            if c["kind"] == kind:
+                return cc
+    return None
+
+def _cred_schema_for(kind: str, country: Optional[str] = None) -> Optional[dict]:
+    if country:
+        for c in COUNTRY_BUSINESS_CREDENTIALS.get(country.upper(), []):
+            if c["kind"] == kind:
+                return c
+    for creds in COUNTRY_BUSINESS_CREDENTIALS.values():
+        for c in creds:
+            if c["kind"] == kind:
+                return c
+    return None
+
+async def _load_media_bytes(media_id: str) -> tuple[bytes, str]:
+    rec = await db.media.find_one({"id": media_id, "is_deleted": False})
+    if not rec:
+        raise HTTPException(404, f"Media {media_id} not found")
+    data, content_type = get_object(rec["storage_path"])
+    mime = rec.get("media_type") or content_type or "application/octet-stream"
+    return data, mime
+
+def _build_verification_prompt(*, purpose: str, expected_kind: Optional[str], country: Optional[str],
+                               expected_regex: Optional[str], schema: Optional[dict], notes: Optional[str]) -> tuple[str, str]:
+    """Returns (system_message, user_text). The model must answer with strict JSON."""
+    if purpose == "content_moderation":
+        system = (
+            "You are an AI content moderator for an online services marketplace. Given an uploaded image, decide if "
+            "it is appropriate for public display in a marketplace listing, store inventory, customer review, or "
+            "service request. Reject images that contain nudity, sexual content, weapons, drugs, gore, hate symbols, "
+            "exposed identity documents, exposed credit cards, or other sensitive personal information."
+        )
+        user_text = (
+            "Inspect the attached image. Reply with ONLY a single JSON object matching this exact schema:\n"
+            "{\"verdict\":\"approved\"|\"flagged\",\"confidence\":0.0-1.0,\"reasons\":[...],\"contains_pii\":bool,"
+            "\"contains_nsfw\":bool,\"explanation\":\"<one paragraph, plain English>\"}\n"
+            "No markdown, no commentary, JSON only."
+        )
+        return system, user_text
+
+    # Credential / document verification
+    schema_block = ""
+    if schema:
+        schema_block = (
+            f"\nExpected credential: {schema.get('label')} ({schema.get('kind')})\n"
+            f"Country: {country or 'unknown'}\n"
+            f"Expected format: {schema.get('format')}\n"
+            f"Issuer (authority): {schema.get('issuer','unknown')}\n"
+        )
+        if schema.get("format_regex"):
+            schema_block += f"Expected number regex: {schema['format_regex']}\n"
+    elif expected_kind:
+        schema_block = f"\nExpected credential kind: {expected_kind}\nCountry: {country or 'unknown'}\n"
+        if expected_regex:
+            schema_block += f"Expected number regex: {expected_regex}\n"
+
+    system = (
+        "You are a forensic document-verification AI for a services marketplace (Lumo). You read uploaded "
+        "credential photos and documents (business registrations, tax IDs, professional licenses, insurance "
+        "certificates) and extract structured data. You are SKEPTICAL — flag anything that looks edited, "
+        "printed from a template, lacks an official issuer header/seal, has mismatched fonts, or where the "
+        "number doesn't match the country's expected format. Never invent data — if a field is not visible, "
+        "leave it null. Confidence reflects how certain you are this document is genuine AND matches the "
+        "expected credential kind/country."
+    )
+    user_text = (
+        f"Verify the attached document.{schema_block}\n"
+        f"{('Submitter notes: ' + notes) if notes else ''}\n"
+        "Reply with ONLY a single JSON object — no markdown, no prose around it — matching this exact schema:\n"
+        "{"
+        "\"verdict\":\"verified\"|\"rejected\"|\"needs_review\","
+        "\"confidence\":0.0-1.0,"
+        "\"document_kind_detected\":\"<what the document appears to be>\","
+        "\"matches_expected\":true|false,"
+        "\"regex_match\":true|false|null,"
+        "\"extracted\":{"
+            "\"id_number\":\"...\"|null,"
+            "\"holder_name\":\"...\"|null,"
+            "\"issuer\":\"...\"|null,"
+            "\"issue_date\":\"YYYY-MM-DD\"|null,"
+            "\"expiry_date\":\"YYYY-MM-DD\"|null,"
+            "\"country\":\"<ISO-2>\"|null"
+        "},"
+        "\"red_flags\":[\"...\",...],"
+        "\"explanation\":\"<2-4 sentence plain-English summary of how you reached this verdict>\""
+        "}"
+    )
+    return system, user_text
+
+async def _call_vision(provider: str, model: str, system: str, user_text: str, image_bytes: bytes, mime: str) -> str:
+    """Run a single vision call; returns the model's raw text reply."""
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "AI verification unavailable — EMERGENT_LLM_KEY not set")
+    image_b64 = base64.b64encode(image_bytes).decode("ascii")
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=f"lumo-verify-{uuid.uuid4()}",
+        system_message=system,
+    ).with_model(provider, model)
+    img = ImageContent(image_base64=image_b64)
+    msg = UserMessage(text=user_text, file_contents=[img])
+    return await chat.send_message(msg)
+
+def _parse_verify_json(raw: str) -> dict:
+    """Best-effort JSON parse from a model reply (strip code fences if present)."""
+    if not raw:
+        return {}
+    s = raw.strip()
+    if s.startswith("```"):
+        # strip ```json ... ```
+        s = re.sub(r"^```(?:json)?\s*", "", s)
+        s = re.sub(r"\s*```\s*$", "", s)
+    # Find the first { ... last }
+    first = s.find("{")
+    last = s.rfind("}")
+    if first == -1 or last == -1 or last <= first:
+        return {}
+    try:
+        return json.loads(s[first:last + 1])
+    except Exception:
+        return {}
+
+async def _ai_verify_document(*, media_id: str, purpose: str, expected_kind: Optional[str], country: Optional[str],
+                              expected_regex: Optional[str], notes: Optional[str],
+                              owner_id: Optional[str] = None) -> dict:
+    data, mime = await _load_media_bytes(media_id)
+    if mime not in _VISION_MIME_OK:
+        # Try to interpret as image anyway, but warn
+        if not mime.startswith("image/"):
+            raise HTTPException(400, f"AI verification supports image documents only (got {mime}). Re-upload as PNG/JPG.")
+    schema = _cred_schema_for(expected_kind, country) if expected_kind else None
+    eff_regex = expected_regex or (schema.get("format_regex") if schema else None)
+    system, user_text = _build_verification_prompt(
+        purpose=purpose, expected_kind=expected_kind, country=country,
+        expected_regex=eff_regex, schema=schema, notes=notes,
+    )
+
+    # Try Claude first, fall back to Gemini
+    last_error = None
+    raw = None
+    used_model = None
+    for provider, model in [("anthropic", "claude-sonnet-4-6"), ("gemini", "gemini-3.1-pro-preview")]:
+        try:
+            raw = await _call_vision(provider, model, system, user_text, data, mime)
+            used_model = f"{provider}/{model}"
+            if raw and raw.strip():
+                break
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"AI verify {provider}/{model} failed: {e}")
+    if not raw:
+        raise HTTPException(502, f"AI verification failed on all models: {last_error}")
+
+    parsed = _parse_verify_json(raw)
+    if not parsed:
+        # Last-resort fallback: needs_review with low confidence
+        parsed = {
+            "verdict": "needs_review",
+            "confidence": 0.0,
+            "extracted": {},
+            "red_flags": ["ai_response_unparseable"],
+            "explanation": "AI returned an unparseable response; manual review required.",
+        }
+
+    # Regex cross-check (post-hoc, in case model didn't compute it)
+    extracted = parsed.get("extracted") or {}
+    id_number = (extracted.get("id_number") or "").strip()
+    regex_match = parsed.get("regex_match")
+    if id_number and eff_regex:
+        try:
+            cleaned = re.sub(r"[\s\-/]", "", id_number)
+            regex_match = bool(re.fullmatch(eff_regex, id_number) or re.fullmatch(eff_regex, cleaned))
+        except re.error:
+            regex_match = None
+    parsed["regex_match"] = regex_match
+    parsed["used_model"] = used_model
+
+    # Auto-downgrade verdict if regex required and failed
+    if eff_regex and regex_match is False and parsed.get("verdict") == "verified":
+        parsed["verdict"] = "needs_review"
+        parsed["confidence"] = min(float(parsed.get("confidence", 0.0)), 0.6)
+        parsed.setdefault("red_flags", []).append("regex_mismatch")
+
+    # Persist
+    record = {
+        "id": str(uuid.uuid4()),
+        "media_id": media_id,
+        "owner_id": owner_id,
+        "purpose": purpose,
+        "expected_kind": expected_kind,
+        "country": (country or "").upper() or None,
+        "verdict": parsed.get("verdict"),
+        "confidence": float(parsed.get("confidence", 0.0) or 0.0),
+        "extracted": extracted,
+        "regex_match": regex_match,
+        "matches_expected": parsed.get("matches_expected"),
+        "red_flags": parsed.get("red_flags", []),
+        "explanation": parsed.get("explanation"),
+        "used_model": used_model,
+        "raw_response": raw,
+        "created_at": now_iso(),
+    }
+    await db.document_verifications.insert_one(record)
+    return clean_doc(record)
+
+@api.post("/verify/credential/{cred_id}")
+async def verify_credential(cred_id: str, body: Optional[CredentialVerifyRequest] = None, user: dict = Depends(get_current_user)):
+    """Run AI verification on a credential's uploaded document. Auto-marks the
+    credential as verified if confidence ≥ 0.90 and the AI returns 'verified'."""
+    cred = await db.credentials.find_one({"id": cred_id})
+    if not cred:
+        raise HTTPException(404, "Credential not found")
+    # The provider OR an admin can run verification on their own credentials.
+    if cred.get("user_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not allowed")
+    media_id = cred.get("document_media_id")
+    if not media_id:
+        raise HTTPException(400, "No document uploaded for this credential")
+    expected_kind = cred.get("kind")
+    country = cred.get("state") if cred.get("category") == "business_registration" else None
+    if not country and expected_kind:
+        country = _find_country_for_kind(expected_kind)
+    result = await _ai_verify_document(
+        media_id=media_id, purpose="business_doc" if cred.get("category") == "business_registration" else "license_doc",
+        expected_kind=expected_kind, country=country,
+        expected_regex=None, notes=(body.notes if body else None),
+        owner_id=cred.get("user_id"),
+    )
+    # Update credential status
+    new_status = cred.get("status", "submitted")
+    if result["verdict"] == "verified" and result["confidence"] >= AI_VERIFY_AUTO_THRESHOLD:
+        new_status = "verified"
+    elif result["verdict"] == "rejected":
+        new_status = "rejected"
+    elif result["verdict"] in ("verified", "needs_review"):
+        new_status = "ai_pending_review"
+    update = {
+        "ai_verification": {
+            "verdict": result["verdict"],
+            "confidence": result["confidence"],
+            "extracted": result["extracted"],
+            "regex_match": result["regex_match"],
+            "red_flags": result["red_flags"],
+            "explanation": result["explanation"],
+            "used_model": result["used_model"],
+            "verified_at": now_iso(),
+        },
+        "status": new_status,
+    }
+    if new_status == "verified":
+        update["verified_at"] = now_iso()
+        update["verified_by"] = "ai"
+    await db.credentials.update_one({"id": cred_id}, {"$set": update})
+    return {**result, "credential_status": new_status}
+
+@api.post("/verify/media/{media_id}")
+async def verify_media(media_id: str, body: MediaVerifyRequest, user: dict = Depends(get_current_user)):
+    """Run AI verification on an arbitrary uploaded media (review photo, job photo, marketplace listing).
+    For purpose='content_moderation' the AI checks for NSFW / PII / inappropriate content."""
+    media = await db.media.find_one({"id": media_id, "is_deleted": False})
+    if not media:
+        raise HTTPException(404, "Media not found")
+    # Owner OR admin can request verification
+    if media.get("owner_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not allowed")
+    result = await _ai_verify_document(
+        media_id=media_id, purpose=body.purpose,
+        expected_kind=body.expected_kind, country=body.country,
+        expected_regex=body.expected_regex, notes=body.notes,
+        owner_id=media.get("owner_id"),
+    )
+    return result
+
+@api.get("/verify/history/{media_id}")
+async def verify_history(media_id: str, user: dict = Depends(get_current_user)):
+    """All prior AI-verification results for a given media."""
+    rows = await db.document_verifications.find({"media_id": media_id}).sort("created_at", -1).to_list(20)
+    return [clean_doc(r) for r in rows]
 
 # ────────────────────────────────────────────────────────────────────────────
 # Provider quotes (counter-offers)

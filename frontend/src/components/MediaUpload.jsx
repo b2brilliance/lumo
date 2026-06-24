@@ -1,11 +1,13 @@
 import React, { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Upload, X, FileVideo, Image as ImageIcon } from "lucide-react";
+import { Upload, X, FileVideo, Image as ImageIcon, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
-export default function MediaUpload({ value, onChange, label = "Attach photo or video (optional)" }) {
+export default function MediaUpload({ value, onChange, label = "Attach photo or video (optional)", aiCheck = true }) {
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   const handle = async (file) => {
@@ -32,6 +34,20 @@ export default function MediaUpload({ value, onChange, label = "Attach photo or 
   if (value?.media_url) {
     const url = value.media_url.startsWith("http") ? value.media_url : `${BACKEND_URL}${value.media_url}`;
     const isVideo = value.media_type?.startsWith("video");
+    const runAi = async () => {
+      if (!value.id) { toast.error("Re-upload to enable AI check"); return; }
+      setAiBusy(true);
+      try {
+        const { data } = await api.post(`/verify/media/${value.id}`, { purpose: "content_moderation" });
+        setAiResult(data);
+        if (data.verdict === "approved") toast.success(`AI: approved · ${(data.confidence * 100).toFixed(0)}%`);
+        else toast.warning(`AI flagged · ${(data.red_flags || []).join(", ") || "see details"}`);
+      } catch (e) {
+        toast.error("AI check failed");
+      } finally {
+        setAiBusy(false);
+      }
+    };
     return (
       <div className="relative border border-slate-300 p-2" data-testid="media-preview">
         {isVideo ? (
@@ -40,12 +56,32 @@ export default function MediaUpload({ value, onChange, label = "Attach photo or 
           <img src={url} alt="" className="w-full max-h-48 object-cover" />
         )}
         <button
-          onClick={() => onChange({ media_url: null, media_type: null })}
+          onClick={() => { onChange({ media_url: null, media_type: null }); setAiResult(null); }}
           className="absolute top-2 right-2 bg-white border border-slate-300 p-1 hover:bg-slate-50"
           data-testid="media-clear-btn"
         >
           <X className="w-3.5 h-3.5" />
         </button>
+        {aiCheck && !isVideo && (
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <button
+              onClick={runAi}
+              disabled={aiBusy}
+              className="text-[10px] font-mono uppercase tracking-widest text-teal-800 border border-teal-300 px-2 py-1 hover:bg-teal-50 inline-flex items-center gap-1"
+              data-testid="media-ai-check-btn"
+            >
+              <Sparkles className="w-3 h-3" /> {aiBusy ? "Checking…" : "AI check"}
+            </button>
+            {aiResult && (
+              <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-1 border ${aiResult.verdict === "approved" ? "border-teal-300 text-teal-800 bg-teal-50" : "border-amber-300 text-amber-800 bg-amber-50"}`} data-testid="media-ai-verdict">
+                {aiResult.verdict} · {(aiResult.confidence * 100).toFixed(0)}%
+              </span>
+            )}
+          </div>
+        )}
+        {aiResult && aiResult.explanation && (
+          <p className="text-xs text-slate-600 mt-1 leading-relaxed" data-testid="media-ai-explain">{aiResult.explanation}</p>
+        )}
       </div>
     );
   }

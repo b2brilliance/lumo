@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MediaUpload from "@/components/MediaUpload";
 import { toast } from "sonner";
-import { ShieldCheck, ShieldAlert, Trash2, CheckCircle2, Globe } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Trash2, CheckCircle2, Globe, Sparkles } from "lucide-react";
 
 const US_STATES = "AL,AK,AZ,AR,CA,CO,CT,DE,FL,GA,HI,ID,IL,IN,IA,KS,KY,LA,ME,MD,MA,MI,MN,MS,MO,MT,NE,NV,NH,NJ,NM,NY,NC,ND,OH,OK,OR,PA,RI,SC,SD,TN,TX,UT,VT,VA,WA,WV,WI,WY,DC".split(",");
 
@@ -17,7 +17,117 @@ const STATUS_STYLES = {
   submitted: "text-amber-700 bg-amber-50 border-amber-200",
   verified: "text-teal-800 bg-teal-50 border-teal-200",
   rejected: "text-red-700 bg-red-50 border-red-200",
+  ai_pending_review: "text-purple-700 bg-purple-50 border-purple-200",
 };
+
+const VERDICT_STYLES = {
+  verified: "bg-teal-50 border-teal-200 text-teal-900",
+  approved: "bg-teal-50 border-teal-200 text-teal-900",
+  needs_review: "bg-amber-50 border-amber-200 text-amber-900",
+  flagged: "bg-amber-50 border-amber-200 text-amber-900",
+  rejected: "bg-red-50 border-red-200 text-red-900",
+};
+
+/**
+ * AI verification result card — shown after running /verify/credential or
+ * embedded inside a credential row once the credential has an ai_verification
+ * stored on it.
+ */
+export function AiVerdictPanel({ result, testId }) {
+  if (!result) return null;
+  const v = result.verdict || "needs_review";
+  const conf = Number(result.confidence || 0);
+  const pct = (conf * 100).toFixed(0);
+  const styles = VERDICT_STYLES[v] || "bg-slate-50 border-slate-200 text-slate-900";
+  const ex = result.extracted || {};
+  return (
+    <div className={`col-span-12 mx-4 mb-4 border ${styles} p-4`} data-testid={testId} data-no-i18n="false">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          <span className="font-display font-bold uppercase tracking-wider text-sm">AI verdict: {v.replace("_", " ")}</span>
+          <span className="text-xs font-mono opacity-70">· confidence {pct}%</span>
+          {result.regex_match === true && <span className="text-[10px] font-mono uppercase border border-current px-2 py-0.5">format ✓</span>}
+          {result.regex_match === false && <span className="text-[10px] font-mono uppercase border border-current px-2 py-0.5">format ✗</span>}
+        </div>
+        {result.used_model && <span className="text-[10px] font-mono opacity-60">via {result.used_model}</span>}
+      </div>
+      {(ex.id_number || ex.holder_name || ex.issuer || ex.issue_date || ex.expiry_date) && (
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono">
+          {ex.id_number    && <div><div className="opacity-60 uppercase">ID Number</div><div>{ex.id_number}</div></div>}
+          {ex.holder_name  && <div><div className="opacity-60 uppercase">Holder</div><div>{ex.holder_name}</div></div>}
+          {ex.issuer       && <div><div className="opacity-60 uppercase">Issuer</div><div>{ex.issuer}</div></div>}
+          {ex.issue_date   && <div><div className="opacity-60 uppercase">Issued</div><div>{ex.issue_date}</div></div>}
+          {ex.expiry_date  && <div><div className="opacity-60 uppercase">Expires</div><div>{ex.expiry_date}</div></div>}
+          {ex.country      && <div><div className="opacity-60 uppercase">Country</div><div>{ex.country}</div></div>}
+        </div>
+      )}
+      {result.red_flags && result.red_flags.length > 0 && (
+        <div className="mt-3 text-xs">
+          <span className="font-mono uppercase opacity-60">Red flags: </span>
+          {result.red_flags.map((f) => (
+            <span key={f} className="inline-block mr-2 mt-1 border border-current px-2 py-0.5 text-[10px] font-mono uppercase">{f}</span>
+          ))}
+        </div>
+      )}
+      {result.explanation && (
+        <p className="text-xs mt-3 opacity-90 leading-relaxed">{result.explanation}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Inline variant of AiVerdictPanel that doesn't span a grid (used inside
+ * BusinessRegistration cards).
+ */
+function AiVerdictPanelInline({ result, testId }) {
+  if (!result) return null;
+  const v = result.verdict || "needs_review";
+  const conf = Number(result.confidence || 0);
+  const pct = (conf * 100).toFixed(0);
+  const styles = VERDICT_STYLES[v] || "bg-slate-50 border-slate-200 text-slate-900";
+  const ex = result.extracted || {};
+  return (
+    <div className={`mt-3 border ${styles} p-3 text-xs`} data-testid={testId}>
+      <div className="flex items-center gap-2 font-display font-bold uppercase tracking-wider text-xs">
+        <Sparkles className="w-3.5 h-3.5" />AI {v.replace("_", " ")} · {pct}%
+        {result.regex_match === true && <span className="ml-1 border border-current px-1.5 py-0.5 text-[9px] uppercase">format ✓</span>}
+        {result.regex_match === false && <span className="ml-1 border border-current px-1.5 py-0.5 text-[9px] uppercase">format ✗</span>}
+      </div>
+      {(ex.id_number || ex.holder_name) && (
+        <div className="mt-2 font-mono text-[10px]">
+          {ex.id_number && <span className="mr-2">#{ex.id_number}</span>}
+          {ex.holder_name && <span>{ex.holder_name}</span>}
+        </div>
+      )}
+      {result.explanation && <p className="mt-2 opacity-90">{result.explanation}</p>}
+    </div>
+  );
+}
+
+function BizAiVerifyButton({ credId, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/verify/credential/${credId}`);
+      if (data.verdict === "verified" && data.confidence >= 0.9) toast.success(`AI verified · ${(data.confidence * 100).toFixed(0)}%`);
+      else if (data.verdict === "rejected") toast.error("AI rejected — see details");
+      else toast.warning("AI suggests human review");
+      onDone?.();
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button size="sm" variant="outline" onClick={run} disabled={busy} className="mt-3 h-7 px-2 text-xs border-teal-300 text-teal-800 hover:bg-teal-50" data-testid={`biz-ai-verify-${credId}`}>
+      <Sparkles className="w-3 h-3 mr-1" /> {busy ? "Checking…" : "Run AI verification"}
+    </Button>
+  );
+}
 
 /**
  * Country-specific business / tax-registration credentials.
@@ -157,6 +267,12 @@ function BusinessRegistration({ credentials, country, profile, onSubmitted }) {
                 {existing && existing.license_number && (
                   <div className="mt-2 font-mono text-xs text-slate-600">#{existing.license_number}{existing.expiry_date ? ` · expires ${existing.expiry_date}` : ""}</div>
                 )}
+                {existing && existing.document_media_id && existing.status !== "verified" && (
+                  <BizAiVerifyButton credId={existing.id} onDone={onSubmitted} />
+                )}
+                {existing && existing.ai_verification && (
+                  <AiVerdictPanelInline result={existing.ai_verification} testId={`biz-ai-panel-${r.kind}`} />
+                )}
               </div>
             );
           })}
@@ -223,6 +339,29 @@ export default function CredentialsPage() {
       toast.success("Marked verified (demo)");
       load();
     } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const [aiBusy, setAiBusy] = useState(null);
+  const [aiResults, setAiResults] = useState({});
+
+  const runAiVerify = async (id) => {
+    setAiBusy(id);
+    try {
+      const { data } = await api.post(`/verify/credential/${id}`);
+      setAiResults((r) => ({ ...r, [id]: data }));
+      if (data.verdict === "verified" && data.confidence >= 0.9) {
+        toast.success(`AI verified · confidence ${(data.confidence * 100).toFixed(0)}%`);
+      } else if (data.verdict === "rejected") {
+        toast.error(`AI rejected — ${data.red_flags?.join(", ") || "see details"}`);
+      } else {
+        toast.warning(`AI suggests human review · confidence ${(data.confidence * 100).toFixed(0)}%`);
+      }
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setAiBusy(null);
+    }
   };
 
   // Build category options that filter only those with explicit kinds + any "required" ones
@@ -328,7 +467,8 @@ export default function CredentialsPage() {
           <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="credentials-list">
             {creds.length === 0 && <div className="p-6 text-sm text-slate-500">No credentials added yet.</div>}
             {creds.map((c) => (
-              <div key={c.id} className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`cred-row-${c.id}`}>
+              <React.Fragment key={c.id}>
+              <div className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`cred-row-${c.id}`}>
                 <div className="col-span-5">
                   <div className="font-display font-bold">{KIND_LABEL[c.kind] || c.kind}</div>
                   <div className="text-xs text-slate-500 font-mono mt-1">
@@ -349,6 +489,19 @@ export default function CredentialsPage() {
                   </span>
                 </div>
                 <div className="col-span-2 text-right flex justify-end gap-1">
+                  {c.document_media_id && c.status !== "verified" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runAiVerify(c.id)}
+                      disabled={aiBusy === c.id}
+                      className="h-7 px-2 text-xs border-teal-300 text-teal-800 hover:bg-teal-50"
+                      data-testid={`cred-ai-verify-${c.id}`}
+                      title="Run AI document verification (Claude → Gemini fallback)"
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" /> {aiBusy === c.id ? "Checking…" : "AI verify"}
+                    </Button>
+                  )}
                   {c.status !== "verified" && (
                     <Button size="sm" variant="outline" onClick={() => devVerify(c.id)} className="h-7 px-2 text-xs" data-testid={`cred-dev-verify-${c.id}`} title="Demo only — would be admin-only in production">
                       <ShieldCheck className="w-3 h-3 mr-1" /> Verify
@@ -359,6 +512,10 @@ export default function CredentialsPage() {
                   </button>
                 </div>
               </div>
+              {(aiResults[c.id] || c.ai_verification) && (
+                <AiVerdictPanel result={aiResults[c.id] || c.ai_verification} testId={`cred-ai-panel-${c.id}`} />
+              )}
+              </React.Fragment>
             ))}
           </div>
           <p className="text-xs text-slate-400 mt-3 font-mono">
