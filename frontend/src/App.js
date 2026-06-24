@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/locale";
+import { CartProvider } from "@/lib/cart";
 import NavBar from "@/components/NavBar";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
@@ -27,6 +28,7 @@ import Settings from "@/pages/Settings";
 import OrderFinalPay from "@/pages/OrderFinalPay";
 import ChatsInbox from "@/pages/ChatsInbox";
 import CredentialsPage from "@/pages/CredentialsPage";
+import Cart from "@/pages/Cart";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -43,10 +45,11 @@ function App() {
       <BrowserRouter>
         <LocaleProvider>
           <AuthProvider>
-            <NavBar />
-            <NotificationsBridge />
-            <AutoTranslator />
-            <Routes>
+            <CartProvider>
+              <NavBar />
+              <NotificationsBridge />
+              <AutoTranslator />
+              <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -72,10 +75,12 @@ function App() {
             <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
+            <Route path="/cart" element={<Protected><Cart /></Protected>} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />
             <AssistantWidget />
+            </CartProvider>
           </AuthProvider>
         </LocaleProvider>
       </BrowserRouter>

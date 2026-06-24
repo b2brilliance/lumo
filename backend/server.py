@@ -259,6 +259,39 @@ class CheckoutCreate(BaseModel):
     allowed_payment_methods: Optional[List[PaymentMethod]] = None
     payment_terms: Optional[str] = None
     country: Optional[str] = None  # ISO country code for tax lookup
+    us_state: Optional[str] = None  # 2-letter US state code for per-state sales tax
+
+class CartCheckoutCreate(BaseModel):
+    """Checkout for all cart items belonging to a single store/restaurant."""
+    store_id: str
+    delivery_address: Optional[dict] = None
+    delivery_fee: float = 0.0
+    notes: Optional[str] = None
+    origin_url: str
+    allowed_payment_methods: Optional[List[PaymentMethod]] = None
+    payment_terms: Optional[str] = None
+    country: Optional[str] = None
+    us_state: Optional[str] = None
+
+class CartAdd(BaseModel):
+    inventory_item_id: str
+    quantity: int = 1
+
+class CartUpdate(BaseModel):
+    quantity: int
+
+class ReviewCreate(BaseModel):
+    target_type: Literal["provider", "store"]
+    target_id: str
+    job_id: Optional[str] = None       # required if target_type == "provider"
+    order_id: Optional[str] = None     # required if target_type == "store"
+    overall_stars: int = Field(ge=1, le=5)
+    quality_stars: Optional[int] = Field(default=None, ge=1, le=5)
+    communication_stars: Optional[int] = Field(default=None, ge=1, le=5)
+    ontime_stars: Optional[int] = Field(default=None, ge=1, le=5)
+    body: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
 
 class FinalPaymentCreate(BaseModel):
     """Customer pays remaining balance — credits provider wallet."""
@@ -312,6 +345,97 @@ def acceptable_kinds_for(category: str, license_required: Optional[str]) -> Opti
         s = MEDICAL_LICENSE_MAP.get(license_required)
         return s if s else None  # 'other' or unknown → accept any verified medical cred
     return None
+
+# ────────────────────────────────────────────────────────────────────────────
+# Country-specific business / tax-registration credentials for providers.
+# Every provider needs ONE of these (depending on their country) to be eligible
+# to invoice work on Lumo. Hard validation happens at admin-verify time; the
+# `format_regex` is a soft client-side hint only.
+# ────────────────────────────────────────────────────────────────────────────
+COUNTRY_BUSINESS_CREDENTIALS = {
+    "US": [
+        {"kind": "ein",                 "label": "EIN (Employer Identification Number)",  "format": "XX-XXXXXXX",        "format_regex": r"^\d{2}-?\d{7}$",   "required_for": "business",   "issuer": "IRS"},
+        {"kind": "ssn_last4",           "label": "SSN (last 4 digits only)",              "format": "XXXX",              "format_regex": r"^\d{4}$",         "required_for": "individual", "issuer": "SSA"},
+        {"kind": "state_business_license","label": "State Business License",              "format": "State + license #", "required_for": "business",   "issuer": "State"},
+        {"kind": "w9",                  "label": "Completed Form W-9 (uploaded)",          "format": "PDF upload",        "required_for": "either",     "issuer": "IRS"},
+    ],
+    "GB": [
+        {"kind": "utr",                 "label": "UTR (Unique Taxpayer Reference)",       "format": "10 digits",         "format_regex": r"^\d{10}$",        "required_for": "either",     "issuer": "HMRC"},
+        {"kind": "companies_house",     "label": "Companies House Number",                "format": "8 chars (e.g. 12345678)", "format_regex": r"^[A-Z0-9]{7,8}$", "required_for": "business", "issuer": "Companies House"},
+        {"kind": "vat_gb",              "label": "VAT Number",                            "format": "GB + 9 digits",     "format_regex": r"^(GB)?\d{9}$",    "required_for": "business",   "issuer": "HMRC"},
+    ],
+    "CA": [
+        {"kind": "bn",                  "label": "BN (Business Number)",                  "format": "9 digits",          "format_regex": r"^\d{9}$",         "required_for": "business",   "issuer": "CRA"},
+        {"kind": "gst_hst",             "label": "GST/HST Registration Number",           "format": "9 digits + RT0001", "required_for": "business",        "issuer": "CRA"},
+        {"kind": "sin_last3",           "label": "SIN (last 3 digits only)",              "format": "XXX",               "format_regex": r"^\d{3}$",         "required_for": "individual", "issuer": "Service Canada"},
+    ],
+    "AU": [
+        {"kind": "abn",                 "label": "ABN (Australian Business Number)",      "format": "11 digits",         "format_regex": r"^\d{11}$",        "required_for": "either",     "issuer": "ATO"},
+        {"kind": "acn",                 "label": "ACN (Australian Company Number)",       "format": "9 digits",          "format_regex": r"^\d{9}$",         "required_for": "business",   "issuer": "ASIC"},
+        {"kind": "gst_au",              "label": "GST Registration",                      "format": "ABN-based",         "required_for": "business",        "issuer": "ATO"},
+    ],
+    "IN": [
+        {"kind": "gstin",               "label": "GSTIN",                                 "format": "15 chars",          "format_regex": r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$", "required_for": "business", "issuer": "GSTN"},
+        {"kind": "pan",                 "label": "PAN (Permanent Account Number)",        "format": "10 chars",          "format_regex": r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", "required_for": "either",     "issuer": "Income Tax Dept"},
+        {"kind": "aadhaar_last4",       "label": "Aadhaar (last 4 digits only)",          "format": "XXXX",              "format_regex": r"^\d{4}$",         "required_for": "individual", "issuer": "UIDAI"},
+        {"kind": "udyam",               "label": "Udyam (MSME) Registration",             "format": "UDYAM-XX-XX-XXXXXXX", "required_for": "business",      "issuer": "Ministry of MSME"},
+    ],
+    "DE": [
+        {"kind": "steuernummer",        "label": "Steuernummer",                          "format": "10–11 digits w/ slashes", "required_for": "either",  "issuer": "Finanzamt"},
+        {"kind": "ust_id",              "label": "USt-IdNr. (VAT ID)",                    "format": "DE + 9 digits",     "format_regex": r"^(DE)?\d{9}$",    "required_for": "business",   "issuer": "BZSt"},
+        {"kind": "gewerbeanmeldung",    "label": "Gewerbeanmeldung (trade registration)", "format": "Upload PDF",        "required_for": "business",        "issuer": "Gewerbeamt"},
+        {"kind": "handelsregister",     "label": "Handelsregister-Nummer (HRB)",          "format": "HRB + digits",      "required_for": "business",        "issuer": "Amtsgericht"},
+    ],
+    "FR": [
+        {"kind": "siret",               "label": "SIRET",                                 "format": "14 digits",         "format_regex": r"^\d{14}$",        "required_for": "either",     "issuer": "INSEE"},
+        {"kind": "siren",               "label": "SIREN",                                 "format": "9 digits",          "format_regex": r"^\d{9}$",         "required_for": "either",     "issuer": "INSEE"},
+        {"kind": "tva_fr",              "label": "Numéro de TVA intracommunautaire",      "format": "FR + 11 digits",    "format_regex": r"^(FR)?[0-9A-Z]{2}\d{9}$", "required_for": "business", "issuer": "DGFiP"},
+        {"kind": "rcs",                 "label": "RCS (Registre du Commerce et des Sociétés)", "format": "City + SIREN", "required_for": "business",    "issuer": "Greffe du Tribunal"},
+        {"kind": "micro_entrepreneur",  "label": "Statut micro-entrepreneur (URSSAF)",    "format": "Upload attestation","required_for": "individual",      "issuer": "URSSAF"},
+    ],
+    "JP": [
+        {"kind": "corporate_number_jp", "label": "法人番号 (Corporate Number)",            "format": "13 digits",         "format_regex": r"^\d{13}$",        "required_for": "business",   "issuer": "国税庁 (NTA)"},
+        {"kind": "kojin_jigyo_jp",      "label": "個人事業の開業届 (Sole-prop registration)", "format": "Upload PDF",     "required_for": "individual",      "issuer": "税務署"},
+        {"kind": "invoice_number_jp",   "label": "適格請求書発行事業者登録番号 (Qualified Invoice Issuer)", "format": "T + 13 digits", "format_regex": r"^T\d{13}$", "required_for": "business", "issuer": "NTA"},
+    ],
+    "BR": [
+        {"kind": "cnpj",                "label": "CNPJ",                                  "format": "14 digits",         "format_regex": r"^\d{14}$",        "required_for": "business",   "issuer": "Receita Federal"},
+        {"kind": "cpf",                 "label": "CPF",                                   "format": "11 digits",         "format_regex": r"^\d{11}$",        "required_for": "individual", "issuer": "Receita Federal"},
+        {"kind": "mei",                 "label": "MEI (Microempreendedor Individual)",    "format": "CNPJ-based",        "required_for": "individual",      "issuer": "Portal do Empreendedor"},
+        {"kind": "inscricao_estadual",  "label": "Inscrição Estadual",                     "format": "State VAT registration", "required_for": "business", "issuer": "Sefaz (state)"},
+    ],
+    "MX": [
+        {"kind": "rfc",                 "label": "RFC (Registro Federal de Contribuyentes)", "format": "12–13 chars",   "format_regex": r"^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$", "required_for": "either", "issuer": "SAT"},
+        {"kind": "curp",                "label": "CURP",                                  "format": "18 chars",          "format_regex": r"^[A-Z]{4}\d{6}[A-Z]{6}[0-9A-Z]{2}$", "required_for": "individual", "issuer": "RENAPO"},
+        {"kind": "constancia_situacion_fiscal","label": "Constancia de Situación Fiscal", "format": "Upload PDF",        "required_for": "either",          "issuer": "SAT"},
+    ],
+    "ES": [
+        {"kind": "nif",                 "label": "NIF (Número de Identificación Fiscal)", "format": "8 digits + letter", "format_regex": r"^\d{8}[A-Z]$",     "required_for": "individual", "issuer": "Hacienda"},
+        {"kind": "nie",                 "label": "NIE (foreign residents)",               "format": "X/Y/Z + 7 digits + letter", "format_regex": r"^[XYZ]\d{7}[A-Z]$", "required_for": "individual", "issuer": "Policía Nacional"},
+        {"kind": "cif",                 "label": "CIF / NIF empresarial",                 "format": "Letter + 8 digits", "format_regex": r"^[A-HJ-NP-SUVW]\d{7}[0-9A-J]$", "required_for": "business", "issuer": "Hacienda"},
+        {"kind": "autonomo",            "label": "Alta como autónomo (RETA)",             "format": "Upload alta",       "required_for": "individual",      "issuer": "Seguridad Social"},
+    ],
+    "NG": [
+        {"kind": "cac",                 "label": "CAC Registration Number",               "format": "RC + 6–7 digits",   "format_regex": r"^(RC|BN)?\d{6,7}$", "required_for": "business", "issuer": "Corporate Affairs Commission"},
+        {"kind": "tin_ng",              "label": "TIN (Tax Identification Number)",       "format": "8–10 digits",       "format_regex": r"^\d{8,10}$",      "required_for": "either",     "issuer": "FIRS"},
+        {"kind": "nin",                 "label": "NIN (National Identification Number)",  "format": "11 digits",         "format_regex": r"^\d{11}$",        "required_for": "individual", "issuer": "NIMC"},
+    ],
+    "AE": [
+        {"kind": "trade_license_ae",    "label": "Trade License (Emirate-issued)",        "format": "License # + emirate","required_for": "either",         "issuer": "DED / Free-zone authority"},
+        {"kind": "trn_ae",              "label": "TRN (Tax Registration Number)",         "format": "15 digits",         "format_regex": r"^\d{15}$",        "required_for": "business",   "issuer": "Federal Tax Authority"},
+        {"kind": "emirates_id",         "label": "Emirates ID (last 4 only)",             "format": "XXXX",              "format_regex": r"^\d{4}$",         "required_for": "individual", "issuer": "ICA"},
+    ],
+    "SG": [
+        {"kind": "uen",                 "label": "UEN (Unique Entity Number)",            "format": "9–10 chars",        "format_regex": r"^[0-9A-Z]{9,10}$", "required_for": "either",    "issuer": "ACRA"},
+        {"kind": "gst_sg",              "label": "GST Registration Number",               "format": "M2-XXXXXXXX-X",     "required_for": "business",        "issuer": "IRAS"},
+        {"kind": "nric_last3",          "label": "NRIC / FIN (last 3 chars only)",        "format": "XXX",               "format_regex": r"^[0-9A-Z]{3}$",   "required_for": "individual", "issuer": "ICA"},
+    ],
+    "ZA": [
+        {"kind": "cipc",                "label": "CIPC Company Registration Number",      "format": "YYYY/XXXXXX/XX",    "format_regex": r"^\d{4}/\d{6}/\d{2}$", "required_for": "business", "issuer": "CIPC"},
+        {"kind": "vat_za",              "label": "VAT Registration Number",               "format": "10 digits",         "format_regex": r"^\d{10}$",        "required_for": "business",   "issuer": "SARS"},
+        {"kind": "income_tax_ref",      "label": "Income Tax Reference Number",           "format": "10 digits",         "format_regex": r"^\d{10}$",        "required_for": "either",     "issuer": "SARS"},
+    ],
+}
 
 class MessageCreate(BaseModel):
     body: str
@@ -738,6 +862,340 @@ async def delete_inventory(item_id: str, user: dict = Depends(require_role("reta
     return {"deleted": True}
 
 # ────────────────────────────────────────────────────────────────────────────
+# Multi-store cart (persisted per user in Mongo)
+# Cart item shape: { id, user_id, store_id, inventory_item_id, quantity,
+#                    name, price_usd, media_url, media_type, created_at }
+# Frontend groups items by store_id and checks out each store separately.
+# ────────────────────────────────────────────────────────────────────────────
+async def _hydrate_cart(user_id: str) -> dict:
+    """Return cart grouped by store with hydrated item + store info."""
+    items = await db.cart_items.find({"user_id": user_id}).sort("created_at", 1).to_list(500)
+    items = [clean_doc(i) for i in items]
+    # Group by store_id
+    by_store: dict = {}
+    for it in items:
+        sid = it["store_id"]
+        by_store.setdefault(sid, []).append(it)
+    # Hydrate store info
+    store_ids = list(by_store.keys())
+    stores = await db.users.find({"id": {"$in": store_ids}}).to_list(len(store_ids))
+    store_map = {}
+    for s in stores:
+        s = clean_doc(s)
+        s.pop("password_hash", None)
+        store_map[s["id"]] = {"id": s["id"], "name": s["name"], "role": s["role"], "storefront": s.get("storefront")}
+    groups = []
+    total_items = 0
+    grand_subtotal_usd = 0.0
+    for sid, its in by_store.items():
+        subtotal = sum(float(i["price_usd"]) * int(i["quantity"]) for i in its)
+        total_items += sum(int(i["quantity"]) for i in its)
+        grand_subtotal_usd += subtotal
+        groups.append({
+            "store_id": sid,
+            "store": store_map.get(sid),
+            "items": its,
+            "subtotal_usd": round(subtotal, 2),
+            "item_count": sum(int(i["quantity"]) for i in its),
+        })
+    return {"groups": groups, "total_items": total_items, "grand_subtotal_usd": round(grand_subtotal_usd, 2)}
+
+@api.get("/cart")
+async def get_cart(user: dict = Depends(get_current_user)):
+    return await _hydrate_cart(user["id"])
+
+@api.post("/cart/add")
+async def add_to_cart(body: CartAdd, user: dict = Depends(get_current_user)):
+    if body.quantity <= 0:
+        raise HTTPException(400, "Quantity must be positive")
+    inv = await db.inventory.find_one({"id": body.inventory_item_id, "status": "active"})
+    if not inv:
+        raise HTTPException(404, "Item not found")
+    # Increment if already in cart, else insert
+    existing = await db.cart_items.find_one({"user_id": user["id"], "inventory_item_id": body.inventory_item_id})
+    if existing:
+        await db.cart_items.update_one(
+            {"id": existing["id"]},
+            {"$inc": {"quantity": body.quantity}, "$set": {"updated_at": now_iso()}}
+        )
+    else:
+        await db.cart_items.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "store_id": inv["owner_id"],
+            "inventory_item_id": inv["id"],
+            "quantity": body.quantity,
+            "name": inv["name"],
+            "price_usd": float(inv["price"]),
+            "media_url": inv.get("media_url"),
+            "media_type": inv.get("media_type"),
+            "created_at": now_iso(),
+        })
+    return await _hydrate_cart(user["id"])
+
+@api.patch("/cart/items/{cart_item_id}")
+async def update_cart_item(cart_item_id: str, body: CartUpdate, user: dict = Depends(get_current_user)):
+    item = await db.cart_items.find_one({"id": cart_item_id, "user_id": user["id"]})
+    if not item:
+        raise HTTPException(404, "Cart item not found")
+    if body.quantity <= 0:
+        await db.cart_items.delete_one({"id": cart_item_id})
+    else:
+        await db.cart_items.update_one(
+            {"id": cart_item_id},
+            {"$set": {"quantity": body.quantity, "updated_at": now_iso()}}
+        )
+    return await _hydrate_cart(user["id"])
+
+@api.delete("/cart/items/{cart_item_id}")
+async def remove_cart_item(cart_item_id: str, user: dict = Depends(get_current_user)):
+    res = await db.cart_items.delete_one({"id": cart_item_id, "user_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Cart item not found")
+    return await _hydrate_cart(user["id"])
+
+@api.delete("/cart/store/{store_id}")
+async def clear_store_cart(store_id: str, user: dict = Depends(get_current_user)):
+    await db.cart_items.delete_many({"user_id": user["id"], "store_id": store_id})
+    return await _hydrate_cart(user["id"])
+
+@api.delete("/cart")
+async def clear_cart(user: dict = Depends(get_current_user)):
+    await db.cart_items.delete_many({"user_id": user["id"]})
+    return await _hydrate_cart(user["id"])
+
+@api.post("/cart/checkout")
+async def cart_checkout(body: CartCheckoutCreate, req: Request, user: dict = Depends(get_current_user)):
+    """Create an order + Stripe deposit checkout for all cart items from one store."""
+    items = await db.cart_items.find({"user_id": user["id"], "store_id": body.store_id}).to_list(500)
+    if not items:
+        raise HTTPException(400, "No items from this store in cart")
+    item_total = round(sum(float(i["price_usd"]) * int(i["quantity"]) for i in items), 2)
+    delivery_fee = round(float(body.delivery_fee), 2)
+    item_deposit = round(item_total * 0.10, 2)
+    delivery_deposit = round(delivery_fee * 0.10, 2)
+    addr_str = body.delivery_address.get("address") if (body.delivery_address and isinstance(body.delivery_address, dict)) else None
+    tax_profile = tax_for(body.country, us_state=body.us_state, delivery_address=addr_str)
+    tax_rate = tax_profile["rate"]
+    taxable_base = round(item_total + delivery_fee, 2)
+    tax_amount = round(taxable_base * tax_rate, 2)
+    deposit_total = round(item_deposit + delivery_deposit + tax_amount, 2)
+    remaining = round(item_total + delivery_fee - item_deposit - delivery_deposit, 2)
+    if deposit_total <= 0:
+        raise HTTPException(400, "Invalid amounts")
+
+    order_id = str(uuid.uuid4())
+    order_lines = [{
+        "inventory_item_id": i["inventory_item_id"], "name": i["name"],
+        "price_usd": float(i["price_usd"]), "quantity": int(i["quantity"]),
+        "subtotal_usd": round(float(i["price_usd"]) * int(i["quantity"]), 2),
+        "media_url": i.get("media_url"),
+    } for i in items]
+    order_doc = {
+        "id": order_id,
+        "customer_id": user["id"],
+        "customer_name": user["name"],
+        "store_id": body.store_id,
+        "lines": order_lines,
+        "item_total": item_total,
+        "delivery_fee": delivery_fee,
+        "item_deposit": item_deposit,
+        "delivery_deposit": delivery_deposit,
+        "tax_country": (body.country or "US").upper(),
+        "tax_rate": tax_rate,
+        "tax_label": tax_profile["label"],
+        "tax_amount": tax_amount,
+        "tax_us_state": tax_profile.get("us_state"),
+        "deposit_total": deposit_total,
+        "remaining_total": remaining,
+        "delivery_address": body.delivery_address,
+        "notes": body.notes,
+        "allowed_payment_methods": body.allowed_payment_methods or ["app", "cash", "card"],
+        "payment_terms": body.payment_terms or "",
+        "status": "deposit_pending",
+        "provider_id": None,
+        "is_cart_order": True,
+        "created_at": now_iso(),
+    }
+    await db.orders.insert_one(order_doc)
+
+    stripe = await _get_stripe(req)
+    success_url = f"{body.origin_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order_id}"
+    cancel_url = f"{body.origin_url}/checkout/cancel?order_id={order_id}"
+    metadata = {
+        "order_id": order_id, "customer_id": user["id"], "type": "deposit",
+        "is_cart": "true", "store_id": body.store_id,
+        "tax_amount": str(tax_amount),
+    }
+    session = await stripe.create_checkout_session(CheckoutSessionRequest(
+        amount=float(deposit_total), currency="usd",
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata,
+    ))
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "order_id": order_id,
+        "user_id": user["id"],
+        "amount": float(deposit_total),
+        "currency": "usd",
+        "type": "deposit",
+        "status": "initiated",
+        "payment_status": "unpaid",
+        "metadata": metadata,
+        "created_at": now_iso(),
+    })
+    # Clear those items from cart now that an order has been created
+    await db.cart_items.delete_many({"user_id": user["id"], "store_id": body.store_id})
+    return {"url": session.url, "session_id": session.session_id, "order_id": order_id}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Reviews & ratings — providers and storefronts
+# Only customers who completed a job (provider) or order (store) may review.
+# One review per (reviewer, target, transaction).
+# ────────────────────────────────────────────────────────────────────────────
+async def _can_review_provider(user_id: str, provider_id: str) -> List[dict]:
+    """Returns the list of completed jobs by this user where this provider was assigned and which haven't been reviewed yet."""
+    jobs = await db.jobs.find({
+        "customer_id": user_id, "provider_id": provider_id, "status": "completed",
+    }).to_list(100)
+    out = []
+    for j in jobs:
+        existing = await db.reviews.find_one({
+            "reviewer_id": user_id, "target_type": "provider",
+            "target_id": provider_id, "job_id": j["id"],
+        })
+        if not existing:
+            out.append({"job_id": j["id"], "job_title": j["title"], "completed_at": j.get("completed_at")})
+    return out
+
+async def _can_review_store(user_id: str, store_id: str) -> List[dict]:
+    """Returns the list of completed orders by this user from this store which haven't been reviewed."""
+    orders = await db.orders.find({
+        "customer_id": user_id, "store_id": store_id,
+        "status": {"$in": ["completed", "deposit_paid", "in_progress"]},
+    }).to_list(100)
+    out = []
+    for o in orders:
+        existing = await db.reviews.find_one({
+            "reviewer_id": user_id, "target_type": "store",
+            "target_id": store_id, "order_id": o["id"],
+        })
+        if not existing:
+            out.append({"order_id": o["id"], "created_at": o.get("created_at"), "item_total": o.get("item_total")})
+    return out
+
+@api.get("/reviews/can-review/{target_type}/{target_id}")
+async def can_review(target_type: str, target_id: str, user: dict = Depends(get_current_user)):
+    if target_type == "provider":
+        eligible = await _can_review_provider(user["id"], target_id)
+    elif target_type == "store":
+        eligible = await _can_review_store(user["id"], target_id)
+    else:
+        raise HTTPException(400, "Invalid target_type")
+    return {"can_review": len(eligible) > 0, "eligible": eligible}
+
+@api.post("/reviews")
+async def create_review(body: ReviewCreate, user: dict = Depends(get_current_user)):
+    # Verify the user has a completed transaction with the target
+    if body.target_type == "provider":
+        if not body.job_id:
+            raise HTTPException(400, "job_id required for provider review")
+        job = await db.jobs.find_one({"id": body.job_id})
+        if not job:
+            raise HTTPException(404, "Job not found")
+        if job.get("customer_id") != user["id"] or job.get("provider_id") != body.target_id:
+            raise HTTPException(403, "You can only review providers from your own completed jobs")
+        if job.get("status") != "completed":
+            raise HTTPException(400, "Job is not completed yet")
+        # Already reviewed?
+        existing = await db.reviews.find_one({
+            "reviewer_id": user["id"], "target_type": "provider",
+            "target_id": body.target_id, "job_id": body.job_id,
+        })
+        if existing:
+            raise HTTPException(400, "You already reviewed this job")
+    elif body.target_type == "store":
+        if not body.order_id:
+            raise HTTPException(400, "order_id required for store review")
+        order = await db.orders.find_one({"id": body.order_id})
+        if not order:
+            raise HTTPException(404, "Order not found")
+        if order.get("customer_id") != user["id"] or order.get("store_id") != body.target_id:
+            raise HTTPException(403, "You can only review stores from your own orders")
+        if order.get("status") not in ("completed", "deposit_paid", "in_progress"):
+            raise HTTPException(400, "Order has not progressed enough to be reviewed")
+        existing = await db.reviews.find_one({
+            "reviewer_id": user["id"], "target_type": "store",
+            "target_id": body.target_id, "order_id": body.order_id,
+        })
+        if existing:
+            raise HTTPException(400, "You already reviewed this order")
+    else:
+        raise HTTPException(400, "Invalid target_type")
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "reviewer_id": user["id"],
+        "reviewer_name": user["name"],
+        "target_type": body.target_type,
+        "target_id": body.target_id,
+        "job_id": body.job_id,
+        "order_id": body.order_id,
+        "overall_stars": body.overall_stars,
+        "quality_stars": body.quality_stars,
+        "communication_stars": body.communication_stars,
+        "ontime_stars": body.ontime_stars,
+        "body": (body.body or "").strip()[:1000] or None,
+        "media_url": body.media_url,
+        "media_type": body.media_type,
+        "created_at": now_iso(),
+    }
+    await db.reviews.insert_one(doc)
+    # Notify the reviewed party
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": body.target_id,
+        "type": "review_received",
+        "title": f"New {body.overall_stars}-star review",
+        "body": f"{user['name']} left you a {body.overall_stars}-star review.",
+        "link": "/" + ("provider" if body.target_type == "provider" else "retailer"),
+        "review_id": doc["id"],
+        "read": False,
+        "created_at": now_iso(),
+    })
+    return clean_doc(doc)
+
+@api.get("/reviews/target/{target_type}/{target_id}")
+async def list_reviews_for_target(target_type: str, target_id: str, limit: int = 50):
+    if target_type not in ("provider", "store"):
+        raise HTTPException(400, "Invalid target_type")
+    docs = await db.reviews.find({"target_type": target_type, "target_id": target_id}).sort("created_at", -1).to_list(min(limit, 200))
+    cleaned = [clean_doc(d) for d in docs]
+    # Aggregate
+    n = len(cleaned)
+    if n == 0:
+        return {"reviews": [], "summary": {"count": 0, "avg_overall": None}}
+    sum_overall = sum(r["overall_stars"] for r in cleaned)
+    def safe_avg(field):
+        vals = [r[field] for r in cleaned if r.get(field) is not None]
+        return round(sum(vals) / len(vals), 2) if vals else None
+    summary = {
+        "count": n,
+        "avg_overall": round(sum_overall / n, 2),
+        "avg_quality": safe_avg("quality_stars"),
+        "avg_communication": safe_avg("communication_stars"),
+        "avg_ontime": safe_avg("ontime_stars"),
+        "stars_breakdown": {str(s): sum(1 for r in cleaned if r["overall_stars"] == s) for s in range(1, 6)},
+    }
+    return {"reviews": cleaned, "summary": summary}
+
+@api.get("/reviews/summary/{target_type}/{target_id}")
+async def review_summary(target_type: str, target_id: str):
+    """Lightweight aggregate (avg + count) — for badge display on cards."""
+    res = await list_reviews_for_target(target_type, target_id, limit=200)
+    return res["summary"]
+
+# ────────────────────────────────────────────────────────────────────────────
 # Orders + Bundled 10% Stripe deposit checkout
 # ────────────────────────────────────────────────────────────────────────────
 async def _get_stripe(req: Request) -> StripeCheckout:
@@ -753,7 +1211,10 @@ async def checkout_deposit(body: CheckoutCreate, req: Request, user: dict = Depe
     item_deposit = round(item_total * 0.10, 2)
     delivery_deposit = round(delivery_fee * 0.10, 2)
     # Tax: applied on the full (item + delivery) amount, collected 100% upfront
-    tax_profile = tax_for(body.country)
+    addr_str = None
+    if body.delivery_address and isinstance(body.delivery_address, dict):
+        addr_str = body.delivery_address.get("address")
+    tax_profile = tax_for(body.country, us_state=body.us_state, delivery_address=addr_str)
     tax_rate = tax_profile["rate"]
     tax_label = tax_profile["label"]
     taxable_base = round(item_total + delivery_fee, 2)
@@ -780,6 +1241,7 @@ async def checkout_deposit(body: CheckoutCreate, req: Request, user: dict = Depe
         "tax_rate": tax_rate,
         "tax_label": tax_label,
         "tax_amount": tax_amount,
+        "tax_us_state": tax_profile.get("us_state"),
         "deposit_total": deposit_total,
         "remaining_total": remaining,
         "delivery_address": body.delivery_address,
@@ -1341,6 +1803,16 @@ async def credentials_requirements():
         "required_categories": sorted(list(CREDENTIAL_REQUIRED_CATEGORIES)),
     }
 
+@api.get("/credentials/country-requirements")
+async def credentials_country_requirements(country: Optional[str] = None):
+    """Returns the list of country-specific business/tax credentials that
+    providers need to be legally allowed to invoice work in that country.
+    Pass `country=ALL` (or omit) to get the full map."""
+    if country and country.upper() != "ALL":
+        c = country.upper()
+        return {"country": c, "credentials": COUNTRY_BUSINESS_CREDENTIALS.get(c, [])}
+    return {"profiles": COUNTRY_BUSINESS_CREDENTIALS}
+
 # ────────────────────────────────────────────────────────────────────────────
 # Provider quotes (counter-offers)
 # ────────────────────────────────────────────────────────────────────────────
@@ -1555,7 +2027,7 @@ class TranslateRequest(BaseModel):
 # production they should be replaced by a proper tax engine (Stripe Tax, Avalara
 # etc.) — especially for US sales tax which varies state by state.
 TAX_PROFILES = {
-    "US": {"rate": 0.08,  "label": "Sales Tax", "note": "US sales tax varies by state — using 8% demo blended rate."},
+    "US": {"rate": 0.08,  "label": "Sales Tax", "note": "US sales tax varies by state — blended default. Per-state rates applied when state code is provided."},
     "GB": {"rate": 0.20,  "label": "VAT",       "note": "UK standard VAT rate."},
     "CA": {"rate": 0.13,  "label": "HST",       "note": "Ontario HST (13%) shown as demo. PST/GST differ by province."},
     "AU": {"rate": 0.10,  "label": "GST",       "note": "Australia GST."},
@@ -1572,18 +2044,61 @@ TAX_PROFILES = {
     "ZA": {"rate": 0.15,  "label": "VAT",       "note": "South Africa VAT."},
 }
 
-def tax_for(country: Optional[str]) -> dict:
-    """Returns the tax profile for a country code, or US default."""
+# US per-state sales tax base rates (state portion only — does NOT include
+# city/county/special-district add-ons; flagged in PRD for upgrade to a real
+# tax engine like Stripe Tax or Avalara before high-volume US launch).
+US_STATE_TAX_RATES = {
+    "AL": 0.04,    "AK": 0.0,    "AZ": 0.056,  "AR": 0.065,  "CA": 0.0725,
+    "CO": 0.029,   "CT": 0.0635, "DE": 0.0,    "DC": 0.06,   "FL": 0.06,
+    "GA": 0.04,    "HI": 0.04,   "ID": 0.06,   "IL": 0.0625, "IN": 0.07,
+    "IA": 0.06,    "KS": 0.065,  "KY": 0.06,   "LA": 0.0445, "ME": 0.055,
+    "MD": 0.06,    "MA": 0.0625, "MI": 0.06,   "MN": 0.06875,"MS": 0.07,
+    "MO": 0.04225, "MT": 0.0,    "NE": 0.055,  "NV": 0.0685, "NH": 0.0,
+    "NJ": 0.06625, "NM": 0.04875,"NY": 0.04,   "NC": 0.0475, "ND": 0.05,
+    "OH": 0.0575,  "OK": 0.045,  "OR": 0.0,    "PA": 0.06,   "RI": 0.07,
+    "SC": 0.06,    "SD": 0.045,  "TN": 0.07,   "TX": 0.0625, "UT": 0.0485,
+    "VT": 0.06,    "VA": 0.053,  "WA": 0.065,  "WV": 0.06,   "WI": 0.05,
+    "WY": 0.04,
+}
+
+STRIPE_TAX_ENABLED = os.environ.get("STRIPE_TAX_ENABLED", "false").lower() == "true"
+
+# Best-effort US state extraction from a free-text delivery address.
+_US_STATE_RE = re.compile(r"\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?")
+
+def extract_us_state(address: Optional[str]) -> Optional[str]:
+    if not address:
+        return None
+    m = _US_STATE_RE.search(address)
+    if not m:
+        return None
+    s = m.group(1).upper()
+    return s if s in US_STATE_TAX_RATES else None
+
+def tax_for(country: Optional[str], us_state: Optional[str] = None, delivery_address: Optional[str] = None) -> dict:
+    """Returns the tax profile for a country code, or US default. When country
+    is 'US' and a state code is supplied (or extractable from delivery_address),
+    returns the per-state rate."""
     c = (country or "US").upper()
-    return TAX_PROFILES.get(c, TAX_PROFILES["US"])
+    base = TAX_PROFILES.get(c, TAX_PROFILES["US"])
+    if c == "US":
+        state = (us_state or "").upper().strip() or extract_us_state(delivery_address)
+        if state and state in US_STATE_TAX_RATES:
+            return {
+                "rate": US_STATE_TAX_RATES[state],
+                "label": f"Sales Tax ({state})",
+                "note": f"US sales tax — {state} state base rate. Excludes county/city/special-district add-ons.",
+                "us_state": state,
+            }
+    return base
 
 @api.get("/i18n/tax")
-async def i18n_tax(country: Optional[str] = None):
+async def i18n_tax(country: Optional[str] = None, us_state: Optional[str] = None):
     """Tax info for a country (or all if no country given)."""
     if country:
-        prof = tax_for(country)
+        prof = tax_for(country, us_state=us_state)
         return {"country": country.upper(), **prof}
-    return {"profiles": TAX_PROFILES}
+    return {"profiles": TAX_PROFILES, "us_state_rates": US_STATE_TAX_RATES, "stripe_tax_enabled": STRIPE_TAX_ENABLED}
 
 _FX_CACHE: dict = {"rates": None, "fetched_at": None}
 

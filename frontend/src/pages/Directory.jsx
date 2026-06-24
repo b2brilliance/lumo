@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { ReviewSummaryBadge } from "@/components/ReviewsSection";
 
 export default function Directory({ role }) {
   const [stores, setStores] = useState([]);
@@ -39,6 +40,7 @@ export default function Directory({ role }) {
               <div className="p-5 flex-1">
                 <div className="overline">{isRestaurant ? sf.cuisine || "Food" : sf.category || "Retail"}</div>
                 <div className="font-display text-xl font-bold mt-1">{sf.name || s.name}</div>
+                <div className="mt-1.5"><ReviewSummaryBadge targetType="store" targetId={s.id} /></div>
                 <div className="text-xs text-slate-500 mt-2 font-mono">{sf.address}</div>
                 {sf.hours && <div className="text-xs text-slate-500 font-mono">{sf.hours}</div>}
               </div>

@@ -1,11 +1,13 @@
 import React from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart } from "lucide-react";
 
 export default function NavBar() {
   const { user, logout } = useAuth();
+  const { cart } = useCart() || { cart: { total_items: 0 } };
   const nav = useNavigate();
 
   const roleLink = () => {
@@ -48,6 +50,14 @@ export default function NavBar() {
                 </NavLink>
               )}
               <NavLink to="/chats" className="text-slate-500 hover:text-slate-900" data-testid="nav-chats" title="Messages"><MessageSquare className="w-4 h-4" /></NavLink>
+              <NavLink to="/cart" className="relative text-slate-500 hover:text-slate-900" data-testid="nav-cart" title="Cart">
+                <ShoppingCart className="w-4 h-4" />
+                {cart && cart.total_items > 0 && (
+                  <span data-no-i18n="true" data-testid="nav-cart-count" className="absolute -top-2 -right-2 bg-teal-700 text-white text-[10px] font-mono font-bold px-1.5 py-0.5 leading-none rounded-full">
+                    {cart.total_items}
+                  </span>
+                )}
+              </NavLink>
               <NavLink to="/settings" className="text-slate-500 hover:text-slate-900" data-testid="nav-settings"><Settings className="w-4 h-4" /></NavLink>
               <span className="text-sm text-slate-700 hidden md:inline" data-testid="nav-user-name">{user.name}</span>
               <Button variant="ghost" size="sm" onClick={() => { logout(); nav("/"); }} data-testid="nav-logout">

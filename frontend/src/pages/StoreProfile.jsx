@@ -12,12 +12,16 @@ import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
 import { useLocale } from "@/lib/locale";
+import { useCart } from "@/lib/cart";
+import ReviewsSection, { ReviewSummaryBadge } from "@/components/ReviewsSection";
 import { toast } from "sonner";
+import { ShoppingCart } from "lucide-react";
 
 export default function StoreProfile({ role }) {
   const { id } = useParams();
   const { user } = useAuth();
   const { country, taxLabel, computeBreakdown } = useLocale();
+  const { add: addToCart } = useCart() || {};
   const [store, setStore] = useState(null);
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
@@ -100,6 +104,7 @@ export default function StoreProfile({ role }) {
           <div className="mt-6">
             <div className="overline">{isRestaurant ? sf.cuisine || "Food" : sf.category || "Retail"}</div>
             <h1 className="font-display text-4xl font-black tracking-tighter mt-2">{sf.name}</h1>
+            <div className="mt-2"><ReviewSummaryBadge targetType="store" targetId={store.id} /></div>
             <div className="mt-4 space-y-1 text-sm text-slate-600">
               <div className="font-mono">{sf.address}</div>
               {sf.hours && <div className="font-mono">{sf.hours}</div>}
@@ -121,9 +126,30 @@ export default function StoreProfile({ role }) {
                   <div className="p-4 flex-1 flex flex-col">
                     <div className="font-display font-bold">{it.name}</div>
                     <div className="text-xs text-slate-500 mt-1 flex-1">{it.description}</div>
-                    <div className="flex items-center justify-between mt-3">
+                    <div className="flex items-center justify-between mt-3 gap-2">
                       <div className="font-display text-xl font-bold">${Number(it.price).toFixed(2)}</div>
-                      <Button size="sm" onClick={() => openOrder(it)} className="bg-slate-900 hover:bg-slate-800" data-testid={`order-item-${it.id}`}>Order</Button>
+                      <div className="flex items-center gap-1.5">
+                        {addToCart && user && user !== false && (
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={async () => {
+                              try {
+                                await addToCart(it.id, 1);
+                                toast.success(`${it.name} added to cart`);
+                              } catch (e) {
+                                toast.error("Could not add to cart");
+                              }
+                            }}
+                            data-testid={`add-cart-${it.id}`}
+                            title="Add to cart"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Button size="sm" onClick={() => openOrder(it)} className="bg-slate-900 hover:bg-slate-800" data-testid={`order-item-${it.id}`}>Order</Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -214,6 +240,10 @@ export default function StoreProfile({ role }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <div className="mt-16">
+        <ReviewsSection targetType="store" targetId={store.id} />
+      </div>
     </div>
   );
 }

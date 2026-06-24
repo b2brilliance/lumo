@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api, ALL_CATEGORIES, formatApiError } from "@/lib/api";
 import { CREDENTIAL_KINDS_BY_CATEGORY, kindsForCategory, KIND_LABEL, REQUIRED_CATEGORIES } from "@/lib/credentialKinds";
+import { useLocale, COUNTRY_PROFILES } from "@/lib/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MediaUpload from "@/components/MediaUpload";
 import { toast } from "sonner";
-import { ShieldCheck, ShieldAlert, Trash2, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Trash2, CheckCircle2, Globe } from "lucide-react";
 
 const US_STATES = "AL,AK,AZ,AR,CA,CO,CT,DE,FL,GA,HI,ID,IL,IN,IA,KS,KY,LA,ME,MD,MA,MI,MN,MS,MO,MT,NE,NV,NH,NJ,NM,NY,NC,ND,OH,OK,OR,PA,RI,SC,SD,TN,TX,UT,VT,VA,WA,WV,WI,WY,DC".split(",");
 
@@ -18,7 +19,158 @@ const STATUS_STYLES = {
   rejected: "text-red-700 bg-red-50 border-red-200",
 };
 
+/**
+ * Country-specific business / tax-registration credentials.
+ * Fetches the credential schema for the current locale country, lets the
+ * provider submit each (number + optional doc) via the standard /credentials
+ * endpoint with category="business_registration".
+ */
+function BusinessRegistration({ credentials, country, profile, onSubmitted }) {
+  const [reqs, setReqs] = useState([]);
+  const [overrideCountry, setOverrideCountry] = useState(country);
+  const [forms, setForms] = useState({});
+  const [busy, setBusy] = useState(null);
+  const activeCountry = overrideCountry || country;
+
+  useEffect(() => {
+    api.get(`/credentials/country-requirements?country=${activeCountry}`)
+      .then(({ data }) => setReqs(data.credentials || []))
+      .catch(() => setReqs([]));
+  }, [activeCountry]);
+
+  const submitOne = async (kind) => {
+    const f = forms[kind] || {};
+    if (!f.value && !f.document?.id) {
+      toast.error("Add a number or upload a document");
+      return;
+    }
+    setBusy(kind);
+    try {
+      await api.post("/credentials", {
+        kind,
+        category: "business_registration",
+        license_number: f.value || null,
+        expiry_date: f.expiry || null,
+        state: activeCountry,                 // we reuse the `state` field to store the country code
+        document_media_id: f.document?.id || null,
+        notes: f.notes || null,
+      });
+      toast.success("Business registration submitted for review");
+      setForms({ ...forms, [kind]: { value: "", expiry: "", document: null, notes: "" } });
+      onSubmitted?.();
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const existingByKind = {};
+  for (const c of credentials) {
+    if (c.category === "business_registration") existingByKind[c.kind] = c;
+  }
+
+  return (
+    <section className="border border-slate-200 p-6 mb-8" data-no-i18n="false" data-testid="business-registration-section">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <Globe className="w-5 h-5 text-teal-700" />
+          <div className="font-display text-xl font-bold">Business / tax registration</div>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-mono">
+          <span className="text-slate-500 uppercase">Country</span>
+          <select
+            value={activeCountry}
+            onChange={(e) => setOverrideCountry(e.target.value)}
+            className="border border-slate-300 px-2 py-1.5"
+            data-testid="biz-country-picker"
+          >
+            {Object.entries(COUNTRY_PROFILES).map(([code, p]) => (
+              <option key={code} value={code}>{p.flag} {code} — {p.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <p className="text-slate-600 text-sm mt-3">
+        Every country has its own rules about who can legally invoice for work. Add the ID(s) from the list below — the ones marked <strong>required</strong> are needed before you can be paid out in {profile?.name || activeCountry}.
+      </p>
+
+      {reqs.length === 0 ? (
+        <div className="mt-6 text-sm text-slate-500">No country-specific business credentials configured for {activeCountry}.</div>
+      ) : (
+        <div className="mt-5 grid md:grid-cols-2 gap-4">
+          {reqs.map((r) => {
+            const existing = existingByKind[r.kind];
+            const f = forms[r.kind] || { value: "", expiry: "", document: null, notes: "" };
+            const setF = (patch) => setForms({ ...forms, [r.kind]: { ...f, ...patch } });
+            return (
+              <div key={r.kind} className="border border-slate-200 p-4 bg-slate-50/40" data-testid={`biz-cred-${r.kind}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-display font-bold text-slate-900">{r.label}</div>
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mt-1">
+                      {r.required_for === "business" ? "businesses" : r.required_for === "individual" ? "individuals (sole prop)" : "businesses & individuals"}
+                      {r.issuer ? ` · ${r.issuer}` : ""}
+                    </div>
+                    <div className="text-xs font-mono text-slate-500 mt-1">Format: {r.format}</div>
+                  </div>
+                  {existing && (
+                    <span className={`text-[10px] font-mono uppercase tracking-widest border px-2 py-1 whitespace-nowrap ${STATUS_STYLES[existing.status] || "border-slate-200 text-slate-500"}`} data-testid={`biz-status-${r.kind}`}>
+                      {existing.status === "verified" ? "✓ verified" : existing.status}
+                    </span>
+                  )}
+                </div>
+                {!existing && (
+                  <div className="mt-3 space-y-2">
+                    <Input
+                      value={f.value}
+                      onChange={(e) => setF({ value: e.target.value })}
+                      placeholder={r.format}
+                      data-testid={`biz-input-${r.kind}`}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={f.expiry}
+                        onChange={(e) => setF({ expiry: e.target.value })}
+                        placeholder="Expiry (if any)"
+                        data-testid={`biz-expiry-${r.kind}`}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => submitOne(r.kind)}
+                        disabled={busy === r.kind}
+                        className="bg-slate-900 hover:bg-slate-800 w-full"
+                        data-testid={`biz-submit-${r.kind}`}
+                      >
+                        {busy === r.kind ? "Submitting…" : "Submit"}
+                      </Button>
+                    </div>
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-1">Optional: upload a supporting document</div>
+                    <MediaUpload
+                      value={f.document ? { media_url: f.document.media_url, media_type: f.document.media_type } : null}
+                      onChange={(v) => setF({ document: v.media_url ? { ...v, id: v.id } : null })}
+                      label=""
+                    />
+                  </div>
+                )}
+                {existing && existing.license_number && (
+                  <div className="mt-2 font-mono text-xs text-slate-600">#{existing.license_number}{existing.expiry_date ? ` · expires ${existing.expiry_date}` : ""}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-xs text-slate-500 mt-4">
+        Tip: Lumo will use these to issue compliant invoices on your behalf and report taxes correctly in {profile?.name || activeCountry}. We never share them publicly — only an internal admin reviewer sees them.
+      </p>
+    </section>
+  );
+}
+
 export default function CredentialsPage() {
+  const { country, profile } = useLocale();
   const [creds, setCreds] = useState([]);
   const [form, setForm] = useState({
     category: "medical", kind: "", state: "", license_number: "",
@@ -83,6 +235,10 @@ export default function CredentialsPage() {
       <p className="text-slate-600 mt-3 text-sm max-w-2xl">
         Upload a credential for each category you work in. Medical and legal jobs require a verified credential before you can accept or quote. Other categories are optional but strongly recommended — verified providers get a trust badge that customers can see.
       </p>
+
+      <div className="mt-8">
+        <BusinessRegistration credentials={creds} country={country} profile={profile} onSubmitted={load} />
+      </div>
 
       <div className="grid lg:grid-cols-12 gap-8 mt-8">
         <form onSubmit={submit} className="lg:col-span-5 border border-slate-200 p-6 space-y-4" data-testid="credential-form">
@@ -206,7 +362,7 @@ export default function CredentialsPage() {
             ))}
           </div>
           <p className="text-xs text-slate-400 mt-3 font-mono">
-            Demo note: the "Verify" button approves your credential instantly so you can test. In production this is admin / compliance only.
+            Demo note: the &quot;Verify&quot; button approves your credential instantly so you can test. In production this is admin / compliance only.
           </p>
         </div>
       </div>

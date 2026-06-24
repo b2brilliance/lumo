@@ -8,6 +8,7 @@ import ChatPanel from "@/components/ChatPanel";
 import QuoteDialog from "@/components/QuoteDialog";
 import TrustBadges from "@/components/TrustBadges";
 import { ServiceDetailsView } from "@/components/ServiceDetailsForm";
+import ReviewsSection from "@/components/ReviewsSection";
 import { toast } from "sonner";
 
 export default function JobDetail() {
@@ -218,6 +219,11 @@ export default function JobDetail() {
         )}
       </aside>
       <QuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} job={job} onSubmitted={() => loadQuotes()} />
+      {job.provider_id && job.status === "completed" && (
+        <div className="md:col-span-12 mt-12">
+          <ReviewsSection targetType="provider" targetId={job.provider_id} />
+        </div>
+      )}
     </div>
   );
 }
