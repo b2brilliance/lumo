@@ -43,10 +43,11 @@ Also: restrict Google Maps API key in Cloud Console (Settings page).
 - Settings: full Google Maps API key restriction guide
 - 4-color category system (red/blue/amber/teal) end-to-end; "Remote-friendly" toggle on /map and provider hub
 - Object storage backed media upload (25MB cap)
+- **Real Google Maps integration** via @react-google-maps/api with restricted REACT_APP_GOOGLE_MAPS_API_KEY; custom SVG drop-pin markers in 4 category colors + InfoWindow on click
+- **Job-scoped real-time chat** (3s polling) with anti-poach sanitizer (phone, email, URL, contact-word redaction → `[hidden]`); per-job per-provider threads; customer thread tabs on open jobs; `/chats` inbox
 
 ## Tested
-- Backend pytest 24/24 — auth, jobs, opportunities (since polling), marketplace + Stripe deposit, stores/restaurants, inventory CRUD, map, wallet.
-- Frontend: customer post-job, marketplace buy deposit dialog, store order deposit, provider hub feed, settings, wallet. Role-based redirect after login/register fixed.
+- Backend pytest **43/43** (24 prior + 19 new chat tests). Sanitizer covers international phone formats, obfuscated emails, off-platform contact words. Role-based redirect after login/register fixed.
 
 ## Backlog
 - **P1**: Real Google Maps integration on /map (currently schematic SVG with US bounds); use the user's restricted Google Maps API key.
