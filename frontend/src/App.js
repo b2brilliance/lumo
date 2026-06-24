@@ -83,6 +83,7 @@ function App() {
             <Route path="/rentals" element={<Rentals />} />
             <Route path="/rentals/host" element={<Protected><RentalHost /></Protected>} />
             <Route path="/rentals/:id" element={<RentalDetail />} />
+            <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />

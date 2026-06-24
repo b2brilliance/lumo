@@ -1,0 +1,46 @@
+{
+  "summary": "Verified the 3 new features added in this session: (1) Multi-photo media[] gallery on rentals (3 thumbnails + main image + '1/3' counter rendered on /rentals/:id), (2) Availability calendar blocking — GET /api/rentals/{id}/blocked-dates returns 200 with confirmed/pending ranges; POST /api/rentals/{id}/book returns HTTP 409 for both exact and partial overlap; adjacent non-overlapping window returns 200, (3) Admin Console at /admin renders all 4 stat tiles (Pending creds=12, Withdrawals=0, Active rentals=48, Pending bookings=1) and all 4 tabs (Credentials, Withdrawals, Reviews, Rentals) with real data (12 verify+reject buttons, 9 review delete buttons, 1 pending rental booking row with deep-link). RBAC enforced: non-admin GET /api/admin/stats and /api/admin/credentials return 403; non-admin frontend user redirected away from /admin. Backend regression: 93/93 pytests across 5 existing files still pass; 17 new tests in test_lumo_admin_and_overlap.py pass. Total backend: 110/110 (excluding test_lumo_chat.py which has a pre-existing collection issue requiring REACT_APP_BACKEND_URL env-var to be set in the shell — not introduced by this session).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/stats", "issue": "Stat response key is 'pending_withdrawals' but counts withdrawals with status in [pending, initiated, completed] — 'completed' shouldn't count as 'pending'. Cosmetic; the AdminConsole tile is just labelled 'Withdrawals' so user-facing copy is fine."},
+      {"endpoint": "/api/rentals/{id}/book", "issue": "When the rental's booking_mode='request', the first booking lands in 'pending_approval' (blocking) status but the Stripe URL is null and no error is returned — the renter has no Stripe link to pay and depends on host approval. Behaviour matches spec; just calling it out."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/rentals/:id date pickers", "issues": ["Uses native browser <input type='date'> instead of the shadcn Calendar component used elsewhere in the app. Functional and the blocked-dates API is wired, but the picker UX is inconsistent with the rest of Lumo and disabling individual dates on a native picker is not possible across browsers — only min/max is reliable. Consider migrating to shadcn Calendar with disabledMatcher for booked ranges to actually disable individual blocked dates."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lumo_admin_and_overlap.py",
+    "/app/test_reports/pytest/admin_overlap_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: migrate rental date pickers in /app/frontend/src/pages/RentalDetail.jsx from native <input type='date'> to shadcn Calendar so that blocked dates can be visually disabled (current implementation likely only sets min/max and cannot grey-out individual days).",
+    "Cosmetic: rename admin_stats key 'pending_withdrawals' or scope its query to status='pending' only (it currently counts pending+initiated+completed which is misleading)."
+  ],
+  "critical_code_review_comments": [
+    "server.py:1455-1463 overlap query is correct: half-open interval check (start < other.end AND end > other.start) over blocking_statuses {pending_approval, deposit_pending, deposit_paid, confirmed, in_progress}. Same status set used by /blocked-dates → consistent.",
+    "server.py:1415 media[] is auto-backfilled from legacy media_url when media is absent — clean backwards-compat shim.",
+    "server.py:1615-1704 admin endpoints share _require_admin dep that 403s non-admins. clean_doc is applied so _id is dropped. owner is joined manually on credentials + withdrawals — N+1 query pattern (acceptable for ≤200 rows).",
+    "AdminConsole.jsx 182 lines, well-structured into one component per tab. All interactive elements have data-testid; trash/verify/reject icons each have unique testid by id. Confirm dialog (window.confirm) for review delete is acceptable for an admin-only surface.",
+    "RentalDetail uses native input type=date — see design_issues above."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lumo_admin_and_overlap.py (NEW — 17 tests: 2 media[] + 6 overlap/blocked-dates + 9 admin)"
+  ],
+  "success_rate": {
+    "backend": "100% (110/110: 93 regression + 17 new)",
+    "frontend": "100% on the 3 newly added features (admin console, multi-photo gallery, date-picker wiring + blocked-dates API integration). Native date picker is a design-not-bug observation."
+  },
+  "test_credentials": "customer@lumo.test, provider@lumo.test, admin@lumo.test — all password123 (already seeded).",
+  "seed_data_creation": "Pytest created 2 TEST_ rentals (TEST_multi_photo_rental, TEST_legacy_single_photo, TEST_overlap_rental) + 2 future-dated bookings (2099-01-10→01-15 instant and 2099-02-01→02-05) + 2 TEST_ credentials (one verified, one rejected). All TEST_ prefixed and harmless. The TEST_multi_photo_rental was used in the UI test to verify the 3-photo thumbnail strip.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The 3 new features (multi-photo media[], blocked-dates+409 overlap, admin console) are fully verified backend + UI. Test file /app/backend/tests/test_lumo_admin_and_overlap.py contains 17 reusable tests with proper TEST_ prefixed seed data. Note: pytest test_lumo_chat.py has a pre-existing collection error 'NoneType has no attribute rstrip' — it reads REACT_APP_BACKEND_URL at import time without a fallback; if running full suite pass `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2) pytest backend/tests/` or skip it. Total rental count is now 48 (was ~45 before — 3 TEST_ rentals added).",
+  "rca of the issue": "N/A — all 12 requested test cases pass."
+}
