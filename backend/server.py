@@ -1149,6 +1149,34 @@ async def accept_quote(quote_id: str, user: dict = Depends(get_current_user)):
         {"job_id": job["id"], "id": {"$ne": quote_id}, "status": "pending"},
         {"$set": {"status": "declined"}}
     )
+    # Notify accepted provider
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": q["provider_id"],
+        "type": "quote_accepted",
+        "title": "Your quote was accepted",
+        "body": f"{user['name']} accepted your ${q['quoted_pay_rate']:.2f}/{q['quoted_pay_unit']} quote on \"{job['title']}\".",
+        "link": f"/jobs/{job['id']}",
+        "job_id": job["id"],
+        "quote_id": quote_id,
+        "read": False,
+        "created_at": now_iso(),
+    })
+    # Notify auto-declined providers
+    other_quotes = await db.quotes.find({"job_id": job["id"], "id": {"$ne": quote_id}, "status": "declined"}).to_list(200)
+    for oq in other_quotes:
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": oq["provider_id"],
+            "type": "quote_declined",
+            "title": "A quote you sent was declined",
+            "body": f"The customer chose another provider for \"{job['title']}\".",
+            "link": f"/jobs/{job['id']}",
+            "job_id": job["id"],
+            "quote_id": oq["id"],
+            "read": False,
+            "created_at": now_iso(),
+        })
     job = await db.jobs.find_one({"id": job["id"]})
     return clean_doc(job)
 
@@ -1162,6 +1190,18 @@ async def decline_quote(quote_id: str, user: dict = Depends(get_current_user)):
     if q["status"] != "pending":
         raise HTTPException(400, "Quote already resolved")
     await db.quotes.update_one({"id": quote_id}, {"$set": {"status": "declined"}})
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": q["provider_id"],
+        "type": "quote_declined",
+        "title": "Your quote was declined",
+        "body": f"{user['name']} declined your ${q['quoted_pay_rate']:.2f}/{q['quoted_pay_unit']} quote.",
+        "link": f"/jobs/{q['job_id']}",
+        "job_id": q["job_id"],
+        "quote_id": quote_id,
+        "read": False,
+        "created_at": now_iso(),
+    })
     return {"ok": True}
 
 @api.delete("/quotes/{quote_id}")
@@ -1172,6 +1212,31 @@ async def withdraw_quote(quote_id: str, user: dict = Depends(require_role("provi
     if q["provider_id"] != user["id"]:
         raise HTTPException(403, "Not yours")
     await db.quotes.delete_one({"id": quote_id})
+    return {"ok": True}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Notifications
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/notifications")
+async def list_notifications(since: Optional[str] = None, unread_only: bool = False, user: dict = Depends(get_current_user)):
+    q: dict = {"user_id": user["id"]}
+    if since:
+        q["created_at"] = {"$gt": since}
+    if unread_only:
+        q["read"] = False
+    docs = await db.notifications.find(q).sort("created_at", -1).to_list(100)
+    return [clean_doc(d) for d in docs]
+
+@api.post("/notifications/{notif_id}/read")
+async def mark_read(notif_id: str, user: dict = Depends(get_current_user)):
+    res = await db.notifications.update_one({"id": notif_id, "user_id": user["id"]}, {"$set": {"read": True}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Not found")
+    return {"ok": True}
+
+@api.post("/notifications/read_all")
+async def mark_all_read(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}})
     return {"ok": True}
 
 

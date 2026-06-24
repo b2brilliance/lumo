@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
+import AddressInput from "@/components/AddressInput";
 import { toast } from "sonner";
 
 export default function StoreProfile({ role }) {
@@ -138,7 +139,14 @@ export default function StoreProfile({ role }) {
               </div>
               <div>
                 <Label className="overline">Delivery address</Label>
-                <Input value={order.delivery_address} onChange={(e) => setOrder({ ...order, delivery_address: e.target.value })} data-testid="order-delivery-address" className="mt-1" />
+                <div className="mt-1">
+                  <AddressInput
+                    value={order.delivery_address}
+                    onChange={(v) => setOrder({ ...order, delivery_address: v })}
+                    placeholder="Where should we deliver?"
+                    data-testid="order-delivery-address"
+                  />
+                </div>
               </div>
               <div>
                 <Label className="overline">Payment methods accepted (for balance)</Label>

@@ -1,0 +1,42 @@
+{
+  "summary": "Backend notification flow + regression suite verified end-to-end. Added 12 new pytest cases in test_lumo_notifications.py covering: anonymous 401, list/since/unread_only filters, sort desc, accept-quote dual notification fan-out (quote_accepted to winner + auto quote_declined to other pending providers), decline-quote single-target notification, double-accept/double-decline/decline-already-accepted all returning 400 with NO duplicate notification, mark-read permission isolation (404 cross-user + bogus id), mark-read persistence, and read_all bulk update. Full suite: 55/55 PASS (24 backend + 19 chat + 12 notifications). Zero regressions on prior 43 tests.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lumo_notifications.py",
+    "/app/backend/tests/test_lumo_backend.py",
+    "/app/backend/tests/test_lumo_chat.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/notifications_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: server.py is now ~1378 lines — well past the 700-line guideline. Recommend splitting routes into routers (auth, jobs, quotes, marketplace, stores, payments, wallet, chat, notifications).",
+    "OPTIONAL: /api/notifications uses string $gt on 'created_at' for the 'since' filter (lexicographic on ISO strings). Works correctly when callers URL-encode '+' in timezone offsets (the requests `params=` kwarg does this automatically and so does URLSearchParams in the frontend useNotifications hook). A future hand-built query string with a raw '+' would silently no-op the filter and return all notifications — same brittleness pattern flagged in iteration_2 for /messages.",
+    "OPTIONAL: notifications list is capped at .to_list(100) with no pagination — fine today but a heavy user could miss older items. Consider an offset/limit or cursor param later.",
+    "OPTIONAL: no cleanup endpoint for notifications. TEST_-prefixed users accumulate notifications across runs; harmless because the test asserts EXISTENCE/COUNT scoped to specific quote_ids, but worth noting if a future ops cleanup is wanted."
+  ],
+  "critical_code_review_comments": [
+    "accept_quote uses two separate operations to mark q1 'accepted' and bulk-update others to 'declined'. The 'other_quotes' query then re-reads only those just-declined (status='declined', id != accepted_id) — correct. But this is 4 sequential DB writes + 1 read + N inserts in a non-transactional flow. If the process dies between the bulk-update and the notification inserts, declined quotes have no notification. Low probability but worth a try/except + idempotency note. Mongo multi-document transactions would require replica set — not a blocker, just a nit.",
+    "Notification 'body' is a free-text f-string that includes provider/customer names and quote rate. If a user sets name=None or quoted_pay_rate is non-numeric (it's typed float in Pydantic, so OK today) the .2f formatter would 500. Today's input model enforces float so this is safe; just keep in mind for future migrations.",
+    "Auth on /api/notifications endpoints is Depends(get_current_user) — correctly returns 401 for anonymous (verified). mark_read uses filter {'id': notif_id, 'user_id': user['id']} — returning 404 on mismatch (verified). Solid.",
+    "Notifications collection has no index defined in server.py. Queries are {'user_id': X, 'read': Y, 'created_at': {'$gt': Z}} with sort by created_at desc. Recommend adding a compound index (user_id, created_at desc) at startup for scalability.",
+    "Earlier file-edit concern from main agent (lost accept_quote notification block) — verified present in live server.py: 'quote_accepted' insert at line 1153, auto-decline loop at 1166-1179. Tests confirm both fire correctly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lumo_notifications.py (new, 12 tests)"
+  ],
+  "success_rate": {"backend": "100% (55/55, 12 new notification tests + 43 prior with no regressions)", "frontend": "not tested this iteration (backend-only request)"},
+  "test_credentials": "customer@lumo.test, provider@lumo.test, retailer@lumo.test, restaurant@lumo.test — all password123 (seeded). Test also registers TEST_notif_<hex>@lumo.test provider accounts on the fly to validate the auto-decline fan-out scenario with two providers.",
+  "seed_data_creation": "Tests create TEST_-prefixed jobs, fresh TEST_notif_* provider users via /auth/register, and quotes which trigger notifications. No cleanup endpoint exists; accumulation is bounded and scoped by unique quote_id so reruns remain green.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Notification endpoints: GET /api/notifications [?since=ISO&unread_only=true], POST /api/notifications/{id}/read, POST /api/notifications/read_all — all Bearer-auth required. Triggers live in accept_quote() (server.py 1125-1181, 'quote_accepted' to winner + 'quote_declined' fan-out) and decline_quote() (1183-1205, single 'quote_declined'). Notification fields: id, user_id, type, title, body, link='/jobs/{job_id}', job_id, quote_id, read, created_at. Run full suite: `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d'=' -f2) pytest backend/tests/ -v` (55 tests, ~130s). Frontend NotificationsBridge + useNotifications + AddressInput Places fallback were NOT tested this iteration (backend-only review request).",
+  "rca of the issue": "No bugs found. All 12 new notification tests passed on first run, all 43 prior tests still pass."
+}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
+import AddressInput from "@/components/AddressInput";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -149,7 +150,14 @@ export default function Marketplace() {
                 </div>
                 <div>
                   <Label className="overline">Address</Label>
-                  <Input value={order.delivery_address} onChange={(e) => setOrder({ ...order, delivery_address: e.target.value })} data-testid="buy-delivery-address" className="mt-1" />
+                  <div className="mt-1">
+                    <AddressInput
+                      value={order.delivery_address}
+                      onChange={(v) => setOrder({ ...order, delivery_address: v })}
+                      placeholder="Where should we deliver?"
+                      data-testid="buy-delivery-address"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="border-t border-slate-200 pt-3 space-y-1 font-mono text-sm">

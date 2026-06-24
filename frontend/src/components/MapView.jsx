@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
 const GOOGLE_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+const LIBRARIES = ["places"];
 
 // US-centered default
 const DEFAULT_CENTER = { lat: 39.8283, lng: -98.5795 };
@@ -45,6 +46,7 @@ export default function MapView({
   const { isLoaded, loadError } = useJsApiLoader({
     id: "lumo-google-maps",
     googleMapsApiKey: GOOGLE_KEY || "",
+    libraries: LIBRARIES,
   });
 
   const [map, setMap] = useState(null);

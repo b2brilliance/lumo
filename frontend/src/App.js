@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import NavBar from "@/components/NavBar";
+import NotificationsBridge from "@/components/NotificationsBridge";
 import { Toaster } from "@/components/ui/sonner";
 
 import Landing from "@/pages/Landing";
@@ -38,6 +39,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <NavBar />
+          <NotificationsBridge />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />

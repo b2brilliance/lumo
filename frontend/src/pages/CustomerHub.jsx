@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import MediaUpload from "@/components/MediaUpload";
+import AddressInput from "@/components/AddressInput";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
@@ -21,7 +22,8 @@ export default function CustomerHub() {
     pay_rate: "", pay_unit: "flat", estimated_units: "1",
     payment_terms: "",
     allowed_payment_methods: ["app", "cash", "card"],
-    pickup_address: "", dropoff_address: "",
+    pickup_address: "", pickup_lat: null, pickup_lng: null,
+    dropoff_address: "", dropoff_lat: null, dropoff_lng: null,
     media_url: null, media_type: null,
   });
   const locMode = locationModeFor(form.category);
@@ -60,10 +62,10 @@ export default function CustomerHub() {
         dropoff_location: null,
       };
       if (locMode === "pickup_dropoff") {
-        body.pickup_location = form.pickup_address ? { lat: 40.7128, lng: -74.006, address: form.pickup_address } : null;
-        body.dropoff_location = form.dropoff_address ? { lat: 40.7128, lng: -74.006, address: form.dropoff_address } : null;
+        body.pickup_location = form.pickup_address ? { lat: form.pickup_lat ?? 40.7128, lng: form.pickup_lng ?? -74.006, address: form.pickup_address } : null;
+        body.dropoff_location = form.dropoff_address ? { lat: form.dropoff_lat ?? 40.7128, lng: form.dropoff_lng ?? -74.006, address: form.dropoff_address } : null;
       } else if (locMode === "onsite") {
-        body.pickup_location = form.pickup_address ? { lat: 40.7128, lng: -74.006, address: form.pickup_address } : null;
+        body.pickup_location = form.pickup_address ? { lat: form.pickup_lat ?? 40.7128, lng: form.pickup_lng ?? -74.006, address: form.pickup_address } : null;
       }
       await api.post("/jobs", body);
       toast.success("Service request posted");
@@ -130,11 +132,27 @@ export default function CustomerHub() {
               <div className="space-y-3">
                 <div>
                   <Label className="overline">{locCopy.pickup_label}</Label>
-                  <Input value={form.pickup_address} onChange={(e) => set("pickup_address", e.target.value)} placeholder={locCopy.pickup_placeholder} data-testid="job-pickup-address" className="mt-1" />
+                  <div className="mt-1">
+                    <AddressInput
+                      value={form.pickup_address}
+                      onChange={(v) => set("pickup_address", v)}
+                      onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
+                      placeholder={locCopy.pickup_placeholder}
+                      data-testid="job-pickup-address"
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label className="overline">{locCopy.dropoff_label}</Label>
-                  <Input value={form.dropoff_address} onChange={(e) => set("dropoff_address", e.target.value)} placeholder={locCopy.dropoff_placeholder} data-testid="job-dropoff-address" className="mt-1" />
+                  <div className="mt-1">
+                    <AddressInput
+                      value={form.dropoff_address}
+                      onChange={(v) => set("dropoff_address", v)}
+                      onPlace={(p) => setForm((f) => ({ ...f, dropoff_address: p.address, dropoff_lat: p.lat, dropoff_lng: p.lng }))}
+                      placeholder={locCopy.dropoff_placeholder}
+                      data-testid="job-dropoff-address"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -144,7 +162,16 @@ export default function CustomerHub() {
               <div className="overline text-blue-700 mb-2">{locCopy.title}</div>
               <div>
                 <Label className="overline">{locCopy.pickup_label}</Label>
-                <Input value={form.pickup_address} onChange={(e) => set("pickup_address", e.target.value)} placeholder={locCopy.pickup_placeholder} data-testid="job-service-address" className="mt-1" required />
+                <div className="mt-1">
+                  <AddressInput
+                    value={form.pickup_address}
+                    onChange={(v) => set("pickup_address", v)}
+                    onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
+                    placeholder={locCopy.pickup_placeholder}
+                    data-testid="job-service-address"
+                    required
+                  />
+                </div>
               </div>
             </div>
           )}

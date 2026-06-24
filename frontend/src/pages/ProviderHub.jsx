@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import MapView from "@/components/MapView";
 import CategoryBadge from "@/components/CategoryBadge";
 import QuoteDialog from "@/components/QuoteDialog";
+import AddressInput from "@/components/AddressInput";
 import { toast } from "sonner";
 import { Wallet, MapPin, Briefcase } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -203,7 +204,15 @@ export default function ProviderHub() {
           <div className="overline flex items-center gap-2"><Briefcase className="w-3.5 h-3.5" /> Match settings</div>
           <div>
             <Label className="overline">Your base location</Label>
-            <Input value={profile.address} onChange={(e) => setProfile((p) => ({ ...p, address: e.target.value }))} placeholder="City, address…" data-testid="provider-address" className="mt-1" />
+            <div className="mt-1">
+              <AddressInput
+                value={profile.address}
+                onChange={(v) => setProfile((p) => ({ ...p, address: v }))}
+                onPlace={(p) => setProfile((prev) => ({ ...prev, address: p.address, lat: p.lat ?? prev.lat, lng: p.lng ?? prev.lng }))}
+                placeholder="City, address…"
+                data-testid="provider-address"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
