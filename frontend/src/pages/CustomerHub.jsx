@@ -10,7 +10,7 @@ import MediaUpload from "@/components/MediaUpload";
 import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import ServiceDetailsForm from "@/components/ServiceDetailsForm";
-import { computeDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
+import { computeDeliveryQuote, computeMovingQuote, milesBetween } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
@@ -35,6 +35,7 @@ export default function CustomerHub() {
 
   // Delivery / courier auto-quote
   const isDeliveryCat = form.category === "delivery" || form.category === "courier";
+  const isMovingCat = form.category === "moving";
   const deliveryQuote = useMemo(() => {
     if (!isDeliveryCat) return null;
     if (form.pickup_lat == null || form.dropoff_lat == null) return null;
@@ -51,6 +52,26 @@ export default function CustomerHub() {
     });
   }, [isDeliveryCat, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.item_size, form.details?.quantity, form.details?.weight_estimate, form.details?.fragile]);
 
+  const movingQuote = useMemo(() => {
+    if (!isMovingCat) return null;
+    // Labor-only doesn't need pickup/dropoff; everything else does
+    const sub = form.details?.subcategory;
+    if (sub !== "labor_only" && (form.pickup_lat == null || form.dropoff_lat == null)) return null;
+    const miles = sub === "labor_only" ? 0 : milesBetween(
+      { lat: form.pickup_lat, lng: form.pickup_lng },
+      { lat: form.dropoff_lat, lng: form.dropoff_lng }
+    );
+    return computeMovingQuote({
+      miles,
+      move_type: sub || "local",
+      property_size: form.details?.property_size || "1br",
+      num_movers: form.details?.num_movers || 2,
+      has_stairs: form.details?.has_stairs || "no",
+      packing_needed: form.details?.packing_needed || "no",
+      duration_hours: parseFloat(form.estimated_units || "2"),
+    });
+  }, [isMovingCat, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.subcategory, form.details?.property_size, form.details?.num_movers, form.details?.has_stairs, form.details?.packing_needed, form.estimated_units]);
+
   // Auto-fill pay_rate from quote
   useEffect(() => {
     if (deliveryQuote && deliveryQuote.total > 0) {
@@ -60,6 +81,15 @@ export default function CustomerHub() {
       });
     }
   }, [deliveryQuote]);
+
+  useEffect(() => {
+    if (movingQuote && movingQuote.total > 0) {
+      setForm((f) => {
+        if (f.category !== "moving") return f;
+        return { ...f, pay_rate: movingQuote.total.toFixed(2), pay_unit: "flat" };
+      });
+    }
+  }, [movingQuote]);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -97,7 +127,7 @@ export default function CustomerHub() {
         pickup_location: null,
         dropoff_location: null,
         details: form.details || {},
-        delivery_quote: deliveryQuote || null,
+        delivery_quote: deliveryQuote || movingQuote || null,
       };
       if (locMode === "pickup_dropoff") {
         body.pickup_location = form.pickup_address ? { lat: form.pickup_lat ?? 40.7128, lng: form.pickup_lng ?? -74.006, address: form.pickup_address } : null;
@@ -263,6 +293,58 @@ export default function CustomerHub() {
             <Textarea value={form.payment_terms} onChange={(e) => set("payment_terms", e.target.value)} placeholder="e.g. Pay after delivery, half cash half app" data-testid="job-payment-terms" className="mt-1" />
           </div>
           <MediaUpload value={form} onChange={(v) => set("media_url", v.media_url) || setForm((f) => ({ ...f, ...v }))} />
+          {isMovingCat && movingQuote && (
+            <div className="border border-red-700/40 bg-red-50/40 p-4" data-testid="moving-quote">
+              <div className="flex items-center justify-between">
+                <div className="overline text-red-800">Moving quote · auto-calculated</div>
+                {movingQuote.is_long_distance && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider border border-amber-400 bg-amber-50 text-amber-800 px-1.5 py-0.5">Long-distance</span>
+                )}
+                {movingQuote.mode === "labor_only" && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider border border-blue-400 bg-blue-50 text-blue-800 px-1.5 py-0.5">Labor only</span>
+                )}
+              </div>
+              <div className="font-mono text-sm mt-3 space-y-1">
+                {movingQuote.mode === "labor_only" ? (
+                  <>
+                    <div className="flex justify-between"><span>{movingQuote.movers} movers × {movingQuote.hours} hr × $45</span><span>${movingQuote.labor_fee.toFixed(2)}</span></div>
+                    {movingQuote.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs surcharge</span><span>${movingQuote.stairs_fee.toFixed(2)}</span></div>}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Base · {movingQuote.base_property} × {movingQuote.movers} movers ({movingQuote.mover_multiplier}×){movingQuote.mode === "long_distance" ? " · long-distance" : ""}{movingQuote.mode === "single_item" ? " · single item" : ""}</span>
+                      <span>${movingQuote.base_fee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>First {movingQuote.short_distance_miles} mi × ${movingQuote.short_per_mile.toFixed(2)}</span>
+                      <span>${movingQuote.short_distance_fee.toFixed(2)}</span>
+                    </div>
+                    {movingQuote.is_long_distance && (
+                      <>
+                        <div className="flex justify-between text-amber-800">
+                          <span>Long-haul {movingQuote.long_distance_miles} mi × ${movingQuote.long_per_mile.toFixed(2)}</span>
+                          <span>${movingQuote.long_distance_fee.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-amber-800">
+                          <span>Long-haul surcharge (50+ mi)</span>
+                          <span>${movingQuote.long_haul_surcharge.toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
+                    {movingQuote.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs</span><span>${movingQuote.stairs_fee.toFixed(2)}</span></div>}
+                    {movingQuote.packing_fee > 0 && <div className="flex justify-between"><span>Packing service</span><span>${movingQuote.packing_fee.toFixed(2)}</span></div>}
+                  </>
+                )}
+                <div className="flex justify-between font-display text-base font-black border-t border-red-700/30 pt-2 mt-2 text-red-900">
+                  <span>Movers receive</span><span data-testid="moving-quote-total">${movingQuote.total.toFixed(2)}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2 leading-snug">
+                Auto-calculated from your property size, movers, stairs, packing service, and distance. Adjust above if your job is unusual.
+              </p>
+            </div>
+          )}
           {isDeliveryCat && deliveryQuote && (
             <div className="border border-teal-700/40 bg-teal-50/40 p-4" data-testid="delivery-quote">
               <div className="flex items-center justify-between">

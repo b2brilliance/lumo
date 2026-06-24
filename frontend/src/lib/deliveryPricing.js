@@ -98,3 +98,108 @@ export function computeStoreDeliveryQuote({ miles } = {}) {
     total,
   };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Moving — pickup → drop-off with size, movers, stairs, packing, distance.
+// ────────────────────────────────────────────────────────────────────────────
+export const MOVING_PROPERTY_BASE = {
+  studio:    120,
+  "1br":     180,
+  "2br":     260,
+  "3br":     360,
+  "4br_plus":500,
+};
+
+// Multiplier relative to 2-mover baseline
+export const MOVING_MOVER_MULT = {
+  1: 0.7, 2: 1.0, 3: 1.4, 4: 1.8, 5: 2.2, 6: 2.6,
+};
+
+export const MOVING_STAIRS_FEE = {
+  no: 0, yes_origin: 40, yes_dest: 40, yes_both: 75,
+};
+
+export const MOVING_PACKING_FEE = {
+  no: 0, partial: 80, full: 200,
+};
+
+export const MOVING_RATES = {
+  per_mile_short: 1.50,
+  per_mile_long: 2.50,
+  long_haul_surcharge: 60,
+  long_distance_type_premium: 100, // extra base bump if move_type=long_distance
+  single_item_base: 50,            // overrides property base when move_type=single_item
+  labor_only_per_mover_hour: 45,
+  labor_only_default_hours: 2,
+  long_distance_threshold_miles: 50,
+};
+
+export function computeMovingQuote({
+  miles, move_type = "local", property_size = "1br",
+  num_movers = 2, has_stairs = "no", packing_needed = "no",
+  duration_hours = null,
+} = {}) {
+  const r = MOVING_RATES;
+  const m = miles != null ? Math.max(0, miles) : 0;
+  const movers = Math.max(1, Math.min(6, Number(num_movers) || 2));
+
+  // Labor-only: hourly per mover, no distance.
+  if (move_type === "labor_only") {
+    const hours = duration_hours != null && duration_hours > 0 ? Number(duration_hours) : r.labor_only_default_hours;
+    const labor = movers * r.labor_only_per_mover_hour * hours;
+    const stairs = MOVING_STAIRS_FEE[has_stairs] || 0;
+    const total = Math.round((labor + stairs) * 100) / 100;
+    return {
+      mode: "labor_only", miles: 0, is_long_distance: false,
+      movers, hours, labor_fee: Math.round(labor * 100) / 100,
+      stairs_fee: stairs, packing_fee: 0, base_fee: 0,
+      short_distance_fee: 0, short_distance_miles: 0, short_per_mile: 0,
+      long_distance_fee: 0, long_distance_miles: 0, long_per_mile: 0, long_haul_surcharge: 0,
+      total,
+    };
+  }
+
+  // Property base — single_item overrides
+  let base = move_type === "single_item"
+    ? r.single_item_base
+    : (MOVING_PROPERTY_BASE[property_size] ?? MOVING_PROPERTY_BASE["1br"]);
+
+  // Mover multiplier on base
+  const moverMult = MOVING_MOVER_MULT[movers] ?? 1.0;
+  base = base * moverMult;
+
+  // Long-distance move type premium (on top of mileage rules)
+  if (move_type === "long_distance") base += r.long_distance_type_premium;
+
+  // Stairs + packing
+  const stairs = MOVING_STAIRS_FEE[has_stairs] || 0;
+  const packing = MOVING_PACKING_FEE[packing_needed] || 0;
+
+  // Distance
+  const shortMiles = Math.min(m, r.long_distance_threshold_miles);
+  const longMiles = Math.max(0, m - r.long_distance_threshold_miles);
+  const shortDistanceFee = shortMiles * r.per_mile_short;
+  const longDistanceFee = longMiles * r.per_mile_long;
+  const longHaulSurcharge = m > r.long_distance_threshold_miles ? r.long_haul_surcharge : 0;
+
+  const total = Math.round((base + stairs + packing + shortDistanceFee + longDistanceFee + longHaulSurcharge) * 100) / 100;
+  return {
+    mode: move_type,
+    miles: miles != null ? Math.round(miles * 10) / 10 : null,
+    is_long_distance: m > r.long_distance_threshold_miles,
+    movers,
+    base_fee: Math.round(base * 100) / 100,
+    base_property: property_size,
+    mover_multiplier: moverMult,
+    short_distance_fee: Math.round(shortDistanceFee * 100) / 100,
+    short_distance_miles: Math.round(shortMiles * 10) / 10,
+    short_per_mile: r.per_mile_short,
+    long_distance_fee: Math.round(longDistanceFee * 100) / 100,
+    long_distance_miles: Math.round(longMiles * 10) / 10,
+    long_per_mile: r.per_mile_long,
+    long_haul_surcharge: longHaulSurcharge,
+    stairs_fee: stairs,
+    packing_fee: packing,
+    total,
+  };
+}
