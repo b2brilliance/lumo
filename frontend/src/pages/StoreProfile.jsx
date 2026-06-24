@@ -11,11 +11,13 @@ import { useAuth } from "@/lib/auth";
 import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
+import { useLocale } from "@/lib/locale";
 import { toast } from "sonner";
 
 export default function StoreProfile({ role }) {
   const { id } = useParams();
   const { user } = useAuth();
+  const { country, taxLabel, computeBreakdown } = useLocale();
   const [store, setStore] = useState(null);
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
@@ -76,6 +78,7 @@ export default function StoreProfile({ role }) {
         origin_url: window.location.origin,
         allowed_payment_methods: order.payment_methods,
         payment_terms: order.terms,
+        country,
       };
       const { data } = await api.post("/checkout/deposit", body);
       window.location.href = data.url;
@@ -86,11 +89,8 @@ export default function StoreProfile({ role }) {
   };
 
   const itemTotal = target ? target.price * order.quantity : 0;
-  const itemDeposit = +(itemTotal * 0.10).toFixed(2);
   const deliveryFee = parseFloat(order.delivery_fee || "0");
-  const deliveryDeposit = +(deliveryFee * 0.10).toFixed(2);
-  const depositTotal = +(itemDeposit + deliveryDeposit).toFixed(2);
-  const remaining = +(itemTotal + deliveryFee - depositTotal).toFixed(2);
+  const breakdown = target ? computeBreakdown(itemTotal, deliveryFee) : null;
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-10">
@@ -196,12 +196,13 @@ export default function StoreProfile({ role }) {
               <div className="border-t border-slate-200 pt-4 space-y-1 font-mono text-sm">
                 <div className="flex justify-between"><span>Item total</span><span>${itemTotal.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Delivery fee</span><span>${deliveryFee.toFixed(2)}</span></div>
-                <div className="flex justify-between text-teal-700"><span>10% Item Deposit</span><span>${itemDeposit.toFixed(2)}</span></div>
-                <div className="flex justify-between text-teal-700"><span>10% Delivery Deposit</span><span>${deliveryDeposit.toFixed(2)}</span></div>
+                <div className="flex justify-between text-teal-700"><span>10% Item Deposit</span><span>${breakdown.itemDeposit.toFixed(2)}</span></div>
+                <div className="flex justify-between text-teal-700"><span>10% Delivery Deposit</span><span>${breakdown.deliveryDeposit.toFixed(2)}</span></div>
+                <div className="flex justify-between text-slate-700"><span>{taxLabel} (100% upfront)</span><span data-testid="order-tax-amount">${breakdown.tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-bold border-t border-slate-200 pt-2 mt-2 text-base">
-                  <span>Pay now (deposit)</span><span data-testid="order-deposit-total">${depositTotal.toFixed(2)}</span>
+                  <span>Pay now (deposit)</span><span data-testid="order-deposit-total">${breakdown.depositTotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-xs text-slate-500"><span>Remaining due on delivery</span><span>${remaining.toFixed(2)}</span></div>
+                <div className="flex justify-between text-xs text-slate-500"><span>Remaining due on delivery</span><span>${breakdown.remaining.toFixed(2)}</span></div>
               </div>
             </div>
           )}

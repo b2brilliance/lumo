@@ -2,9 +2,11 @@ import React from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { LocaleProvider } from "@/lib/locale";
 import NavBar from "@/components/NavBar";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
+import AutoTranslator from "@/components/AutoTranslator";
 import { Toaster } from "@/components/ui/sonner";
 
 import Landing from "@/pages/Landing";
@@ -39,10 +41,12 @@ function App() {
   return (
     <div className="App grain">
       <BrowserRouter>
-        <AuthProvider>
-          <NavBar />
-          <NotificationsBridge />
-          <Routes>
+        <LocaleProvider>
+          <AuthProvider>
+            <NavBar />
+            <NotificationsBridge />
+            <AutoTranslator />
+            <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -71,8 +75,9 @@ function App() {
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />
-          <AssistantWidget />
-        </AuthProvider>
+            <AssistantWidget />
+          </AuthProvider>
+        </LocaleProvider>
       </BrowserRouter>
     </div>
   );

@@ -246,7 +246,7 @@ class InventoryItemCreate(BaseModel):
     category: Optional[str] = None
 
 class CheckoutCreate(BaseModel):
-    """Bundled 10% deposit checkout — item + delivery."""
+    """Bundled 10% deposit checkout — item + delivery + 100% tax (so Lumo collects full tax upfront)."""
     item_price: float
     delivery_fee: float
     listing_id: Optional[str] = None
@@ -258,6 +258,7 @@ class CheckoutCreate(BaseModel):
     origin_url: str
     allowed_payment_methods: Optional[List[PaymentMethod]] = None
     payment_terms: Optional[str] = None
+    country: Optional[str] = None  # ISO country code for tax lookup
 
 class FinalPaymentCreate(BaseModel):
     """Customer pays remaining balance — credits provider wallet."""
@@ -746,13 +747,19 @@ async def _get_stripe(req: Request) -> StripeCheckout:
 
 @api.post("/checkout/deposit")
 async def checkout_deposit(body: CheckoutCreate, req: Request, user: dict = Depends(get_current_user)):
-    """Create order + Stripe checkout for 10% bundled deposit (item + delivery)."""
+    """Create order + Stripe checkout for 10% bundled deposit (item + delivery) + 100% tax."""
     item_total = round(body.item_price * body.quantity, 2)
     delivery_fee = round(body.delivery_fee, 2)
     item_deposit = round(item_total * 0.10, 2)
     delivery_deposit = round(delivery_fee * 0.10, 2)
-    deposit_total = round(item_deposit + delivery_deposit, 2)
-    remaining = round(item_total + delivery_fee - deposit_total, 2)
+    # Tax: applied on the full (item + delivery) amount, collected 100% upfront
+    tax_profile = tax_for(body.country)
+    tax_rate = tax_profile["rate"]
+    tax_label = tax_profile["label"]
+    taxable_base = round(item_total + delivery_fee, 2)
+    tax_amount = round(taxable_base * tax_rate, 2)
+    deposit_total = round(item_deposit + delivery_deposit + tax_amount, 2)
+    remaining = round(item_total + delivery_fee - item_deposit - delivery_deposit, 2)
     if deposit_total <= 0:
         raise HTTPException(400, "Invalid amounts")
 
@@ -769,6 +776,10 @@ async def checkout_deposit(body: CheckoutCreate, req: Request, user: dict = Depe
         "delivery_fee": delivery_fee,
         "item_deposit": item_deposit,
         "delivery_deposit": delivery_deposit,
+        "tax_country": (body.country or "US").upper(),
+        "tax_rate": tax_rate,
+        "tax_label": tax_label,
+        "tax_amount": tax_amount,
         "deposit_total": deposit_total,
         "remaining_total": remaining,
         "delivery_address": body.delivery_address,
@@ -787,6 +798,7 @@ async def checkout_deposit(body: CheckoutCreate, req: Request, user: dict = Depe
     metadata = {
         "order_id": order_id, "customer_id": user["id"], "type": "deposit",
         "item_deposit": str(item_deposit), "delivery_deposit": str(delivery_deposit),
+        "tax_country": (body.country or "US").upper(), "tax_amount": str(tax_amount),
     }
     session = await stripe.create_checkout_session(CheckoutSessionRequest(
         amount=float(deposit_total), currency="usd",
@@ -941,14 +953,28 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
         "id": str(uuid.uuid4()),
         "user_id": user["id"], "user_name": user["name"], "user_email": user["email"],
         "amount": body.amount, "method": body.method, "notes": body.notes,
-        "status": "pending", "created_at": now_iso(),
+        "status": "completed",
+        "auto_processed": True,
+        "created_at": now_iso(),
+        "completed_at": now_iso(),
     }
     await db.withdrawal_requests.insert_one(wr)
     await db.users.update_one({"id": user["id"]}, {"$inc": {"wallet_balance": -body.amount}})
     await db.wallet_transactions.insert_one({
         "id": str(uuid.uuid4()), "user_id": user["id"], "amount": -body.amount,
-        "type": "debit", "reason": "Withdrawal requested",
+        "type": "debit", "reason": f"Payout via {body.method}",
         "withdrawal_id": wr["id"], "created_at": now_iso(),
+    })
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "type": "payout_sent",
+        "title": f"Payout of ${body.amount:.2f} sent",
+        "body": f"Your ${body.amount:.2f} payout via {body.method.replace('_', ' ')} has been processed.",
+        "link": "/wallet",
+        "withdrawal_id": wr["id"],
+        "read": False,
+        "created_at": now_iso(),
     })
     return clean_doc(wr)
 
@@ -1518,6 +1544,200 @@ async def mark_all_read(user: dict = Depends(get_current_user)):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# i18n — translation + currency
+# ────────────────────────────────────────────────────────────────────────────
+class TranslateRequest(BaseModel):
+    texts: List[str]
+    target_lang: str            # ISO 639-1, e.g. "ja", "fr", "pt-BR"
+    source_lang: str = "en"
+
+# Per-country tax: rate + label + remit hint. These are sensible defaults; in
+# production they should be replaced by a proper tax engine (Stripe Tax, Avalara
+# etc.) — especially for US sales tax which varies state by state.
+TAX_PROFILES = {
+    "US": {"rate": 0.08,  "label": "Sales Tax", "note": "US sales tax varies by state — using 8% demo blended rate."},
+    "GB": {"rate": 0.20,  "label": "VAT",       "note": "UK standard VAT rate."},
+    "CA": {"rate": 0.13,  "label": "HST",       "note": "Ontario HST (13%) shown as demo. PST/GST differ by province."},
+    "AU": {"rate": 0.10,  "label": "GST",       "note": "Australia GST."},
+    "IN": {"rate": 0.18,  "label": "GST",       "note": "India GST standard rate for services."},
+    "DE": {"rate": 0.19,  "label": "MwSt.",     "note": "Germany VAT (Mehrwertsteuer)."},
+    "FR": {"rate": 0.20,  "label": "TVA",       "note": "France VAT (TVA)."},
+    "JP": {"rate": 0.10,  "label": "消費税",      "note": "Japan Consumption Tax (JCT)."},
+    "BR": {"rate": 0.17,  "label": "ICMS",      "note": "Brazil ICMS demo blended rate; varies by state."},
+    "MX": {"rate": 0.16,  "label": "IVA",       "note": "Mexico VAT (IVA)."},
+    "ES": {"rate": 0.21,  "label": "IVA",       "note": "Spain VAT (IVA)."},
+    "NG": {"rate": 0.075, "label": "VAT",       "note": "Nigeria VAT."},
+    "AE": {"rate": 0.05,  "label": "VAT",       "note": "UAE VAT."},
+    "SG": {"rate": 0.09,  "label": "GST",       "note": "Singapore GST."},
+    "ZA": {"rate": 0.15,  "label": "VAT",       "note": "South Africa VAT."},
+}
+
+def tax_for(country: Optional[str]) -> dict:
+    """Returns the tax profile for a country code, or US default."""
+    c = (country or "US").upper()
+    return TAX_PROFILES.get(c, TAX_PROFILES["US"])
+
+@api.get("/i18n/tax")
+async def i18n_tax(country: Optional[str] = None):
+    """Tax info for a country (or all if no country given)."""
+    if country:
+        prof = tax_for(country)
+        return {"country": country.upper(), **prof}
+    return {"profiles": TAX_PROFILES}
+
+_FX_CACHE: dict = {"rates": None, "fetched_at": None}
+
+async def _fetch_fx_rates() -> dict:
+    """Fetch USD-based exchange rates. Cached 1h. Falls back to a static table on failure."""
+    now = datetime.now(timezone.utc)
+    cached_at = _FX_CACHE.get("fetched_at")
+    if _FX_CACHE.get("rates") and cached_at and (now - cached_at).total_seconds() < 3600:
+        return _FX_CACHE["rates"]
+    fallback = {
+        "USD": 1.0, "EUR": 0.92, "GBP": 0.79, "CAD": 1.36, "AUD": 1.51,
+        "INR": 83.2, "JPY": 152.0, "BRL": 5.05, "MXN": 17.1, "NGN": 1480.0,
+        "AED": 3.67, "SGD": 1.34, "ZAR": 18.2, "CHF": 0.88, "CNY": 7.22,
+    }
+    try:
+        r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=8)
+        r.raise_for_status()
+        data = r.json()
+        rates = data.get("rates") or {}
+        if not rates:
+            raise ValueError("empty rates")
+        _FX_CACHE["rates"] = rates
+        _FX_CACHE["fetched_at"] = now
+        return rates
+    except Exception as e:
+        logger.warning(f"FX fetch failed, using fallback: {e}")
+        _FX_CACHE["rates"] = fallback
+        _FX_CACHE["fetched_at"] = now
+        return fallback
+
+@api.get("/i18n/fx")
+async def fx_rates():
+    """Live USD-based FX rates (cached 1h)."""
+    rates = await _fetch_fx_rates()
+    return {
+        "base": "USD",
+        "fetched_at": _FX_CACHE["fetched_at"].isoformat() if _FX_CACHE["fetched_at"] else None,
+        "rates": rates,
+    }
+
+# Languages supported for translation
+SUPPORTED_LANGS = {
+    "en": "English",
+    "es": "Spanish (native conversational, neutral Latin American Spanish)",
+    "fr": "French (native conversational French of France)",
+    "fr-CA": "French (Canadian / Québécois French as spoken in Québec)",
+    "de": "German (native conversational German of Germany)",
+    "pt-BR": "Portuguese (Brazilian Portuguese as spoken naturally in Brazil)",
+    "ja": "Japanese (natural conversational Japanese, polite -desu/-masu register)",
+    "hi": "Hindi (natural conversational Hindi in Devanagari script, the way people actually speak in India)",
+    "ar": "Arabic (Modern Standard Arabic, natural and respectful)",
+    "zh": "Chinese (Simplified Chinese, natural conversational Mandarin)",
+}
+
+LANG_LABELS = {
+    "en": "English", "es": "Español", "fr": "Français", "fr-CA": "Français (Canada)",
+    "de": "Deutsch", "pt-BR": "Português (Brasil)", "ja": "日本語",
+    "hi": "हिन्दी", "ar": "العربية", "zh": "中文",
+}
+
+@api.get("/i18n/languages")
+async def i18n_languages():
+    return [{"code": code, "label": LANG_LABELS.get(code, code)} for code in SUPPORTED_LANGS]
+
+@api.post("/i18n/translate")
+async def translate(body: TranslateRequest):
+    """Batch translate a list of short strings into target_lang. Cached per-string per-lang in Mongo."""
+    lang = body.target_lang
+    if lang == "en" or not lang:
+        return {"translations": {t: t for t in body.texts}}
+    if lang not in SUPPORTED_LANGS:
+        raise HTTPException(400, f"Unsupported language: {lang}")
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "Translation unavailable — LLM key not configured")
+
+    # Dedup + clean inputs
+    inputs = []
+    seen = set()
+    for t in body.texts:
+        s = (t or "").strip()
+        if not s or s in seen:
+            continue
+        if len(s) > 500:
+            continue
+        seen.add(s)
+        inputs.append(s)
+    if not inputs:
+        return {"translations": {}}
+
+    # Pull cached
+    cached_docs = await db.translations.find({"lang": lang, "src": {"$in": inputs}}).to_list(len(inputs))
+    cache = {d["src"]: d["tgt"] for d in cached_docs}
+    missing = [s for s in inputs if s not in cache]
+
+    new_translations: dict = {}
+    if missing:
+        lang_descr = SUPPORTED_LANGS[lang]
+        system = (
+            f"You are a professional localization translator. Translate each numbered English string into {lang_descr}. "
+            "Use the way native speakers naturally talk in that region — idiomatic, warm, modern. "
+            "Preserve punctuation, line breaks, %s placeholders, and any code-like tokens (e.g. $20, 5km, URLs, emails) exactly. "
+            "Do NOT add explanations, quotes, or commentary. "
+            "Output exactly N lines, each prefixed with the same number and a tab, in the same order as the input. "
+            "Never translate proper nouns like 'Lumo', 'Lumi', 'Stripe'."
+        )
+        numbered = "\n".join(f"{i+1}.\t{s}" for i, s in enumerate(missing))
+        prompt = f"Translate the following {len(missing)} strings into {lang_descr}.\n\n{numbered}\n\nReturn exactly {len(missing)} numbered lines."
+        try:
+            chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=f"lumo-i18n-{lang}-{uuid.uuid4()}",
+                system_message=system,
+            ).with_model("anthropic", "claude-sonnet-4-6")
+            reply = await chat.send_message(UserMessage(text=prompt))
+        except Exception as e:
+            logger.error(f"i18n translate error: {e}")
+            raise HTTPException(502, "Translation service unavailable")
+
+        # Parse "N.\tTranslation" lines
+        lines = [ln for ln in (reply or "").splitlines() if ln.strip()]
+        parsed: dict = {}
+        for ln in lines:
+            m = re.match(r"^\s*(\d+)[.)]\s*(.+)$", ln)
+            if not m:
+                continue
+            idx = int(m.group(1)) - 1
+            if 0 <= idx < len(missing):
+                parsed[missing[idx]] = m.group(2).strip()
+        # For anything LLM missed, fall back to the source string
+        for s in missing:
+            new_translations[s] = parsed.get(s, s)
+
+        # Persist cache
+        if new_translations:
+            ops = []
+            for src, tgt in new_translations.items():
+                ops.append({
+                    "lang": lang, "src": src, "tgt": tgt, "created_at": now_iso(),
+                })
+            for doc in ops:
+                await db.translations.update_one(
+                    {"lang": doc["lang"], "src": doc["src"]},
+                    {"$set": doc}, upsert=True,
+                )
+
+    out = {**cache, **new_translations}
+    # Also echo any input we filtered out (length/etc) back as themselves
+    for t in body.texts:
+        s = (t or "").strip()
+        if s and s not in out:
+            out[s] = s
+    return {"translations": out}
+
+# ────────────────────────────────────────────────────────────────────────────
 # Seeding
 # ────────────────────────────────────────────────────────────────────────────
 SEED_USERS = [
@@ -1626,6 +1846,208 @@ async def seed():
                 "total_estimate": s["pay_rate"] * s["estimated_units"],
                 "created_at": now_iso(),
             })
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Global demo: ~3 sample jobs in each of 15 countries, varied categories.
+    # Pay rates are stored in USD (the frontend converts to local currency at display time).
+    # ────────────────────────────────────────────────────────────────────────
+    if customer and await db.jobs.count_documents({"is_global_demo": True}) == 0:
+        global_demo = [
+            # ── United States
+            {"country": "US", "city": "Los Angeles", "lat": 34.0522, "lng": -118.2437,
+             "title": "Move 1-bedroom apartment to Santa Monica", "description": "About 8 boxes, a queen mattress, and a small couch. Need help loading and a flat-rate move.",
+             "category": "moving", "pay_rate": 220.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Echo Park, Los Angeles, CA", "dropoff_address": "Santa Monica, CA",
+             "dropoff_lat": 34.0195, "dropoff_lng": -118.4912},
+            {"country": "US", "city": "Austin", "lat": 30.2672, "lng": -97.7431,
+             "title": "Deep-clean a 2-bedroom apartment", "description": "Move-out clean, including oven and inside cabinets. Saturday preferred.",
+             "category": "cleaning", "pay_rate": 35.0, "pay_unit": "hour", "estimated_units": 5.0,
+             "pickup_address": "South Congress, Austin, TX"},
+
+            # ── United Kingdom
+            {"country": "GB", "city": "London", "lat": 51.5074, "lng": -0.1278,
+             "title": "Walk my Labrador in Hyde Park", "description": "Weekday mornings, about an hour. Friendly dog, good with people.",
+             "category": "pet_care", "pay_rate": 18.0, "pay_unit": "day", "estimated_units": 5.0,
+             "pickup_address": "Bayswater, London, UK"},
+            {"country": "GB", "city": "Manchester", "lat": 53.4808, "lng": -2.2426,
+             "title": "Fix a dripping kitchen tap", "description": "Mixer tap, slow drip from the spout. Replacement cartridge probably needed.",
+             "category": "handyman", "pay_rate": 45.0, "pay_unit": "hour", "estimated_units": 1.5,
+             "pickup_address": "Didsbury, Manchester, UK"},
+
+            # ── Canada
+            {"country": "CA", "city": "Toronto", "lat": 43.6532, "lng": -79.3832,
+             "title": "Same-day courier to Mississauga", "description": "Small envelope of legal documents. Pickup downtown, drop near Square One.",
+             "category": "courier", "pay_rate": 28.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "King St W, Toronto, ON",
+             "dropoff_address": "Square One, Mississauga, ON",
+             "dropoff_lat": 43.5938, "dropoff_lng": -79.6403},
+            {"country": "CA", "city": "Vancouver", "lat": 49.2827, "lng": -123.1207,
+             "title": "Tutor my daughter in Grade 9 math", "description": "Two evenings a week, online OK. Algebra and word problems.",
+             "category": "education", "pay_rate": 38.0, "pay_unit": "hour", "estimated_units": 8.0},
+
+            # ── Australia
+            {"country": "AU", "city": "Sydney", "lat": -33.8688, "lng": 151.2093,
+             "title": "Lawn mow + hedge trim, Bondi", "description": "Small front and back yard, hedges along the fence. Looking for fortnightly.",
+             "category": "landscaping", "pay_rate": 60.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Bondi Beach, Sydney, NSW"},
+            {"country": "AU", "city": "Melbourne", "lat": -37.8136, "lng": 144.9631,
+             "title": "Build a Shopify storefront for my cafe", "description": "Need a clean storefront, menu page, online ordering. Brand already done.",
+             "category": "digital_tech", "pay_rate": 70.0, "pay_unit": "hour", "estimated_units": 25.0},
+
+            # ── India
+            {"country": "IN", "city": "Mumbai", "lat": 19.0760, "lng": 72.8777,
+             "title": "Deliver a birthday cake from Bandra to Andheri", "description": "Fragile box. Pickup from Theobroma at 4pm, deliver by 5:30pm.",
+             "category": "delivery", "pay_rate": 6.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Theobroma, Bandra West, Mumbai",
+             "dropoff_address": "Andheri East, Mumbai",
+             "dropoff_lat": 19.1136, "dropoff_lng": 72.8697},
+            {"country": "IN", "city": "Bengaluru", "lat": 12.9716, "lng": 77.5946,
+             "title": "Home cleaning before Diwali", "description": "Full deep-clean of a 3BHK in Indiranagar. Kitchen, bathrooms, ceiling fans.",
+             "category": "cleaning", "pay_rate": 7.0, "pay_unit": "hour", "estimated_units": 6.0,
+             "pickup_address": "Indiranagar, Bengaluru, KA"},
+            {"country": "IN", "city": "Delhi", "lat": 28.6139, "lng": 77.2090,
+             "title": "Looking for a part-time content writer (remote)", "description": "Two articles a week on travel and lifestyle. English, light edits.",
+             "category": "marketing", "pay_rate": 12.0, "pay_unit": "hour", "estimated_units": 10.0},
+
+            # ── Germany
+            {"country": "DE", "city": "Berlin", "lat": 52.5200, "lng": 13.4050,
+             "title": "Hilfe beim Umzug — pickup truck + 2 movers", "description": "Studio to 1-bedroom, Kreuzberg to Prenzlauer Berg. About 20 boxes.",
+             "category": "moving", "pay_rate": 180.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Kreuzberg, Berlin",
+             "dropoff_address": "Prenzlauer Berg, Berlin",
+             "dropoff_lat": 52.5379, "dropoff_lng": 13.4250},
+            {"country": "DE", "city": "Munich", "lat": 48.1351, "lng": 11.5820,
+             "title": "Babysitter for two evenings a week", "description": "Two kids, ages 4 and 7. Light dinner, bedtime routine. German + English OK.",
+             "category": "pet_care", "pay_rate": 20.0, "pay_unit": "hour", "estimated_units": 6.0,
+             "pickup_address": "Schwabing, Munich"},
+
+            # ── France
+            {"country": "FR", "city": "Paris", "lat": 48.8566, "lng": 2.3522,
+             "title": "Livraison d'un colis du 11ème au 16ème", "description": "Petit colis, 3 kg. Récupérer près de Bastille, livrer Trocadéro avant 18h.",
+             "category": "delivery", "pay_rate": 22.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Bastille, Paris 11e",
+             "dropoff_address": "Trocadéro, Paris 16e",
+             "dropoff_lat": 48.8629, "dropoff_lng": 2.2873},
+            {"country": "FR", "city": "Lyon", "lat": 45.7640, "lng": 4.8357,
+             "title": "Refonte du site vitrine de mon restaurant", "description": "Site moderne, menu, réservations, photos. WordPress ou pareil.",
+             "category": "digital_tech", "pay_rate": 55.0, "pay_unit": "hour", "estimated_units": 20.0},
+
+            # ── Japan
+            {"country": "JP", "city": "Tokyo", "lat": 35.6762, "lng": 139.6503,
+             "title": "Bento delivery from Shibuya to Shinjuku", "description": "Three bentos, keep upright. Pickup at 12:00, deliver by 12:30.",
+             "category": "delivery", "pay_rate": 12.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Shibuya, Tokyo",
+             "dropoff_address": "Shinjuku, Tokyo",
+             "dropoff_lat": 35.6896, "dropoff_lng": 139.6917},
+            {"country": "JP", "city": "Osaka", "lat": 34.6937, "lng": 135.5023,
+             "title": "Weekly apartment cleaning, Namba", "description": "1LDK, weekly, Sunday mornings. Kitchen + bathroom + floor.",
+             "category": "cleaning", "pay_rate": 25.0, "pay_unit": "hour", "estimated_units": 3.0,
+             "pickup_address": "Namba, Osaka"},
+
+            # ── Brazil
+            {"country": "BR", "city": "São Paulo", "lat": -23.5505, "lng": -46.6333,
+             "title": "Entrega de documentos — Pinheiros para Itaim", "description": "Envelope pequeno, urgente. Retirar em Pinheiros e entregar no Itaim Bibi até as 17h.",
+             "category": "courier", "pay_rate": 8.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Pinheiros, São Paulo",
+             "dropoff_address": "Itaim Bibi, São Paulo",
+             "dropoff_lat": -23.5839, "dropoff_lng": -46.6739},
+            {"country": "BR", "city": "Rio de Janeiro", "lat": -22.9068, "lng": -43.1729,
+             "title": "Faxineira(o) para apartamento em Ipanema", "description": "Limpeza semanal, manhã, cerca de 4 horas. 2 quartos.",
+             "category": "cleaning", "pay_rate": 7.0, "pay_unit": "hour", "estimated_units": 4.0,
+             "pickup_address": "Ipanema, Rio de Janeiro"},
+
+            # ── Mexico
+            {"country": "MX", "city": "Mexico City", "lat": 19.4326, "lng": -99.1332,
+             "title": "Ayuda con mudanza — Roma Norte a Condesa", "description": "Departamento de 1 recámara, 15 cajas y muebles ligeros. Camioneta + 2 personas.",
+             "category": "moving", "pay_rate": 80.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Roma Norte, CDMX",
+             "dropoff_address": "Condesa, CDMX",
+             "dropoff_lat": 19.4109, "dropoff_lng": -99.1769},
+            {"country": "MX", "city": "Guadalajara", "lat": 20.6597, "lng": -103.3496,
+             "title": "Diseñador gráfico para identidad de marca", "description": "Logo, paleta, tipografías y un manual breve para una panadería local.",
+             "category": "digital_tech", "pay_rate": 18.0, "pay_unit": "hour", "estimated_units": 15.0},
+
+            # ── Spain
+            {"country": "ES", "city": "Madrid", "lat": 40.4168, "lng": -3.7038,
+             "title": "Pasear a mi perro por El Retiro", "description": "Mañanas, una hora, perro mediano muy sociable.",
+             "category": "pet_care", "pay_rate": 15.0, "pay_unit": "day", "estimated_units": 5.0,
+             "pickup_address": "Salamanca, Madrid"},
+            {"country": "ES", "city": "Barcelona", "lat": 41.3851, "lng": 2.1734,
+             "title": "Fontanero — fuga en el baño", "description": "Goteo en la tubería bajo el lavabo. Disponibilidad esta semana.",
+             "category": "handyman", "pay_rate": 40.0, "pay_unit": "hour", "estimated_units": 2.0,
+             "pickup_address": "El Born, Barcelona"},
+
+            # ── Nigeria
+            {"country": "NG", "city": "Lagos", "lat": 6.5244, "lng": 3.3792,
+             "title": "Same-day delivery, Lekki to Victoria Island", "description": "Small package of phone accessories. Pickup at 10am.",
+             "category": "delivery", "pay_rate": 9.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Lekki Phase 1, Lagos",
+             "dropoff_address": "Victoria Island, Lagos",
+             "dropoff_lat": 6.4281, "dropoff_lng": 3.4219},
+            {"country": "NG", "city": "Abuja", "lat": 9.0765, "lng": 7.3986,
+             "title": "Generator servicing — 5kVA", "description": "Annual service, oil change, filter, and load test. Wuse 2.",
+             "category": "handyman", "pay_rate": 25.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Wuse 2, Abuja"},
+
+            # ── United Arab Emirates
+            {"country": "AE", "city": "Dubai", "lat": 25.2048, "lng": 55.2708,
+             "title": "Move 2-bedroom apartment, Marina to JLT", "description": "Sofa, dining table, 25 boxes. Need a truck and 2 movers.",
+             "category": "moving", "pay_rate": 200.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Dubai Marina, Dubai",
+             "dropoff_address": "Jumeirah Lake Towers, Dubai",
+             "dropoff_lat": 25.0688, "dropoff_lng": 55.1393},
+            {"country": "AE", "city": "Abu Dhabi", "lat": 24.4539, "lng": 54.3773,
+             "title": "Personal trainer — 3x per week", "description": "Strength + cardio mix, home gym available. Beginner-friendly.",
+             "category": "personal_care", "pay_rate": 50.0, "pay_unit": "hour", "estimated_units": 12.0,
+             "pickup_address": "Al Reem Island, Abu Dhabi"},
+
+            # ── Singapore
+            {"country": "SG", "city": "Singapore", "lat": 1.3521, "lng": 103.8198,
+             "title": "Office cleaning — small co-working space", "description": "Tuesdays and Fridays evening, ~3 hours. Trash, restrooms, kitchen, floors.",
+             "category": "cleaning", "pay_rate": 22.0, "pay_unit": "hour", "estimated_units": 6.0,
+             "pickup_address": "Tanjong Pagar, Singapore"},
+            {"country": "SG", "city": "Singapore", "lat": 1.2966, "lng": 103.7764,
+             "title": "Looking for a part-time bookkeeper", "description": "Monthly close, expense categorisation, QuickBooks. Small e-commerce business.",
+             "category": "financial", "pay_rate": 45.0, "pay_unit": "hour", "estimated_units": 8.0},
+
+            # ── South Africa
+            {"country": "ZA", "city": "Cape Town", "lat": -33.9249, "lng": 18.4241,
+             "title": "Garden makeover, Sea Point", "description": "Clear overgrown beds, plant indigenous shrubs, lay mulch. Half-day job.",
+             "category": "landscaping", "pay_rate": 45.0, "pay_unit": "flat", "estimated_units": 1.0,
+             "pickup_address": "Sea Point, Cape Town"},
+            {"country": "ZA", "city": "Johannesburg", "lat": -26.2041, "lng": 28.0473,
+             "title": "Logo + brand kit for a coffee shop", "description": "Simple, warm, modern. Logo, two colour palettes, social templates.",
+             "category": "digital_tech", "pay_rate": 25.0, "pay_unit": "hour", "estimated_units": 12.0},
+        ]
+        for s in global_demo:
+            is_remote = s["category"] in REMOTE_FRIENDLY_CATEGORIES
+            pickup_loc = None
+            if s.get("pickup_address"):
+                pickup_loc = {"lat": s["lat"], "lng": s["lng"], "address": s["pickup_address"]}
+            dropoff_loc = None
+            if s.get("dropoff_address"):
+                dropoff_loc = {
+                    "lat": s.get("dropoff_lat", s["lat"]),
+                    "lng": s.get("dropoff_lng", s["lng"]),
+                    "address": s["dropoff_address"],
+                }
+            await db.jobs.insert_one({
+                "id": str(uuid.uuid4()),
+                "customer_id": customer["id"], "customer_name": customer["name"],
+                "title": s["title"], "description": s["description"], "category": s["category"],
+                "category_group": category_group(s["category"]), "is_remote": is_remote,
+                "pickup_location": pickup_loc, "dropoff_location": dropoff_loc,
+                "pay_rate": s["pay_rate"], "pay_unit": s["pay_unit"], "estimated_units": s["estimated_units"],
+                "media_url": None, "media_type": None,
+                "payment_terms": "", "allowed_payment_methods": ["app", "cash", "card"],
+                "status": "open", "provider_id": None,
+                "deposit_paid": False, "deposit_amount": 0.0,
+                "total_estimate": s["pay_rate"] * s["estimated_units"],
+                "country": s["country"], "city": s["city"],
+                "is_global_demo": True,
+                "created_at": now_iso(),
+            })
+        logger.info(f"Seeded {len(global_demo)} global demo jobs across 15 countries")
 
 @app.on_event("startup")
 async def on_startup():

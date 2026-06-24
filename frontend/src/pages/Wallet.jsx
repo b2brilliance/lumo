@@ -23,13 +23,15 @@ export default function Wallet() {
     e.preventDefault(); setBusy(true);
     try {
       await api.post("/wallet/withdraw", { amount: parseFloat(amount), method: "bank_transfer" });
-      toast.success("Withdrawal requested");
+      toast.success("Payout sent");
       setAmount("");
       await refresh();
       load();
-    } catch (e) {
-      toast.error(formatApiError(e));
-    } finally { setBusy(false); }
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

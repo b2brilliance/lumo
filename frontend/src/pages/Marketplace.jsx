@@ -12,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useLocale } from "@/lib/locale";
 
 export default function Marketplace() {
   const { user } = useAuth();
+  const { country, taxLabel, computeBreakdown } = useLocale();
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   const [items, setItems] = useState([]);
   const [openCreate, setOpenCreate] = useState(false);
@@ -63,6 +65,7 @@ export default function Marketplace() {
         delivery_address: order.delivery_address ? { address: order.delivery_address } : null,
         notes: order.notes,
         origin_url: window.location.origin,
+        country,
       });
       window.location.href = data.url;
     } catch (e) {
@@ -72,9 +75,8 @@ export default function Marketplace() {
   };
 
   const item = orderTarget;
-  const itemDeposit = item ? +(item.price * 0.10).toFixed(2) : 0;
-  const deliveryDeposit = +(parseFloat(order.delivery_fee || "0") * 0.10).toFixed(2);
-  const depositTotal = +(itemDeposit + deliveryDeposit).toFixed(2);
+  const deliveryFeeNum = parseFloat(order.delivery_fee || "0");
+  const breakdown = item ? computeBreakdown(item.price, deliveryFeeNum) : null;
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-10">
@@ -211,9 +213,12 @@ export default function Marketplace() {
               </div>
               <div className="border-t border-slate-200 pt-3 space-y-1 font-mono text-sm">
                 <div className="flex justify-between"><span>Item</span><span>${orderTarget.price.toFixed(2)}</span></div>
-                <div className="flex justify-between text-teal-700"><span>10% Item Deposit</span><span>${itemDeposit.toFixed(2)}</span></div>
-                <div className="flex justify-between text-teal-700"><span>10% Delivery Deposit</span><span>${deliveryDeposit.toFixed(2)}</span></div>
-                <div className="flex justify-between font-bold border-t pt-2 mt-1 text-base"><span>Pay now</span><span data-testid="buy-deposit-total">${depositTotal.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Delivery fee</span><span>${deliveryFeeNum.toFixed(2)}</span></div>
+                <div className="flex justify-between text-teal-700"><span>10% Item Deposit</span><span>${breakdown.itemDeposit.toFixed(2)}</span></div>
+                <div className="flex justify-between text-teal-700"><span>10% Delivery Deposit</span><span>${breakdown.deliveryDeposit.toFixed(2)}</span></div>
+                <div className="flex justify-between text-slate-700"><span>{taxLabel} (100% upfront)</span><span data-testid="buy-tax-amount">${breakdown.tax.toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold border-t pt-2 mt-1 text-base"><span>Pay now</span><span data-testid="buy-deposit-total">${breakdown.depositTotal.toFixed(2)}</span></div>
+                <div className="flex justify-between text-xs text-slate-500"><span>Remaining due on delivery</span><span>${breakdown.remaining.toFixed(2)}</span></div>
               </div>
               <DialogFooter>
                 <Button onClick={checkout} disabled={busy} className="bg-teal-700 hover:bg-teal-800" data-testid="buy-checkout-submit">
