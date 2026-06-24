@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
 import ChatPanel from "@/components/ChatPanel";
 import QuoteDialog from "@/components/QuoteDialog";
+import TrustBadges from "@/components/TrustBadges";
 import { ServiceDetailsView } from "@/components/ServiceDetailsForm";
 import { toast } from "sonner";
 
@@ -77,6 +78,18 @@ export default function JobDetail() {
           <div className="font-mono text-xs uppercase tracking-widest text-slate-500">{job.status}</div>
         </div>
         <h1 className="font-display text-4xl font-black tracking-tighter mt-3">{job.title}</h1>
+        {job.provider_id && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap" data-testid="job-assigned-provider">
+            <span className="overline text-slate-500">Assigned to</span>
+            <span className="font-mono text-sm">{job.provider_name}</span>
+            <TrustBadges userId={job.provider_id} />
+            {job.credential_match && (
+              <span className="text-[10px] font-mono uppercase tracking-wider border border-teal-700/40 bg-teal-50 text-teal-800 px-1.5 py-0.5" data-testid="credential-match-indicator">
+                ✓ Match: {job.credential_match.matched_kind.toUpperCase()}
+              </span>
+            )}
+          </div>
+        )}
         <div className="font-mono text-sm mt-3">
           <span className="font-display text-3xl font-black">${job.pay_rate.toFixed(2)}</span>
           <span className="text-slate-500"> / {job.pay_unit}</span>

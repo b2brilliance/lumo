@@ -288,6 +288,30 @@ class CredentialCreate(BaseModel):
 # Categories where accepting / quoting a job requires at least one verified credential
 CREDENTIAL_REQUIRED_CATEGORIES = {"medical", "legal"}
 
+# Map of medical license_required enum (job.details.license_required) → acceptable credential kinds
+MEDICAL_LICENSE_MAP = {
+    "rn_lpn": {"rn", "lpn"},
+    "cna_hha": {"cna", "hha"},
+    "pt": {"dpt", "pta"},
+    "ot": {"ot"},
+    "slp": {"slp"},
+    "rt": {"rt"},
+    "phlebotomist": {"cpt"},
+    "mental_health": {"lcsw", "lmft", "psychologist", "md_do_np_pa"},
+    "ibclc": {"ibclc"},
+    "doula": {"doula"},
+    "md_do_np_pa": {"md_do_np_pa"},
+    "rad_tech": {"rad_tech"},
+    "other": set(),  # match against anything verified in the category
+}
+
+def acceptable_kinds_for(category: str, license_required: Optional[str]) -> Optional[set]:
+    """Returns the set of acceptable credential kinds for a job's license_required field, or None if any kind matches."""
+    if category == "medical" and license_required:
+        s = MEDICAL_LICENSE_MAP.get(license_required)
+        return s if s else None  # 'other' or unknown → accept any verified medical cred
+    return None
+
 class MessageCreate(BaseModel):
     body: str
     thread_provider_id: Optional[str] = None
@@ -517,10 +541,19 @@ async def accept_job(job_id: str, user: dict = Depends(require_role("provider"))
         raise HTTPException(400, "Job is not open")
     if not await _has_verified_credential(user["id"], j["category"]):
         raise HTTPException(403, f"A verified credential is required to accept {j['category']} jobs. Add one in Provider Hub → Credentials.")
-    await db.jobs.update_one(
-        {"id": job_id},
-        {"$set": {"status": "accepted", "provider_id": user["id"], "provider_name": user["name"], "accepted_at": now_iso()}}
-    )
+    # If the job specifies a license_required, verify the provider holds a matching credential
+    lic_req = (j.get("details") or {}).get("license_required")
+    needed = acceptable_kinds_for(j["category"], lic_req)
+    match_info = None
+    if needed is not None:
+        cred = await db.credentials.find_one({"user_id": user["id"], "category": j["category"], "status": "verified", "kind": {"$in": list(needed)}})
+        if not cred:
+            raise HTTPException(403, f"This job requires a verified {lic_req.replace('_', ' / ').upper()} credential. Add or verify one in Credentials.")
+        match_info = {"matched_kind": cred["kind"], "required": lic_req}
+    update = {"status": "accepted", "provider_id": user["id"], "provider_name": user["name"], "accepted_at": now_iso()}
+    if match_info:
+        update["credential_match"] = match_info
+    await db.jobs.update_one({"id": job_id}, {"$set": update})
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
 
@@ -1199,6 +1232,51 @@ async def create_credential(body: CredentialCreate, user: dict = Depends(require
 
 @api.get("/credentials/mine")
 async def list_my_credentials(user: dict = Depends(get_current_user)):
+    docs = await db.credentials.find({"user_id": user["id"]}).sort("created_at", -1).to_list(100)
+    # Lazy expiry reminder check: fire notifications when expiry within 30 days
+    today = datetime.now(timezone.utc).date()
+    for d in docs:
+        for date_field, label_kind in [("expiry_date", "license"), ("insurance_expiry", "insurance")]:
+            exp = d.get(date_field)
+            if not exp:
+                continue
+            try:
+                exp_d = datetime.fromisoformat(exp).date() if "T" in exp else datetime.strptime(exp, "%Y-%m-%d").date()
+            except Exception:
+                continue
+            days_left = (exp_d - today).days
+            if days_left > 30:
+                continue
+            last_key = f"last_{label_kind}_expiry_notice_at"
+            last = d.get(last_key)
+            if last:
+                try:
+                    last_dt = datetime.fromisoformat(last).date()
+                    if (today - last_dt).days < 7:
+                        continue  # already notified within last 7 days
+                except Exception:
+                    pass
+            kind_label = d["kind"].replace("_", " ").upper()
+            if days_left < 0:
+                title = f"Your {label_kind} expired"
+                body = f"Your {kind_label} {label_kind} expired on {exp}. Update it to keep accepting restricted jobs."
+                ntype = f"{label_kind}_expired"
+            else:
+                title = f"Your {label_kind} expires in {days_left} day{'s' if days_left != 1 else ''}"
+                body = f"Your {kind_label} {label_kind} expires {exp}. Renew it to avoid losing access to restricted jobs."
+                ntype = f"{label_kind}_expiring"
+            await db.notifications.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "type": ntype,
+                "title": title,
+                "body": body,
+                "link": "/credentials",
+                "credential_id": d["id"],
+                "read": False,
+                "created_at": now_iso(),
+            })
+            await db.credentials.update_one({"id": d["id"]}, {"$set": {last_key: today.isoformat()}})
     docs = await db.credentials.find({"user_id": user["id"]}).sort("created_at", -1).to_list(100)
     return [clean_doc(d) for d in docs]
 

@@ -10,6 +10,8 @@ import MapView from "@/components/MapView";
 import CategoryBadge from "@/components/CategoryBadge";
 import QuoteDialog from "@/components/QuoteDialog";
 import AddressInput from "@/components/AddressInput";
+import { checkCredentialMatch } from "@/lib/credentialMatch";
+import { KIND_LABEL } from "@/lib/credentialKinds";
 import { toast } from "sonner";
 import { Wallet, MapPin, Briefcase } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -56,6 +58,14 @@ export default function ProviderHub() {
     } catch (_) { /* ignore */ }
   };
 
+  const [myCreds, setMyCreds] = useState([]);
+  const loadCreds = async () => {
+    try {
+      const { data } = await api.get("/credentials/mine");
+      setMyCreds(data.filter((c) => c.status === "verified"));
+    } catch (_) { /* ignore */ }
+  };
+
   const pollNew = async () => {
     try {
       const since = lastPollRef.current;
@@ -95,6 +105,7 @@ export default function ProviderHub() {
     loadOpps();
     loadPins();
     loadMyQuotes();
+    loadCreds();
     const t = setInterval(pollNew, 15000);
     return () => clearInterval(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -172,7 +183,12 @@ export default function ProviderHub() {
         <div className="lg:col-span-8">
           <div className="overline">Opportunities in your radius ({opps.length})</div>          <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="opportunities-list">
             {opps.length === 0 && <div className="p-6 text-sm text-slate-500">No matches right now. Toast will fire when a new job lands.</div>}
-            {opps.map((j) => (
+            {opps.map((j) => {
+              const licReq = j.details?.license_required;
+              const match = (j.category === "medical" || j.category === "legal")
+                ? checkCredentialMatch(myCreds, j.category, licReq)
+                : null;
+              return (
               <div
                 key={j.id}
                 className={`p-4 grid grid-cols-12 gap-4 items-center cursor-pointer transition-colors ${highlightId === j.id ? "bg-teal-50" : "hover:bg-slate-50"}`}
@@ -181,7 +197,19 @@ export default function ProviderHub() {
               >
                 <div className="col-span-2"><CategoryBadge group={j.category_group} isRemote={j.is_remote} /></div>
                 <div className="col-span-5">
-                  <div className="font-display font-bold">{j.title}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-display font-bold">{j.title}</div>
+                    {match?.matched && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider border border-teal-700/40 bg-teal-50 text-teal-800 px-1.5 py-0.5" data-testid={`match-badge-${j.id}`}>
+                        ✓ Match · {KIND_LABEL[match.kind] || match.kind}
+                      </span>
+                    )}
+                    {match && !match.matched && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider border border-amber-300 bg-amber-50 text-amber-800 px-1.5 py-0.5" data-testid={`needs-cred-${j.id}`}>
+                        Needs {licReq?.replace(/_/g, " / ").toUpperCase() || "credential"}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-500 mt-1 line-clamp-1">{j.description}</div>
                 </div>
                 <div className="col-span-2 font-mono text-xs">
@@ -200,7 +228,7 @@ export default function ProviderHub() {
                   </Button>
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         </div>
 
