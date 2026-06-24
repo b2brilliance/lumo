@@ -973,6 +973,26 @@ async def post_message(job_id: str, body: MessageCreate, user: dict = Depends(ge
         "created_at": now_iso(),
     }
     await db.messages.insert_one(msg)
+    # Notify the recipient (the other side of this thread).
+    if user["role"] == "provider":
+        recipient_id = job["customer_id"]
+    else:
+        # sender is customer (or other) — recipient is the thread provider
+        recipient_id = thread_provider_id
+    if recipient_id and recipient_id != user["id"]:
+        snippet = cleaned[:120] + ("…" if len(cleaned) > 120 else "")
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": recipient_id,
+            "type": "new_message",
+            "title": f"{user['name']} sent a message",
+            "body": f"On \"{job['title']}\": {snippet}",
+            "link": f"/jobs/{job_id}",
+            "job_id": job_id,
+            "message_id": msg["id"],
+            "read": False,
+            "created_at": now_iso(),
+        })
     return clean_doc(msg)
 
 @api.get("/jobs/{job_id}/messages")
@@ -1093,6 +1113,19 @@ async def create_quote(job_id: str, body: QuoteCreate, user: dict = Depends(requ
         "created_at": now_iso(),
     }
     await db.quotes.insert_one(q)
+    # Notify customer of new quote
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": job["customer_id"],
+        "type": "quote_received",
+        "title": f"New quote on \"{job['title']}\"",
+        "body": f"{user['name']} proposed ${body.quoted_pay_rate:.2f}/{body.quoted_pay_unit}" + (f" — asking ${job['pay_rate']:.2f}/{job['pay_unit']}." if job.get('pay_rate') else "."),
+        "link": f"/jobs/{job_id}",
+        "job_id": job_id,
+        "quote_id": q["id"],
+        "read": False,
+        "created_at": now_iso(),
+    })
     return clean_doc(q)
 
 @api.get("/jobs/{job_id}/quotes")

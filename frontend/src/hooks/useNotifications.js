@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 const TYPE_VARIANT = {
   quote_accepted: "success",
   quote_declined: "warning",
+  quote_received: "info",
+  new_message: "info",
   default: "info",
 };
 
