@@ -148,6 +148,10 @@ export default function ProviderHub() {
             <span className="overline">Wallet</span>
             <span className="font-display font-bold">${Number(user.wallet_balance || 0).toFixed(2)}</span>
           </Link>
+          <Link to="/credentials" className="border border-slate-200 px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50" data-testid="provider-credentials-link">
+            <span className="overline">Credentials</span>
+            <span className="font-display font-bold text-teal-700">↗</span>
+          </Link>
         </div>
       </div>
 

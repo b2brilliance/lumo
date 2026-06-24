@@ -15,7 +15,7 @@ export default function MediaUpload({ value, onChange, label = "Attach photo or 
       const fd = new FormData();
       fd.append("file", file);
       const { data } = await api.post("/media/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      onChange({ media_url: data.media_url, media_type: data.media_type });
+      onChange({ media_url: data.media_url, media_type: data.media_type, id: data.id });
       toast.success("Media attached");
     } catch (e) {
       toast.error("Upload failed");

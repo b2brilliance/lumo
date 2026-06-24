@@ -24,6 +24,7 @@ import Wallet from "@/pages/Wallet";
 import Settings from "@/pages/Settings";
 import OrderFinalPay from "@/pages/OrderFinalPay";
 import ChatsInbox from "@/pages/ChatsInbox";
+import CredentialsPage from "@/pages/CredentialsPage";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -66,6 +67,7 @@ function App() {
 
             <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />
+            <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />

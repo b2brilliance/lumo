@@ -272,6 +272,22 @@ class WithdrawRequest(BaseModel):
 class AssistantChat(BaseModel):
     message: str
 
+class CredentialCreate(BaseModel):
+    kind: str               # e.g. "rn", "bar_license", "electrician"
+    category: str           # job category this credential applies to
+    subcategory: Optional[str] = None
+    state: Optional[str] = None  # US state if applicable
+    license_number: Optional[str] = None
+    expiry_date: Optional[str] = None  # ISO date string
+    document_media_id: Optional[str] = None
+    insurance_carrier: Optional[str] = None
+    insurance_policy_number: Optional[str] = None
+    insurance_expiry: Optional[str] = None
+    notes: Optional[str] = None
+
+# Categories where accepting / quoting a job requires at least one verified credential
+CREDENTIAL_REQUIRED_CATEGORIES = {"medical", "legal"}
+
 class MessageCreate(BaseModel):
     body: str
     thread_provider_id: Optional[str] = None
@@ -499,6 +515,8 @@ async def accept_job(job_id: str, user: dict = Depends(require_role("provider"))
         raise HTTPException(404, "Job not found")
     if j["status"] != "open":
         raise HTTPException(400, "Job is not open")
+    if not await _has_verified_credential(user["id"], j["category"]):
+        raise HTTPException(403, f"A verified credential is required to accept {j['category']} jobs. Add one in Provider Hub → Credentials.")
     await db.jobs.update_one(
         {"id": job_id},
         {"$set": {"status": "accepted", "provider_id": user["id"], "provider_name": user["name"], "accepted_at": now_iso()}}
@@ -1158,6 +1176,68 @@ async def assistant_clear(user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 # ────────────────────────────────────────────────────────────────────────────
+# Credentials — licenses / certifications / insurance for providers
+# ────────────────────────────────────────────────────────────────────────────
+async def _has_verified_credential(user_id: str, category: str) -> bool:
+    if category not in CREDENTIAL_REQUIRED_CATEGORIES:
+        return True
+    doc = await db.credentials.find_one({"user_id": user_id, "category": category, "status": "verified"})
+    return doc is not None
+
+@api.post("/credentials")
+async def create_credential(body: CredentialCreate, user: dict = Depends(require_role("provider"))):
+    doc = body.model_dump()
+    doc.update({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "user_name": user["name"],
+        "status": "submitted",  # pending admin review
+        "created_at": now_iso(),
+    })
+    await db.credentials.insert_one(doc)
+    return clean_doc(doc)
+
+@api.get("/credentials/mine")
+async def list_my_credentials(user: dict = Depends(get_current_user)):
+    docs = await db.credentials.find({"user_id": user["id"]}).sort("created_at", -1).to_list(100)
+    return [clean_doc(d) for d in docs]
+
+@api.get("/credentials/user/{user_id}")
+async def list_user_credentials(user_id: str):
+    """Public summary — returns kind/category/status only (no document IDs or PII)."""
+    docs = await db.credentials.find({"user_id": user_id, "status": "verified"}).to_list(100)
+    return [{
+        "id": d["id"], "kind": d["kind"], "category": d["category"],
+        "state": d.get("state"), "expiry_date": d.get("expiry_date"),
+        "status": d["status"],
+    } for d in docs]
+
+@api.delete("/credentials/{cred_id}")
+async def delete_credential(cred_id: str, user: dict = Depends(require_role("provider"))):
+    res = await db.credentials.delete_one({"id": cred_id, "user_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Credential not found")
+    return {"ok": True}
+
+@api.post("/credentials/{cred_id}/dev_verify")
+async def dev_verify_credential(cred_id: str, user: dict = Depends(require_role("provider"))):
+    """Demo / dev shortcut — in production this would be an admin-only endpoint."""
+    res = await db.credentials.update_one(
+        {"id": cred_id, "user_id": user["id"]},
+        {"$set": {"status": "verified", "verified_at": now_iso(), "verified_by": "dev"}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Credential not found")
+    cred = await db.credentials.find_one({"id": cred_id})
+    return clean_doc(cred)
+
+@api.get("/credentials/requirements")
+async def credentials_requirements():
+    return {
+        "required_categories": sorted(list(CREDENTIAL_REQUIRED_CATEGORIES)),
+    }
+
+# ────────────────────────────────────────────────────────────────────────────
 # Provider quotes (counter-offers)
 # ────────────────────────────────────────────────────────────────────────────
 @api.post("/jobs/{job_id}/quotes")
@@ -1167,6 +1247,8 @@ async def create_quote(job_id: str, body: QuoteCreate, user: dict = Depends(requ
         raise HTTPException(404, "Job not found")
     if job["status"] != "open":
         raise HTTPException(400, "Job is not open")
+    if not await _has_verified_credential(user["id"], job["category"]):
+        raise HTTPException(403, f"A verified credential is required to quote {job['category']} jobs. Add one in Provider Hub → Credentials.")
     # one active quote per provider per job
     existing = await db.quotes.find_one({"job_id": job_id, "provider_id": user["id"], "status": "pending"})
     if existing:
