@@ -31,6 +31,7 @@ import CredentialsPage from "@/pages/CredentialsPage";
 import Cart from "@/pages/Cart";
 import Rentals from "@/pages/Rentals";
 import RentalDetail from "@/pages/RentalDetail";
+import RentalHost from "@/pages/RentalHost";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -79,6 +80,7 @@ function App() {
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
             <Route path="/cart" element={<Protected><Cart /></Protected>} />
             <Route path="/rentals" element={<Rentals />} />
+            <Route path="/rentals/host" element={<Protected><RentalHost /></Protected>} />
             <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

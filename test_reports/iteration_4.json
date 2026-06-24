@@ -1,0 +1,48 @@
+{
+  "summary": "Tested rental host wizard + booking inbox (frontend) and the underlying /api/rentals + /api/rental-bookings endpoints (backend). Re-verified prior 21-test new-features suite (now 21/21 PASS after fixing the used_model assertion). Added 13 new pytest cases in test_lumo_rentals.py — 12 PASS, 1 FAIL exposing a real backend bug: POST /api/rental-bookings/{id}/decline does NOT validate booking status, so an already-approved booking can be declined and end up in a contradictory 'declined' state (review spec explicitly says decline should 403 once not pending). Frontend e2e flow is solid: anonymous /rentals/host → sign-in; logged-in customer sees hero + 'List a rental' CTA; 4-step wizard advances correctly through Category → Photo & details → Pricing & booking → Location & publish; clicking Publish lands on /rentals/<new-id>. Marketplaces dropdown in NavBar shows all 4 entries (Marketplace, Stores, Restaurants, Rentals). Booking inbox renders with all 4 filter pills.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/rental-bookings/{booking_id}/decline",
+        "issue": "Missing status guard — accepts decline of an already-approved booking. After owner approves (status='deposit_pending'), POST /decline returns 200 {declined:true} and flips status back to 'declined', creating an inconsistent state where the booking is both approved AND declined. Spec requires 403/400 once status != 'pending_approval'.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lumo_rentals.py",
+    "/app/backend/tests/test_lumo_new_features.py",
+    "/app/test_reports/pytest/rentals_results.xml",
+    "/app/test_reports/pytest/new_features_results.xml"
+  ],
+  "action_items": [
+    "Add a status guard to decline_rental_booking in server.py (line ~1567): mirror approve_rental_booking's check — if b['status'] != 'pending_approval': raise HTTPException(400, 'Booking is not awaiting approval'). One-line fix.",
+    "OPTIONAL: server.py still ~3411 lines — keep on the long-term split-to-routers list."
+  ],
+  "critical_code_review_comments": [
+    "decline_rental_booking is asymmetric with approve_rental_booking — approve guards 'status==pending_approval', decline does not. Beyond the spec violation, this also means the renter could be notified 'Booking declined' even though they were previously notified 'Booking approved', leaving conflicting notifications in their feed.",
+    "Both approve/decline write a notification AFTER the DB update with no transaction. Low-probability mid-write inconsistency window — same Mongo-no-tx note flagged in iteration_3 for the quote accept fan-out.",
+    "RENTAL_HIGH_VALUE_CATEGORIES gate at create_rental sets status='pending_host_verification' but never re-checks the credential after issuance — if the credential is revoked later the listing stays active. Out of scope here, just a note.",
+    "Frontend RentalHost wizard step3 publishes daily price as a string '50' — backend Pydantic coerces fine, but a stricter type would catch typos earlier.",
+    "Demo seed 'Tools & Equipment' shows 28 listings in 'Your listings' for the customer — confirms owner_id mapping is correct for the inbox role=owner query."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lumo_rentals.py (NEW — 13 tests covering /rentals create, high-value gate, request-to-book, approve, decline-status-guard, non-owner 403, book-own 400, categories listing)"
+  ],
+  "success_rate": {
+    "backend": "97% (33/34 across rentals + new_features suites — 12/13 rentals + 21/21 new_features; 1 failure is a real product bug)",
+    "frontend": "100% (smoke + wizard + inbox all verified end-to-end)"
+  },
+  "test_credentials": "customer@lumo.test, provider@lumo.test (both password123). Rentals tests also register a TEST_rentals_<hex>@lumo.test fresh user to validate the pending_host_verification gate without contamination.",
+  "seed_data_creation": "Test creates TEST_-prefixed rentals (tools_equipment + request-mode trailer) and one TEST_rentals_<hex> user. Demo seed (23 rentals) untouched. The frontend wizard run additionally created 'TEST Cordless Drill' as customer@lumo.test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug: /api/rental-bookings/{id}/decline lacks status guard (server.py ~1568). Fix is one if-check matching approve_rental_booking at line 1550. After fix, re-run: pytest backend/tests/test_lumo_rentals.py -v. The 'TestRentalBookingFlow' class uses module-level pytest._rental_booking_id to share the booking_id between tests — works for sequential runs but order-dependent (don't reorder). Frontend wizard step4 has BOTH location fields AND the Publish button on the same step (no extra Next needed), so the wizard is effectively 4 visual steps. The customer@lumo.test account is the owner of all 23 seeded demo rentals + our test rentals (now ~28 listings).",
+  "rca of the issue": "decline_rental_booking (server.py:1567-1586) only checks ownership but not current status before transitioning to 'declined'. Reproduce: (1) create request-mode rental as customer, (2) book as provider (status=pending_approval), (3) customer approves (status=deposit_pending), (4) customer POST /decline → returns 200 and overwrites status to 'declined'. Mitigation: add `if b['status'] != 'pending_approval': raise HTTPException(400, 'Booking is not awaiting approval')` between the ownership check and the update_one call, identical to approve's existing guard at line 1550."
+}

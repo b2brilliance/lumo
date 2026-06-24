@@ -1,25 +1,62 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="21" time="10.130" timestamp="2026-06-24T21:38:21.058170+00:00" hostname="agent-env-db358817-76d9-4c47-9ee7-c7d67f4854e7"><testcase classname="backend.tests.test_lumo_new_features.TestI18n" name="test_fx_rates" time="0.219" /><testcase classname="backend.tests.test_lumo_new_features.TestI18n" name="test_languages" time="0.094" /><testcase classname="backend.tests.test_lumo_new_features.TestI18n" name="test_translate_to_japanese" time="0.111" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_gb_vat" time="0.094" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_us_ca" time="0.093" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_us_or_zero" time="0.109" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_jp_label" time="0.098" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_fr" time="0.094" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_us" time="0.107" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_in" time="0.121" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_jp_corporate_number" time="0.100" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_all_profiles" time="0.100" /><testcase classname="backend.tests.test_lumo_new_features.TestCheckoutDeposit" name="test_gb_deposit_tax" time="1.448"><failure message="KeyError: 'tax_amount'">backend/tests/test_lumo_new_features.py:218: in test_gb_deposit_tax
-    assert abs(order["tax_amount"] - 24.0) &lt; 0.01, order
-               ^^^^^^^^^^^^^^^^^^^
-E   KeyError: 'tax_amount'</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestCheckoutDeposit" name="test_us_ca_deposit_tax" time="0.679"><failure message="KeyError: 'tax_amount'">backend/tests/test_lumo_new_features.py:237: in test_us_ca_deposit_tax
-    assert abs(order["tax_amount"] - 7.25) &lt; 0.01, order
-               ^^^^^^^^^^^^^^^^^^^
-E   KeyError: 'tax_amount'</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestCart" name="test_cart_flow" time="0.384"><failure message="assert None == 2&#10; +  where None = &lt;built-in method get of dict object at 0xf8069b211b80&gt;('item_count')&#10; +    where &lt;built-in method get of dict object at 0xf8069b211b80&gt; = {'groups': [{'store_id': '16de04c1-7995-4ccc-8d05-1286f0485c0e', 'store': {'id': '16de04c1-7995-4ccc-8d05-1286f0485c0e', 'name': &quot;Ramona's Boutique&quot;, 'role': 'retailer', 'storefront': {'name': &quot;Ramona's Boutique&quot;, 'logo_url': None, 'hours': 'Mon–Sat 10am–8pm', 'address': '123 Market St, Brooklyn, NY', ...}}, 'items': [{'id': 'ef2743ff-24be-42e9-9580-cc62bfbec2ac', 'user_id': 'e7bf3ad0-30c2-41fa-8106-92176d2e1de1', 'store_id': '16de04c1-7995-4ccc-8d05-1286f0485c0e', 'inventory_item_id': 'f6b39139-9d3a-4882-8c32-6ffe22b86aaf', ...}], 'subtotal_usd': 50.0, ...}], 'total_items': 2, 'grand_subtotal_usd': 50.0}.get">backend/tests/test_lumo_new_features.py:274: in test_cart_flow
-    assert cart.get("item_count") == 2
-E   assert None == 2
-E    +  where None = &lt;built-in method get of dict object at 0xf8069b211b80&gt;('item_count')
-E    +    where &lt;built-in method get of dict object at 0xf8069b211b80&gt; = {'groups': [{'store_id': '16de04c1-7995-4ccc-8d05-1286f0485c0e', 'store': {'id': '16de04c1-7995-4ccc-8d05-1286f0485c0e', 'name': "Ramona's Boutique", 'role': 'retailer', 'storefront': {'name': "Ramona's Boutique", 'logo_url': None, 'hours': 'Mon–Sat 10am–8pm', 'address': '123 Market St, Brooklyn, NY', ...}}, 'items': [{'id': 'ef2743ff-24be-42e9-9580-cc62bfbec2ac', 'user_id': 'e7bf3ad0-30c2-41fa-8106-92176d2e1de1', 'store_id': '16de04c1-7995-4ccc-8d05-1286f0485c0e', 'inventory_item_id': 'f6b39139-9d3a-4882-8c32-6ffe22b86aaf', ...}], 'subtotal_usd': 50.0, ...}], 'total_items': 2, 'grand_subtotal_usd': 50.0}.get</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestCart" name="test_cart_checkout" time="0.709"><failure message="AssertionError: assert None is True&#10; +  where None = &lt;built-in method get of dict object at 0xf8069b2b51c0&gt;('is_cart_order')&#10; +    where &lt;built-in method get of dict object at 0xf8069b2b51c0&gt; = {'url': 'https://checkout.stripe.com/c/pay/cs_test_a1XvWM0QHH59D5uULSknkefk1rYm3xRL0EQihHJj1qA5kv8LHcOahiuzBq#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSdicGRmZGhqaWBTZHdsZGtxJz8nZmprcXdqaScpJ2R1bE5gfCc%2FJ3VuWnFgdnFaMDRXbE08UUNjTkpDVzZGVFBqa39TSzVgVXw2a2xiRj11RGdcMkR1XE1QdlBRbEJhRkhgYn1WfG18TUNxdHZuM1Q0bTxISFZoN3c0V2BKUEt8bkozPUo0M2M1NTR9ZmNfdUtmJyknY3dqaFZgd3Ngdyc%2FcXdwYCknZ2RmbmJ3anBrYUZqaWp3Jz8nJmNjY2NjYycpJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl', 'session_id': 'cs_test_a1XvWM0QHH59D5uULSknkefk1rYm3xRL0EQihHJj1qA5kv8LHcOahiuzBq', 'order_id': '4ea979f6-7bfc-485a-b977-ca5fc4bd3870'}.get">backend/tests/test_lumo_new_features.py:340: in test_cart_checkout
-    assert order.get("is_cart_order") is True
-E   AssertionError: assert None is True
-E    +  where None = &lt;built-in method get of dict object at 0xf8069b2b51c0&gt;('is_cart_order')
-E    +    where &lt;built-in method get of dict object at 0xf8069b2b51c0&gt; = {'url': 'https://checkout.stripe.com/c/pay/cs_test_a1XvWM0QHH59D5uULSknkefk1rYm3xRL0EQihHJj1qA5kv8LHcOahiuzBq#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSdicGRmZGhqaWBTZHdsZGtxJz8nZmprcXdqaScpJ2R1bE5gfCc%2FJ3VuWnFgdnFaMDRXbE08UUNjTkpDVzZGVFBqa39TSzVgVXw2a2xiRj11RGdcMkR1XE1QdlBRbEJhRkhgYn1WfG18TUNxdHZuM1Q0bTxISFZoN3c0V2BKUEt8bkozPUo0M2M1NTR9ZmNfdUtmJyknY3dqaFZgd3Ngdyc%2FcXdwYCknZ2RmbmJ3anBrYUZqaWp3Jz8nJmNjY2NjYycpJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl', 'session_id': 'cs_test_a1XvWM0QHH59D5uULSknkefk1rYm3xRL0EQihHJj1qA5kv8LHcOahiuzBq', 'order_id': '4ea979f6-7bfc-485a-b977-ca5fc4bd3870'}.get</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestReviews" name="test_404_unknown_job" time="0.431" /><testcase classname="backend.tests.test_lumo_new_features.TestReviews" name="test_job_not_completed" time="0.446"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;missing&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;pay_rate&quot;],&quot;msg&quot;:&quot;Field required&quot;,&quot;input&quot;:{&quot;title&quot;:&quot;TEST_review_gate&quot;,&quot;description&quot;:&quot;x&quot;,&quot;category&quot;:&quot;cleaning&quot;,&quot;category_group&quot;:&quot;household&quot;,&quot;address&quot;:{&quot;address&quot;:&quot;1 Test St&quot;},&quot;expected_pay_rate&quot;:50.0},&quot;url&quot;:&quot;https://errors.pydantic.dev/2.13/v/missing&quot;}]}&#10;assert 422 in (200, 201)&#10; +  where 422 = &lt;Response [422]&gt;.status_code">backend/tests/test_lumo_new_features.py:383: in test_job_not_completed
-    assert cj.status_code in (200, 201), cj.text
-E   AssertionError: {"detail":[{"type":"missing","loc":["body","pay_rate"],"msg":"Field required","input":{"title":"TEST_review_gate","description":"x","category":"cleaning","category_group":"household","address":{"address":"1 Test St"},"expected_pay_rate":50.0},"url":"https://errors.pydantic.dev/2.13/v/missing"}]}
-E   assert 422 in (200, 201)
-E    +  where 422 = &lt;Response [422]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestReviews" name="test_happy_path_and_duplicate" time="0.096"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;missing&quot;,&quot;loc&quot;:[&quot;body&quot;,&quot;pay_rate&quot;],&quot;msg&quot;:&quot;Field required&quot;,&quot;input&quot;:{&quot;title&quot;:&quot;TEST_review_happy&quot;,&quot;description&quot;:&quot;x&quot;,&quot;category&quot;:&quot;cleaning&quot;,&quot;category_group&quot;:&quot;household&quot;,&quot;address&quot;:{&quot;address&quot;:&quot;1 Test St&quot;},&quot;expected_pay_rate&quot;:75.0},&quot;url&quot;:&quot;https://errors.pydantic.dev/2.13/v/missing&quot;}]}&#10;assert 422 in (200, 201)&#10; +  where 422 = &lt;Response [422]&gt;.status_code">backend/tests/test_lumo_new_features.py:411: in test_happy_path_and_duplicate
-    assert cj.status_code in (200, 201), cj.text
-E   AssertionError: {"detail":[{"type":"missing","loc":["body","pay_rate"],"msg":"Field required","input":{"title":"TEST_review_happy","description":"x","category":"cleaning","category_group":"household","address":{"address":"1 Test St"},"expected_pay_rate":75.0},"url":"https://errors.pydantic.dev/2.13/v/missing"}]}
-E   assert 422 in (200, 201)
-E    +  where 422 = &lt;Response [422]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestAiVerification" name="test_verify_media_content_moderation" time="4.212"><failure message="AssertionError: assert 'anthropic/claude-sonnet-4-6' in ('claude-sonnet-4-6', 'gemini-3.1-pro-preview')">backend/tests/test_lumo_new_features.py:476: in test_verify_media_content_moderation
-    assert d["used_model"] in ("claude-sonnet-4-6", "gemini-3.1-pro-preview")
-E   AssertionError: assert 'anthropic/claude-sonnet-4-6' in ('claude-sonnet-4-6', 'gemini-3.1-pro-preview')</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestAiVerification" name="test_verify_credential_requires_document" time="0.214" /></testsuite></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="21" time="38.632" timestamp="2026-06-24T22:03:29.384980+00:00" hostname="agent-env-db358817-76d9-4c47-9ee7-c7d67f4854e7"><testcase classname="backend.tests.test_lumo_new_features.TestI18n" name="test_fx_rates" time="0.194" /><testcase classname="backend.tests.test_lumo_new_features.TestI18n" name="test_languages" time="0.108" /><testcase classname="backend.tests.test_lumo_new_features.TestI18n" name="test_translate_to_japanese" time="0.159" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_gb_vat" time="0.109" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_us_ca" time="0.105" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_us_or_zero" time="0.105" /><testcase classname="backend.tests.test_lumo_new_features.TestTax" name="test_jp_label" time="0.107" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_fr" time="0.100" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_us" time="0.099" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_in" time="0.126" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_jp_corporate_number" time="0.103" /><testcase classname="backend.tests.test_lumo_new_features.TestCountryCredentials" name="test_all_profiles" time="0.096" /><testcase classname="backend.tests.test_lumo_new_features.TestCheckoutDeposit" name="test_gb_deposit_tax" time="1.523" /><testcase classname="backend.tests.test_lumo_new_features.TestCheckoutDeposit" name="test_us_ca_deposit_tax" time="0.801" /><testcase classname="backend.tests.test_lumo_new_features.TestCart" name="test_cart_flow" time="0.913" /><testcase classname="backend.tests.test_lumo_new_features.TestCart" name="test_cart_checkout" time="0.875" /><testcase classname="backend.tests.test_lumo_new_features.TestReviews" name="test_404_unknown_job" time="0.429" /><testcase classname="backend.tests.test_lumo_new_features.TestReviews" name="test_job_not_completed" time="0.707" /><testcase classname="backend.tests.test_lumo_new_features.TestReviews" name="test_happy_path_and_duplicate" time="0.791" /><testcase classname="backend.tests.test_lumo_new_features.TestAiVerification" name="test_verify_media_content_moderation" time="30.075"><failure message="requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='lumo-bundle-checkout.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)">/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:534: in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:571: in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:1415: in getresponse
+    response.begin()
+/usr/local/lib/python3.11/http/client.py:330: in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:291: in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/socket.py:718: in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/ssl.py:1314: in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/ssl.py:1166: in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:696: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:842: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:498: in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/util/util.py:39: in reraise
+    raise value
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:788: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:536: in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:367: in _raise_timeout
+    raise ReadTimeoutError(
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='lumo-bundle-checkout.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_lumo_new_features.py:469: in test_verify_media_content_moderation
+    u = requests.post(f"{API}/media/upload", files=files, headers=_h(provider_token), timeout=30)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:134: in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:71: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:651: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:784: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:742: in send
+    raise ReadTimeout(e, request=request)
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='lumo-bundle-checkout.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)</failure></testcase><testcase classname="backend.tests.test_lumo_new_features.TestAiVerification" name="test_verify_credential_requires_document" time="0.901" /></testsuite></testsuites>

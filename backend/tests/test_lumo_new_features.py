@@ -480,7 +480,7 @@ class TestAiVerification:
         d = v.json()
         for k in ("verdict", "confidence", "used_model", "explanation"):
             assert k in d, f"missing {k} in AI response: {d}"
-        assert d["used_model"] in ("claude-sonnet-4-6", "gemini-3.1-pro-preview")
+        assert d["used_model"] in ("anthropic/claude-sonnet-4-6", "gemini/gemini-3.1-pro-preview")
         assert 0.0 <= float(d["confidence"]) <= 1.0
 
     def test_verify_credential_requires_document(self, provider_token):

@@ -3,7 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { RENTAL_CATEGORIES, RENTAL_PRICING_LABEL } from "@/lib/rentalCategories";
 import { Input } from "@/components/ui/input";
-import { MapPin, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MapPin, Star, Sparkles } from "lucide-react";
 
 function PriceTag({ pricing }) {
   if (!pricing) return null;
@@ -102,18 +103,25 @@ export default function Rentals() {
         <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter">
           {activeCat ? activeCat.label.toLowerCase() : "Rent anything, anywhere."}
         </h1>
-        <form
-          onSubmit={(e) => { e.preventDefault(); const p = new URLSearchParams(params); if (search) p.set("q", search); else p.delete("q"); setParams(p); }}
-          className="flex-1 max-w-md"
-        >
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search rentals — try “Tesla” or “tent” or “studio”"
-            className="border-slate-300"
-            data-testid="rentals-search-input"
-          />
-        </form>
+        <div className="flex items-center gap-3 flex-1 max-w-xl">
+          <form
+            onSubmit={(e) => { e.preventDefault(); const p = new URLSearchParams(params); if (search) p.set("q", search); else p.delete("q"); setParams(p); }}
+            className="flex-1"
+          >
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search rentals — try “Tesla” or “tent” or “studio”"
+              className="border-slate-300"
+              data-testid="rentals-search-input"
+            />
+          </form>
+          <Link to="/rentals/host">
+            <Button className="bg-slate-900 hover:bg-slate-800 text-white whitespace-nowrap" data-testid="rentals-host-cta">
+              <Sparkles className="w-4 h-4 mr-1.5" /> List a rental
+            </Button>
+          </Link>
+        </div>
       </div>
       {activeCat && (
         <p className="text-slate-600 mt-3 max-w-2xl">{activeCat.blurb}</p>
