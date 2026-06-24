@@ -34,6 +34,17 @@ export default function StoreProfile({ role }) {
     api.get(`/inventory?owner_id=${id}`).then(({ data }) => setItems(data));
   }, [id]);
 
+  const storeLoc = store?.storefront?.location;
+  const storeMiles = storeLoc && order.delivery_lat != null
+    ? milesBetween({ lat: storeLoc.lat, lng: storeLoc.lng }, { lat: order.delivery_lat, lng: order.delivery_lng })
+    : null;
+  const storeQuote = storeMiles != null ? computeStoreDeliveryQuote({ miles: storeMiles }) : null;
+
+  useEffect(() => {
+    if (storeQuote) setOrder((o) => ({ ...o, delivery_fee: storeQuote.total.toFixed(2) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeMiles]);
+
   if (!store) return <div className="p-12 text-slate-500">Loading…</div>;
   const sf = store.storefront;
 
@@ -46,17 +57,6 @@ export default function StoreProfile({ role }) {
     setOrder((o) => ({ ...o, quantity: 1, delivery_address: "", delivery_lat: null, delivery_lng: null }));
     setOpen(true);
   };
-
-  const storeLoc = store?.storefront?.location;
-  const storeMiles = storeLoc && order.delivery_lat != null
-    ? milesBetween({ lat: storeLoc.lat, lng: storeLoc.lng }, { lat: order.delivery_lat, lng: order.delivery_lng })
-    : null;
-  const storeQuote = storeMiles != null ? computeStoreDeliveryQuote({ miles: storeMiles }) : null;
-
-  React.useEffect(() => {
-    if (storeQuote) setOrder((o) => ({ ...o, delivery_fee: storeQuote.total.toFixed(2) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeMiles]);
 
   const togglePM = (m) => setOrder((o) => ({
     ...o, payment_methods: o.payment_methods.includes(m) ? o.payment_methods.filter((x) => x !== m) : [...o.payment_methods, m]
