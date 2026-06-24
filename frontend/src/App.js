@@ -29,6 +29,8 @@ import OrderFinalPay from "@/pages/OrderFinalPay";
 import ChatsInbox from "@/pages/ChatsInbox";
 import CredentialsPage from "@/pages/CredentialsPage";
 import Cart from "@/pages/Cart";
+import Rentals from "@/pages/Rentals";
+import RentalDetail from "@/pages/RentalDetail";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -76,6 +78,8 @@ function App() {
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
             <Route path="/cart" element={<Protected><Cart /></Protected>} />
+            <Route path="/rentals" element={<Rentals />} />
+            <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />

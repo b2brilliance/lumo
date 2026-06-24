@@ -1,14 +1,29 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound } from "lucide-react";
+
+const MARKETPLACE_LINKS = [
+  { to: "/marketplace",  label: "Marketplace",  icon: ShoppingBag,      blurb: "P2P listings, used goods, gear", testId: "nav-mp-marketplace" },
+  { to: "/stores",       label: "Stores",       icon: Store,            blurb: "Retailers with inventory & delivery", testId: "nav-mp-stores" },
+  { to: "/restaurants",  label: "Restaurants",  icon: UtensilsCrossed,  blurb: "Order food for delivery", testId: "nav-mp-restaurants" },
+  { to: "/rentals",      label: "Rentals",      icon: KeyRound,         blurb: "Rent anything — homes, cars, venues, gear", testId: "nav-mp-rentals" },
+];
 
 export default function NavBar() {
   const { user, logout } = useAuth();
   const { cart } = useCart() || { cart: { total_items: 0 } };
   const nav = useNavigate();
+  const [mpOpen, setMpOpen] = useState(false);
+  const mpRef = useRef(null);
+
+  useEffect(() => {
+    const onClick = (e) => { if (mpRef.current && !mpRef.current.contains(e.target)) setMpOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
 
   const roleLink = () => {
     if (!user || user === false) return null;
@@ -29,16 +44,49 @@ export default function NavBar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200" data-testid="nav-bar">
-      <div className="max-w-screen-2xl mx-auto px-6 flex items-center gap-8 h-14">
+      <div className="max-w-screen-2xl mx-auto px-6 flex items-center gap-6 h-14">
         <Link to="/" className="flex items-center gap-2" data-testid="nav-logo">
           <div className="w-7 h-7 bg-slate-900 text-white flex items-center justify-center font-display font-black text-sm">L</div>
           <span className="font-display font-bold text-lg tracking-tight">Lumo</span>
         </Link>
         <nav className="hidden md:flex items-center gap-1 h-full">
           <NavLink to="/map" className={linkClass} data-testid="nav-map"><MapPin className="inline w-3.5 h-3.5 mr-1" />Map</NavLink>
-          <NavLink to="/marketplace" className={linkClass} data-testid="nav-marketplace"><ShoppingBag className="inline w-3.5 h-3.5 mr-1" />Marketplace</NavLink>
-          <NavLink to="/stores" className={linkClass} data-testid="nav-stores"><Store className="inline w-3.5 h-3.5 mr-1" />Stores</NavLink>
-          <NavLink to="/restaurants" className={linkClass} data-testid="nav-restaurants"><UtensilsCrossed className="inline w-3.5 h-3.5 mr-1" />Restaurants</NavLink>
+          {/* Marketplaces dropdown */}
+          <div ref={mpRef} className="relative h-full flex items-center">
+            <button
+              onClick={() => setMpOpen((v) => !v)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1 ${mpOpen ? "border-teal-700 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-900"}`}
+              data-testid="nav-marketplaces-toggle"
+              aria-expanded={mpOpen}
+            >
+              Marketplaces <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mpOpen ? "rotate-180" : ""}`} />
+            </button>
+            {mpOpen && (
+              <div
+                className="absolute left-0 top-full mt-0.5 w-80 bg-white border border-slate-200 shadow-2xl divide-y divide-slate-100 z-50"
+                data-testid="nav-marketplaces-menu"
+              >
+                {MARKETPLACE_LINKS.map((m) => {
+                  const Icon = m.icon;
+                  return (
+                    <Link
+                      key={m.to}
+                      to={m.to}
+                      onClick={() => setMpOpen(false)}
+                      className="flex items-start gap-3 p-3 hover:bg-slate-50 transition-colors"
+                      data-testid={m.testId}
+                    >
+                      <Icon className="w-5 h-5 text-teal-700 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-display font-bold text-slate-900">{m.label}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{m.blurb}</div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           {rl && <NavLink to={rl.to} className={linkClass} data-testid="nav-hub"><rl.icon className="inline w-3.5 h-3.5 mr-1" />{rl.label}</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">

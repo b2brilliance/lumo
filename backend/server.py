@@ -1198,6 +1198,394 @@ async def review_summary(target_type: str, target_id: str):
     return res["summary"]
 
 # ────────────────────────────────────────────────────────────────────────────
+# Rentals — separate marketplace for vacation stays, vehicles, tools, venues,
+# equipment, etc. 11 consolidated categories with category-specific filters.
+# ────────────────────────────────────────────────────────────────────────────
+RENTAL_TAXONOMY = {
+    "property": {
+        "label": "Property & Stays",
+        "icon": "home",
+        "color": "rose",
+        "blurb": "Vacation homes, apartments, commercial real estate, workspaces, parking",
+        "subcategories": ["vacation_rental", "residential", "commercial_re", "workspace", "meeting_room", "warehouse", "parking", "garage"],
+        "filters": ["dates", "guests", "bedrooms", "bathrooms", "amenities", "type", "price"],
+        "pricing_units": ["daily", "weekly", "monthly"],
+    },
+    "venues": {
+        "label": "Venues",
+        "icon": "building",
+        "color": "violet",
+        "blurb": "Banquet halls, wedding venues, studios, galleries, rooftops, theaters",
+        "subcategories": ["banquet_hall", "wedding_venue", "photo_studio", "music_studio", "podcast_studio", "art_gallery", "theater", "rooftop", "garden", "private_dining"],
+        "filters": ["dates", "capacity", "indoor_outdoor", "catering_allowed", "parking", "price"],
+        "pricing_units": ["hourly", "daily"],
+    },
+    "vehicles": {
+        "label": "Vehicles",
+        "icon": "car",
+        "color": "blue",
+        "blurb": "Cars, RVs, boats, motorcycles, bikes",
+        "subcategories": ["car", "suv", "truck", "rv", "boat", "motorcycle", "bike", "scooter"],
+        "filters": ["dates", "make", "model", "year", "transmission", "fuel", "seats", "mileage_cap_per_day", "price"],
+        "pricing_units": ["hourly", "daily", "weekly"],
+    },
+    "tools_equipment": {
+        "label": "Tools & Equipment",
+        "icon": "wrench",
+        "color": "amber",
+        "blurb": "Hand tools, power tools, construction equipment, generators, farm machinery",
+        "subcategories": ["hand_tools", "power_tools", "construction", "farm_equipment", "industrial_machinery", "generator"],
+        "filters": ["dates", "power_source", "delivery_available", "operator_required", "price"],
+        "pricing_units": ["hourly", "daily", "weekly"],
+    },
+    "photo_av": {
+        "label": "Photo, Video & AV",
+        "icon": "camera",
+        "color": "indigo",
+        "blurb": "Cameras, lenses, lighting, audio, projectors, drones",
+        "subcategories": ["camera_body", "lens", "lighting", "audio", "projector", "drone", "av_package"],
+        "filters": ["dates", "brand", "model", "delivery_available", "price"],
+        "pricing_units": ["daily", "weekly"],
+    },
+    "outdoor_sports": {
+        "label": "Outdoor & Sports",
+        "icon": "tent",
+        "color": "emerald",
+        "blurb": "Camping gear, water sports, ski/snowboard, bikes, sports equipment",
+        "subcategories": ["camping", "kayak", "paddleboard", "surfboard", "ski", "snowboard", "bike", "sports_equipment"],
+        "filters": ["dates", "size", "delivery_available", "price"],
+        "pricing_units": ["hourly", "daily", "weekly"],
+    },
+    "furniture_appliances": {
+        "label": "Furniture, Appliances & Electronics",
+        "icon": "sofa",
+        "color": "slate",
+        "blurb": "Sofas, dining sets, appliances, TVs, computers, gaming consoles",
+        "subcategories": ["sofa", "dining_set", "bed", "office", "appliance", "tv", "computer", "gaming"],
+        "filters": ["dates", "delivery_available", "price"],
+        "pricing_units": ["daily", "weekly", "monthly"],
+    },
+    "medical_mobility": {
+        "label": "Medical, Mobility & Baby",
+        "icon": "heart-pulse",
+        "color": "red",
+        "blurb": "Wheelchairs, hospital beds, mobility scooters, baby gear",
+        "subcategories": ["wheelchair", "hospital_bed", "mobility_scooter", "crutches", "baby_crib", "stroller", "car_seat"],
+        "filters": ["dates", "delivery_available", "size", "price"],
+        "pricing_units": ["daily", "weekly", "monthly"],
+    },
+    "events_weddings": {
+        "label": "Events, Parties & Weddings",
+        "icon": "party-popper",
+        "color": "pink",
+        "blurb": "Tents, chairs, tables, linens, lighting, formal wear & costumes",
+        "subcategories": ["tent", "tables_chairs", "linens", "lighting", "dance_floor", "formal_wear", "costume", "decor"],
+        "filters": ["dates", "delivery_available", "guests", "price"],
+        "pricing_units": ["daily", "weekend"],
+    },
+    "storage_containers": {
+        "label": "Storage & Containers",
+        "icon": "package",
+        "color": "stone",
+        "blurb": "Self-storage units, shipping containers, dumpsters",
+        "subcategories": ["self_storage", "shipping_container", "dumpster"],
+        "filters": ["dates", "size", "climate_controlled", "access_24_7", "price"],
+        "pricing_units": ["daily", "weekly", "monthly"],
+    },
+    "site_services": {
+        "label": "Site Services",
+        "icon": "construction",
+        "color": "yellow",
+        "blurb": "Portable toilets, on-site generators, fencing, light towers",
+        "subcategories": ["portable_toilet", "site_generator", "fencing", "light_tower"],
+        "filters": ["dates", "delivery_available", "size", "price"],
+        "pricing_units": ["daily", "weekly", "monthly"],
+    },
+}
+
+# Categories that require ID/business credential verification before listings go live
+RENTAL_HIGH_VALUE_CATEGORIES = {"property", "vehicles", "venues"}
+
+class RentalCreate(BaseModel):
+    category: str
+    subcategory: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    location: Optional[dict] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    media: Optional[List[dict]] = None
+    pricing: dict                                  # { hourly?, daily?, weekly?, monthly?, security_deposit? }
+    attributes: Optional[dict] = None              # category-specific: { bedrooms, capacity, transmission, ... }
+    booking_mode: Literal["instant", "request"] = "instant"
+    min_duration: Optional[int] = 1
+    max_duration: Optional[int] = None
+    is_demo: Optional[bool] = False
+
+class RentalBookingCreate(BaseModel):
+    rental_id: str
+    start_date: str
+    end_date: str
+    quantity: Optional[int] = None                # used for hourly (hours); else inferred from dates
+    pricing_unit: Literal["hourly", "daily", "weekly", "monthly", "weekend"] = "daily"
+    notes: Optional[str] = None
+    origin_url: str
+    country: Optional[str] = None
+    us_state: Optional[str] = None
+
+@api.get("/rentals/categories")
+async def rentals_categories():
+    return {"categories": [{"key": k, **v} for k, v in RENTAL_TAXONOMY.items()]}
+
+@api.get("/rentals")
+async def list_rentals(
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    q: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    booking_mode: Optional[str] = None,
+    limit: int = 60,
+):
+    """Browse / search rentals."""
+    f: dict = {"status": "active"}
+    if category and category in RENTAL_TAXONOMY:
+        f["category"] = category
+    if subcategory:
+        f["subcategory"] = subcategory
+    if booking_mode in ("instant", "request"):
+        f["booking_mode"] = booking_mode
+    if q:
+        f["$or"] = [{"title": {"$regex": q, "$options": "i"}}, {"description": {"$regex": q, "$options": "i"}}]
+    docs = await db.rentals.find(f).sort("created_at", -1).to_list(min(limit, 200))
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        # Price filter (use the smallest available unit price for comparison)
+        prices = [v for k, v in (d.get("pricing") or {}).items() if isinstance(v, (int, float)) and k != "security_deposit"]
+        ref_price = min(prices) if prices else None
+        if ref_price is not None:
+            if min_price is not None and ref_price < min_price:
+                continue
+            if max_price is not None and ref_price > max_price:
+                continue
+        out.append(d)
+    return out
+
+@api.get("/rentals/{rental_id}")
+async def get_rental(rental_id: str):
+    r = await db.rentals.find_one({"id": rental_id})
+    if not r:
+        raise HTTPException(404, "Rental not found")
+    return clean_doc(r)
+
+@api.post("/rentals")
+async def create_rental(body: RentalCreate, user: dict = Depends(get_current_user)):
+    if body.category not in RENTAL_TAXONOMY:
+        raise HTTPException(400, f"Unknown category {body.category}")
+    if not body.pricing or not any(k in body.pricing for k in ("hourly", "daily", "weekly", "monthly", "weekend")):
+        raise HTTPException(400, "At least one of hourly/daily/weekly/monthly/weekend price is required")
+    # High-value categories require verified ID / business credential
+    requires_verification = body.category in RENTAL_HIGH_VALUE_CATEGORIES
+    verified_cred = None
+    if requires_verification:
+        verified_cred = await db.credentials.find_one({"user_id": user["id"], "status": "verified"})
+    doc = {
+        "id": str(uuid.uuid4()),
+        "owner_id": user["id"],
+        "owner_name": user["name"],
+        "category": body.category,
+        "subcategory": body.subcategory,
+        "title": body.title,
+        "description": body.description,
+        "location": body.location,
+        "media_url": body.media_url,
+        "media_type": body.media_type,
+        "media": body.media or ([{"media_url": body.media_url, "media_type": body.media_type}] if body.media_url else []),
+        "pricing": body.pricing,
+        "attributes": body.attributes or {},
+        "booking_mode": body.booking_mode,
+        "min_duration": body.min_duration or 1,
+        "max_duration": body.max_duration,
+        "status": "active" if (not requires_verification or verified_cred) else "pending_host_verification",
+        "host_verification_required": requires_verification,
+        "is_demo": bool(body.is_demo),
+        "created_at": now_iso(),
+    }
+    await db.rentals.insert_one(doc)
+    return clean_doc(doc)
+
+@api.delete("/rentals/{rental_id}")
+async def delete_rental(rental_id: str, user: dict = Depends(get_current_user)):
+    r = await db.rentals.find_one({"id": rental_id})
+    if not r:
+        raise HTTPException(404, "Rental not found")
+    if r.get("owner_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not allowed")
+    await db.rentals.update_one({"id": rental_id}, {"$set": {"status": "deleted"}})
+    return {"deleted": True}
+
+@api.post("/rentals/{rental_id}/book")
+async def book_rental(rental_id: str, body: RentalBookingCreate, req: Request, user: dict = Depends(get_current_user)):
+    r = await db.rentals.find_one({"id": rental_id, "status": "active"})
+    if not r:
+        raise HTTPException(404, "Rental not found or unavailable")
+    if r.get("owner_id") == user["id"]:
+        raise HTTPException(400, "You cannot book your own rental")
+    # Compute duration & subtotal
+    try:
+        sd = datetime.fromisoformat(body.start_date.replace("Z", "+00:00"))
+        ed = datetime.fromisoformat(body.end_date.replace("Z", "+00:00"))
+    except Exception:
+        raise HTTPException(400, "Invalid start_date / end_date (use YYYY-MM-DD or ISO 8601)")
+    if ed <= sd:
+        raise HTTPException(400, "end_date must be after start_date")
+    pricing = r.get("pricing") or {}
+    if body.pricing_unit not in pricing or not pricing[body.pricing_unit]:
+        raise HTTPException(400, f"Rental does not offer {body.pricing_unit} pricing")
+    unit_price = float(pricing[body.pricing_unit])
+    if body.pricing_unit == "hourly":
+        qty = body.quantity or max(1, int((ed - sd).total_seconds() / 3600))
+    elif body.pricing_unit in ("daily", "weekend"):
+        qty = body.quantity or max(1, (ed - sd).days)
+    elif body.pricing_unit == "weekly":
+        qty = body.quantity or max(1, (ed - sd).days // 7)
+    else:  # monthly
+        qty = body.quantity or max(1, (ed - sd).days // 30)
+    subtotal = round(unit_price * qty, 2)
+    security_deposit = round(float(pricing.get("security_deposit") or 0), 2)
+    # Tax
+    addr_str = (r.get("location") or {}).get("address")
+    tax_profile = tax_for(body.country, us_state=body.us_state, delivery_address=addr_str)
+    tax_amount = round(subtotal * tax_profile["rate"], 2)
+    rental_deposit = round(subtotal * 0.10, 2)
+    deposit_total = round(rental_deposit + tax_amount + security_deposit, 2)
+    remaining = round(subtotal - rental_deposit, 2)
+
+    booking_id = str(uuid.uuid4())
+    status = "pending_approval" if r.get("booking_mode") == "request" else "deposit_pending"
+    booking_doc = {
+        "id": booking_id,
+        "rental_id": rental_id,
+        "renter_id": user["id"],
+        "renter_name": user["name"],
+        "owner_id": r["owner_id"],
+        "start_date": body.start_date,
+        "end_date": body.end_date,
+        "pricing_unit": body.pricing_unit,
+        "quantity": qty,
+        "unit_price": unit_price,
+        "subtotal": subtotal,
+        "security_deposit": security_deposit,
+        "tax_country": (body.country or "US").upper(),
+        "tax_rate": tax_profile["rate"],
+        "tax_label": tax_profile["label"],
+        "tax_amount": tax_amount,
+        "rental_deposit": rental_deposit,
+        "deposit_total": deposit_total,
+        "remaining_total": remaining,
+        "booking_mode": r.get("booking_mode"),
+        "notes": body.notes,
+        "status": status,
+        "created_at": now_iso(),
+    }
+    await db.rental_bookings.insert_one(booking_doc)
+
+    # Request-mode → notify owner and return without Stripe
+    if status == "pending_approval":
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": r["owner_id"],
+            "type": "rental_request",
+            "title": f"New booking request: {r['title']}",
+            "body": f"{user['name']} requested to book your rental {body.start_date} → {body.end_date}.",
+            "link": f"/rentals/{rental_id}",
+            "booking_id": booking_id,
+            "read": False,
+            "created_at": now_iso(),
+        })
+        return {"booking_id": booking_id, "status": status, "deposit_total": deposit_total, "url": None}
+
+    # Instant book → Stripe checkout
+    stripe = await _get_stripe(req)
+    success_url = f"{body.origin_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}&booking_id={booking_id}"
+    cancel_url = f"{body.origin_url}/checkout/cancel?booking_id={booking_id}"
+    metadata = {
+        "booking_id": booking_id, "rental_id": rental_id,
+        "type": "rental_deposit", "renter_id": user["id"], "owner_id": r["owner_id"],
+        "tax_amount": str(tax_amount),
+    }
+    session = await stripe.create_checkout_session(CheckoutSessionRequest(
+        amount=float(deposit_total), currency="usd",
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata,
+    ))
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "booking_id": booking_id,
+        "user_id": user["id"],
+        "amount": float(deposit_total),
+        "currency": "usd",
+        "type": "rental_deposit",
+        "status": "initiated",
+        "payment_status": "unpaid",
+        "metadata": metadata,
+        "created_at": now_iso(),
+    })
+    return {"booking_id": booking_id, "status": status, "deposit_total": deposit_total, "url": session.url, "session_id": session.session_id}
+
+@api.get("/rental-bookings/mine")
+async def my_rental_bookings(role: Literal["renter", "owner"] = "renter", user: dict = Depends(get_current_user)):
+    f = {"renter_id" if role == "renter" else "owner_id": user["id"]}
+    docs = await db.rental_bookings.find(f).sort("created_at", -1).to_list(100)
+    return [clean_doc(d) for d in docs]
+
+@api.post("/rental-bookings/{booking_id}/approve")
+async def approve_rental_booking(booking_id: str, req: Request, user: dict = Depends(get_current_user)):
+    b = await db.rental_bookings.find_one({"id": booking_id})
+    if not b:
+        raise HTTPException(404, "Booking not found")
+    if b["owner_id"] != user["id"]:
+        raise HTTPException(403, "Not allowed")
+    if b["status"] != "pending_approval":
+        raise HTTPException(400, "Booking is not awaiting approval")
+    # Transition to deposit_pending, create Stripe checkout, notify renter
+    await db.rental_bookings.update_one({"id": booking_id}, {"$set": {"status": "deposit_pending", "approved_at": now_iso()}})
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": b["renter_id"],
+        "type": "rental_approved",
+        "title": "Booking approved",
+        "body": "Your booking request was approved. Complete payment to confirm your dates.",
+        "link": f"/rentals/{b['rental_id']}",
+        "booking_id": booking_id,
+        "read": False,
+        "created_at": now_iso(),
+    })
+    return {"approved": True}
+
+@api.post("/rental-bookings/{booking_id}/decline")
+async def decline_rental_booking(booking_id: str, user: dict = Depends(get_current_user)):
+    b = await db.rental_bookings.find_one({"id": booking_id})
+    if not b:
+        raise HTTPException(404, "Booking not found")
+    if b["owner_id"] != user["id"]:
+        raise HTTPException(403, "Not allowed")
+    await db.rental_bookings.update_one({"id": booking_id}, {"$set": {"status": "declined", "declined_at": now_iso()}})
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": b["renter_id"],
+        "type": "rental_declined",
+        "title": "Booking declined",
+        "body": "Your booking request was declined.",
+        "link": f"/rentals/{b['rental_id']}",
+        "booking_id": booking_id,
+        "read": False,
+        "created_at": now_iso(),
+    })
+    return {"declined": True}
+
+# ────────────────────────────────────────────────────────────────────────────
 # Orders + Bundled 10% Stripe deposit checkout
 # ────────────────────────────────────────────────────────────────────────────
 async def _get_stripe(req: Request) -> StripeCheckout:
@@ -2869,6 +3257,131 @@ async def seed():
                 "created_at": now_iso(),
             })
         logger.info(f"Seeded {len(global_demo)} global demo jobs across 15 countries")
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Demo rentals across all 11 categories
+    # ────────────────────────────────────────────────────────────────────────
+    if customer and await db.rentals.count_documents({"is_demo": True}) == 0:
+        demo_rentals = [
+            # Property & Stays
+            {"category": "property", "subcategory": "vacation_rental", "title": "Sun-drenched Loft in Echo Park", "description": "Open-plan 1BR with a private patio, two minutes from Sunset Blvd. Walk to Echo Park Lake.",
+             "location": {"address": "Echo Park, Los Angeles, CA", "lat": 34.0786, "lng": -118.2606},
+             "pricing": {"daily": 185, "weekly": 1100, "monthly": 3800, "security_deposit": 300},
+             "attributes": {"bedrooms": 1, "bathrooms": 1, "guests": 3, "amenities": ["WiFi", "Kitchen", "Patio", "AC"], "type": "Loft"}},
+            {"category": "property", "subcategory": "workspace", "title": "Brooklyn Brownstone Workspace", "description": "Dedicated desk in a quiet Park Slope brownstone, 7am–11pm access.",
+             "location": {"address": "Park Slope, Brooklyn, NY", "lat": 40.6712, "lng": -73.9789},
+             "pricing": {"daily": 35, "weekly": 175, "monthly": 600},
+             "attributes": {"capacity": 1, "amenities": ["WiFi 500/500", "Standing desk", "Coffee", "Printer"]}},
+            # Venues
+            {"category": "venues", "subcategory": "wedding_venue", "title": "Riverside Garden Wedding Venue", "description": "Outdoor riverside venue with a covered pavilion and string lights. Catering allowed.",
+             "location": {"address": "Hudson Valley, NY", "lat": 41.7004, "lng": -73.9210},
+             "pricing": {"hourly": 450, "daily": 3200, "security_deposit": 1000},
+             "attributes": {"capacity": 180, "indoor_outdoor": "Outdoor", "catering_allowed": True, "parking_spaces": 60}},
+            {"category": "venues", "subcategory": "photo_studio", "title": "Daylight Photo Studio · 2,000 sqft", "description": "South-facing daylight studio with cyc wall, props, and grip kit included.",
+             "location": {"address": "Williamsburg, Brooklyn, NY", "lat": 40.7081, "lng": -73.9571},
+             "pricing": {"hourly": 95, "daily": 650},
+             "attributes": {"capacity": 25, "indoor_outdoor": "Indoor", "amenities": ["Cyc wall", "Strobes", "WiFi", "Kitchen"]}},
+            # Vehicles
+            {"category": "vehicles", "subcategory": "car", "title": "2023 Tesla Model 3 Long Range", "description": "Clean, fast, Autopilot. Includes one supercharger session per day.",
+             "location": {"address": "San Francisco, CA", "lat": 37.7749, "lng": -122.4194},
+             "pricing": {"hourly": 18, "daily": 110, "weekly": 650, "security_deposit": 400},
+             "attributes": {"make": "Tesla", "model": "Model 3", "year": 2023, "transmission": "Auto", "fuel": "Electric", "seats": 5, "mileage_cap_per_day": 200}},
+            {"category": "vehicles", "subcategory": "rv", "title": "Class C Motorhome — sleeps 6", "description": "Pet-friendly Class C, fully equipped: kitchen, bathroom, generator, bike rack.",
+             "location": {"address": "Bend, OR", "lat": 44.0582, "lng": -121.3153},
+             "pricing": {"daily": 240, "weekly": 1500, "security_deposit": 800},
+             "attributes": {"make": "Winnebago", "year": 2021, "seats": 6, "mileage_cap_per_day": 150}},
+            {"category": "vehicles", "subcategory": "boat", "title": "23ft Bowrider with Captain", "description": "Half-day or full-day Lake Tahoe charter. Captain + fuel included.",
+             "location": {"address": "South Lake Tahoe, CA", "lat": 38.9399, "lng": -119.9772},
+             "pricing": {"hourly": 195, "daily": 1100, "security_deposit": 500},
+             "attributes": {"make": "Bayliner", "seats": 8, "captain_included": True}},
+            # Tools & Equipment
+            {"category": "tools_equipment", "subcategory": "construction", "title": "Mini Excavator — Kubota KX040", "description": "9,500 lb mini excavator, includes 18\", 24\", and 36\" buckets.",
+             "location": {"address": "Phoenix, AZ", "lat": 33.4484, "lng": -112.0740},
+             "pricing": {"daily": 320, "weekly": 1500, "security_deposit": 750},
+             "attributes": {"power_source": "Diesel", "delivery_available": True, "operator_required": True}},
+            {"category": "tools_equipment", "subcategory": "generator", "title": "Honda EU7000iS Inverter Generator", "description": "Quiet, ~7kW inverter generator with electric start. Tested at 64dB at 22ft.",
+             "location": {"address": "Austin, TX", "lat": 30.2672, "lng": -97.7431},
+             "pricing": {"daily": 85, "weekly": 450},
+             "attributes": {"power_source": "Gasoline", "delivery_available": True}},
+            # Photo, Video & AV
+            {"category": "photo_av", "subcategory": "camera_body", "title": "Sony A7 IV + 24-70 f/2.8 GM", "description": "Full-frame mirrorless kit with 64GB card and two batteries.",
+             "location": {"address": "Brooklyn, NY", "lat": 40.6782, "lng": -73.9442},
+             "pricing": {"daily": 110, "weekly": 550, "security_deposit": 1500},
+             "attributes": {"brand": "Sony", "model": "A7 IV", "delivery_available": False}},
+            {"category": "photo_av", "subcategory": "drone", "title": "DJI Mavic 3 Pro · drone + extra batteries", "description": "Cinema-tier drone with 3 batteries, ND filters, ProRes activation.",
+             "location": {"address": "Los Angeles, CA", "lat": 34.0522, "lng": -118.2437},
+             "pricing": {"daily": 145, "weekly": 700, "security_deposit": 1200},
+             "attributes": {"brand": "DJI", "model": "Mavic 3 Pro"}},
+            # Outdoor & Sports
+            {"category": "outdoor_sports", "subcategory": "camping", "title": "4-person camping kit · tent + bags + cookset", "description": "Everything for a weekend out: REI Half Dome 4, two 30°F bags, JetBoil, headlamps.",
+             "location": {"address": "Seattle, WA", "lat": 47.6062, "lng": -122.3321},
+             "pricing": {"daily": 35, "weekly": 175},
+             "attributes": {"size": "4-person", "delivery_available": True}},
+            {"category": "outdoor_sports", "subcategory": "ski", "title": "Adult Ski Package — boots, skis, poles", "description": "Daily / weekly rental, freshly tuned and waxed. Sizing on-site.",
+             "location": {"address": "Park City, UT", "lat": 40.6461, "lng": -111.4980},
+             "pricing": {"daily": 45, "weekly": 220},
+             "attributes": {"size": "Sizes 38–46", "level": "Intermediate"}},
+            # Furniture, Appliances & Electronics
+            {"category": "furniture_appliances", "subcategory": "sofa", "title": "Mid-century 3-seat Sofa (monthly)", "description": "Walnut-frame mid-century sofa, dove grey wool. White-glove delivery and pickup.",
+             "location": {"address": "Chicago, IL", "lat": 41.8781, "lng": -87.6298},
+             "pricing": {"monthly": 95, "weekly": 28, "security_deposit": 200},
+             "attributes": {"delivery_available": True}},
+            {"category": "furniture_appliances", "subcategory": "gaming", "title": "PS5 + 2 controllers + 4 games", "description": "Disc edition, two DualSense controllers, four AAA titles. Perfect for a weekend.",
+             "location": {"address": "Miami, FL", "lat": 25.7617, "lng": -80.1918},
+             "pricing": {"daily": 25, "weekly": 120, "security_deposit": 250}},
+            # Medical, Mobility & Baby
+            {"category": "medical_mobility", "subcategory": "wheelchair", "title": "Lightweight Folding Wheelchair", "description": "Travel-ready folding wheelchair, 220 lb capacity. Free delivery within 10 miles.",
+             "location": {"address": "Atlanta, GA", "lat": 33.7490, "lng": -84.3880},
+             "pricing": {"weekly": 60, "monthly": 180, "security_deposit": 100},
+             "attributes": {"size": "Standard", "delivery_available": True}},
+            {"category": "medical_mobility", "subcategory": "stroller", "title": "Doona Convertible Car Seat / Stroller", "description": "Folds from stroller to car seat in seconds. Sanitised before pickup.",
+             "location": {"address": "San Diego, CA", "lat": 32.7157, "lng": -117.1611},
+             "pricing": {"daily": 20, "weekly": 95, "monthly": 280},
+             "attributes": {"size": "Birth–35 lb"}},
+            # Events, Parties & Weddings
+            {"category": "events_weddings", "subcategory": "tent", "title": "20ft × 40ft White Pole Tent", "description": "Includes sidewalls, string lights, and setup/breakdown labor.",
+             "location": {"address": "Nashville, TN", "lat": 36.1627, "lng": -86.7816},
+             "pricing": {"daily": 650, "weekend": 1100, "security_deposit": 300},
+             "attributes": {"guests": 80, "delivery_available": True}},
+            {"category": "events_weddings", "subcategory": "formal_wear", "title": "Designer Tuxedo Rental", "description": "Tom Ford Shelton tux. 3-day rental + free re-fitting if needed.",
+             "location": {"address": "New York, NY", "lat": 40.7128, "lng": -74.0060},
+             "pricing": {"daily": 220, "weekend": 320, "security_deposit": 500},
+             "attributes": {"size": "38R–46R"}},
+            # Storage & Containers
+            {"category": "storage_containers", "subcategory": "self_storage", "title": "10×10 Climate-controlled Storage Unit", "description": "Indoor, climate-controlled unit with 24/7 access.",
+             "location": {"address": "Denver, CO", "lat": 39.7392, "lng": -104.9903},
+             "pricing": {"monthly": 165, "weekly": 50},
+             "attributes": {"size": "10×10 ft", "climate_controlled": True, "access_24_7": True}},
+            {"category": "storage_containers", "subcategory": "shipping_container", "title": "20ft Shipping Container — Delivered", "description": "Wind & watertight 20-foot container delivered to your site.",
+             "location": {"address": "Houston, TX", "lat": 29.7604, "lng": -95.3698},
+             "pricing": {"monthly": 220, "weekly": 70, "security_deposit": 400},
+             "attributes": {"size": "20 ft", "delivery_available": True}},
+            # Site Services
+            {"category": "site_services", "subcategory": "portable_toilet", "title": "Portable Toilet — Standard Unit", "description": "Weekly servicing included. Delivery within 30 miles.",
+             "location": {"address": "Dallas, TX", "lat": 32.7767, "lng": -96.7970},
+             "pricing": {"weekly": 110, "monthly": 380},
+             "attributes": {"delivery_available": True, "size": "Standard"}},
+            {"category": "site_services", "subcategory": "light_tower", "title": "4-bulb Towable Light Tower", "description": "30 ft mast, 10 hr runtime. Diesel-powered.",
+             "location": {"address": "Las Vegas, NV", "lat": 36.1699, "lng": -115.1398},
+             "pricing": {"daily": 145, "weekly": 700, "security_deposit": 250},
+             "attributes": {"power_source": "Diesel", "delivery_available": True}},
+        ]
+        for r in demo_rentals:
+            doc = {
+                "id": str(uuid.uuid4()),
+                "owner_id": customer["id"], "owner_name": customer["name"],
+                "category": r["category"], "subcategory": r.get("subcategory"),
+                "title": r["title"], "description": r.get("description"),
+                "location": r.get("location"),
+                "media_url": None, "media_type": None, "media": [],
+                "pricing": r["pricing"], "attributes": r.get("attributes", {}),
+                "booking_mode": "instant", "min_duration": 1, "max_duration": None,
+                "status": "active", "host_verification_required": r["category"] in RENTAL_HIGH_VALUE_CATEGORIES,
+                "is_demo": True,
+                "created_at": now_iso(),
+            }
+            await db.rentals.insert_one(doc)
+        logger.info(f"Seeded {len(demo_rentals)} demo rentals across 11 categories")
 
 @app.on_event("startup")
 async def on_startup():
