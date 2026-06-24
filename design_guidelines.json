@@ -1,0 +1,118 @@
+{
+  "theme": "light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "design_philosophy": "Functional clarity, high data density, sharp aesthetics for a complex hybrid marketplace. Information density must be high but optically clear using rigid grids, 1px borders, and high contrast typography.",
+  "colors": {
+    "brand_primary": "#0F172A",
+    "brand_accent": "#0F766E",
+    "background_primary": "#FFFFFF",
+    "background_secondary": "#F8FAFC",
+    "text_primary": "#020617",
+    "text_secondary": "#475569",
+    "border_color": "#E2E8F0",
+    "job_categories": {
+      "physical_delivery": {
+        "name": "Delivery & P2P",
+        "hex": "#DC2626",
+        "tailwind": "bg-red-600",
+        "description": "Used for physical movement of goods."
+      },
+      "local_services": {
+        "name": "Local Services",
+        "hex": "#2563EB",
+        "tailwind": "bg-blue-600",
+        "description": "Used for in-person trades and tasks."
+      },
+      "tech_digital": {
+        "name": "Digital & Tech",
+        "hex": "#D97706",
+        "tailwind": "bg-amber-600",
+        "description": "Used for digital, marketing, education."
+      },
+      "remote_jobs": {
+        "name": "Remote Jobs",
+        "hex": "#0F766E",
+        "tailwind": "bg-teal-700",
+        "description": "MANDATORY 4TH COLOR. Used for fully remote opportunities."
+      }
+    }
+  },
+  "typography": {
+    "primary_font": "Cabinet Grotesk",
+    "secondary_font": "IBM Plex Sans",
+    "rules": {
+      "headings": "Cabinet Grotesk, tracking-tight, font-black for H1, font-bold for H2-H3.",
+      "body": "IBM Plex Sans, text-sm to text-base, leading-relaxed for high readability.",
+      "h1_max": "text-4xl md:text-5xl",
+      "labels": "Uppercase, text-xs, tracking-[0.2em] for overlines and meta data."
+    }
+  },
+  "layout_and_spacing": {
+    "global_radius": "rounded-sm (4px) to rounded-md (8px) maximum. No pill-shaped buttons.",
+    "shadows": "Minimal. Rely on 1px borders (border-collapse style) for definition.",
+    "grid_dashboards": "Control Room Grid: grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-4. Highly dense.",
+    "grid_directories": "Tetris Grid: grid-cols-1 md:grid-cols-8 gap-8 for /stores and /restaurants."
+  },
+  "components": {
+    "buttons": "Solid backgrounds, sharp borders, high contrast hover states (e.g., hover:bg-slate-800 hover:text-white).",
+    "inputs": "Flat, 1px border, bg-white, focus:ring-2 focus:ring-teal-700.",
+    "cards": "Cardless approach preferred. Use border-b or 1px border-border/40 instead of soft shadows.",
+    "toast": "Use Sonner. Polling toast for Provider Hub MUST be highly visible. Include 'Fly to Pin' action button inside toast.",
+    "map": "Full bleed or large container. Map pins MUST use the 4 category colors. Add a distinct 'Remote-friendly' toggle (teal) above map.",
+    "media_upload": "Drag and drop zone for photo/video. Use dashed borders and subtle background tint."
+  },
+  "testing_and_accessibility": {
+    "data_testid_rule": "CRITICAL: ALL interactive elements (buttons, links, map pins, form inputs, toggles, toasts, tabs) MUST have a data-testid attribute in kebab-case (e.g., data-testid='provider-accept-job-button')."
+  },
+  "media_assets": {
+    "restaurants": [
+      {
+        "url": "https://images.pexels.com/photos/15101682/pexels-photo-15101682.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Modern cafe storefront"
+      },
+      {
+        "url": "https://images.pexels.com/photos/27990876/pexels-photo-27990876.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Modern architecture cafe"
+      }
+    ],
+    "retailers": [
+      {
+        "url": "https://images.pexels.com/photos/31763620/pexels-photo-31763620.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Boutique retail storefront"
+      },
+      {
+        "url": "https://images.pexels.com/photos/12791209/pexels-photo-12791209.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Fashion retail display"
+      }
+    ],
+    "providers": [
+      {
+        "url": "https://images.pexels.com/photos/7706489/pexels-photo-7706489.jpeg",
+        "description": "Delivery courier on bicycle"
+      },
+      {
+        "url": "https://images.pexels.com/photos/13431924/pexels-photo-13431924.jpeg",
+        "description": "Young cyclists with delivery bags"
+      }
+    ],
+    "remote_workers": [
+      {
+        "url": "https://images.pexels.com/photos/4022018/pexels-photo-4022018.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Remote worker on laptop"
+      },
+      {
+        "url": "https://images.pexels.com/photos/4050296/pexels-photo-4050296.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Woman working from home"
+      }
+    ]
+  },
+  "feature_implementation_instructions": {
+    "provider_hub": "Display live opportunity feed. Implement 15s polling. Sonner toast for new jobs in radius/category must contain title and miles. Clicking toast triggers 'fly to pin' on the map. Include internal wallet balance display with a 'Withdraw Funds' button.",
+    "marketplace_and_requests": "Service requests and marketplace listings MUST support optional photo/video attachments. Listings seamlessly forward to delivery requests with media_url and media_type fields.",
+    "categories_and_colors": "Auto-flag 'digital_tech', 'marketing', 'business_admin', 'education', 'legal', 'financial', 'remote_work', 'research' as Remote Jobs (Teal color #0F766E).",
+    "stripe_checkout": "Implement bundled 10% deposit. The checkout UI must clearly visually split '10% Item Deposit' and '10% Delivery Fee'. Use test mode.",
+    "roles_and_directories": "Implement /stores and /restaurants directories. Each profile must show logo, hours, address, and an inventory CRUD grid.",
+    "google_maps": "Ensure map handles 4 colored pins. Add an instruction section in the Settings page detailing how to restrict the Google Maps API key in Cloud Console.",
+    "pay_units": "Job posting forms must support dropdown for Pay Unit: hour / day / week / flat."
+  }
+}
