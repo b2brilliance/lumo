@@ -47,6 +47,11 @@ Also: restrict Google Maps API key in Cloud Console (Settings page).
 - **Job-scoped real-time chat** (3s polling) with anti-poach sanitizer (phone, email, URL, contact-word redaction → `[hidden]`); per-job per-provider threads; customer thread tabs on open jobs; `/chats` inbox
 - **Adaptive service-request form** — location fields change based on category: pickup+dropoff for delivery/courier/moving, single "Service address" for handyman/cleaning/landscaping/auto/pet_care/personal_care/events, no location for remote/digital roles
 - **Provider counter-offers** — `POST /api/jobs/{id}/quotes` lets providers propose their own rate / unit / units / notes; one active quote per provider per job. Customer sees all quotes on the job detail page with Accept/Decline. Accepting locks the job at the quoted rate + assigns the provider and auto-declines other pending quotes. Providers see their `/quotes/mine` list on Provider Hub with withdraw support.
+- **Notifications** — `notifications` collection + `/api/notifications` endpoints (list, since, unread_only, mark-read, read_all). Quote accept/decline writes notifications for the accepted provider and auto-declines other pending providers. Frontend `<NotificationsBridge />` polls every 15s and fires sonner toasts with an "Open" action that navigates to the job and marks the notification read.
+- **Google Places Autocomplete** in service request fields (pickup/dropoff/service address), provider base location, marketplace buy delivery address, and store-profile order delivery address. Falls back to plain input if Maps key is missing/blocked.
+
+## Tested
+- Backend pytest **55/55** ✅ (24 base + 19 chat + 12 notifications). Zero regressions.
 
 ## Tested
 - Backend pytest **43/43** (24 prior + 19 new chat tests). Sanitizer covers international phone formats, obfuscated emails, off-platform contact words. Role-based redirect after login/register fixed.
