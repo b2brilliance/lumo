@@ -27,6 +27,18 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Admin / Operator console + Rental availability calendar + Multi-photo gallery (Feb 2026)
+- **Admin Console** at `/admin` (gated `role==='admin'`) — `AdminConsole.jsx` with 4 stat tiles + 4 tabs:
+  - Credentials: list pending creds w/ owner info → Verify / Reject buttons
+  - Withdrawals: list withdrawals w/ owner balance + amount + method
+  - Reviews: list reviews → delete (trash icon w/ confirm)
+  - Rentals: pending_approval booking inbox w/ deep-link to listing
+- Backend admin endpoints under `/api/admin/*` gated by `_require_admin` dep (`/credentials`, `/credentials/{id}/verify|reject`, `/withdrawals`, `/reviews`, `/reviews/{id}` DELETE, `/rental-bookings`, `/stats`)
+- Seeded `admin@lumo.test` / `password123` on startup; added to `/app/memory/test_credentials.md`
+- **Rental availability calendar**: `GET /api/rentals/{id}/blocked-dates` returns confirmed/pending booking ranges (statuses: pending_approval / deposit_pending / deposit_paid / confirmed / in_progress); `POST /api/rentals/{id}/book` enforces overlap check returning **HTTP 409** on conflict (half-open interval); `RentalDetail.jsx` date pickers fetch blocked ranges and constrain min/max
+- **Multi-photo gallery**: `media[]` array on rentals (auto-backfilled from legacy `media_url`); `RentalHost.jsx` accepts multiple photos; `RentalDetail.jsx` renders main image + thumbnail strip + counter
+- Verified by testing agent iteration_6: 110/110 backend tests pass (93 regression + 17 new in `test_lumo_admin_and_overlap.py`); UI E2E confirmed all 4 admin tabs, 3-photo thumbnail strip, and 409 overlap; RBAC enforced (non-admin → 403)
+
 ### Ride + Towing service categories (Feb 2026)
 - Added `ride_share` and `towing` to `ALL_CATEGORIES` in both backend (`server.py`) and frontend (`api.js`), both in the `physical_delivery` group (red color)
 - New `ride_share` schema: subcategories (standard / XL / premium / WAV / airport / long-distance) + 9 fields (passengers, luggage, vehicle class, timing now-vs-scheduled, scheduled_for datetime-local, extra stops, child seat, pet, special requests)
@@ -98,10 +110,9 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## Backlog
 - **P1**: Re-run /app/backend/tests/test_lumo_new_features.py and clean up the `used_model` field shape (strip provider prefix OR document it)
-- **P2**: Admin / operator console (credential verification queue + withdrawal approvals + review moderation)
-- **P2**: List-your-rental flow (`/rentals/host`) — currently rentals can only be created via direct API call
-- **P2**: Rental owner dashboard (bookings inbox, approve/decline UI for request-mode rentals)
-- **P2**: Availability calendar on rentals (block dates already booked)
+- **P2**: Migrate `/rentals/:id` date pickers from native `<input type="date">` to shadcn `Calendar` w/ `disabledMatcher` so individual booked dates are visually greyed-out (currently min/max only)
+- **P2**: Rental owner dashboard (bookings inbox, approve/decline UI for request-mode rentals) — backend done; need dedicated host UI
+- **P2**: Rename `admin_stats.pending_withdrawals` (currently counts pending+initiated+completed)
 - **P3**: Brute-force rate limiting on `/auth/login`
 - **P3**: Split `server.py` into routers — now ~3400 lines (flagged in 4 consecutive iterations)
 - **P3**: RTL layout polish for Arabic
@@ -111,5 +122,6 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - **P3**: Index Mongo `reviews` for $group aggregation instead of in-memory loop
 
 ## Next Tasks
-- Build `/rentals/host` page + rental owner inbox so the rental side can be exercised fully by demo users
-- Admin / Operator console (P2)
+- Split `server.py` (3530 lines) into `APIRouter`-based modules (`routes/admin.py`, `routes/rentals.py`, `routes/cart.py`, `routes/auth.py`)
+- shadcn Calendar upgrade on rental date pickers (P2)
+- Rental owner-facing booking inbox UI (P2)
