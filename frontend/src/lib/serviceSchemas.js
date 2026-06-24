@@ -1,0 +1,489 @@
+// Schema-driven service detail forms.
+// Each schema has: { subcategoryLabel?, subcategories: { value: { label, fields?, helpText? } }, baseFields? }
+// Field types: "select" | "number" | "text" | "textarea" | "multiselect" | "conditional"
+
+const COMMON_ITEM_SIZES = [
+  { value: "envelope", label: "Envelope / documents" },
+  { value: "small_box", label: "Small box (≤ shoebox)" },
+  { value: "medium_box", label: "Medium box (≤ moving box)" },
+  { value: "large_box", label: "Large box / suitcase" },
+  { value: "furniture", label: "Furniture" },
+  { value: "appliance", label: "Appliance" },
+  { value: "vehicle_parts", label: "Vehicle parts" },
+  { value: "groceries", label: "Groceries / food" },
+  { value: "other", label: "Other" },
+];
+
+const CLEANING_ROOMS = [
+  { value: "living_room", label: "Living room" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "bathroom", label: "Bathroom" },
+  { value: "bedroom", label: "Bedroom" },
+  { value: "office", label: "Office / study" },
+  { value: "laundry_room", label: "Laundry room" },
+  { value: "garage", label: "Garage" },
+  { value: "outdoor", label: "Patio / outdoor" },
+];
+
+const CLEANING_TASKS = [
+  { value: "sweep", label: "Sweep" },
+  { value: "mop", label: "Mop" },
+  { value: "vacuum", label: "Vacuum" },
+  { value: "dust", label: "Dust surfaces" },
+  { value: "windows", label: "Windows / mirrors" },
+  { value: "trash", label: "Take out trash" },
+  { value: "laundry", label: "Laundry" },
+  { value: "dishes", label: "Dishes" },
+  { value: "fridge", label: "Clean fridge interior" },
+  { value: "oven", label: "Clean oven interior" },
+  { value: "toilet", label: "Toilet scrub" },
+  { value: "shower", label: "Shower / tub scrub" },
+];
+
+const PROPERTY_TYPES = [
+  { value: "apartment", label: "Apartment / condo" },
+  { value: "house", label: "Single-family house" },
+  { value: "townhouse", label: "Townhouse" },
+  { value: "office", label: "Office / commercial" },
+  { value: "airbnb", label: "Short-term rental" },
+];
+
+const HOUSE_SIZES = [
+  { value: "studio", label: "Studio" },
+  { value: "1br", label: "1 bedroom" },
+  { value: "2br", label: "2 bedrooms" },
+  { value: "3br", label: "3 bedrooms" },
+  { value: "4br_plus", label: "4+ bedrooms" },
+];
+
+const TIRE_SIZES = [
+  "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"
+].map((s) => ({ value: s, label: `${s}\" wheel` }));
+
+export const SERVICE_SCHEMAS = {
+  delivery: {
+    subcategoryLabel: "Item type",
+    subcategories: {
+      package: { label: "Package / parcel" },
+      documents: { label: "Documents" },
+      food: { label: "Food / groceries" },
+      flowers: { label: "Flowers / gifts" },
+      furniture: { label: "Furniture (single item)" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "item_size", label: "Approx. size", type: "select", options: COMMON_ITEM_SIZES, required: true },
+      { name: "quantity", label: "How many items", type: "number", min: 1, default: 1, required: true },
+      { name: "weight_estimate", label: "Approx. weight (lbs)", type: "number", min: 0, step: 1 },
+      { name: "fragile", label: "Fragile / handle with care", type: "select", options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
+    ],
+  },
+  courier: {
+    subcategoryLabel: "Courier type",
+    subcategories: {
+      same_day: { label: "Same-day" },
+      next_day: { label: "Next-day" },
+      scheduled: { label: "Scheduled" },
+    },
+    baseFields: [
+      { name: "item_size", label: "Item size", type: "select", options: COMMON_ITEM_SIZES, required: true },
+      { name: "quantity", label: "Number of items", type: "number", min: 1, default: 1, required: true },
+    ],
+  },
+  moving: {
+    subcategoryLabel: "Move type",
+    subcategories: {
+      local: { label: "Local move (under 50 mi)" },
+      long_distance: { label: "Long distance (50+ mi)" },
+      single_item: { label: "Single bulky item" },
+      labor_only: { label: "Labor only (loading / unloading)" },
+    },
+    baseFields: [
+      { name: "property_size", label: "Property size", type: "select", options: HOUSE_SIZES, required: true },
+      { name: "num_movers", label: "Movers requested", type: "number", min: 1, max: 6, default: 2 },
+      { name: "has_stairs", label: "Stairs involved", type: "select", options: [{ value: "no", label: "No" }, { value: "yes_origin", label: "Yes — at pickup" }, { value: "yes_dest", label: "Yes — at drop-off" }, { value: "yes_both", label: "Yes — both" }] },
+      { name: "packing_needed", label: "Packing service needed", type: "select", options: [{ value: "no", label: "No" }, { value: "partial", label: "Partial" }, { value: "full", label: "Full pack" }] },
+    ],
+  },
+  handyman: {
+    subcategoryLabel: "Type of work",
+    subcategories: {
+      repair: { label: "Repair (something is broken)" },
+      installation: { label: "Installation (new item)" },
+      assembly: { label: "Assembly (furniture, etc.)" },
+      mounting: { label: "Mounting (TV, shelves, art)" },
+      painting: { label: "Painting / patching" },
+      plumbing_minor: { label: "Plumbing (minor)" },
+      electrical_minor: { label: "Electrical (minor)" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "tools_provided", label: "Tools provided by", type: "select", options: [{ value: "provider", label: "Provider" }, { value: "customer", label: "Customer" }, { value: "either", label: "Either is fine" }], default: "either" },
+      { name: "materials_provided", label: "Materials provided by", type: "select", options: [{ value: "provider", label: "Provider" }, { value: "customer", label: "Customer" }, { value: "either", label: "Either is fine" }], default: "customer" },
+    ],
+  },
+  cleaning: {
+    subcategoryLabel: "Cleaning type",
+    subcategories: {
+      standard: { label: "Standard clean" },
+      deep: { label: "Deep clean" },
+      move_in_out: { label: "Move-in / move-out" },
+      post_construction: { label: "Post-construction" },
+      recurring: { label: "Recurring (weekly / bi-weekly)" },
+    },
+    baseFields: [
+      { name: "property_type", label: "Property type", type: "select", options: PROPERTY_TYPES, required: true },
+      { name: "property_size", label: "Size", type: "select", options: HOUSE_SIZES, required: true },
+      { name: "rooms", label: "Rooms to clean", type: "multiselect", options: CLEANING_ROOMS, required: true },
+      { name: "tasks", label: "Tasks to perform", type: "multiselect", options: CLEANING_TASKS, required: true },
+      { name: "num_bathrooms", label: "Bathrooms to clean", type: "number", min: 0, default: 1 },
+      { name: "bathroom_notes", label: "Bathroom details", type: "text", placeholder: "Shower scrub, grout, tub, etc." },
+      { name: "kitchen_notes", label: "Kitchen details", type: "text", placeholder: "Fridge interior, oven, dishes…" },
+      { name: "laundry_loads", label: "Laundry loads (if selected above)", type: "number", min: 0, default: 0 },
+      { name: "pets_in_home", label: "Pets in home", type: "select", options: [{ value: "no", label: "No" }, { value: "dog", label: "Dog" }, { value: "cat", label: "Cat" }, { value: "both", label: "Both" }, { value: "other", label: "Other" }] },
+      { name: "supplies", label: "Cleaning supplies", type: "select", options: [{ value: "provider", label: "Provider brings" }, { value: "customer", label: "Customer provides" }] },
+    ],
+  },
+  landscaping: {
+    subcategoryLabel: "Service type",
+    subcategories: {
+      maintenance: { label: "Routine maintenance" },
+      cleanup: { label: "Yard cleanup" },
+      install: { label: "Landscape installation" },
+      hardscape: { label: "Hardscape (patio, walkway, walls)" },
+      tree: { label: "Tree care / removal" },
+    },
+    baseFields: [
+      { name: "services", label: "Tasks needed", type: "multiselect", required: true, options: [
+        { value: "mow", label: "Mow lawn" },
+        { value: "edge", label: "Edge / trim borders" },
+        { value: "trim_bushes", label: "Trim bushes / shrubs" },
+        { value: "leaves", label: "Leaf removal" },
+        { value: "weed", label: "Weed removal" },
+        { value: "mulch", label: "Mulching" },
+        { value: "plant", label: "Plant flowers / new beds" },
+        { value: "tree_prune", label: "Tree pruning" },
+        { value: "tree_remove", label: "Tree removal" },
+        { value: "snow", label: "Snow removal" },
+      ]},
+      { name: "lawn_size", label: "Approx. lawn size", type: "select", options: [
+        { value: "small", label: "Small (< 1/8 acre)" },
+        { value: "medium", label: "Medium (1/8 – 1/4 acre)" },
+        { value: "large", label: "Large (1/4 – 1/2 acre)" },
+        { value: "xl", label: "Extra large (1/2 + acre)" },
+      ]},
+      { name: "frequency", label: "Frequency", type: "select", options: [
+        { value: "one_time", label: "One-time" },
+        { value: "weekly", label: "Weekly" },
+        { value: "biweekly", label: "Bi-weekly" },
+        { value: "monthly", label: "Monthly" },
+      ], default: "one_time" },
+    ],
+  },
+  auto: {
+    subcategoryLabel: "Service type",
+    subcategories: {
+      minor_repair: { label: "Minor repair" },
+      major_repair: { label: "Major repair" },
+      maintenance: { label: "Maintenance / tune-up" },
+      detailing: { label: "Detailing / wash" },
+      roadside: {
+        label: "Roadside assistance",
+        fields: [
+          { name: "roadside_type", label: "Roadside service", type: "select", required: true, options: [
+            { value: "gas", label: "Gas delivery" },
+            { value: "battery", label: "Battery jump" },
+            { value: "tire", label: "Tire service" },
+            { value: "lockout", label: "Lockout" },
+            { value: "tow", label: "Tow" },
+          ]},
+          { name: "fuel_grade", label: "Fuel grade", type: "select", showIf: { roadside_type: "gas" }, options: [
+            { value: "regular", label: "Regular (87)" },
+            { value: "midgrade", label: "Mid-grade (89)" },
+            { value: "premium", label: "Premium (91+)" },
+            { value: "diesel", label: "Diesel" },
+          ]},
+          { name: "fuel_gallons", label: "Gallons (max 5)", type: "number", showIf: { roadside_type: "gas" }, min: 1, max: 5, default: 2 },
+          { name: "tire_service", label: "Tire service needed", type: "select", showIf: { roadside_type: "tire" }, options: [
+            { value: "change_spare", label: "Change to spare" },
+            { value: "repair_flat", label: "Repair flat" },
+            { value: "bring_new", label: "Bring new tire" },
+          ]},
+          { name: "tire_size", label: "Tire / wheel size", type: "select", showIf: { roadside_type: "tire", tire_service: "bring_new" }, options: TIRE_SIZES },
+        ],
+      },
+    },
+    baseFields: [
+      { name: "vehicle_year", label: "Vehicle year", type: "select", required: true, options: (() => {
+        const years = [];
+        for (let y = new Date().getFullYear() + 1; y >= 1980; y--) years.push({ value: String(y), label: String(y) });
+        return years;
+      })() },
+      { name: "vehicle_make", label: "Make", type: "select", required: true, options: [
+        "Acura","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler","Dodge","Ford","GMC","Honda","Hyundai","Infiniti","Jaguar","Jeep","Kia","Land Rover","Lexus","Lincoln","Mazda","Mercedes-Benz","Mini","Mitsubishi","Nissan","Porsche","Ram","Subaru","Tesla","Toyota","Volkswagen","Volvo","Other"
+      ].map((m) => ({ value: m, label: m })) },
+      { name: "vehicle_model", label: "Model", type: "text", required: true, placeholder: "e.g. Civic, F-150, Model 3" },
+    ],
+  },
+  pet_care: {
+    subcategoryLabel: "Care type",
+    subcategories: {
+      veterinary: { label: "Veterinary care" },
+      petsitting: { label: "Pet-sitting" },
+      dogwalking: { label: "Dog walking" },
+      training: { label: "Training" },
+      grooming: { label: "Grooming" },
+      boarding: { label: "Boarding" },
+    },
+    baseFields: [
+      { name: "animal_type", label: "Animal", type: "select", required: true, options: [
+        { value: "dog", label: "Dog" },
+        { value: "cat", label: "Cat" },
+        { value: "bird", label: "Bird" },
+        { value: "reptile", label: "Reptile" },
+        { value: "small_mammal", label: "Small mammal (rabbit, hamster…)" },
+        { value: "fish", label: "Fish" },
+        { value: "other", label: "Other" },
+      ]},
+      { name: "breed", label: "Breed", type: "text", placeholder: "e.g. Golden Retriever, Maine Coon" },
+      { name: "age_years", label: "Age (years)", type: "number", min: 0, step: 1, default: 1 },
+      { name: "temperament", label: "Temperament", type: "select", options: [
+        { value: "friendly", label: "Friendly" },
+        { value: "shy", label: "Shy" },
+        { value: "energetic", label: "High energy" },
+        { value: "reactive", label: "Reactive / nervous" },
+      ]},
+    ],
+  },
+  events: {
+    subcategoryLabel: "Event type",
+    subcategories: {
+      wedding: { label: "Wedding" },
+      birthday: { label: "Birthday" },
+      graduation: { label: "Graduation" },
+      anniversary: { label: "Anniversary" },
+      funeral: { label: "Funeral / memorial" },
+      corporate: { label: "Corporate / work" },
+      religious: { label: "Religious ceremony" },
+      reunion: { label: "Reunion" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "service_needed", label: "Service needed", type: "select", required: true, options: [
+        { value: "photography", label: "Photography" },
+        { value: "video", label: "Videography" },
+        { value: "catering", label: "Catering" },
+        { value: "bartending", label: "Bartending" },
+        { value: "dj", label: "DJ / music" },
+        { value: "decor", label: "Decor / setup" },
+        { value: "officiant", label: "Officiant" },
+        { value: "planning", label: "Planning / coordination" },
+        { value: "other", label: "Other" },
+      ]},
+      { name: "guest_count", label: "Approx. guest count", type: "number", min: 1, default: 25 },
+      { name: "venue_type", label: "Venue", type: "select", options: [
+        { value: "home", label: "Private home" },
+        { value: "outdoor", label: "Outdoor" },
+        { value: "rented_venue", label: "Rented venue" },
+        { value: "church", label: "Place of worship" },
+        { value: "tbd", label: "Not decided yet" },
+      ]},
+    ],
+  },
+  personal_care: {
+    subcategoryLabel: "Care type",
+    subcategories: {
+      hair: { label: "Hair" },
+      makeup: { label: "Makeup" },
+      nails: { label: "Nails" },
+      skincare: { label: "Skincare / facial" },
+      massage: { label: "Massage" },
+      barber: { label: "Barber" },
+      fitness: { label: "Personal training / fitness" },
+      lashes: { label: "Lashes / brows" },
+    },
+    baseFields: [
+      { name: "num_people", label: "Number of people", type: "number", min: 1, default: 1 },
+      { name: "occasion", label: "Occasion", type: "select", options: [
+        { value: "everyday", label: "Everyday" },
+        { value: "event", label: "Event / special occasion" },
+        { value: "bridal", label: "Bridal / wedding" },
+        { value: "photoshoot", label: "Photoshoot" },
+        { value: "other", label: "Other" },
+      ]},
+    ],
+  },
+
+  // Digital / remote
+  digital_tech: {
+    subcategoryLabel: "Service area",
+    subcategories: {
+      website: { label: "Website build / redesign" },
+      mobile: { label: "Mobile app" },
+      bug_fix: { label: "Bug fix / one-off task" },
+      tech_support: { label: "Tech support" },
+      ai_ml: { label: "AI / ML" },
+      data: { label: "Data engineering / analytics" },
+      devops: { label: "DevOps / hosting" },
+      qa: { label: "QA / testing" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "tech_stack", label: "Stack / platform", type: "text", placeholder: "React, Node, Postgres, AWS…" },
+      { name: "duration", label: "Expected duration", type: "select", options: [
+        { value: "hours", label: "A few hours" },
+        { value: "days", label: "A few days" },
+        { value: "weeks", label: "A few weeks" },
+        { value: "ongoing", label: "Ongoing" },
+      ]},
+    ],
+  },
+  marketing: {
+    subcategoryLabel: "Channel",
+    subcategories: {
+      seo: { label: "SEO" },
+      social: { label: "Social media" },
+      paid_ads: { label: "Paid ads" },
+      content: { label: "Content writing" },
+      email: { label: "Email marketing" },
+      branding: { label: "Branding / identity" },
+      influencer: { label: "Influencer / PR" },
+    },
+    baseFields: [
+      { name: "industry", label: "Industry", type: "text", placeholder: "e.g. SaaS, retail, hospitality" },
+      { name: "engagement", label: "Engagement type", type: "select", options: [
+        { value: "one_time", label: "One-time project" },
+        { value: "monthly", label: "Monthly retainer" },
+        { value: "campaign", label: "Specific campaign" },
+      ]},
+    ],
+  },
+  business_admin: {
+    subcategoryLabel: "Service",
+    subcategories: {
+      bookkeeping: { label: "Bookkeeping" },
+      data_entry: { label: "Data entry" },
+      scheduling: { label: "Scheduling / calendar" },
+      recruiting: { label: "Recruiting" },
+      operations: { label: "Operations support" },
+      research: { label: "Research / data gathering" },
+      transcription: { label: "Transcription" },
+    },
+    baseFields: [
+      { name: "tools", label: "Tools / software", type: "text", placeholder: "QuickBooks, Notion, HubSpot…" },
+      { name: "hours_per_week", label: "Approx. hours / week", type: "number", min: 1, default: 5 },
+    ],
+  },
+  education: {
+    subcategoryLabel: "Subject area",
+    subcategories: {
+      k12: { label: "K-12 tutoring" },
+      test_prep: { label: "Test prep (SAT, GRE, etc.)" },
+      college: { label: "College-level subject" },
+      adult_ed: { label: "Adult education" },
+      language: { label: "Language" },
+      music: { label: "Music" },
+      coding: { label: "Coding / CS" },
+    },
+    baseFields: [
+      { name: "topic", label: "Specific topic", type: "text", placeholder: "Algebra II, AP Physics, Spanish…" },
+      { name: "student_level", label: "Student level", type: "select", options: [
+        { value: "elementary", label: "Elementary" },
+        { value: "middle", label: "Middle school" },
+        { value: "high", label: "High school" },
+        { value: "college", label: "College" },
+        { value: "adult", label: "Adult" },
+      ]},
+      { name: "session_format", label: "Format", type: "select", options: [
+        { value: "remote", label: "Remote (video)" },
+        { value: "in_person", label: "In-person" },
+        { value: "either", label: "Either" },
+      ], default: "remote" },
+    ],
+  },
+  legal: {
+    subcategoryLabel: "Practice area",
+    subcategories: {
+      contract: { label: "Contract review / drafting" },
+      filing: { label: "Filing / paperwork" },
+      family: { label: "Family law" },
+      immigration: { label: "Immigration" },
+      small_claims: { label: "Small claims" },
+      estate: { label: "Estate / wills" },
+      business: { label: "Business / LLC" },
+    },
+    baseFields: [
+      { name: "jurisdiction", label: "State / jurisdiction", type: "text", placeholder: "e.g. NY, CA, US Federal" },
+      { name: "urgency", label: "Urgency", type: "select", options: [
+        { value: "low", label: "No rush" },
+        { value: "normal", label: "This month" },
+        { value: "high", label: "This week" },
+        { value: "urgent", label: "ASAP" },
+      ]},
+    ],
+  },
+  financial: {
+    subcategoryLabel: "Service area",
+    subcategories: {
+      tax: { label: "Tax preparation" },
+      bookkeeping: { label: "Bookkeeping" },
+      planning: { label: "Financial planning" },
+      audit: { label: "Audit / review" },
+      insurance: { label: "Insurance" },
+      payroll: { label: "Payroll" },
+    },
+    baseFields: [
+      { name: "entity_type", label: "Entity type", type: "select", options: [
+        { value: "individual", label: "Individual" },
+        { value: "sole_prop", label: "Sole proprietor" },
+        { value: "llc", label: "LLC" },
+        { value: "scorp", label: "S-Corp" },
+        { value: "ccorp", label: "C-Corp" },
+        { value: "nonprofit", label: "Non-profit" },
+      ]},
+      { name: "tax_year", label: "Tax year (if applicable)", type: "text", placeholder: "2025" },
+    ],
+  },
+  remote_work: {
+    subcategoryLabel: "Role",
+    subcategories: {
+      va: { label: "Virtual assistant" },
+      support: { label: "Customer support" },
+      translation: { label: "Translation" },
+      voice: { label: "Voice work / narration" },
+      transcription: { label: "Transcription" },
+      moderation: { label: "Community / moderation" },
+    },
+    baseFields: [
+      { name: "engagement", label: "Engagement", type: "select", options: [
+        { value: "one_time", label: "One-time gig" },
+        { value: "part_time", label: "Part-time ongoing" },
+        { value: "full_time", label: "Full-time" },
+      ]},
+      { name: "languages", label: "Languages needed", type: "text", placeholder: "English, Spanish…" },
+    ],
+  },
+  research: {
+    subcategoryLabel: "Research type",
+    subcategories: {
+      market: { label: "Market research" },
+      academic: { label: "Academic" },
+      investigative: { label: "Investigative" },
+      survey: { label: "Survey / data collection" },
+      competitive: { label: "Competitive analysis" },
+    },
+    baseFields: [
+      { name: "depth", label: "Depth", type: "select", options: [
+        { value: "summary", label: "Summary report" },
+        { value: "detailed", label: "Detailed analysis" },
+        { value: "deep_dive", label: "Deep-dive whitepaper" },
+      ]},
+      { name: "output_format", label: "Output format", type: "select", options: [
+        { value: "doc", label: "Document" },
+        { value: "slides", label: "Slides / deck" },
+        { value: "spreadsheet", label: "Spreadsheet / data" },
+        { value: "either", label: "Either" },
+      ]},
+    ],
+  },
+};

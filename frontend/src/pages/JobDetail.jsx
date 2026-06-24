@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
 import ChatPanel from "@/components/ChatPanel";
 import QuoteDialog from "@/components/QuoteDialog";
+import { ServiceDetailsView } from "@/components/ServiceDetailsForm";
 import { toast } from "sonner";
 
 export default function JobDetail() {
@@ -108,6 +109,13 @@ export default function JobDetail() {
             return <div><div className="overline">Location</div>Remote</div>;
           })()}
         </div>
+
+        {job.details && Object.keys(job.details).length > 0 && (
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <div className="overline mb-3">Service details</div>
+            <ServiceDetailsView category={job.category} details={job.details} />
+          </div>
+        )}
 
         {job.allowed_payment_methods?.length > 0 && (
           <div className="mt-6 border-t border-slate-200 pt-4">

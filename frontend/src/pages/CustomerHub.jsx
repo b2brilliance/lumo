@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import MediaUpload from "@/components/MediaUpload";
 import AddressInput from "@/components/AddressInput";
+import ServiceDetailsForm from "@/components/ServiceDetailsForm";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
@@ -25,6 +26,7 @@ export default function CustomerHub() {
     pickup_address: "", pickup_lat: null, pickup_lng: null,
     dropoff_address: "", dropoff_lat: null, dropoff_lng: null,
     media_url: null, media_type: null,
+    details: {},
   });
   const locMode = locationModeFor(form.category);
   const locCopy = LOCATION_COPY[locMode];
@@ -39,7 +41,11 @@ export default function CustomerHub() {
   };
   useEffect(() => { load(); }, [user.id]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k, v) => setForm((f) => {
+    // Reset details when category changes
+    if (k === "category" && v !== f.category) return { ...f, category: v, details: {} };
+    return { ...f, [k]: v };
+  });
   const togglePM = (m) => set("allowed_payment_methods",
     form.allowed_payment_methods.includes(m)
       ? form.allowed_payment_methods.filter((x) => x !== m)
@@ -60,6 +66,7 @@ export default function CustomerHub() {
         media_url: form.media_url, media_type: form.media_type,
         pickup_location: null,
         dropoff_location: null,
+        details: form.details || {},
       };
       if (locMode === "pickup_dropoff") {
         body.pickup_location = form.pickup_address ? { lat: form.pickup_lat ?? 40.7128, lng: form.pickup_lng ?? -74.006, address: form.pickup_address } : null;
@@ -69,7 +76,7 @@ export default function CustomerHub() {
       }
       await api.post("/jobs", body);
       toast.success("Service request posted");
-      setForm({ ...form, title: "", description: "", pay_rate: "", media_url: null, media_type: null });
+      setForm({ ...form, title: "", description: "", pay_rate: "", media_url: null, media_type: null, details: {} });
       load();
     } catch (e) {
       toast.error(formatApiError(e));
@@ -126,6 +133,11 @@ export default function CustomerHub() {
               <Input type="number" step="0.5" value={form.estimated_units} onChange={(e) => set("estimated_units", e.target.value)} disabled={form.pay_unit === "flat"} data-testid="job-estimated-units" className="mt-1" />
             </div>
           </div>
+          <ServiceDetailsForm
+            category={form.category}
+            details={form.details || {}}
+            onChange={(d) => setForm((f) => ({ ...f, details: d }))}
+          />
           {locMode === "pickup_dropoff" && (
             <div className="border-l-2 border-red-500 pl-3">
               <div className="overline text-red-700 mb-2">{locCopy.title}</div>

@@ -206,6 +206,7 @@ class JobCreate(BaseModel):
     is_remote: Optional[bool] = None
     payment_terms: Optional[str] = None  # free text terms
     allowed_payment_methods: Optional[List[PaymentMethod]] = None
+    details: Optional[dict] = None  # schema-driven subcategory + fields
 
 class JobAccept(BaseModel):
     job_id: str
@@ -444,6 +445,7 @@ async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
         "media_type": body.media_type,
         "payment_terms": body.payment_terms or "",
         "allowed_payment_methods": body.allowed_payment_methods or ["app", "cash", "card"],
+        "details": body.details or {},
         "status": "open",
         "provider_id": None,
         "deposit_paid": False,

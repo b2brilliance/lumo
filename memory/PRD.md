@@ -47,13 +47,18 @@ Also: restrict Google Maps API key in Cloud Console (Settings page).
 - **Job-scoped real-time chat** (3s polling) with anti-poach sanitizer (phone, email, URL, contact-word redaction → `[hidden]`); per-job per-provider threads; customer thread tabs on open jobs; `/chats` inbox
 - **Adaptive service-request form** — location fields change based on category: pickup+dropoff for delivery/courier/moving, single "Service address" for handyman/cleaning/landscaping/auto/pet_care/personal_care/events, no location for remote/digital roles
 - **Provider counter-offers** — `POST /api/jobs/{id}/quotes` lets providers propose their own rate / unit / units / notes; one active quote per provider per job. Customer sees all quotes on the job detail page with Accept/Decline. Accepting locks the job at the quoted rate + assigns the provider and auto-declines other pending quotes. Providers see their `/quotes/mine` list on Provider Hub with withdraw support.
-- **Notifications** — `notifications` collection + `/api/notifications` endpoints (list, since, unread_only, mark-read, read_all). Triggers:
-  - `quote_received` → customer when a provider posts a new quote
-  - `quote_accepted` → winning provider when their quote is accepted
-  - `quote_declined` → provider when their quote is declined (directly or auto-declined by another winning)
-  - `new_message` → the other party of a job thread when a chat message arrives
-  
-  Frontend `<NotificationsBridge />` polls every 15s and fires sonner toasts with an "Open" action that navigates to the job and marks the notification read.
+- **Schema-driven service detail subforms** — per-category `subcategory` + dynamic fields configured in `/app/frontend/src/lib/serviceSchemas.js` and rendered by `<ServiceDetailsForm>`. Persisted as `job.details` (dict) on the backend.
+  - Delivery / courier: item type, size, quantity, weight, fragile flag
+  - Moving: move type, property size, # movers, stairs, packing
+  - Handyman: repair / install / assembly / mounting / painting / minor plumbing or electrical; tools & materials source
+  - Cleaning: type (standard/deep/move-in-out/post-construction/recurring), property type, size, room checklist, task checklist (sweep/vacuum/dust/laundry/windows/etc.), # bathrooms, bathroom & kitchen detail notes, laundry loads, pets, supplies source
+  - Landscaping: type + task checklist (mow/edge/trim/leaves/weed/mulch/plant/tree-prune/snow), lawn size, frequency
+  - Auto: minor / major / maintenance / detailing / roadside. Roadside expands to gas (fuel grade + gallons up to 5), battery jump, tire (change spare / repair flat / bring new — size required if new), lockout, tow. Always collects vehicle year / make / model
+  - Pet care: animal type, breed, age, temperament + subcategory (vet/sitting/walking/training/grooming/boarding)
+  - Events: event type (wedding/birthday/graduation/anniversary/funeral/corporate/religious/reunion/other) + service needed, guest count, venue
+  - Personal care: hair / makeup / nails / skincare / massage / barber / fitness / lashes + occasion + # people
+  - Digital, marketing, business admin, education, legal, financial, remote work, research — each have their own subcategory + light field set
+- **Landing page copy** rewritten for a clearer, more professional voice while keeping the colour-coded four-category headline.
 - **Google Places Autocomplete** in service request fields (pickup/dropoff/service address), provider base location, marketplace buy delivery address, and store-profile order delivery address. Falls back to plain input if Maps key is missing/blocked.
 
 ## Tested
