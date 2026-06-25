@@ -2219,13 +2219,35 @@ class ScheduleBody(BaseModel):
     name: str
     ad_ids: List[str]
     connector_ids: Optional[List[str]] = None  # None = all enabled at run time
-    cadence_hours: int = 24  # how often to post (1 = hourly, 24 = daily, 168 = weekly)
+    cadence_hours: int = 24  # used when daily_times is empty
+    daily_times: Optional[List[str]] = None  # ["09:00", "21:00"] — fire at these clock times each day
+    timezone: Optional[str] = "UTC"  # IANA name, e.g. "America/New_York"
     start_at: Optional[str] = None  # ISO string; default = now
     end_at: Optional[str] = None  # optional auto-stop
     enabled: bool = True
 
 
-def _next_run(now: datetime, last: Optional[datetime], cadence_hours: int) -> datetime:
+def _next_run(now: datetime, last: Optional[datetime], cadence_hours: int,
+              daily_times: Optional[list] = None, tz_name: Optional[str] = None) -> datetime:
+    if daily_times:
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(tz_name or "UTC")
+        except Exception:
+            tz = timezone.utc
+        now_local = now.astimezone(tz)
+        slots = []
+        for t in daily_times:
+            try:
+                hh, mm = (int(p) for p in t.split(":"))
+            except Exception:
+                continue
+            today_slot = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            if today_slot <= now_local:
+                today_slot = today_slot + timedelta(days=1)
+            slots.append(today_slot)
+        if slots:
+            return min(slots).astimezone(timezone.utc)
     base = last or now
     return base + timedelta(hours=cadence_hours)
 
@@ -2249,16 +2271,20 @@ async def create_schedule(body: ScheduleBody, user: dict = Depends(_require_admi
     now = datetime.now(timezone.utc)
     start = datetime.fromisoformat(body.start_at.replace("Z", "+00:00")) if body.start_at else now
     end = datetime.fromisoformat(body.end_at.replace("Z", "+00:00")) if body.end_at else None
+    # If daily_times are provided, compute the first fire time from now (else use start_at)
+    first_run = _next_run(now, None, body.cadence_hours, body.daily_times, body.timezone) if body.daily_times else start
     doc = {
         "id": str(uuid.uuid4()),
         "name": body.name,
         "ad_ids": body.ad_ids,
         "connector_ids": body.connector_ids,  # None = all enabled
         "cadence_hours": body.cadence_hours,
+        "daily_times": body.daily_times or [],
+        "timezone": body.timezone or "UTC",
         "start_at": start.isoformat(),
         "end_at": end.isoformat() if end else None,
         "enabled": body.enabled,
-        "next_run_at": start.isoformat(),
+        "next_run_at": first_run.isoformat(),
         "last_run_at": None,
         "posts_sent": 0,
         "ad_cursor": 0,  # which ad in the rotation is next
@@ -2315,7 +2341,7 @@ async def _run_due_schedules():
             if not ad:
                 # Skip missing ad; advance cursor
                 next_cursor = (cursor + 1) % len(ad_ids)
-                next_run = _next_run(now, now, s["cadence_hours"])
+                next_run = _next_run(now, now, s["cadence_hours"], s.get("daily_times") or None, s.get("timezone"))
                 await db.ad_schedules.update_one({"id": s["id"]}, {"$set": {"ad_cursor": next_cursor, "next_run_at": next_run.isoformat()}})
                 continue
             ad = clean_doc(ad)
@@ -2340,7 +2366,7 @@ async def _run_due_schedules():
                     logger.warning(f"Scheduler post to {c['platform']} failed: {e}")
             # Advance cursor + next run
             next_cursor = (cursor + 1) % len(ad_ids)
-            next_run = _next_run(now, now, s["cadence_hours"])
+            next_run = _next_run(now, now, s["cadence_hours"], s.get("daily_times") or None, s.get("timezone"))
             await db.ad_schedules.update_one({"id": s["id"]}, {
                 "$set": {"ad_cursor": next_cursor, "next_run_at": next_run.isoformat(), "last_run_at": now.isoformat()},
                 "$inc": {"posts_sent": ok_count},

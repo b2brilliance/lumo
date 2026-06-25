@@ -28,7 +28,7 @@ export default function Distribution() {
   const [bcastModal, setBcastModal] = useState(null);
   const [bcastResult, setBcastResult] = useState(null);
   const [schedModal, setSchedModal] = useState(false);
-  const [schedForm, setSchedForm] = useState({ name: "Lumo daily drip", ad_ids: [], cadence_hours: 24 });
+  const [schedForm, setSchedForm] = useState({ name: "Lumo daily drip", ad_ids: [], cadence_hours: 24, mode: "interval", daily_times: ["09:00", "21:00"], timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" });
 
   useEffect(() => {
     api.get("/admin/distribution/types").then(({ data }) => setTypes(data.types || {})).catch(() => {});
@@ -95,11 +95,20 @@ export default function Distribution() {
 
   const saveSchedule = async () => {
     if (schedForm.ad_ids.length === 0) { toast.error("Pick at least one ad"); return; }
+    const payload = {
+      name: schedForm.name,
+      ad_ids: schedForm.ad_ids,
+      cadence_hours: schedForm.cadence_hours,
+    };
+    if (schedForm.mode === "times" && schedForm.daily_times.length > 0) {
+      payload.daily_times = [...schedForm.daily_times].sort();
+      payload.timezone = schedForm.timezone;
+    }
     try {
-      await api.post("/admin/distribution/schedules", schedForm);
-      toast.success("Schedule created — first post will fire within a minute");
+      await api.post("/admin/distribution/schedules", payload);
+      toast.success("Schedule created — first post will fire at the next slot");
       setSchedModal(false);
-      setSchedForm({ name: "Lumo daily drip", ad_ids: [], cadence_hours: 24 });
+      setSchedForm({ name: "Lumo daily drip", ad_ids: [], cadence_hours: 24, mode: "interval", daily_times: ["09:00", "21:00"], timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" });
       refreshSchedules();
     } catch (e) { toast.error(formatApiError(e)); }
   };
@@ -231,7 +240,7 @@ export default function Distribution() {
                       <span className="font-display font-bold">{s.name}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 font-mono">
-                      {s.ad_ids?.length || 0} ads · every {s.cadence_hours}h
+                      {s.ad_ids?.length || 0} ads · {(s.daily_times && s.daily_times.length > 0) ? `${s.daily_times.length}×/day at ${[...s.daily_times].sort().join(", ")} (${s.timezone || "UTC"})` : `every ${s.cadence_hours}h`}
                     </div>
                   </div>
                   <div className="col-span-6 md:col-span-4 text-xs font-mono">
@@ -268,16 +277,56 @@ export default function Distribution() {
                 <Input value={schedForm.name} onChange={(e) => setSchedForm({ ...schedForm, name: e.target.value })} className="mt-1" data-testid="schedule-name" />
               </div>
               <div>
-                <label className="overline text-slate-500">Cadence</label>
-                <div className="mt-1 grid grid-cols-3 md:grid-cols-6 gap-1">
-                  {CADENCE_OPTIONS.map((o) => (
-                    <button key={o.hours} type="button" onClick={() => setSchedForm({ ...schedForm, cadence_hours: o.hours })}
-                      className={`text-[10px] font-mono uppercase tracking-widest border px-1 py-2 ${schedForm.cadence_hours === o.hours ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:border-slate-400"}`}
-                      data-testid={`schedule-cadence-${o.hours}`}>
-                      {o.label}
-                    </button>
-                  ))}
+                <label className="overline text-slate-500">When to post</label>
+                <div className="mt-1 grid grid-cols-2 gap-1">
+                  <button type="button" onClick={() => setSchedForm({ ...schedForm, mode: "interval" })}
+                    className={`text-[10px] font-mono uppercase tracking-widest border px-2 py-2 ${schedForm.mode === "interval" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:border-slate-400"}`}
+                    data-testid="schedule-mode-interval">Every N hours</button>
+                  <button type="button" onClick={() => setSchedForm({ ...schedForm, mode: "times" })}
+                    className={`text-[10px] font-mono uppercase tracking-widest border px-2 py-2 ${schedForm.mode === "times" ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:border-slate-400"}`}
+                    data-testid="schedule-mode-times">Specific times of day</button>
                 </div>
+                {schedForm.mode === "interval" ? (
+                  <div className="mt-2 grid grid-cols-3 md:grid-cols-6 gap-1">
+                    {CADENCE_OPTIONS.map((o) => (
+                      <button key={o.hours} type="button" onClick={() => setSchedForm({ ...schedForm, cadence_hours: o.hours })}
+                        className={`text-[10px] font-mono uppercase tracking-widest border px-1 py-2 ${schedForm.cadence_hours === o.hours ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:border-slate-400"}`}
+                        data-testid={`schedule-cadence-${o.hours}`}>
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex flex-wrap gap-2" data-testid="schedule-times-list">
+                      {schedForm.daily_times.map((t, i) => (
+                        <div key={i} className="flex items-center gap-1 border border-slate-300 bg-white px-2 py-1">
+                          <input
+                            type="time"
+                            value={t}
+                            onChange={(e) => {
+                              const arr = [...schedForm.daily_times];
+                              arr[i] = e.target.value;
+                              setSchedForm({ ...schedForm, daily_times: arr });
+                            }}
+                            className="text-sm font-mono outline-none"
+                            data-testid={`schedule-time-${i}`}
+                          />
+                          <button type="button" onClick={() => setSchedForm({ ...schedForm, daily_times: schedForm.daily_times.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-600" aria-label="Remove">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => setSchedForm({ ...schedForm, daily_times: [...schedForm.daily_times, "12:00"] })}
+                        className="border border-dashed border-slate-300 px-3 py-1 text-xs font-mono uppercase tracking-widest text-slate-600 hover:border-slate-900" data-testid="schedule-time-add">
+                        + Add time
+                      </button>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500">
+                      Posts {schedForm.daily_times.length}× / day at: {[...schedForm.daily_times].sort().join(" · ")} <span className="opacity-60">({schedForm.timezone})</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="overline text-slate-500">Ads in rotation ({schedForm.ad_ids.length} selected)</label>
