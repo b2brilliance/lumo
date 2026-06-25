@@ -27,6 +27,12 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Visible locale switcher in NavBar (Feb 2026)
+- New `LocaleSwitcher.jsx` — flag + currency-code chevron trigger in the top-right of the NavBar, visible on every page (homepage included) for both signed-in and signed-out users.
+- Dropdown lists all 15 countries with flag + name + currency · language; active country shows a check; outside-click + Reset-to-auto-detect both wired.
+- Reuses existing `useLocale()`, `setCountryOverride()`, `formatPrice()` and the `AutoTranslator` DOM walker — switching country instantly triggers translated UI + converted prices ($X → ₹ / € / ¥ / £) using live FX from `/api/i18n/fx`.
+- Verified iteration_8: 13/13 acceptance criteria pass end-to-end on the public preview URL — IN/DE/JP/GB all render correct currency + translations.
+
 ### Calendar polish + Rental owner inbox (Feb 2026)
 - Replaced native `<input type="date">` on `/rentals/:id` with **shadcn Popover + Calendar** (react-day-picker) — individual booked days now visually greyed-out via `disabled={dayDisabled}` matcher (past + every blocked range). End-date matcher additionally blocks ranges that would span a booked window starting after `start_date`.
 - New **Rental owner inbox** at `/rentals/inbox` (`RentalInbox.jsx`) — stat tiles + 6 filter tabs (All / Pending / Awaiting payment / Confirmed / Completed / Declined) + per-row rental thumbnail + Approve/Decline actions for `pending_approval` bookings.
