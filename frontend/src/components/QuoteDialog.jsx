@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { providerEarningsBreakdown, LUMO_COMMISSION_RATE } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 
 export default function QuoteDialog({ open, onOpenChange, job, onSubmitted }) {
@@ -94,6 +95,20 @@ export default function QuoteDialog({ open, onOpenChange, job, onSubmitted }) {
               {diff > 0 ? "+" : ""}${diff.toFixed(2)} vs asking rate
             </div>
           )}
+          {(() => {
+            const ru = parseFloat(form.quoted_pay_rate || "0");
+            const units = form.quoted_pay_unit === "flat" ? 1 : parseFloat(form.quoted_estimated_units || "1") || 1;
+            const gross = ru * units;
+            if (!Number.isFinite(gross) || gross <= 0) return null;
+            const b = providerEarningsBreakdown({ customerCost: gross });
+            return (
+              <div className="border border-slate-200 bg-slate-50 p-3 text-xs font-mono space-y-1" data-testid="quote-earnings">
+                <div className="flex justify-between"><span>Customer pays</span><span>${b.customer_pays.toFixed(2)}</span></div>
+                <div className="flex justify-between text-slate-500"><span>Lumo fee ({(LUMO_COMMISSION_RATE * 100).toFixed(0)}%)</span><span>−${b.lumo_commission.toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1"><span>Your take-home</span><span data-testid="quote-take-home">${b.net_to_provider.toFixed(2)}</span></div>
+              </div>
+            );
+          })()}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={busy} className="bg-teal-700 hover:bg-teal-800" data-testid="quote-submit">

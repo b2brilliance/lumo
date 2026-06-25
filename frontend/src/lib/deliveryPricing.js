@@ -37,6 +37,36 @@ export const DELIVERY_RATES = {
   store_per_mile: 1.5,
 };
 
+// Lumo platform fee — used to show providers what they actually take home.
+// Customer-facing UI should never mention this.
+export const LUMO_COMMISSION_RATE = 0.10;
+
+/**
+ * Provider-facing earnings breakdown. Tax is collected from the customer at
+ * checkout and does NOT reduce the provider's take-home, so we surface it
+ * informationally only.
+ */
+export function providerEarningsBreakdown({
+  customerCost = 0,
+  taxRate = null,
+  taxAmount = null,
+} = {}) {
+  const gross = Math.max(0, Number(customerCost) || 0);
+  const lumoCommission = Math.round(gross * LUMO_COMMISSION_RATE * 100) / 100;
+  const net = Math.round((gross - lumoCommission) * 100) / 100;
+  const computedTaxAmount = taxAmount != null
+    ? Number(taxAmount)
+    : (taxRate != null ? Math.round(gross * Number(taxRate) * 100) / 100 : null);
+  return {
+    customer_pays: Math.round(gross * 100) / 100,
+    lumo_commission_rate: LUMO_COMMISSION_RATE,
+    lumo_commission: lumoCommission,
+    tax_rate: taxRate,
+    tax_amount: computedTaxAmount,
+    net_to_provider: net,
+  };
+}
+
 // Haversine miles
 export function milesBetween(a, b) {
   if (!a || !b || a.lat == null || b.lat == null) return null;

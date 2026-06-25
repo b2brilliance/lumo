@@ -159,51 +159,55 @@ export default function CustomerHub() {
             <Label className="overline">Description</Label>
             <Textarea value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Details, address, timing..." required data-testid="job-description" className="mt-1" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="overline">Category</Label>
-              <Select value={form.category} onValueChange={(v) => set("category", v)}>
-                <SelectTrigger className="mt-1" data-testid="job-category"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ALL_CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="overline">Pay unit</Label>
-              <Select value={form.pay_unit} onValueChange={(v) => set("pay_unit", v)}>
-                <SelectTrigger className="mt-1" data-testid="job-pay-unit"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="hour">Per hour</SelectItem>
-                  <SelectItem value="day">Per day</SelectItem>
-                  <SelectItem value="week">Per week</SelectItem>
-                  <SelectItem value="flat">Flat (one-time)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="overline">Pay rate ($)</Label>
-              <Input type="number" step="0.01" value={form.pay_rate} onChange={(e) => set("pay_rate", e.target.value)} required data-testid="job-pay-rate" className="mt-1" />
-            </div>
-            <div>
-              <Label className="overline">
-                {form.pay_unit === "flat" ? "Estimated time" :
-                 form.pay_unit === "hour" ? "How many hours?" :
-                 form.pay_unit === "day" ? "How many days?" :
-                 form.pay_unit === "week" ? "How many weeks?" : "Estimated units"}
-              </Label>
-              <Input type="number" step="0.5" value={form.estimated_units} onChange={(e) => set("estimated_units", e.target.value)} disabled={form.pay_unit === "flat"} data-testid="job-estimated-units" className="mt-1" />
-            </div>
+          <div>
+            <Label className="overline">Category</Label>
+            <Select value={form.category} onValueChange={(v) => set("category", v)}>
+              <SelectTrigger className="mt-1" data-testid="job-category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ALL_CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <ServiceDetailsForm
             category={form.category}
             details={form.details || {}}
             onChange={(d) => setForm((f) => ({ ...f, details: d }))}
           />
+          {/* For delivery / courier / moving, pay rate is auto-calculated from
+              the item + distance — hide the manual inputs to avoid confusion. */}
+          {!isDeliveryCat && !isMovingCat && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="overline">Pay unit</Label>
+                  <Select value={form.pay_unit} onValueChange={(v) => set("pay_unit", v)}>
+                    <SelectTrigger className="mt-1" data-testid="job-pay-unit"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hour">Per hour</SelectItem>
+                      <SelectItem value="day">Per day</SelectItem>
+                      <SelectItem value="week">Per week</SelectItem>
+                      <SelectItem value="flat">Flat (one-time)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="overline">
+                    {form.pay_unit === "flat" ? "Estimated time" :
+                     form.pay_unit === "hour" ? "How many hours?" :
+                     form.pay_unit === "day" ? "How many days?" :
+                     form.pay_unit === "week" ? "How many weeks?" : "Estimated units"}
+                  </Label>
+                  <Input type="number" step="0.5" value={form.estimated_units} onChange={(e) => set("estimated_units", e.target.value)} disabled={form.pay_unit === "flat"} data-testid="job-estimated-units" className="mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="overline">Pay rate ($)</Label>
+                <Input type="number" step="0.01" value={form.pay_rate} onChange={(e) => set("pay_rate", e.target.value)} required data-testid="job-pay-rate" className="mt-1" />
+              </div>
+            </>
+          )}
           {locMode === "pickup_dropoff" && (
             <div className="border-l-2 border-red-500 pl-3">
               <div className="overline text-red-700 mb-2">{locCopy.title}</div>
@@ -296,7 +300,7 @@ export default function CustomerHub() {
           {isMovingCat && movingQuote && (
             <div className="border border-red-700/40 bg-red-50/40 p-4" data-testid="moving-quote">
               <div className="flex items-center justify-between">
-                <div className="overline text-red-800">Moving quote · auto-calculated</div>
+                <div className="overline text-red-800">Your price · auto-calculated</div>
                 {movingQuote.is_long_distance && (
                   <span className="text-[10px] font-mono uppercase tracking-wider border border-amber-400 bg-amber-50 text-amber-800 px-1.5 py-0.5">Long-distance</span>
                 )}
@@ -337,7 +341,7 @@ export default function CustomerHub() {
                   </>
                 )}
                 <div className="flex justify-between font-display text-base font-black border-t border-red-700/30 pt-2 mt-2 text-red-900">
-                  <span>Movers receive</span><span data-testid="moving-quote-total">${movingQuote.total.toFixed(2)}</span>
+                  <span>Your price</span><span data-testid="moving-quote-total">${movingQuote.total.toFixed(2)}</span>
                 </div>
               </div>
               <p className="text-[11px] text-slate-500 mt-2 leading-snug">
@@ -348,7 +352,7 @@ export default function CustomerHub() {
           {isDeliveryCat && deliveryQuote && (
             <div className="border border-teal-700/40 bg-teal-50/40 p-4" data-testid="delivery-quote">
               <div className="flex items-center justify-between">
-                <div className="overline text-teal-800">Driver quote · auto-calculated</div>
+                <div className="overline text-teal-800">Your price · auto-calculated</div>
                 {deliveryQuote.is_long_distance && (
                   <span className="text-[10px] font-mono uppercase tracking-wider border border-amber-400 bg-amber-50 text-amber-800 px-1.5 py-0.5">Long-distance</span>
                 )}
@@ -375,16 +379,24 @@ export default function CustomerHub() {
                 {deliveryQuote.weight_fee > 0 && <div className="flex justify-between"><span>Weight surcharge (over 5 lb)</span><span>${deliveryQuote.weight_fee.toFixed(2)}</span></div>}
                 {deliveryQuote.fragile_multiplier > 1 && <div className="flex justify-between text-amber-700"><span>Fragile handling (+20%)</span><span>×{deliveryQuote.fragile_multiplier}</span></div>}
                 <div className="flex justify-between font-display text-base font-black border-t border-teal-700/30 pt-2 mt-2 text-teal-900">
-                  <span>Driver receives</span><span data-testid="delivery-quote-total">${deliveryQuote.total.toFixed(2)}</span>
+                  <span>Your price</span><span data-testid="delivery-quote-total">${deliveryQuote.total.toFixed(2)}</span>
                 </div>
               </div>
               <p className="text-[11px] text-slate-500 mt-2 leading-snug">
-                This is what the driver sees. You can adjust the rate above if your job is unusual.
+                Calculated from the item, your pickup and drop-off addresses, and any extras. Sales tax (if any) is added at checkout.
               </p>
             </div>
           )}
-          <Button type="submit" disabled={busy} className="w-full bg-slate-900 hover:bg-slate-800" data-testid="post-job-submit">
-            {busy ? "Posting…" : "Post request"}
+          <Button
+            type="submit"
+            disabled={busy || ((isDeliveryCat || isMovingCat) && !(deliveryQuote || movingQuote))}
+            className="w-full bg-slate-900 hover:bg-slate-800"
+            data-testid="post-job-submit"
+          >
+            {busy ? "Posting…"
+              : (isDeliveryCat && !deliveryQuote) ? "Enter pickup + drop-off addresses to see price"
+              : (isMovingCat && !movingQuote) ? "Add details + addresses to see price"
+              : "Post request"}
           </Button>
         </form>
 

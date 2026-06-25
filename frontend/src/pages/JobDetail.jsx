@@ -9,6 +9,7 @@ import QuoteDialog from "@/components/QuoteDialog";
 import TrustBadges from "@/components/TrustBadges";
 import { ServiceDetailsView } from "@/components/ServiceDetailsForm";
 import ReviewsSection from "@/components/ReviewsSection";
+import { providerEarningsBreakdown, LUMO_COMMISSION_RATE } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 
 export default function JobDetail() {
@@ -97,6 +98,28 @@ export default function JobDetail() {
           {job.pay_unit !== "flat" && <span className="text-slate-500"> · est. {job.estimated_units} {job.pay_unit}s</span>}
         </div>
         <p className="text-slate-700 mt-6 whitespace-pre-line">{job.description}</p>
+
+        {/* Provider-facing earnings breakdown — never shown to the customer */}
+        {isProvider && (() => {
+          const gross = (job.pay_rate || 0) * (job.pay_unit !== "flat" ? (job.estimated_units || 1) : 1);
+          const b = providerEarningsBreakdown({ customerCost: gross });
+          return (
+            <div className="mt-5 border border-slate-300 p-4 bg-slate-50" data-testid="provider-earnings-breakdown">
+              <div className="overline text-slate-700">Your earnings if you take this job</div>
+              <div className="font-mono text-sm mt-3 space-y-1">
+                <div className="flex justify-between"><span>Customer pays</span><span data-testid="earnings-customer-pays">${b.customer_pays.toFixed(2)}</span></div>
+                <div className="flex justify-between text-slate-500"><span>Lumo platform fee ({(LUMO_COMMISSION_RATE * 100).toFixed(0)}%)</span><span data-testid="earnings-commission">−${b.lumo_commission.toFixed(2)}</span></div>
+                <div className="flex justify-between font-display text-lg font-black border-t border-slate-300 pt-2 mt-2 text-slate-900">
+                  <span>Your take-home</span><span data-testid="earnings-net">${b.net_to_provider.toFixed(2)}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-3 leading-snug">
+                Sales tax (if any) is paid by the customer at checkout — it doesn&apos;t reduce your earnings.
+                {job.pay_unit !== "flat" && ` Estimate based on ${job.estimated_units} ${job.pay_unit}${job.estimated_units !== 1 ? "s" : ""}; actual depends on the hours you log.`}
+              </p>
+            </div>
+          );
+        })()}
 
         {img && (
           <div className="mt-6 border border-slate-200">

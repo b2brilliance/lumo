@@ -12,6 +12,7 @@ import QuoteDialog from "@/components/QuoteDialog";
 import AddressInput from "@/components/AddressInput";
 import { checkCredentialMatch } from "@/lib/credentialMatch";
 import { KIND_LABEL } from "@/lib/credentialKinds";
+import { providerEarningsBreakdown } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 import { Wallet, MapPin, Briefcase } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -218,6 +219,15 @@ export default function ProviderHub() {
                 <div className="col-span-2 font-mono text-xs">
                   <div className="font-display text-base font-bold text-slate-900">${j.pay_rate.toFixed(2)}</div>
                   <div className="text-slate-500 uppercase">per {j.pay_unit}</div>
+                  {(() => {
+                    const gross = (j.pay_rate || 0) * (j.pay_unit !== "flat" ? (j.estimated_units || 1) : 1);
+                    const b = providerEarningsBreakdown({ customerCost: gross });
+                    return (
+                      <div className="text-teal-700 mt-0.5" data-testid={`opp-take-home-${j.id}`}>
+                        You keep ${b.net_to_provider.toFixed(2)}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="col-span-1 text-right flex flex-col gap-1">
                   <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800 h-7 px-2 text-xs" data-testid={`accept-job-${j.id}`}>

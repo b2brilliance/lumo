@@ -1,0 +1,51 @@
+{
+  "summary": "Iteration 13 — Pricing UI overhaul (auto-quote + 10% Lumo fee provider breakdown) verified end-to-end. Backend (5/5 pytest in /app/backend/tests/test_jobs_pricing_iter13.py): POST /api/jobs with category='delivery' + pay_rate=25.00 + pickup_location+dropoff_location creates job (200) and is fetched back by GET /api/jobs; non-delivery category=cleaning with pay_rate=30/hour still works; missing pay_rate is rejected (422); /api/jobs/open lists open jobs for provider; /api/auth/login still returns JWT. Frontend (Playwright on https://lumo-bundle-checkout.preview.emergentagent.com): on /customer logged in as customer@lumo.test — category default delivery hides data-testid='job-pay-rate'+'job-pay-unit'+'job-estimated-units'; switching to courier hides them; switching to moving hides them; switching to cleaning brings them back. data-testid='post-job-submit' renders disabled with text 'Enter pickup + drop-off addresses to see price' when no coords. No occurrences of 'Driver receives'/'Movers receive'/'Driver keeps'/'driver_keeps' on /customer, /provider, /map, /jobs/:id. On /provider as provider@lumo.test, every open-job row has data-testid='opp-take-home-${jobId}' with text matching 'You keep $NN.NN' (verified 5 rows: $81.00, $22.50, $396.00, $360.00, $1530.00). On /jobs/:id (provider view), data-testid='provider-earnings-breakdown' renders with rows Customer pays $90.00 / Lumo platform fee (10%) −$9.00 / Your take-home $81.00 — math verified (90 × 0.10 = 9; 90 − 9 = 81). Sales-tax disclaimer present. On /jobs/:id (customer view) the breakdown panel is absent and text contains neither 'Your take-home' nor 'Lumo platform fee'. QuoteDialog renders data-testid='quote-earnings' + 'quote-take-home' that update in real-time (rate=100 × units=3 → take-home=$270.00, matches the 90% formula).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_acceptance_criteria": [
+    "POST /api/jobs (category=delivery, pay_rate=25.00, pickup_location, dropoff_location) → 200, job persisted (verified via GET /api/jobs).",
+    "POST /api/jobs (category=cleaning, pay_rate=30, pay_unit=hour) still works.",
+    "POST /api/jobs without pay_rate is rejected with 4xx — backend contract unchanged.",
+    "/customer (category=delivery default): job-pay-rate, job-pay-unit, job-estimated-units NOT rendered.",
+    "/customer category=courier: same three inputs hidden.",
+    "/customer category=moving: same three inputs hidden.",
+    "/customer category=cleaning: all three inputs RE-APPEAR.",
+    "post-job-submit disabled with helper text 'Enter pickup + drop-off addresses to see price' when no coords.",
+    "delivery-quote box: header 'Your price · auto-calculated', total label 'Your price', footnote 'Sales tax (if any) is added at checkout.'",
+    "moving-quote box: header 'Your price · auto-calculated', total label 'Your price' (was 'Movers receive' — FIXED this run, see updated_files).",
+    "/provider rows: data-testid='opp-take-home-${id}' shows 'You keep $NN.NN' (5+ samples verified).",
+    "/jobs/:id provider view: data-testid='provider-earnings-breakdown' renders 3 rows (Customer pays / Lumo platform fee (10%) / Your take-home) with correct math; sales-tax disclaimer present.",
+    "/jobs/:id customer view: provider-earnings-breakdown ABSENT; 'Your take-home' and 'Lumo platform fee' strings absent.",
+    "QuoteDialog: data-testid='quote-earnings' + 'quote-take-home' update live; rate=100 × units=3 → take-home=$270.00 (90% formula confirmed).",
+    "Regression: zero occurrences of 'Driver receives' / 'Movers receive' / 'Driver keeps' / 'driver_keeps' in rendered DOM on /customer, /provider, /map, /jobs/:id."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_jobs_pricing_iter13.py",
+    "/app/test_reports/pytest/iter13_jobs.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CustomerHub.jsx line 344 had a missed regression: 'Movers receive' was still showing as the moving-quote total label. Testing agent fixed it to 'Your price' for parity with the delivery-quote box. After the fix, full-DOM grep on /customer, /provider, /map, /jobs/:id is clean.",
+    "deliveryPricing.js providerEarningsBreakdown is well-isolated (pure function, rounds to 2 decimals via Math.round(x*100)/100); LUMO_COMMISSION_RATE=0.10 is exported and reused in JobDetail + QuoteDialog + ProviderHub, no duplicated magic numbers.",
+    "JobDetail.jsx correctly gates the panel on `isProvider` (user.role === 'provider') — customer view confirmed clean.",
+    "QuoteDialog.jsx safely guards `if (!Number.isFinite(gross) || gross <= 0) return null` so the earnings card hides when rate/units invalid — no NaN flash.",
+    "ProviderHub.jsx subtitle uses the same providerEarningsBreakdown — consistent.",
+    "CustomerHub.jsx submit button correctly disabled when (isDeliveryCat||isMovingCat) && !(deliveryQuote||movingQuote). Helper text wired to the same condition. Good UX.",
+    "Suggestion (non-blocking): moving-quote footnote currently doesn't explicitly mention 'Sales tax is added at checkout' like delivery does — consider parity for customer clarity."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/CustomerHub.jsx (line 344: 'Movers receive' → 'Your price')",
+    "/app/backend/tests/test_jobs_pricing_iter13.py (new — 5 pytest cases)"
+  ],
+  "success_rate": { "backend": "100% (5/5)", "frontend": "100% (15/15 acceptance criteria)" },
+  "test_credentials": "customer@lumo.test / password123 and provider@lumo.test / password123 (seeded).",
+  "seed_data_creation": "Two TEST_-prefixed jobs were created by backend tests (TEST_delivery_{uuid6}, TEST_cleaning_{uuid6}) — neither modifies seeded data; both safely listed afterwards.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Pricing UI: pay_rate/pay_unit/estimated_units inputs are conditionally hidden in CustomerHub.jsx whenever category ∈ {delivery, courier, moving}; the auto-quote is computed client-side via computeDeliveryQuote / computeMovingQuote from /app/frontend/src/lib/deliveryPricing.js and injected into form.pay_rate via useEffect. Backend /api/jobs contract is unchanged — still requires pay_rate. The 10% Lumo fee is applied client-side only (providerEarningsBreakdown) and surfaced in 3 places: JobDetail.jsx (panel testid='provider-earnings-breakdown', gated on user.role==='provider'), QuoteDialog.jsx (testid='quote-earnings'/'quote-take-home', live preview), and ProviderHub.jsx opportunity rows (testid='opp-take-home-${jobId}'). Test job IDs used in earlier flows: 914002cd-554f-4fb4-ae38-70f8138492aa (TEST_delivery $25 flat from this iteration).",
+  "rca of the issue": "The user's complaint that customer-facing copy still said 'Movers receive' was caused by a missed string at CustomerHub.jsx line 344 in the moving-quote total row. The delivery-quote total row had already been updated to 'Your price' (line 382), but the moving-quote sibling block was missed during the relabel. Reproduction: /customer → category=moving → fill pickup+drop-off → moving-quote box appeared with 'Movers receive $X.XX' label. Mitigation: changed 'Movers receive' → 'Your price' to match the delivery box and the rest of the new copy. Re-verified via Playwright full-DOM scan — zero occurrences of the forbidden strings on /customer, /provider, /map, /jobs/:id."
+}
