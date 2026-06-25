@@ -66,6 +66,9 @@ function rewriteCurrency(text, formatPrice, isUsd) {
 // Per-node state — WeakMap so React-removed nodes get GC'd.
 const nodeState = new WeakMap();
 const elemState = new WeakMap();
+// Source-text → already-translated text (per language). Survives React node
+// swaps so identical strings get re-translated instantly from cache.
+const translationCache = new Map(); // key = `${lang}::${source}` → applied
 
 export default function AutoTranslator() {
   const { lang, country, formatPrice, ratesLoaded } = useLocale();
@@ -180,8 +183,6 @@ export default function AutoTranslator() {
     const sync = async () => {
       if (cancelled) return;
       const nodes = collectNodes();
-      // Resolve true "source" for each node (English original) — either the
-      // first time we see it (current text == source) or remembered.
       const items = [];
       const sourceSet = new Set();
       for (const n of nodes) {
@@ -191,11 +192,12 @@ export default function AutoTranslator() {
         if (prev && prev.applied === text) {
           source = prev.source;
         } else {
+          // New or React-replaced node — text is the English source
           source = text;
         }
         items.push({ node: n, source });
         // Only ask for translation on actually translatable strings (not pure "$9.50")
-        if (langRef.current !== "en" && isTranslatable(source)) {
+        if (langRef.current !== "en" && isTranslatable(source) && !translationCache.has(`${langRef.current}::${source}`)) {
           sourceSet.add(source);
         }
       }
@@ -215,11 +217,21 @@ export default function AutoTranslator() {
             // keep originals
           }
         }
+        // Persist into the cross-render cache so React-replaced nodes can
+        // get instantly re-translated next pass without another API call.
+        for (const [src, out] of Object.entries(translated)) {
+          if (out && out !== src) translationCache.set(`${langRef.current}::${src}`, out);
+        }
       }
       mutating = true;
       try {
         for (const { node, source } of items) {
-          let display = (langRef.current !== "en" && translated[source]) ? translated[source] : source;
+          let display = source;
+          if (langRef.current !== "en") {
+            const cacheKey = `${langRef.current}::${source}`;
+            if (translated[source]) display = translated[source];
+            else if (translationCache.has(cacheKey)) display = translationCache.get(cacheKey);
+          }
           display = rewriteCurrency(display, formatPrice, isUsd);
           if (node.nodeValue !== display) {
             node.nodeValue = display;
@@ -243,6 +255,12 @@ export default function AutoTranslator() {
 
     scheduleScan();
 
+    // Safety net: re-scan every 4s to catch any React re-renders that the
+    // MutationObserver missed (replaced text nodes, late-mounted components,
+    // conditional renders triggered after the initial pass). Translations are
+    // server-cached so this is cheap.
+    const intervalId = setInterval(() => { if (!cancelled) scheduleScan(); }, 4000);
+
     const observer = new MutationObserver((mutations) => {
       if (mutating) return;
       // ignore noisy mutations that are just our own characterData rewrites
@@ -262,6 +280,7 @@ export default function AutoTranslator() {
     return () => {
       cancelled = true;
       if (scanTimer) clearTimeout(scanTimer);
+      clearInterval(intervalId);
       observer.disconnect();
     };
   }, [lang, country, isUsd, formatPrice, ratesLoaded]);
