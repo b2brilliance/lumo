@@ -27,6 +27,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Real Estate + Auto Sales marketplace with Masked Chat (Feb 25, 2026)
+- New `/api/real-estate` and `/api/autos` CRUD endpoints with rich, vertical-specific filters (beds/baths/sqft/year-built for homes; year/make/model/mileage/fuel/transmission/body-style for autos).
+- New `/api/inquiries` thread system (buyer ↔ seller in-app chat with unread counters, 5s poll, masked contact info — seller never sees buyer email/phone and vice versa).
+- Optional Resend email notification on first inquiry — activates automatically if `RESEND_API_KEY` is added to backend `.env` (currently unset → silent no-op).
+- Seeded **21 realistic homes** (sale + rent across 15 US metros) and **24 realistic cars** (mix of EV / gas / hybrid, 2015–2024, $16K–$148K).
+- Routes: `/real-estate`, `/real-estate/list`, `/real-estate/:id`, `/autos`, `/autos/list`, `/autos/:id`, `/inquiries`, `/inquiries/:id`.
+- Modularization start: new code lives in `/app/backend/classifieds.py` (not `server.py`) — first step of the eventual refactor.
+- Removed `<a id="emergent-badge">` from `frontend/public/index.html`.
+- **Tested**: iteration_10 — 28/28 backend pytests pass + full frontend E2E (masked contacts, owner-only delete, anti-self-inquiry, thread dedupe, unread counters, NavBar entries, badge removal).
+
+
 ### Growth Engine: Ad Studio + Programmatic SEO + Realistic Seed Data (Feb 2026)
 - **Realistic marketplace seed**: 5 new retailers (North Shore Books, Lagos Bike Co., Verdant Plant Studio, Circuit Hub Electronics, Mariposa Specialty Foods) + 5 new restaurants (Tony's Brick Oven, Sakura Sushi, Casa del Mar, Saffron Kitchen, Root & Bloom) — each with 5 realistic inventory items. 12 structured career postings emphasizing "keep 90%" + flexibility (full-time, part-time, seasonal, freelance).
 - **AI Ad Studio** at `/admin` → Ad Studio tab: 12 audience archetypes × 19 categories × 3 sizes = 684 unique ad combos. Each ad = Claude-generated headline+body+CTA+2 variants+hashtags + Gemini Nano Banana 1080×1080/1080×1920/1200×628 photoreal image. Worker audiences emphasize 90%/10% & flexibility; customer audiences emphasize instant on-demand; sellers/hosts emphasize same-day delivery + zero monthly fee. Backend `/api/admin/ads/*` (admin-only RBAC), public `/api/storage/ads/{filename}` for image serving.
