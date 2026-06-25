@@ -9,6 +9,7 @@ import QuoteDialog from "@/components/QuoteDialog";
 import TrustBadges from "@/components/TrustBadges";
 import { ServiceDetailsView } from "@/components/ServiceDetailsForm";
 import ReviewsSection from "@/components/ReviewsSection";
+import DeliveryActions from "@/components/DeliveryActions";
 import { providerEarningsBreakdown, LUMO_COMMISSION_RATE } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 
@@ -169,6 +170,16 @@ export default function JobDetail() {
               {myProviderQuote ? "Update your quote" : "Send a counter-quote"}
             </Button>
           </div>
+        )}
+
+        {/* Escrow + proof-of-delivery flow */}
+        {(isProvider || isCustomer) && (
+          <DeliveryActions
+            row={job}
+            kind="job"
+            viewerRole={isProvider ? "provider" : "customer"}
+            onUpdated={(updated) => setJob({ ...job, ...updated })}
+          />
         )}
         {isProvider && myProviderQuote && (
           <div className="mt-4 border border-slate-200 p-4 text-sm" data-testid="my-quote-status">

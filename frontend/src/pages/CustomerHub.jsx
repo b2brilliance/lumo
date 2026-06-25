@@ -10,6 +10,7 @@ import MediaUpload from "@/components/MediaUpload";
 import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import ServiceDetailsForm from "@/components/ServiceDetailsForm";
+import DeliveryActions from "@/components/DeliveryActions";
 import { computeDeliveryQuote, computeMovingQuote, milesBetween } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -428,17 +429,20 @@ export default function CustomerHub() {
             <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="my-orders-list">
               {orders.length === 0 && <div className="p-6 text-sm text-slate-500">No orders yet — shop the <Link className="underline text-teal-700" to="/stores">stores</Link> or <Link className="underline text-teal-700" to="/restaurants">restaurants</Link>.</div>}
               {orders.map((o) => (
-                <div key={o.id} className="p-4 flex items-center gap-4" data-testid={`my-order-${o.id}`}>
-                  <div className="text-xs font-mono uppercase tracking-wider text-slate-500">{o.status}</div>
-                  <div className="flex-1">
-                    <div className="font-display font-bold">Order ${o.item_total.toFixed(2)} + ${o.delivery_fee.toFixed(2)} delivery</div>
-                    <div className="text-xs text-slate-500 mt-1 font-mono">
-                      Deposit ${o.deposit_total.toFixed(2)} · Remaining ${o.remaining_total.toFixed(2)}
+                <div key={o.id} className="p-4" data-testid={`my-order-${o.id}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="text-xs font-mono uppercase tracking-wider text-slate-500">{o.delivery_status || o.status}</div>
+                    <div className="flex-1">
+                      <div className="font-display font-bold">Order ${o.item_total.toFixed(2)} + ${o.delivery_fee.toFixed(2)} delivery</div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">
+                        Deposit paid ${o.deposit_total.toFixed(2)}
+                      </div>
                     </div>
                   </div>
-                  {o.status === "deposit_paid" || o.status === "in_progress" || o.status === "completed" ? (
-                    <Link to={`/orders/${o.id}/pay`} className="text-xs underline text-teal-700" data-testid={`order-pay-final-${o.id}`}>Pay remaining →</Link>
-                  ) : null}
+                  <DeliveryActions
+                    row={o} kind="order" viewerRole="customer"
+                    onUpdated={(u) => setOrders((arr) => arr.map((x) => x.id === o.id ? { ...x, ...u } : x))}
+                  />
                 </div>
               ))}
             </div>

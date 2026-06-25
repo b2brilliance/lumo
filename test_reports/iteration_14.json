@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 14 — Escrow + proof-of-delivery flow validated end-to-end. Backend pytest (19/19 in /app/backend/tests/test_escrow_iter14.py): mark-delivered rejects no-photos for physical (delivery) with 400, accepts no-photos for non-physical (cleaning), enforces MAX_PHOTOS=3, rejects ftp:// non-image URLs, returns 403 when caller is not the assigned provider; confirm-receipt credits provider wallet with pay_rate × 0.90 verified via /api/wallet diff (e.g. $100 → +$90.00), idempotent on second call (no double credit), returns 403 when provider tries to confirm; dispute sets delivery_status='disputed', stores dispute_reason, does NOT credit wallet; orders parallel flow works — mark-delivered without photos 400, full flow credits (item_total+delivery_fee)×0.90; escrow._release_payment auto-release helper directly invoked after backdating delivered_at to 25h ago → row updates to status='completed', delivery_status='auto_confirmed', payment_released_at set, wallet credited exactly pay_rate×0.90; legacy /api/jobs/{id}/complete still works (regression OK); /api/auth/login, /api/real-estate, /api/autos, /api/inquiries all 200. Frontend (Playwright on https://lumo-bundle-checkout.preview.emergentagent.com): logged in as provider@lumo.test → /provider rendered data-testid='my-deliveries-section' with 8 delivery-mark-btn rows (4 'Mark delivered (upload photos)' for delivery + 3 'Mark complete' for non-physical + 1 mixed); clicking the non-physical 'Mark complete' opens data-testid='delivery-mark-dialog' with photo-add NOT rendered (count=0), only the note Textarea; clicking the physical 'Mark delivered (upload photos)' opens dialog with delivery-photo-add rendered, submit disabled before upload, after setInputFiles on data-testid='delivery-photo-input' the delivery-photo-remove-0 preview appears and submit becomes enabled. Logged in as customer@lumo.test → /jobs/{TEST_id} rendered data-testid='delivery-awaiting-panel' with delivery-proof-photo-0, header 'CONFIRM TO RELEASE PAYMENT', relative-time string 'Marked delivered 1m ago · auto-releases in 24h', and both delivery-confirm-btn + delivery-dispute-btn. Clicking 'I received it' → toast 'Delivery confirmed. Provider has been paid.' + delivery-confirmed-pill with text 'Confirmed by customer · paid out $36.00' (matches $40 × 0.90 = $36 for the seed-job rate). Clicking 'Something is wrong' opens data-testid='delivery-dispute-dialog'; submitting reason hits /api/jobs/{id}/dispute and delivery-disputed-pill appears with text 'Dispute under review — payment is on hold' + toast 'Dispute opened. Payment is on hold while Lumo reviews.'",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "verified_acceptance_criteria": [
+    "POST /api/jobs/{id}/mark-delivered, physical, no photos → 400 'Upload at least one photo as proof of delivery.'",
+    "POST /api/jobs/{id}/mark-delivered, non-physical (cleaning), no photos → 200, delivery_photos=[], delivery_status='awaiting_confirmation', delivered_at present",
+    "POST /api/jobs/{id}/mark-delivered with 2 photos → 200; with 4 photos → 400 'Up to 3 photos allowed.'; with ftp:// URL → 400",
+    "POST /api/jobs/{id}/mark-delivered as non-provider → 403",
+    "POST /api/jobs/{id}/confirm-receipt by customer → wallet credit = pay_rate × 0.90 (delta verified via /api/wallet before/after), delivery_status='confirmed', payment_released_at & payment_released_amount set",
+    "POST /api/jobs/{id}/confirm-receipt idempotent — 2nd call does not double-credit",
+    "POST /api/jobs/{id}/confirm-receipt as provider → 403",
+    "POST /api/jobs/{id}/dispute → delivery_status='disputed', dispute_reason saved, NO wallet credit",
+    "POST /api/orders/{id}/mark-delivered no photos → 400 (orders always physical)",
+    "POST /api/orders/{id}/mark-delivered + confirm-receipt credits (item_total + delivery_fee) × 0.90",
+    "escrow._release_payment auto-release: backdating delivered_at 25h ago + direct invocation sets status=completed, delivery_status=auto_confirmed, credits wallet exactly pay_rate × 0.90",
+    "Frontend /provider renders my-deliveries-section, every accepted row gets DeliveryActions footer",
+    "Non-physical CTA reads 'Mark complete', dialog opens, delivery-photo-add NOT rendered",
+    "Physical CTA reads 'Mark delivered (upload photos)', dialog opens, delivery-photo-add rendered, submit disabled until at least one file uploaded; setInputFiles → preview-0 appears, submit enabled",
+    "Customer /jobs/{id}: delivery-awaiting-panel renders with delivery-proof-photo-0, relative time string, two CTAs (delivery-confirm-btn + delivery-dispute-btn)",
+    "Click 'I received it' → POST /api/jobs/{id}/confirm-receipt → toast 'Delivery confirmed. Provider has been paid.' + delivery-confirmed-pill (text includes 'paid out $XX.XX')",
+    "Click 'Something is wrong' → delivery-dispute-dialog opens; submit → POST /api/jobs/{id}/dispute → delivery-disputed-pill with 'Dispute under review — payment is on hold'",
+    "Regression: /api/jobs/{id}/complete still works, /api/auth/login JWT for customer + provider, /api/real-estate, /api/autos, /api/inquiries all 200"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_escrow_iter14.py",
+    "/app/test_reports/pytest/iter14_escrow.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "escrow.py is clean and well-factored: _release_payment is idempotent via early-return on payment_released_at; ×0.90 commission lives in one place; auto-release loop runs at 5-min interval per spec.",
+    "escrow.py line 137 has a redundant ternary: `'completed' if kind == 'jobs' else 'completed'` — both branches return the same string. Cosmetic, not a bug.",
+    "Dispute endpoint allows delivery_status in ('awaiting_confirmation','delivered') — the 'delivered' alias is unused since mark-delivered now sets 'awaiting_confirmation'; harmless but dead code path.",
+    "server.py _credit_provider uses $inc on wallet_balance + inserts wallet_transactions row in two steps — not transactional. Low risk because Mongo single-doc ops succeed independently, but consider a session if double-bookkeeping ever needs strict atomicity.",
+    "DeliveryActions.jsx state lifecycle clean: provider dialog resets photos+note on success; customer panel correctly hides CTAs for provider viewerRole; auto-release messaging in pill text matches backend's auto_confirmed state.",
+    "Iter 14 frontend strictly enforces MAX_PHOTOS=3 / 900KB pre-flight which matches the backend's MAX_PHOTO_BYTES (~1.2MB to accommodate base64 overhead) — good defense-in-depth.",
+    "Suggestion (non-blocking): /api/jobs/{id}/mark-delivered returns early 200 with the existing doc if status already in ('awaiting_confirmation','confirmed','auto_confirmed') — quiet success may surprise a provider re-clicking after a network blip; consider returning a 'no-op' flag in the body."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_escrow_iter14.py (new — 19 pytest cases)",
+    "/app/test_reports/iteration_14.json (this report)"
+  ],
+  "success_rate": { "backend": "100% (19/19)", "frontend": "100% (all 6 frontend acceptance criteria verified)" },
+  "test_credentials": "customer@lumo.test / password123 and provider@lumo.test / password123 (seeded).",
+  "seed_data_creation": "Tests inserted TEST_-prefixed jobs (delivery + cleaning) and TESTORD_-prefixed orders directly into Mongo with provider_id pre-assigned (to bypass credential-required accept gate for the 'delivery' category). All 14 TEST_/TESTORD_ rows were cleaned up post-run via db.jobs.delete_many({'id': {'$regex':'^TEST_'}}) and db.orders.delete_many({'id': {'$regex':'^TESTORD_'}}).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Escrow lifecycle: open/accepted → mark-delivered → awaiting_confirmation → confirm-receipt|dispute|auto_confirmed. Physical-category set in escrow.py = {delivery, courier, moving, ride_share, towing}; non-physical jobs (cleaning/medical/etc.) get the 'Mark complete' CTA and photos are optional. Wallet credit math: jobs gross = pay_rate (if pay_unit='flat') else pay_rate × estimated_units; net = round(gross × 0.90, 2). Orders gross = item_total + delivery_fee. The auto-release scheduler runs every 5 min from server.py @startup — to test fast, import escrow._release_payment and call directly with a constructed credit_provider helper (see TestAutoRelease in test_escrow_iter14.py). For Playwright login, the email-form route is /signin → 'Continue with email' (multi-step); easier to bypass by POSTing /api/auth/login then writing lumo_token + lumo_user into localStorage and navigating to /provider or /jobs/{id} directly.",
+  "rca of the issue": "No bug found — feature works as designed. Backend escrow.py + frontend DeliveryActions.jsx + ProviderHub.jsx + JobDetail.jsx wire together cleanly, math (pay_rate × 0.90) matches between client and server, auto-release scheduler logic is correct and reproducibly fires when delivered_at is older than AUTO_RELEASE_HOURS=24."
+}

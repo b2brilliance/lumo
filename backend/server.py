@@ -5237,6 +5237,35 @@ app.include_router(_create_sms_auth_router(db=db, create_access_token=create_acc
 from auth_google import create_router as _create_google_auth_router  # noqa: E402
 app.include_router(_create_google_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
 
+# Escrow + proof-of-delivery payment release (jobs & orders)
+from escrow import create_router as _create_escrow_router, auto_release_loop as _escrow_auto_release_loop  # noqa: E402
+
+
+async def _credit_provider(*, provider_id: str, amount: float, reason: str,
+                           ref_id: Optional[str] = None, ref_kind: Optional[str] = None) -> None:
+    """Shared helper used by escrow.release_payment to credit a provider's
+    wallet (simulated payment release per user direction)."""
+    await db.users.update_one({"id": provider_id}, {"$inc": {"wallet_balance": amount}})
+    await db.wallet_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": provider_id,
+        "amount": amount,
+        "type": "credit",
+        "reason": reason,
+        "ref_id": ref_id,
+        "ref_kind": ref_kind,
+        "created_at": now_iso(),
+    })
+
+
+app.include_router(_create_escrow_router(db=db, get_current_user=get_current_user,
+                                         credit_provider=_credit_provider))
+
+
+@app.on_event("startup")
+async def _start_escrow_scheduler():
+    asyncio.create_task(_escrow_auto_release_loop(db=db, credit_provider=_credit_provider))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import MapView from "@/components/MapView";
 import CategoryBadge from "@/components/CategoryBadge";
 import QuoteDialog from "@/components/QuoteDialog";
+import DeliveryActions from "@/components/DeliveryActions";
 import AddressInput from "@/components/AddressInput";
 import { checkCredentialMatch } from "@/lib/credentialMatch";
 import { KIND_LABEL } from "@/lib/credentialKinds";
@@ -67,6 +68,25 @@ export default function ProviderHub() {
     } catch (_) { /* ignore */ }
   };
 
+  // Active jobs + orders the provider is delivering (escrow flow)
+  const [myDeliveries, setMyDeliveries] = useState({ jobs: [], orders: [] });
+  const loadMyDeliveries = async () => {
+    try {
+      const [jobsRes, ordersRes] = await Promise.all([
+        api.get(`/jobs?provider_id=${encodeURIComponent(user.id)}`),
+        api.get("/orders"),
+      ]);
+      const jobs = (jobsRes.data || []).filter(
+        (j) => ["accepted", "assigned", "in_progress", "awaiting_confirmation"].includes(j.status)
+      );
+      const orders = (ordersRes.data || []).filter(
+        (o) => o.provider_id === user.id &&
+          ["in_progress", "awaiting_confirmation"].includes(o.status)
+      );
+      setMyDeliveries({ jobs, orders });
+    } catch (_) { /* ignore */ }
+  };
+
   const pollNew = async () => {
     try {
       const since = lastPollRef.current;
@@ -107,8 +127,10 @@ export default function ProviderHub() {
     loadPins();
     loadMyQuotes();
     loadCreds();
+    loadMyDeliveries();
     const t = setInterval(pollNew, 15000);
-    return () => clearInterval(t);
+    const t2 = setInterval(loadMyDeliveries, 20000);
+    return () => { clearInterval(t); clearInterval(t2); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadPins(); }, [remoteOnly, groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -182,6 +204,45 @@ export default function ProviderHub() {
 
       <div className="grid lg:grid-cols-12 gap-8 mt-8">
         <div className="lg:col-span-8">
+          {/* Active deliveries / jobs the provider needs to complete */}
+          {(myDeliveries.jobs.length + myDeliveries.orders.length > 0) && (
+            <div className="mb-6" data-testid="my-deliveries-section">
+              <div className="overline">Your active deliveries ({myDeliveries.jobs.length + myDeliveries.orders.length})</div>
+              <div className="mt-3 border border-slate-200 divide-y divide-slate-200">
+                {myDeliveries.jobs.map((j) => (
+                  <div key={`j-${j.id}`} className="p-4" data-testid={`my-delivery-job-${j.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-display font-bold truncate">
+                          <Link to={`/jobs/${j.id}`} className="hover:underline">{j.title}</Link>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1 font-mono uppercase">{j.category} · {j.delivery_status || j.status}</div>
+                      </div>
+                    </div>
+                    <DeliveryActions
+                      row={j} kind="job" viewerRole="provider"
+                      onUpdated={() => loadMyDeliveries()}
+                    />
+                  </div>
+                ))}
+                {myDeliveries.orders.map((o) => (
+                  <div key={`o-${o.id}`} className="p-4" data-testid={`my-delivery-order-${o.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-display font-bold">Cart order · ${o.item_total.toFixed(2)} + ${o.delivery_fee.toFixed(2)} delivery</div>
+                        <div className="text-xs text-slate-500 mt-1 font-mono uppercase">{o.delivery_status || o.status}</div>
+                      </div>
+                    </div>
+                    <DeliveryActions
+                      row={o} kind="order" viewerRole="provider"
+                      onUpdated={() => loadMyDeliveries()}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="overline">Opportunities in your radius ({opps.length})</div>          <div className="mt-3 border border-slate-200 divide-y divide-slate-200" data-testid="opportunities-list">
             {opps.length === 0 && <div className="p-6 text-sm text-slate-500">No matches right now. Toast will fire when a new job lands.</div>}
             {opps.map((j) => {
