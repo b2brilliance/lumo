@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Download, Trash2, Loader2, Copy as CopyIcon, RefreshCw } from "lucide-react";
+import { Sparkles, Download, Trash2, Loader2, Copy as CopyIcon, RefreshCw, Send, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 const SIZE_ORDER = ["square", "story", "landscape"];
@@ -18,9 +20,19 @@ export default function AdStudio() {
   const [busy, setBusy] = useState(false);
   const [previewAd, setPreviewAd] = useState(null);
 
+  // ── Publish / Schedule ──
+  const [pubAd, setPubAd] = useState(null);            // { ad, mode: 'now' | 'later' }
+  const [connectors, setConnectors] = useState([]);
+  const [pickedIds, setPickedIds] = useState([]);
+  const [runAtLocal, setRunAtLocal] = useState("");    // "YYYY-MM-DDTHH:mm"
+  const [pubBusy, setPubBusy] = useState(false);
+
+  const loadConnectors = () => api.get("/admin/distribution/connectors").then(({ data }) => setConnectors(data || [])).catch(() => {});
+
   useEffect(() => {
     api.get("/admin/ads/presets").then(({ data }) => setPresets(data)).catch(() => {});
     refreshAds();
+    loadConnectors();
   }, []);
 
   const refreshAds = () => api.get("/admin/ads").then(({ data }) => setAds(data || [])).catch(() => {});
@@ -47,6 +59,48 @@ export default function AdStudio() {
 
   const copyToClipboard = (text) => {
     try { navigator.clipboard.writeText(text); toast.success("Copied"); } catch { /* ignore */ }
+  };
+
+  // ── Publish / Schedule helpers ──
+  const openPublish = (ad, mode = "now") => {
+    setPubAd({ ad, mode });
+    setPickedIds(connectors.filter((c) => c.enabled).map((c) => c.id));   // default: all enabled
+    // Default scheduled time: 1 hour from now (local clock)
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    setRunAtLocal(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+  };
+
+  const togglePicked = (id) => setPickedIds((arr) => arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
+
+  const submitPublish = async () => {
+    if (!pubAd || pickedIds.length === 0) {
+      toast.error("Pick at least one channel.");
+      return;
+    }
+    setPubBusy(true);
+    try {
+      if (pubAd.mode === "now") {
+        const { data } = await api.post("/admin/distribution/broadcast", {
+          ad_id: pubAd.ad.id,
+          connector_ids: pickedIds,
+        });
+        toast.success(`Posted to ${data.summary.ok} channel${data.summary.ok === 1 ? "" : "s"}` + (data.summary.failed ? ` · ${data.summary.failed} failed` : ""));
+      } else {
+        const runAtIso = new Date(runAtLocal).toISOString();
+        await api.post("/admin/distribution/schedule-once", {
+          ad_id: pubAd.ad.id,
+          connector_ids: pickedIds,
+          run_at: runAtIso,
+        });
+        toast.success("Scheduled. Watch /admin → Distribution to see when it fires.");
+      }
+      setPubAd(null);
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setPubBusy(false);
+    }
   };
 
   const imgUrl = (ad) => {
@@ -138,7 +192,9 @@ export default function AdStudio() {
                     <p className="font-mono text-xs mt-1">{previewAd.hashtags.map((h) => `#${h}`).join(" ")}</p>
                   </div>
                 )}
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2 flex-wrap">
+                  <Button size="sm" className="bg-teal-700 hover:bg-teal-800 text-white" onClick={() => openPublish(previewAd, "now")} data-testid="ad-publish-now"><Send className="w-3.5 h-3.5 mr-1" /> Publish now</Button>
+                  <Button size="sm" variant="outline" onClick={() => openPublish(previewAd, "later")} data-testid="ad-schedule"><Clock className="w-3.5 h-3.5 mr-1" /> Schedule…</Button>
                   <Button size="sm" variant="outline" onClick={() => copyToClipboard(`${previewAd.headline}\n\n${previewAd.body}\n\n${previewAd.cta}\n\n${(previewAd.hashtags || []).map((h) => `#${h}`).join(" ")}`)} data-testid="ad-copy-all"><CopyIcon className="w-3.5 h-3.5 mr-1" /> Copy text</Button>
                   {imgUrl(previewAd) && <a href={imgUrl(previewAd)} target="_blank" rel="noreferrer" download className="inline-flex items-center text-xs font-mono uppercase tracking-widest border border-slate-200 px-3 py-1.5 hover:border-slate-400"><Download className="w-3.5 h-3.5 mr-1" /> Download image</a>}
                 </div>
@@ -174,6 +230,7 @@ export default function AdStudio() {
                   {imgUrl(ad) ? <img src={imgUrl(ad)} alt={ad.headline} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No image</div>}
                   <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                     <button onClick={() => setPreviewAd(ad)} className="bg-white border border-slate-200 p-1 text-xs hover:border-slate-400" data-testid={`ad-view-${ad.id}`}>View</button>
+                    <button onClick={() => openPublish(ad, "now")} className="bg-white border border-teal-200 text-teal-700 p-1 hover:bg-teal-50" title="Publish now" data-testid={`ad-publish-${ad.id}`}><Send className="w-3 h-3" /></button>
                     <button onClick={() => removeAd(ad.id)} className="bg-white border border-red-200 text-red-600 p-1 hover:bg-red-50" data-testid={`ad-delete-${ad.id}`}><Trash2 className="w-3 h-3" /></button>
                   </div>
                 </div>
@@ -186,6 +243,54 @@ export default function AdStudio() {
           </div>
         )}
       </div>
+
+      {/* ── Publish / Schedule dialog ─────────────────────────────────────── */}
+      <Dialog open={!!pubAd} onOpenChange={(v) => !v && setPubAd(null)}>
+        <DialogContent data-testid="ad-publish-dialog" className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{pubAd?.mode === "later" ? "Schedule this ad" : "Publish this ad"}</DialogTitle>
+            <DialogDescription>
+              {pubAd?.mode === "later"
+                ? "Pick the channels and the moment you want this ad to go out."
+                : "Pick the channels to publish to right now."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="overline">Channels ({pickedIds.length} picked)</Label>
+              {connectors.length === 0 ? (
+                <div className="text-xs text-slate-500 mt-2 border border-dashed border-slate-200 p-3" data-testid="ad-publish-empty">
+                  You have no channels yet. Open <a href="/admin?tab=distribution" className="underline">Admin → Distribution</a> and add a Discord webhook, Telegram bot, Slack incoming webhook, Zapier / Make catch hook, or any generic webhook URL.
+                </div>
+              ) : (
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
+                  {connectors.map((c) => (
+                    <label key={c.id} className={`border px-3 py-2 text-xs cursor-pointer flex items-center gap-2 ${pickedIds.includes(c.id) ? "border-teal-700 bg-teal-50/40" : "border-slate-200"} ${!c.enabled ? "opacity-50" : ""}`} data-testid={`ad-publish-channel-${c.id}`}>
+                      <input type="checkbox" checked={pickedIds.includes(c.id)} onChange={() => togglePicked(c.id)} disabled={!c.enabled} />
+                      <div className="min-w-0">
+                        <div className="font-mono uppercase tracking-widest text-[10px] text-slate-500">{c.platform_label}</div>
+                        <div className="truncate font-bold">{c.name}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {pubAd?.mode === "later" && (
+              <div>
+                <Label className="overline">Run at (your local time)</Label>
+                <Input type="datetime-local" value={runAtLocal} onChange={(e) => setRunAtLocal(e.target.value)} data-testid="ad-publish-runat" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPubAd(null)} disabled={pubBusy}>Cancel</Button>
+            <Button onClick={submitPublish} disabled={pubBusy || pickedIds.length === 0} className="bg-teal-700 hover:bg-teal-800" data-testid="ad-publish-submit">
+              {pubBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : (pubAd?.mode === "later" ? "Schedule it" : "Publish now")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2017,6 +2017,38 @@ CONNECTOR_TYPES = {
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
     },
+    # ── Zero-OAuth "paste a URL and go" channels — instantly usable ──
+    "slack": {
+        "label": "Slack (Incoming Webhook)",
+        "fields": [{"key": "webhook_url", "label": "Incoming Webhook URL", "type": "url", "required": True, "hint": "Slack → Apps → Incoming Webhooks → Add to Slack"}],
+        "instant": True,
+    },
+    "zapier": {
+        "label": "Zapier (Catch Hook) → routes to X / FB / IG / LinkedIn / Pinterest",
+        "fields": [{"key": "hook_url", "label": "Catch Hook URL", "type": "url", "required": True, "hint": "Zapier → Webhooks → Catch Hook → copy URL. Add steps to post to any platform Zapier supports."}],
+        "instant": True,
+    },
+    "make": {
+        "label": "Make.com (Custom Webhook)",
+        "fields": [{"key": "hook_url", "label": "Custom Webhook URL", "type": "url", "required": True, "hint": "Make.com → Webhooks → Custom webhook → copy address. Route to any social platform Make supports."}],
+        "instant": True,
+    },
+    "ifttt": {
+        "label": "IFTTT (Webhooks → applet)",
+        "fields": [
+            {"key": "event_name", "label": "Event name", "type": "text", "required": True, "hint": "e.g. lumo_ad"},
+            {"key": "key", "label": "IFTTT Webhooks key", "type": "password", "required": True, "hint": "ifttt.com/maker_webhooks → Documentation"},
+        ],
+        "instant": True,
+    },
+    "webhook": {
+        "label": "Generic Webhook (any URL accepting POST JSON)",
+        "fields": [
+            {"key": "url", "label": "Webhook URL", "type": "url", "required": True, "hint": "Any HTTPS endpoint that accepts POST application/json"},
+            {"key": "auth_header", "label": "Authorization header (optional)", "type": "password", "required": False, "hint": "e.g. Bearer abc123 — leave blank if not needed"},
+        ],
+        "instant": True,
+    },
 }
 
 
@@ -2147,6 +2179,88 @@ async def _post_to_telegram(cfg: dict, ad: dict, image_full_url: Optional[str]) 
 POSTERS = {"discord": _post_to_discord, "telegram": _post_to_telegram}
 
 
+# ── Zero-OAuth posters: every one of these just POSTs JSON to a URL the
+#    admin pastes in the dashboard. No platform API setup needed.
+def _ad_summary(ad: dict, image_full_url: Optional[str]) -> dict:
+    """Canonical 'ad' shape every webhook receives. Lets routers/Zaps/Make
+    pluck whatever fields they need."""
+    return {
+        "platform": "lumo",
+        "headline": ad.get("headline") or "",
+        "body": ad.get("body") or "",
+        "cta": ad.get("cta") or "",
+        "hashtags": ad.get("hashtags") or [],
+        "image_url": image_full_url,
+        "campaign_url": "https://golumo.app",
+        "tags": ad.get("hashtags") or [],
+    }
+
+
+async def _post_to_slack(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    text = f"*{ad.get('headline','')}*\n{ad.get('body','')}\n{ad.get('cta','')} → https://golumo.app"
+    payload: dict = {"text": text}
+    if image_full_url:
+        payload["blocks"] = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": text}},
+            {"type": "image", "image_url": image_full_url, "alt_text": ad.get("headline", "Lumo ad")},
+        ]
+    async with httpx.AsyncClient(timeout=12.0) as c:
+        r = await c.post(cfg["webhook_url"], json=payload)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Slack {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+async def _post_to_zapier(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        r = await c.post(cfg["hook_url"], json=_ad_summary(ad, image_full_url))
+        if r.status_code >= 400:
+            raise RuntimeError(f"Zapier {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+async def _post_to_make(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        r = await c.post(cfg["hook_url"], json=_ad_summary(ad, image_full_url))
+        if r.status_code >= 400:
+            raise RuntimeError(f"Make {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+async def _post_to_ifttt(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    url = f"https://maker.ifttt.com/trigger/{cfg['event_name']}/with/key/{cfg['key']}"
+    body = {
+        "value1": (ad.get("headline") or "")[:300],
+        "value2": (ad.get("body") or "")[:1000],
+        "value3": image_full_url or "https://golumo.app",
+    }
+    async with httpx.AsyncClient(timeout=12.0) as c:
+        r = await c.post(url, json=body)
+        if r.status_code >= 400:
+            raise RuntimeError(f"IFTTT {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+async def _post_to_webhook(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    headers = {"Content-Type": "application/json"}
+    if cfg.get("auth_header"):
+        headers["Authorization"] = cfg["auth_header"]
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        r = await c.post(cfg["url"], json=_ad_summary(ad, image_full_url), headers=headers)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Webhook {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+POSTERS.update({
+    "slack":   _post_to_slack,
+    "zapier":  _post_to_zapier,
+    "make":    _post_to_make,
+    "ifttt":   _post_to_ifttt,
+    "webhook": _post_to_webhook,
+})
+
+
 class BroadcastBody(BaseModel):
     ad_id: str
     connector_ids: Optional[List[str]] = None  # None = all enabled
@@ -2215,6 +2329,50 @@ async def test_connector(cid: str, user: dict = Depends(_require_admin)):
 # ────────────────────────────────────────────────────────────────────────────
 # AUTO-DISTRIBUTE SCHEDULER — drip Ad Studio creatives across enabled channels
 # ────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# AUTO-DISTRIBUTE SCHEDULER — drip Ad Studio creatives across enabled channels
+# ────────────────────────────────────────────────────────────────────────────
+class OneShotScheduleBody(BaseModel):
+    ad_id: str
+    connector_ids: Optional[List[str]] = None
+    run_at: str  # ISO 8601
+
+
+@api.post("/admin/distribution/schedule-once")
+async def schedule_one_shot(body: OneShotScheduleBody, user: dict = Depends(_require_admin)):
+    """Schedule a single ad to fire one time at a future moment. Picked up by
+    the existing _run_due_schedules loop."""
+    ad = await db.ads.find_one({"id": body.ad_id})
+    if not ad:
+        raise HTTPException(404, "Ad not found")
+    try:
+        run_at_dt = datetime.fromisoformat(body.run_at.replace("Z", "+00:00"))
+    except Exception:
+        raise HTTPException(400, "run_at must be an ISO-8601 datetime")
+    if run_at_dt.tzinfo is None:
+        run_at_dt = run_at_dt.replace(tzinfo=timezone.utc)
+    if run_at_dt < datetime.now(timezone.utc):
+        raise HTTPException(400, "run_at is in the past")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": f"One-shot · {ad.get('headline','')[:50]}",
+        "ad_ids": [body.ad_id],
+        "connector_ids": body.connector_ids,
+        "cadence_hours": 24,
+        "daily_times": None,
+        "timezone": "UTC",
+        "start_at": run_at_dt.isoformat(),
+        "end_at": run_at_dt.isoformat(),
+        "enabled": True,
+        "one_shot": True,
+        "next_run_at": run_at_dt.isoformat(),
+        "last_run_at": None,
+        "created_at": now_iso(),
+    }
+    await db.ad_schedules.insert_one(doc)
+    return clean_doc(doc)
+
+
 class ScheduleBody(BaseModel):
     name: str
     ad_ids: List[str]
@@ -2364,7 +2522,14 @@ async def _run_due_schedules():
                     ok_count += 1
                 except Exception as e:
                     logger.warning(f"Scheduler post to {c['platform']} failed: {e}")
-            # Advance cursor + next run
+            # Advance cursor + next run (or auto-disable one-shots)
+            if s.get("one_shot"):
+                await db.ad_schedules.update_one({"id": s["id"]}, {
+                    "$set": {"enabled": False, "last_run_at": now.isoformat()},
+                    "$inc": {"posts_sent": ok_count},
+                })
+                logger.info(f"One-shot schedule '{s.get('name')}' fired and disabled.")
+                continue
             next_cursor = (cursor + 1) % len(ad_ids)
             next_run = _next_run(now, now, s["cadence_hours"], s.get("daily_times") or None, s.get("timezone"))
             await db.ad_schedules.update_one({"id": s["id"]}, {
