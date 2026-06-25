@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 12 — 3-button SignIn chooser (Google + Phone SMS + Email) fully verified. Backend: 9/9 pytest cases PASS in /app/backend/tests/test_google_auth.py — POST /api/auth/google/exchange contract (empty body→422, session_id='a'→400 'Missing session_id', 'fake-uuid-12345-…'→401 'That sign-in link has expired. Try again.' via REAL httpx call to https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data, no 5xx on any input). Regression: /api/auth/login (customer@lumo.test/password123) still issues JWT; /api/real-estate, /api/autos, /api/inquiries respond 200/401; /api/auth/sms/start still validates phone. Frontend (Playwright on https://lumo-bundle-checkout.preview.emergentagent.com): T1 chooser renders with data-testid='signin-choose' and three buttons in correct order [google, phone, email]; Google icon has 4 distinct brand colors (#4285F4, #34A853, #FBBC05, #EA4335). T2 /signin?next=%2Fcustomer → email btn href = '/login?next=%2Fcustomer'. T3 Phone button switches to signin-phone-form (signin-phone-input visible); 'Other options' back-link returns to signin-choose. T4 Google button performs window.location.href = 'https://auth.emergentagent.com/?redirect=' + encodeURIComponent(window.location.origin + '/signin?next=%2Fjobs%2Fabc%2Fapply'), decoded redirect param = 'https://lumo-bundle-checkout.preview.emergentagent.com/signin?next=%2Fjobs%2Fabc%2Fapply'; without ?next, redirect = '<origin>/signin' (URL NOT hardcoded — uses window.location.origin). T5 /signin#session_id=fake-uuid-12345-bad → backend returns 401 → SignIn shows error toast, URL hash cleared, chooser visible again (no stuck spinner). T6 mocked happy path /signin#session_id=fake-uuid-happy → POST /api/auth/google/exchange (mocked 200) → 'lumo_token' written to localStorage, hash cleared, SPA navigates to /customer. T7 /signin?next=%2Fjobs%2Fabc%2Fapply#session_id=… (mocked) → lands on /jobs/abc/apply. T8 visiting /customer logged out → /signin (not /login). T9 regression: phone SMS flow with mocked /api/auth/sms/start + /api/auth/sms/verify still lands at /customer.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "verified_acceptance_criteria": [
+    "GET /signin renders signin-choose with signin-google-btn (top, primary), signin-phone-btn, signin-email-btn.",
+    "Google button shows multi-color G icon (4 distinct brand fills).",
+    "signin-email-btn is an <a> with href='/login' and preserves ?next= in the link.",
+    "signin-phone-btn toggles to signin-phone-form; signin-back-to-choose returns to chooser.",
+    "Google CTA navigates to https://auth.emergentagent.com/?redirect=<urlencoded origin/signin[?next=...]>. NOT hardcoded — uses window.location.origin.",
+    "POST /api/auth/google/exchange: {}→422, {session_id:'a'}→400 'Missing session_id', fake long session_id→401 'expired' (real httpx call to Emergent), no 5xx.",
+    "OAuth error path: hash is cleared via history.replaceState, toast shown, fallback to signin-choose.",
+    "OAuth happy path (mocked): token persisted to localStorage 'lumo_token', user set in AuthProvider, hash cleared, smart redirect to /customer.",
+    "?next= preserved across happy-path OAuth: lands on /jobs/abc/apply.",
+    "Protected /customer while logged out → /signin (not /login).",
+    "SMS regression: phone-input → /api/auth/sms/start (mocked) → code-input → /api/auth/sms/verify (mocked) → /customer.",
+    "Email/password login regression: customer@lumo.test / password123 still returns JWT.",
+    "Iteration-10 endpoints (real-estate, autos, inquiries) still 200."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_google_auth.py",
+    "/app/test_reports/pytest/google_auth_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auth_google.py is well-scoped (~100 LOC) with dependency injection of db/create_access_token/now_iso — mirrors auth_sms.py pattern, no globals.",
+    "MongoDB _id and password_hash both correctly stripped from /exchange response via dict comprehension.",
+    "httpx call wrapped in try/except → HTTPError mapped to 502; non-200 response mapped to 401 with friendly 'expired' message. No SDK tracebacks leak to clients. Verified no 5xx in any tested input.",
+    "Synchronous /session-data call uses httpx.AsyncClient (10s timeout) — does NOT block the event loop. Good.",
+    "OAuth-only accounts created with password_hash=null and auth_provider='google' — login() endpoint would fail safely (bcrypt.checkpw with None hash returns False in verify_password's except clause). Acceptable.",
+    "Frontend SignIn.jsx: hash detection runs synchronously on mount (useState initializer reads window.location.hash for the spinner state). history.replaceState clears hash immediately before async exchange — replay-safe. Good.",
+    "Google redirect URL uses window.location.origin (NOT hardcoded). Confirmed via test on the production preview URL.",
+    "Email button is a real <Link to=/login> wrapping a <Button variant='outline'> — semantic & crawlable.",
+    "loginWithSmsResult helper correctly reused for both SMS and Google success — no code duplication."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_google_auth.py (new — 9 tests)"
+  ],
+  "success_rate": { "backend": "100% (9/9)", "frontend": "100% (9/9 flows verified)" },
+  "test_credentials": "Used seeded customer@lumo.test / password123 for password-login regression. Fake session_ids ('fake-uuid-12345-not-a-real-emergent-session') used against the real Emergent /session-data endpoint — confirmed 401 mapping. No real OAuth was completed.",
+  "seed_data_creation": "None. Mocked Google exchange response in browser via page.route() for happy-path SPA tests so no DB users were created.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Google OAuth router mounted at /api/auth/google/exchange. Backend makes a REAL httpx call to Emergent's /session-data on every request — there is no mock toggle, just send a fake session_id and expect 401. Frontend hash-detection runs in useState initializer (synchronous) + useEffect (async) so the spinner shows immediately on /signin#session_id=…; remember to clear the hash with history.replaceState before any async call. For frontend happy-path E2E you MUST mock both /api/auth/google/exchange AND /api/auth/me with page.route() — otherwise the real /api/auth/me will 401 the fake JWT and re-render the chooser. To assert the Google redirect URL without actually navigating to auth.emergentagent.com, register page.route('**://auth.emergentagent.com/**', …) and abort the request — Playwright captures the URL even on aborted external navigations. Window.location.href setter override does NOT work for capturing this redirect because window.location is a non-configurable host object.",
+  "rca of the issue": "N/A — no product bugs found this iteration."
+}

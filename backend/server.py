@@ -5233,6 +5233,10 @@ app.include_router(_create_classifieds_router(db=db, get_current_user=get_curren
 from auth_sms import create_router as _create_sms_auth_router  # noqa: E402
 app.include_router(_create_sms_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
 
+# Emergent-managed Google sign-in (one-tap OAuth → Lumo JWT)
+from auth_google import create_router as _create_google_auth_router  # noqa: E402
+app.include_router(_create_google_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
