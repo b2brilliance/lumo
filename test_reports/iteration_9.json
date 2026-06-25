@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 9 — Ad Studio (Claude Sonnet 4.6 + Gemini Nano Banana 3.1) + new marketplace seed data fully verified. Backend: 14/14 new pytests pass (Ad presets RBAC, ad generation for worker AND customer audiences with correct messaging, PNG image serve from /api/storage/ads/{filename}, list/delete with admin-only enforcement, 5 new retailers + 5 inventory each, 5 new restaurants + 5 menu each, 12 career postings present). Regression: existing 17/17 admin+overlap pytests still pass (rental overlap 409, admin RBAC, multi-photo galleries intact). Frontend: AdStudio renders inside /admin as the 5th tab, composer→generate→preview→library refresh flow works end-to-end against the live preview URL, real photoreal image rendered. Other 4 admin tabs (credentials/withdrawals/reviews/rentals) still navigate cleanly. Worker copy correctly emphasises 90%/flexibility ('Deliver On Your Terms, Keep 90% Always' / 'choose your own hours, take home 90% of every naira earned'); customer copy correctly emphasises instant/on-demand.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "verified_acceptance_criteria": [
+    "GET /api/admin/ads/presets returns exactly 12 audiences, 19 categories, 3 sizes — admin only (non-admin → 403).",
+    "POST /api/admin/ads/generate returns id, headline, body, cta (string), hashtags (array), variants (array of {headline,body}), image_url starting with /api/storage/ads/, width=1080, height=1080. Generation completed in ~17–22s, well under the 30s budget.",
+    "Worker audience (flex_worker) copy mentions 90%/10% AND flexibility ('Keep 90%', 'your own hours'). Customer audience (everyday_customer) copy emphasises instant/on-demand. Asserted via regex in test_lumo_ad_studio_and_seed.py.",
+    "GET /api/storage/ads/{filename} returns a real PNG (>10KB, content-type image/png) — verified via direct HTTP fetch against the URL returned by /generate.",
+    "GET /api/admin/ads returns the new ads sorted desc by created_at — verified in test_list_ads_includes_new.",
+    "DELETE /api/admin/ads/{id} removes an ad and is admin-only — customer DELETE returns 403.",
+    "Frontend /admin shows 5th tab 'Ad Studio' (data-testid='admin-tab-ads'); clicking renders <AdStudio /> (data-testid='ad-studio').",
+    "Composer flow: audience=Flexible Worker, category=Delivery, size=square, city=Lagos → 'Generate ad' → data-testid='ad-preview' panel appears with image (data-testid='ad-preview-image'), headline, body, CTA, hashtags. Library (data-testid='ad-library') refreshes to include the new card.",
+    "Marketplace seed: GET /api/stores returns 6+ retailers including Ramona's Boutique, North Shore Books, Lagos Bike Co., Verdant Plant Studio, Circuit Hub Electronics, Mariposa Specialty Foods. Each of the 5 new retailers has ≥5 inventory items via /api/inventory?owner_id=…",
+    "Marketplace seed: GET /api/restaurants returns 6+ restaurants including Cafe Lumière (original, 2 items), Tony's Brick Oven, Sakura Sushi, Casa del Mar, Saffron Kitchen, Root & Bloom. Each of the 5 new restaurants has ≥5 menu items.",
+    "GET /api/jobs?status=open contains the 12 career-demo postings (verified titles include 'Full-time Delivery Driver — flexible shifts', 'Part-time Babysitter', 'Seasonal Movers', 'Freelance React/Next.js Developer').",
+    "Regression: Admin console other tabs (credentials, withdrawals, reviews, rentals) still load — verified each tab click via Playwright without errors.",
+    "Regression: test_lumo_admin_and_overlap.py — 17/17 still pass (rental overlap 409 logic, multi-photo media array backfill, admin RBAC on /admin/stats, /admin/credentials, /admin/withdrawals, /admin/reviews, /admin/rental-bookings)."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_lumo_ad_studio_and_seed.py",
+    "/app/backend/tests/test_lumo_admin_and_overlap.py",
+    "/app/test_reports/pytest/iteration_9_adstudio.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /admin/ads/generate is well-structured: separates copy (Claude Sonnet 4.6) and image (Gemini 3.1 flash image) into two independent LlmChat sessions, gracefully falls back to copy-only when image gen errors out (image_url=null). Copy prompt enforces JSON-only output with safe parsing + fallback dict if Claude returns garbled JSON — good defensive coding.",
+    "Image upload path: tries object-storage first via put_object, falls back to /app/backend/storage/ads local disk with a dedicated /api/ads/local-image/{filename} serve route. Both paths sanitize filename (.. and / removed) — XSS/path-traversal safe.",
+    "Pydantic AdGenerateBody validates audience/category/size against the in-memory dicts with explicit 400 on unknown values — correct input validation pattern.",
+    "_require_admin decorator applied to all 4 ad endpoints (presets, list, delete, generate). Verified at runtime that customer@lumo.test gets 403 on each.",
+    "AdStudio.jsx is 192 lines, single-concern, clean separation of composer/preview/library, every interactive element has a data-testid (ad-audience, ad-category, ad-size-{key}, ad-city, ad-generate, ad-regenerate, ad-preview, ad-preview-image, ad-copy-all, ad-library, ad-card-{id}, ad-view-{id}, ad-delete-{id}, ad-empty). Matches spec exactly.",
+    "Image URL handling in AdStudio: imgUrl() correctly prepends REACT_APP_BACKEND_URL when image_url is a relative /api/storage/ads/… path, keeping the component portable across environments.",
+    "Minor (non-blocking) — generate() in AdStudio.jsx does not cancel an in-flight request if user navigates away; with 25s gen time this could cause a stale toast.success on an unmounted component. Consider an AbortController. Not a regression, low priority.",
+    "Minor — copyToClipboard's catch silently swallows the error; could surface 'Clipboard unavailable' toast for the user. Low priority.",
+    "server.py is now 4059 lines — well past the 700-line guideline. Recommend extracting /admin/ads/* + ad prompt helpers into a separate ads module (and likewise seed_users / seed_marketplace into seed modules) when the next refactor window opens. Not urgent for this iteration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lumo_ad_studio_and_seed.py (NEW)"
+  ],
+  "success_rate": { "backend": "100% (14/14 ad-studio+seed + 17/17 regression)", "frontend": "100% (Ad Studio composer→generate→preview→library + 4 regression tabs all pass)" },
+  "test_credentials": "admin@lumo.test / password123 and customer@lumo.test / password123 — both worked.",
+  "seed_data_creation": "Test creates 2 ads via /admin/ads/generate and deletes 1 (customer-audience ad). The worker-audience ad remains in the library and is harmless demo content for the admin. No marketplace/job data created — only read.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "AD STUDIO QUICK GUIDE: (1) Ad generation is async-slow (10-25s for Claude+Gemini sequence). When testing /admin/ads/generate, use timeout >= 60s in requests and wait_for_timeout(60000) in Playwright. (2) image_url may legitimately be null if Gemini Nano Banana errors out — the API still returns 200 with the copy intact (graceful degradation). Treat null image as a soft pass. (3) Worker audiences = flex_worker, skilled_trade_pro, childcare_provider, tech_freelancer; their copy MUST contain 90%/10%/flexibility cues. Customer audiences = everyday_customer, parent, emergency_user, student_senior; their copy MUST contain instant/on-demand cues. Seller/host audiences exist for retailers/restaurants/rental hosts. (4) Cafe Lumière is the ORIGINAL demo restaurant with 2 items — only the 5 NEW restaurants (Tony's Brick Oven, Sakura Sushi, Casa del Mar, Saffron Kitchen, Root & Bloom) have 5 items each. Same pattern for retailers (Ramona's is original with original count; 5 new ones have 5 items each). (5) /api/admin/ads/presets is admin-only — there is NO public presets endpoint. (6) /api/storage/ads/{filename} is the canonical image URL; /api/ads/local-image/{filename} is the local-disk fallback when object-storage fails.",
+  "rca of the issue": "No issue. One initial test failure was a test-side false-negative (asserted 5+ items for Cafe Lumière, which is the original demo restaurant with 2 items, not one of the 5 NEW seeded restaurants). Fixed by introducing NEW_RESTAURANTS = EXPECTED_RESTAURANTS - {Cafe Lumière} (and analogous NEW_RETAILERS minus Ramona's Boutique). After fix all 14 ad-studio+seed tests pass on first re-run."
+}

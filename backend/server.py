@@ -21,7 +21,7 @@ from typing import List, Optional, Literal
 import jwt
 import bcrypt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Header, Response
-from fastapi.responses import Response as FastApiResponse
+from fastapi.responses import Response as FastApiResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -1712,7 +1712,227 @@ async def admin_stats(user: dict = Depends(_require_admin)):
         "pending_rental_bookings": await db.rental_bookings.count_documents({"status": "pending_approval"}),
         "total_users": await db.users.count_documents({}),
         "total_jobs_open": await db.jobs.count_documents({"status": "open"}),
+        "total_ads": await db.ads.count_documents({}),
     }
+
+# ────────────────────────────────────────────────────────────────────────────
+# AD STUDIO — AI-generated marketing creative (Claude copy + Nano Banana image)
+# ────────────────────────────────────────────────────────────────────────────
+AD_AUDIENCES = {
+    "flex_worker": {"label": "Flexible Worker", "tone": "warm, empowering", "hook": "Earn on your schedule. Keep 90% of every job.", "persona": "an independent worker who wants flexibility and good pay"},
+    "skilled_trade_pro": {"label": "Skilled Trade Pro", "tone": "respectful, professional", "hook": "Bring your trade to Lumo. 10% platform fee — keep the rest.", "persona": "a licensed plumber, electrician, carpenter, mechanic or HVAC tech"},
+    "childcare_provider": {"label": "Childcare Provider", "tone": "warm, trustworthy", "hook": "Babysit, nanny, tutor. Vetted families. You keep 90%.", "persona": "an experienced babysitter, nanny or tutor"},
+    "tech_freelancer": {"label": "Tech / Digital Freelancer", "tone": "smart, ambitious", "hook": "Code, design, write from anywhere. Real clients, no bidding wars.", "persona": "a developer, designer, marketer or writer working remote"},
+    "everyday_customer": {"label": "Everyday Customer", "tone": "friendly, reassuring", "hook": "Instant help, on demand. Never wait days again.", "persona": "a busy adult who needs everyday help — delivery, repairs, services"},
+    "parent": {"label": "Parent", "tone": "warm, practical", "hook": "Trusted childcare and family help. On-demand, vetted, nearby.", "persona": "a parent juggling work, school pickups and household demands"},
+    "emergency_user": {"label": "Emergency Help", "tone": "urgent, calming", "hook": "Towing, lockouts, urgent repairs — answered now, not tomorrow.", "persona": "someone with an urgent problem who needs immediate professional help"},
+    "small_biz_recruiter": {"label": "Small Business Recruiter", "tone": "direct, practical", "hook": "Hire vetted local talent in days, not months. No agency fees.", "persona": "a small business owner trying to hire reliable workers"},
+    "retailer_seller": {"label": "Retailer / Seller", "tone": "growth-minded", "hook": "Sell on Lumo. Same-day delivery built-in. 10% fee, no monthly cost.", "persona": "an independent retailer or boutique owner ready to grow online"},
+    "restaurant_owner": {"label": "Restaurant Owner", "tone": "appetizing, urgent", "hook": "Same-day delivery, zero monthly fee. Keep 90% of every order.", "persona": "a restaurant or cafe owner wanting more delivery orders"},
+    "rental_host": {"label": "Rental Host", "tone": "confident, aspirational", "hook": "Rent your space, car or gear. We handle deposits, payouts, insurance.", "persona": "someone with a property, vehicle, venue or equipment to rent out"},
+    "student_senior": {"label": "Students & Seniors", "tone": "affordable, inclusive", "hook": "Rides, errands, help — without the surge pricing.", "persona": "a student or senior wanting affordable help and rides"},
+}
+
+AD_CATEGORIES = {
+    "delivery": {"label": "Delivery", "side": "worker"},
+    "courier": {"label": "Same-day Courier", "side": "worker"},
+    "moving": {"label": "Moving", "side": "worker"},
+    "ride_share": {"label": "Ride-share", "side": "worker"},
+    "towing": {"label": "Towing", "side": "worker"},
+    "handyman": {"label": "Handyman / Repairs", "side": "worker"},
+    "cleaning": {"label": "Cleaning", "side": "worker"},
+    "landscaping": {"label": "Landscaping", "side": "worker"},
+    "pet_care": {"label": "Pet Care", "side": "worker"},
+    "education": {"label": "Tutoring & Childcare", "side": "worker"},
+    "personal_care": {"label": "Personal Care & Fitness", "side": "worker"},
+    "digital_tech": {"label": "Tech & Digital Freelance", "side": "worker"},
+    "marketing": {"label": "Marketing & Creative", "side": "worker"},
+    "remote_work": {"label": "Remote Work", "side": "worker"},
+    "marketplace_retail": {"label": "Sell on Lumo (Retailer)", "side": "seller"},
+    "marketplace_restaurant": {"label": "Restaurant on Lumo", "side": "seller"},
+    "rentals_property": {"label": "List Your Property", "side": "host"},
+    "rentals_vehicle": {"label": "List Your Vehicle", "side": "host"},
+    "rentals_venue": {"label": "List Your Venue", "side": "host"},
+}
+
+AD_SIZES = {
+    "square": {"width": 1080, "height": 1080, "label": "Square 1:1 (IG feed)"},
+    "story": {"width": 1080, "height": 1920, "label": "Vertical 9:16 (Stories / TikTok)"},
+    "landscape": {"width": 1200, "height": 628, "label": "Landscape (FB / LinkedIn)"},
+}
+
+
+class AdGenerateBody(BaseModel):
+    audience: str
+    category: str
+    size: str = "square"
+    city: Optional[str] = None  # optional localized city for hyper-local ad
+
+
+@api.get("/admin/ads/presets")
+async def ad_presets(user: dict = Depends(_require_admin)):
+    return {"audiences": AD_AUDIENCES, "categories": AD_CATEGORIES, "sizes": AD_SIZES}
+
+
+@api.get("/admin/ads")
+async def list_ads(user: dict = Depends(_require_admin)):
+    docs = await db.ads.find({}).sort("created_at", -1).to_list(500)
+    return [clean_doc(d) for d in docs]
+
+
+@api.delete("/admin/ads/{ad_id}")
+async def delete_ad(ad_id: str, user: dict = Depends(_require_admin)):
+    res = await db.ads.delete_one({"id": ad_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Ad not found")
+    return {"ok": True}
+
+
+def _ad_copy_prompt(audience_info: dict, category_info: dict, size_info: dict, city: Optional[str]) -> str:
+    locale_line = f" Tailor it to people in {city}." if city else ""
+    return (
+        "You are a senior marketing copywriter for Lumo — a global on-demand marketplace for jobs, "
+        "delivery, rentals, retail and food. Lumo's key differentiators are: providers KEEP 90% of every "
+        "job (10% platform fee), instant on-demand booking (no waiting days), and the broadest job-type "
+        "flexibility on the market.\n\n"
+        f"Write a single high-impact ad for **{category_info['label']}** targeted at **{audience_info['label']}** — "
+        f"{audience_info['persona']}. Tone: {audience_info['tone']}.{locale_line}\n\n"
+        "Return ONLY raw JSON (no markdown fences) with this exact shape:\n"
+        '{"headline":"<6-9 words, punchy>","body":"<25-40 words, emotional, action-driven>",'
+        '"cta":"<2-4 words call-to-action>","hashtags":["<7-10 platform-friendly hashtags WITHOUT the # sign>"],'
+        '"variants":[{"headline":"<alt 1>","body":"<alt 1>"},{"headline":"<alt 2>","body":"<alt 2>"}]}\n\n'
+        "Hard rules:\n"
+        "- For worker-facing categories emphasise the 10% / 90% split AND scheduling flexibility.\n"
+        "- For customer-facing emphasise INSTANT / on-demand vs days of waiting.\n"
+        "- For seller/host emphasise zero monthly fee + built-in delivery + reach.\n"
+        "- Never use the word 'platform' more than once. No emoji in the headline.\n"
+        "- Keep all text in English."
+    )
+
+
+def _ad_image_prompt(audience_info: dict, category_info: dict, size_info: dict) -> str:
+    aspect = f"{size_info['width']}x{size_info['height']}"
+    layout = "square 1:1" if size_info['width'] == size_info['height'] else ("vertical 9:16 portrait" if size_info['height'] > size_info['width'] else "horizontal 1200x628 landscape")
+    return (
+        f"Create a professional, photorealistic marketing photograph for a {category_info['label']} ad targeted at "
+        f"{audience_info['label']}. The image should be a {layout} ({aspect}) composition.\n\n"
+        "Mood: candid, warm, optimistic, energetic. Real human faces (diverse ages, ethnicities, "
+        "natural smiles). Show the activity in context — not a stock-photo cliché. "
+        "Leave the upper-left third clear of subjects so text overlay can be added later. "
+        "Use natural light, modern color grading, shallow depth-of-field. No text, no logos, no watermarks. "
+        f"For context, the activity is: {category_info['label']}."
+    )
+
+
+@api.post("/admin/ads/generate")
+async def generate_ad(body: AdGenerateBody, user: dict = Depends(_require_admin)):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "AI generation unavailable — EMERGENT_LLM_KEY not set")
+    if body.audience not in AD_AUDIENCES:
+        raise HTTPException(400, "Unknown audience")
+    if body.category not in AD_CATEGORIES:
+        raise HTTPException(400, "Unknown category")
+    if body.size not in AD_SIZES:
+        raise HTTPException(400, "Unknown size")
+
+    audience_info = AD_AUDIENCES[body.audience]
+    category_info = AD_CATEGORIES[body.category]
+    size_info = AD_SIZES[body.size]
+
+    # 1) Copy via Claude Sonnet
+    copy_chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=f"ad-copy-{uuid.uuid4()}",
+        system_message="You are a marketing copywriter. Always respond with raw JSON only.",
+    ).with_model("anthropic", "claude-sonnet-4-6")
+    try:
+        raw = await copy_chat.send_message(UserMessage(text=_ad_copy_prompt(audience_info, category_info, size_info, body.city)))
+    except Exception as e:
+        logger.error(f"Ad copy generation failed: {e}")
+        raise HTTPException(502, f"Copy generation failed: {str(e)[:200]}")
+    copy_data: dict
+    try:
+        text = raw.strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.lower().startswith("json"):
+                text = text[4:].strip()
+        copy_data = json.loads(text)
+    except Exception:
+        copy_data = {"headline": audience_info["hook"], "body": raw[:200] if isinstance(raw, str) else "", "cta": "Join Lumo", "hashtags": ["lumo", "ondemand", "gigwork"], "variants": []}
+
+    # 2) Image via Gemini Nano Banana
+    img_chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=f"ad-image-{uuid.uuid4()}",
+        system_message="You are an art director generating photorealistic marketing images.",
+    ).with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+    image_url = None
+    image_path = None
+    try:
+        _text, images = await img_chat.send_message_multimodal_response(
+            UserMessage(text=_ad_image_prompt(audience_info, category_info, size_info))
+        )
+        if images:
+            img_bytes = base64.b64decode(images[0]["data"])
+            ad_id = str(uuid.uuid4())
+            image_path = f"ads/{ad_id}.png"
+            try:
+                put_object(image_path, img_bytes, "image/png")
+                image_url = f"/api/storage/{image_path}"
+            except Exception as se:
+                logger.warning(f"Object-storage upload failed, falling back to local disk: {se}")
+                local_dir = "/app/backend/storage/ads"
+                os.makedirs(local_dir, exist_ok=True)
+                with open(f"{local_dir}/{ad_id}.png", "wb") as f:
+                    f.write(img_bytes)
+                image_url = f"/api/ads/local-image/{ad_id}.png"
+    except Exception as e:
+        logger.error(f"Ad image generation failed: {e}")
+        image_url = None  # copy is still useful even if image fails
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "audience": body.audience, "audience_label": audience_info["label"],
+        "category": body.category, "category_label": category_info["label"],
+        "size": body.size, "size_label": size_info["label"],
+        "width": size_info["width"], "height": size_info["height"],
+        "city": body.city,
+        "headline": copy_data.get("headline", ""),
+        "body": copy_data.get("body", ""),
+        "cta": copy_data.get("cta", "Join Lumo"),
+        "hashtags": copy_data.get("hashtags", []),
+        "variants": copy_data.get("variants", []),
+        "image_url": image_url, "image_path": image_path,
+        "created_at": now_iso(),
+        "created_by": user["id"],
+    }
+    await db.ads.insert_one(doc)
+    return clean_doc(doc)
+
+
+@api.get("/ads/local-image/{filename}")
+async def serve_local_ad_image(filename: str):
+    # Fallback when object-storage is unavailable — serve from local disk
+    safe = filename.replace("..", "").replace("/", "")
+    path = f"/app/backend/storage/ads/{safe}"
+    if not os.path.exists(path):
+        raise HTTPException(404, "Image not found")
+    return FileResponse(path, media_type="image/png")
+
+
+@api.get("/storage/ads/{filename}")
+async def serve_ad_object(filename: str):
+    """Public serve for ad images stored in object storage."""
+    safe = filename.replace("..", "").replace("/", "")
+    try:
+        data, ctype = get_object(f"ads/{safe}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Storage fetch failed: {e}")
+        raise HTTPException(404, "Image not found")
+    return Response(content=data, media_type=ctype or "image/png")
 
 # ────────────────────────────────────────────────────────────────────────────
 # Orders + Bundled 10% Stripe deposit checkout
@@ -3100,6 +3320,68 @@ SEED_USERS = [
          "logo_url": "https://images.pexels.com/photos/15101682/pexels-photo-15101682.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
          "description": "Light pastries, espresso, and seasonal mains.",
      }},
+    # ── Additional retailers (expand marketplace breadth)
+    {"email": "northshore_books@lumo.test", "password": "password123", "name": "North Shore Books", "role": "retailer",
+     "storefront": {"name": "North Shore Books", "address": "412 Ocean Ave, Santa Monica, CA",
+         "hours": "Daily 9am–9pm", "category": "Books",
+         "location": {"lat": 34.0195, "lng": -118.4912},
+         "logo_url": "https://images.pexels.com/photos/1370298/pexels-photo-1370298.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Independent bookstore — new releases, used finds, and a great staff picks shelf."}},
+    {"email": "lagosbikes@lumo.test", "password": "password123", "name": "Lagos Bike Co.", "role": "retailer",
+     "storefront": {"name": "Lagos Bike Co.", "address": "21 Admiralty Way, Lekki, Lagos",
+         "hours": "Mon–Sat 8am–7pm", "category": "Sports & Outdoors",
+         "location": {"lat": 6.4350, "lng": 3.4500},
+         "logo_url": "https://images.pexels.com/photos/100582/pexels-photo-100582.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Commuter bikes, gravel rigs, and full repair service."}},
+    {"email": "verdantplants@lumo.test", "password": "password123", "name": "Verdant Plant Studio", "role": "retailer",
+     "storefront": {"name": "Verdant Plant Studio", "address": "88 Hackney Rd, London E2",
+         "hours": "Tue–Sun 10am–6pm", "category": "Home & Garden",
+         "location": {"lat": 51.5290, "lng": -0.0720},
+         "logo_url": "https://images.pexels.com/photos/1005058/pexels-photo-1005058.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Houseplants, pots, and plant care for every London flat."}},
+    {"email": "circuithub@lumo.test", "password": "password123", "name": "Circuit Hub Electronics", "role": "retailer",
+     "storefront": {"name": "Circuit Hub Electronics", "address": "5/7 MG Road, Bengaluru",
+         "hours": "Daily 10am–9pm", "category": "Electronics",
+         "location": {"lat": 12.9716, "lng": 77.6093},
+         "logo_url": "https://images.pexels.com/photos/356056/pexels-photo-356056.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Headphones, smart home, accessories — and same-day fixes for your phone or laptop."}},
+    {"email": "mariposamarket@lumo.test", "password": "password123", "name": "Mariposa Specialty Foods", "role": "retailer",
+     "storefront": {"name": "Mariposa Specialty Foods", "address": "1140 Valencia St, San Francisco, CA",
+         "hours": "Daily 8am–10pm", "category": "Specialty Foods",
+         "location": {"lat": 37.7565, "lng": -122.4218},
+         "logo_url": "https://images.pexels.com/photos/2255379/pexels-photo-2255379.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Latin pantry, fresh tortillas, single-origin coffee, local bakers."}},
+    # ── Additional restaurants (expand food marketplace)
+    {"email": "tonyspizza@lumo.test", "password": "password123", "name": "Tony's Brick Oven", "role": "restaurant",
+     "storefront": {"name": "Tony's Brick Oven", "address": "212 Carmine St, New York, NY",
+         "hours": "Daily 11am–11pm", "cuisine": "Pizza",
+         "location": {"lat": 40.7305, "lng": -74.0030},
+         "logo_url": "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Coal-fired pizza since 1979. Walk-ins, slices, and delivery."}},
+    {"email": "sakurasushi@lumo.test", "password": "password123", "name": "Sakura Sushi", "role": "restaurant",
+     "storefront": {"name": "Sakura Sushi", "address": "Shibuya 1-12, Tokyo",
+         "hours": "Daily 12pm–11pm", "cuisine": "Japanese",
+         "location": {"lat": 35.6595, "lng": 139.7005},
+         "logo_url": "https://images.pexels.com/photos/2098085/pexels-photo-2098085.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Edomae-style sushi, omakase counter, and delivery bento lunches."}},
+    {"email": "casadelmar@lumo.test", "password": "password123", "name": "Casa del Mar", "role": "restaurant",
+     "storefront": {"name": "Casa del Mar", "address": "Av. Revolución 1200, CDMX",
+         "hours": "Tue–Sun 1pm–11pm", "cuisine": "Mexican",
+         "location": {"lat": 19.3650, "lng": -99.1820},
+         "logo_url": "https://images.pexels.com/photos/2092507/pexels-photo-2092507.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Costal Mexican kitchen — ceviches, mezcal, and slow-cooked tacos."}},
+    {"email": "saffronkitchen@lumo.test", "password": "password123", "name": "Saffron Kitchen", "role": "restaurant",
+     "storefront": {"name": "Saffron Kitchen", "address": "44 Brick Lane, London E1",
+         "hours": "Daily 5pm–11pm", "cuisine": "Indian",
+         "location": {"lat": 51.5210, "lng": -0.0710},
+         "logo_url": "https://images.pexels.com/photos/2474661/pexels-photo-2474661.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Modern Indian dining. Tandoor specialities, regional thalis, and craft cocktails."}},
+    {"email": "rootandbloom@lumo.test", "password": "password123", "name": "Root & Bloom", "role": "restaurant",
+     "storefront": {"name": "Root & Bloom", "address": "4900 Kingsway, Vancouver",
+         "hours": "Daily 11am–9pm", "cuisine": "Plant-based",
+         "location": {"lat": 49.2360, "lng": -123.0382},
+         "logo_url": "https://images.pexels.com/photos/1640774/pexels-photo-1640774.jpeg?auto=compress&cs=tinysrgb&w=800",
+         "description": "Seasonal plant-based bowls, smoothies, and grab-and-go."}},
 ]
 
 async def seed():
@@ -3512,6 +3794,242 @@ async def seed():
             }
             await db.rentals.insert_one(doc)
         logger.info(f"Seeded {len(demo_rentals)} demo rentals across 11 categories")
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Realistic marketplace inventory for new retailers/restaurants (idempotent)
+    # ────────────────────────────────────────────────────────────────────────
+    MARKETPLACE_INVENTORY = {
+        # New retailers
+        "northshore_books@lumo.test": [
+            {"name": "Penguin Classics — Hardcover Set (5 vols)", "price": 89.0, "stock": 12, "category": "Books",
+             "media_url": "https://images.pexels.com/photos/694740/pexels-photo-694740.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Five Penguin Classics hardcovers in a slipcase. Great gift."},
+            {"name": "Moleskine Classic Notebook · Large", "price": 24.0, "stock": 40, "category": "Stationery",
+             "media_url": "https://images.pexels.com/photos/159832/pencils-stationery-color-pens-159832.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "240 pages, ruled, hardcover. Made in Italy."},
+            {"name": "Local Indie Author Bundle", "price": 38.0, "stock": 15, "category": "Books",
+             "media_url": "https://images.pexels.com/photos/261857/pexels-photo-261857.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Three handpicked Southern California novelists in paperback."},
+            {"name": "Reading Light · USB-C rechargeable", "price": 19.0, "stock": 22, "category": "Accessories",
+             "media_url": "https://images.pexels.com/photos/3771097/pexels-photo-3771097.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Warm amber LED, clips on any book."},
+            {"name": "Kids' Picture Book Box (ages 3–6)", "price": 55.0, "stock": 8, "category": "Books",
+             "media_url": "https://images.pexels.com/photos/4143793/pexels-photo-4143793.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Five staff-picked picture books. Best-selling box this month."},
+        ],
+        "lagosbikes@lumo.test": [
+            {"name": "City Commuter — 7-speed", "price": 320.0, "stock": 6, "category": "Bikes",
+             "media_url": "https://images.pexels.com/photos/100582/pexels-photo-100582.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Steel frame, fenders, rack-ready. Tuned by our team."},
+            {"name": "Gravel Bike — Carbon Fork", "price": 980.0, "stock": 3, "category": "Bikes",
+             "media_url": "https://images.pexels.com/photos/2152/sky-earth-galaxy-universe.jpg?auto=compress&cs=tinysrgb&w=600",
+             "description": "1×11 drivetrain, hydraulic discs. Lekki test rides welcome."},
+            {"name": "Premium Tune-up (Service)", "price": 35.0, "stock": 50, "category": "Service",
+             "media_url": "https://images.pexels.com/photos/2611687/pexels-photo-2611687.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Brakes, gears, cables, true wheels. Pickup/drop-off within 5km."},
+            {"name": "Helmet · MIPS Certified", "price": 65.0, "stock": 18, "category": "Accessories",
+             "media_url": "https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Lightweight ventilated MIPS helmet. Sizes S/M/L."},
+            {"name": "Front + Rear Light Set", "price": 28.0, "stock": 30, "category": "Accessories",
+             "description": "USB-rechargeable, 200 lumens front, 50 lumens rear."},
+        ],
+        "verdantplants@lumo.test": [
+            {"name": "Monstera Deliciosa · 80cm", "price": 65.0, "stock": 9, "category": "Plants",
+             "media_url": "https://images.pexels.com/photos/3076899/pexels-photo-3076899.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Healthy young Monstera, terracotta pot included."},
+            {"name": "Snake Plant Sansevieria", "price": 22.0, "stock": 28, "category": "Plants",
+             "media_url": "https://images.pexels.com/photos/776656/pexels-photo-776656.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Almost-indestructible. Perfect for low-light flats."},
+            {"name": "Hand-thrown Terracotta Pot · 25cm", "price": 18.0, "stock": 24, "category": "Pots",
+             "description": "Made in Stoke. Drainage hole + saucer."},
+            {"name": "Self-Watering Globe (set of 3)", "price": 14.0, "stock": 35, "category": "Accessories",
+             "media_url": "https://images.pexels.com/photos/4503819/pexels-photo-4503819.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Keep your plants happy on holiday."},
+            {"name": "Subscription · Plant of the Month", "price": 18.0, "stock": 100, "category": "Subscription",
+             "description": "A new houseplant every month, delivered."},
+        ],
+        "circuithub@lumo.test": [
+            {"name": "Sony WH-1000XM5 Headphones", "price": 320.0, "stock": 14, "category": "Audio",
+             "media_url": "https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Industry-leading noise cancelling. 1-year warranty."},
+            {"name": "Anker 65W GaN Charger", "price": 49.0, "stock": 60, "category": "Accessories",
+             "media_url": "https://images.pexels.com/photos/4316741/pexels-photo-4316741.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Charge laptop + phone + earbuds at once. USB-C × 2 + USB-A."},
+            {"name": "Smart Plug Bundle (4-pack)", "price": 32.0, "stock": 40, "category": "Smart Home",
+             "description": "Works with Alexa, Google Home. Energy monitoring."},
+            {"name": "iPhone Screen Repair (same-day)", "price": 75.0, "stock": 50, "category": "Service",
+             "media_url": "https://images.pexels.com/photos/4068314/pexels-photo-4068314.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Genuine OLED. 90-day warranty. Drop-off or pickup."},
+            {"name": "Mechanical Keyboard · 65%", "price": 110.0, "stock": 12, "category": "Computers",
+             "media_url": "https://images.pexels.com/photos/2115256/pexels-photo-2115256.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Hot-swap, brown switches, RGB. USB-C."},
+        ],
+        "mariposamarket@lumo.test": [
+            {"name": "Fresh Corn Tortillas (dozen)", "price": 4.5, "stock": 80, "category": "Bakery",
+             "media_url": "https://images.pexels.com/photos/2092507/pexels-photo-2092507.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Pressed and griddled this morning."},
+            {"name": "Oaxacan Single-Origin Coffee · 12oz", "price": 18.0, "stock": 22, "category": "Coffee",
+             "media_url": "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Notes of cocoa nib, brown sugar, dried cherry."},
+            {"name": "Salsa Verde · 16oz", "price": 7.0, "stock": 40, "category": "Pantry",
+             "description": "Tomatillo, jalapeño, cilantro. Small-batch."},
+            {"name": "Hand-painted Tile · 6×6 (each)", "price": 12.0, "stock": 60, "category": "Home",
+             "media_url": "https://images.pexels.com/photos/270669/pexels-photo-270669.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Glazed ceramic tile from Puebla. Each one slightly different."},
+            {"name": "Tres Leches Cake (whole)", "price": 32.0, "stock": 8, "category": "Bakery",
+             "description": "Family recipe. Order 24 hours ahead."},
+        ],
+        # New restaurants
+        "tonyspizza@lumo.test": [
+            {"name": "Margherita · 16\"", "price": 22.0, "stock": 100, "category": "Pizza",
+             "media_url": "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "San Marzano, fresh mozz, basil."},
+            {"name": "Sicilian Square · 12 slices", "price": 32.0, "stock": 50, "category": "Pizza",
+             "description": "Crispy edges, soft middle. Feeds 4–6."},
+            {"name": "Pepperoni · 16\"", "price": 26.0, "stock": 100, "category": "Pizza",
+             "media_url": "https://images.pexels.com/photos/1640772/pexels-photo-1640772.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Cup-and-char pepperoni, hand-stretched dough."},
+            {"name": "Garden Salad", "price": 9.0, "stock": 60, "category": "Sides"},
+            {"name": "Cannoli (2)", "price": 6.0, "stock": 40, "category": "Dessert"},
+        ],
+        "sakurasushi@lumo.test": [
+            {"name": "Omakase Bento (12 pc)", "price": 38.0, "stock": 20, "category": "Sushi",
+             "media_url": "https://images.pexels.com/photos/2098085/pexels-photo-2098085.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Chef's selection. Ready in 20 minutes."},
+            {"name": "Salmon Sashimi · 8 pc", "price": 22.0, "stock": 40, "category": "Sushi",
+             "media_url": "https://images.pexels.com/photos/2098134/pexels-photo-2098134.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Norwegian salmon, hand-cut to order."},
+            {"name": "Dragon Roll · 8 pc", "price": 18.0, "stock": 50, "category": "Sushi",
+             "description": "Shrimp tempura, avocado, eel sauce."},
+            {"name": "Miso Soup", "price": 4.0, "stock": 100, "category": "Soup"},
+            {"name": "Mochi Ice Cream (3)", "price": 7.0, "stock": 60, "category": "Dessert"},
+        ],
+        "casadelmar@lumo.test": [
+            {"name": "Tacos al Pastor · 3 pc", "price": 9.0, "stock": 80, "category": "Tacos",
+             "media_url": "https://images.pexels.com/photos/2092897/pexels-photo-2092897.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Marinated pork, pineapple, onion, cilantro."},
+            {"name": "Ceviche Mixto", "price": 16.0, "stock": 30, "category": "Mains",
+             "media_url": "https://images.pexels.com/photos/2076070/pexels-photo-2076070.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Shrimp, fish, octopus, lime, chili."},
+            {"name": "Mezcal Flight (3)", "price": 24.0, "stock": 25, "category": "Bar",
+             "description": "Three sips of espadín, tepeztate, and tobalá."},
+            {"name": "Guacamole + Chips", "price": 12.0, "stock": 60, "category": "Sides"},
+            {"name": "Tres Leches", "price": 8.0, "stock": 30, "category": "Dessert"},
+        ],
+        "saffronkitchen@lumo.test": [
+            {"name": "Lamb Rogan Josh", "price": 22.0, "stock": 30, "category": "Mains",
+             "media_url": "https://images.pexels.com/photos/2474661/pexels-photo-2474661.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Slow-cooked lamb in Kashmiri spices."},
+            {"name": "Paneer Tikka Masala", "price": 17.0, "stock": 40, "category": "Mains",
+             "media_url": "https://images.pexels.com/photos/674574/pexels-photo-674574.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Tandoor-charred paneer in a creamy tomato gravy."},
+            {"name": "Garlic Naan", "price": 4.5, "stock": 100, "category": "Bread"},
+            {"name": "Thali · Vegetarian", "price": 24.0, "stock": 25, "category": "Mains",
+             "description": "Five small plates + rice, naan, dessert."},
+            {"name": "Mango Lassi", "price": 5.0, "stock": 80, "category": "Drinks"},
+        ],
+        "rootandbloom@lumo.test": [
+            {"name": "Buddha Bowl · Miso Tahini", "price": 14.0, "stock": 50, "category": "Bowls",
+             "media_url": "https://images.pexels.com/photos/1640774/pexels-photo-1640774.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "Quinoa, roasted yams, chickpeas, greens, miso-tahini drizzle."},
+            {"name": "Acai Smoothie Bowl", "price": 12.0, "stock": 40, "category": "Smoothies",
+             "media_url": "https://images.pexels.com/photos/1346347/pexels-photo-1346347.jpeg?auto=compress&cs=tinysrgb&w=600",
+             "description": "House granola, banana, coconut, hemp seeds."},
+            {"name": "Green Goddess Juice", "price": 9.0, "stock": 60, "category": "Juices",
+             "description": "Kale, apple, cucumber, lemon, ginger."},
+            {"name": "Walnut Lentil Burger", "price": 13.0, "stock": 35, "category": "Mains"},
+            {"name": "Chocolate Avocado Mousse", "price": 7.0, "stock": 30, "category": "Dessert"},
+        ],
+    }
+    for email, items in MARKETPLACE_INVENTORY.items():
+        owner = await db.users.find_one({"email": email})
+        if not owner:
+            continue
+        if await db.inventory.count_documents({"owner_id": owner["id"]}) > 0:
+            continue
+        for it in items:
+            await db.inventory.insert_one({
+                "id": str(uuid.uuid4()), "owner_id": owner["id"],
+                "owner_role": owner["role"], "store_name": owner["name"],
+                "name": it["name"], "price": it["price"], "stock": it["stock"],
+                "category": it["category"],
+                "media_url": it.get("media_url"), "media_type": "image/jpeg" if it.get("media_url") else None,
+                "description": it.get("description", ""),
+                "status": "active", "created_at": now_iso(),
+            })
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Realistic job opportunities: full-time, part-time, seasonal, freelance
+    # ────────────────────────────────────────────────────────────────────────
+    if customer and await db.jobs.count_documents({"is_career_demo": True}) == 0:
+        careers = [
+            {"title": "Full-time Delivery Driver — flexible shifts, 80%+ of fares yours",
+             "description": "Drive for Lumo full-time. Pick your own hours, accept the jobs you want. Drivers keep 90% of every fare — we only take 10%. Average earnings $900–$1,400/week in major cities.",
+             "category": "delivery", "pay_rate": 28.0, "pay_unit": "hour", "estimated_units": 40.0,
+             "pickup_address": "Brooklyn, NY", "lat": 40.6782, "lng": -73.9442},
+            {"title": "Part-time Babysitter — afternoons & weekends",
+             "description": "Looking for evening / weekend babysitters across the city. Set your hours. Lumo takes only 10%, you keep the rest. Background-checked sitters earn $22–$35/hr.",
+             "category": "education", "pay_rate": 25.0, "pay_unit": "hour", "estimated_units": 20.0,
+             "pickup_address": "Manhattan, NY", "lat": 40.7831, "lng": -73.9712},
+            {"title": "Seasonal Movers — summer surge, hiring crews of 2–3",
+             "description": "Peak moving season May–Sept. Build a 2–3 person crew, choose your jobs. Average crew earnings $1,800/weekend. We handle billing — you keep 90%.",
+             "category": "moving", "pay_rate": 65.0, "pay_unit": "hour", "estimated_units": 30.0,
+             "pickup_address": "Boston, MA", "lat": 42.3601, "lng": -71.0589},
+            {"title": "Freelance React/Next.js Developer — remote, ongoing",
+             "description": "Build storefronts, dashboards and landing pages for Lumo small-business clients. Remote, async, 10–30 hrs/wk. You set your rate; we connect you to clients.",
+             "category": "digital_tech", "pay_rate": 85.0, "pay_unit": "hour", "estimated_units": 20.0},
+            {"title": "Weekend Dog Walker — premium $25/walk, you set your route",
+             "description": "Saturdays and Sundays. Take 4–6 dogs/day in your neighborhood. Lumo handles payments, schedules, insurance. You keep 90%.",
+             "category": "pet_care", "pay_rate": 25.0, "pay_unit": "day", "estimated_units": 8.0,
+             "pickup_address": "Williamsburg, Brooklyn, NY", "lat": 40.7081, "lng": -73.9571},
+            {"title": "Part-time Cleaner — choose your blocks, 2-hr minimum",
+             "description": "Set your weekly availability. Same neighborhoods, repeat clients possible. $30–$45/hr depending on city. 10% platform fee, no monthly subscription.",
+             "category": "cleaning", "pay_rate": 35.0, "pay_unit": "hour", "estimated_units": 20.0,
+             "pickup_address": "Austin, TX", "lat": 30.2672, "lng": -97.7431},
+            {"title": "Tow Truck Operator — 24/7 dispatch, work when you want",
+             "description": "Own a flatbed or wrecker? Get instant dispatch calls in your area. Average $180/job. You only accept what you want. 90% to you.",
+             "category": "towing", "pay_rate": 180.0, "pay_unit": "flat", "estimated_units": 5.0,
+             "pickup_address": "Houston, TX", "lat": 29.7604, "lng": -95.3698},
+            {"title": "Math Tutor — middle school + high school, $40/hr",
+             "description": "Tutor 3–10 hrs/week. Online or in-person. Lumo matches you with students near you. Choose your schedule.",
+             "category": "education", "pay_rate": 40.0, "pay_unit": "hour", "estimated_units": 10.0},
+            {"title": "Personal Trainer — build your private client base on Lumo",
+             "description": "Use Lumo to fill your week with $60–$95/hr personal training sessions. Bring clients with you or get matched to new ones. Insurance + scheduling included.",
+             "category": "personal_care", "pay_rate": 75.0, "pay_unit": "hour", "estimated_units": 15.0,
+             "pickup_address": "Los Angeles, CA", "lat": 34.0522, "lng": -118.2437},
+            {"title": "Same-day Courier — bike or car, urgent runs",
+             "description": "Pick up and deliver same-day across the city. Urgent runs pay $35–$60 each. Bike couriers welcome. Flexible schedule, you accept what fits.",
+             "category": "courier", "pay_rate": 40.0, "pay_unit": "flat", "estimated_units": 10.0,
+             "pickup_address": "Chicago, IL", "lat": 41.8781, "lng": -87.6298},
+            {"title": "Seasonal Landscaper — spring/fall hires, 3-month contracts",
+             "description": "Peak season hiring. Mowing, hedging, leaf-clearing routes pre-booked. Average $1,100/week. Lumo handles routing and invoices.",
+             "category": "landscaping", "pay_rate": 35.0, "pay_unit": "hour", "estimated_units": 35.0,
+             "pickup_address": "Portland, OR", "lat": 45.5152, "lng": -122.6784},
+            {"title": "Bilingual Customer Support — remote, part-time, $22/hr",
+             "description": "Lumo is hiring Spanish/English support agents. Work from home, 15–25 hrs/wk. Pick your shifts. $22/hr, full benefits at 25hrs+.",
+             "category": "remote_work", "pay_rate": 22.0, "pay_unit": "hour", "estimated_units": 20.0},
+        ]
+        for c in careers:
+            is_remote = c["category"] in REMOTE_FRIENDLY_CATEGORIES
+            pickup_loc = None
+            if c.get("pickup_address"):
+                pickup_loc = {"lat": c.get("lat"), "lng": c.get("lng"), "address": c["pickup_address"]}
+            await db.jobs.insert_one({
+                "id": str(uuid.uuid4()),
+                "customer_id": customer["id"], "customer_name": "Lumo Network",
+                "title": c["title"], "description": c["description"], "category": c["category"],
+                "category_group": category_group(c["category"]), "is_remote": is_remote,
+                "pickup_location": pickup_loc, "dropoff_location": None,
+                "pay_rate": c["pay_rate"], "pay_unit": c["pay_unit"], "estimated_units": c["estimated_units"],
+                "media_url": None, "media_type": None,
+                "payment_terms": "", "allowed_payment_methods": ["app"],
+                "status": "open", "provider_id": None,
+                "deposit_paid": False, "deposit_amount": 0.0,
+                "total_estimate": c["pay_rate"] * c["estimated_units"],
+                "is_career_demo": True,
+                "created_at": now_iso(),
+            })
+        logger.info(f"Seeded {len(careers)} structured career opportunities")
 
 @app.on_event("startup")
 async def on_startup():
