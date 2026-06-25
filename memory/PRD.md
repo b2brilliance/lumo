@@ -27,6 +27,19 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Stripe Connect — real bank payouts (Feb 26, 2026)
+- New module `/app/backend/stripe_connect.py` using official `stripe` Python SDK.
+- Provider onboarding via Stripe-hosted Express AccountLink: `POST /api/stripe/connect/onboard` (creates account if missing, returns hosted URL).
+- Status + bank state: `GET /api/stripe/connect/status` returns `connected`, `charges_enabled`, `payouts_enabled`, requirements (`currently_due` / `past_due` / `disabled_reason`).
+- Stripe Express dashboard SSO: `POST /api/stripe/connect/dashboard-link`.
+- Disconnect + transfer history: `DELETE /api/stripe/connect/disconnect`, `GET /api/stripe/connect/transfers`.
+- Webhook: `POST /api/stripe/connect/webhook` syncs `account.updated`, `payout.paid`, `payout.failed`.
+- **Real payouts wired into `_credit_provider`** in `server.py`: on escrow auto-release the platform attempts `stripe.Transfer.create(destination=acct, amount=$)` first; falls back to in-app wallet credit if not connected / transfer fails. Wallet withdraw endpoint similarly upgrades to real Stripe transfer when the user is connected.
+- New frontend component `StripeConnectCard.jsx` rendered in `/provider-hub` below the map — shows status badge, "Connect bank account" CTA, "Finish onboarding" if incomplete, and "Stripe dashboard" link when ready.
+- Test key stored in `/app/backend/.env` as `STRIPE_CONNECT_SECRET_KEY` (isolated from the existing `STRIPE_API_KEY=sk_test_emergent` used by the customer Checkout flow — no regression to customer payments).
+- **Tested**: iteration_18 — 10/10 backend endpoints + frontend smoke PASS. Card renders, error toast surfaces cleanly when Stripe Connect isn't yet enabled on the user's Stripe dashboard.
+- **⚠️ Pending user action**: User must visit https://dashboard.stripe.com/connect and click "Get started" / "Sign up for Connect" (one-time, free, ~30 seconds). Until then the onboard endpoint returns a friendly 400 explaining the next step.
+
 ### Admin Analytics Dashboard (Feb 25, 2026)
 - New module `/app/backend/analytics.py` — public POST `/api/analytics/pageview` (bot-filtered by UA regex) + admin-only `/api/admin/analytics/{overview,visitors,signups,orders,providers,revenue}`.
 - **Owner bootstrap**: `julius.a.mason@gmail.com` is promoted to `role='admin'` (or created passwordless for Google OAuth) on every backend startup.
