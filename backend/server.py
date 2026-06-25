@@ -2213,6 +2213,157 @@ async def test_connector(cid: str, user: dict = Depends(_require_admin)):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# AUTO-DISTRIBUTE SCHEDULER — drip Ad Studio creatives across enabled channels
+# ────────────────────────────────────────────────────────────────────────────
+class ScheduleBody(BaseModel):
+    name: str
+    ad_ids: List[str]
+    connector_ids: Optional[List[str]] = None  # None = all enabled at run time
+    cadence_hours: int = 24  # how often to post (1 = hourly, 24 = daily, 168 = weekly)
+    start_at: Optional[str] = None  # ISO string; default = now
+    end_at: Optional[str] = None  # optional auto-stop
+    enabled: bool = True
+
+
+def _next_run(now: datetime, last: Optional[datetime], cadence_hours: int) -> datetime:
+    base = last or now
+    return base + timedelta(hours=cadence_hours)
+
+
+@api.get("/admin/distribution/schedules")
+async def list_schedules(user: dict = Depends(_require_admin)):
+    docs = await db.ad_schedules.find({}).sort("created_at", -1).to_list(100)
+    return [clean_doc(d) for d in docs]
+
+
+@api.post("/admin/distribution/schedules")
+async def create_schedule(body: ScheduleBody, user: dict = Depends(_require_admin)):
+    if not body.ad_ids:
+        raise HTTPException(400, "At least one ad must be selected")
+    if body.cadence_hours < 1 or body.cadence_hours > 24 * 30:
+        raise HTTPException(400, "cadence_hours must be between 1 and 720 (30 days)")
+    # validate ads exist
+    count = await db.ads.count_documents({"id": {"$in": body.ad_ids}})
+    if count != len(body.ad_ids):
+        raise HTTPException(400, "One or more ads not found")
+    now = datetime.now(timezone.utc)
+    start = datetime.fromisoformat(body.start_at.replace("Z", "+00:00")) if body.start_at else now
+    end = datetime.fromisoformat(body.end_at.replace("Z", "+00:00")) if body.end_at else None
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": body.name,
+        "ad_ids": body.ad_ids,
+        "connector_ids": body.connector_ids,  # None = all enabled
+        "cadence_hours": body.cadence_hours,
+        "start_at": start.isoformat(),
+        "end_at": end.isoformat() if end else None,
+        "enabled": body.enabled,
+        "next_run_at": start.isoformat(),
+        "last_run_at": None,
+        "posts_sent": 0,
+        "ad_cursor": 0,  # which ad in the rotation is next
+        "created_at": now_iso(),
+        "created_by": user["id"],
+    }
+    await db.ad_schedules.insert_one(doc)
+    return clean_doc(doc)
+
+
+@api.patch("/admin/distribution/schedules/{sid}")
+async def update_schedule(sid: str, body: dict, user: dict = Depends(_require_admin)):
+    update = {}
+    for k in ("enabled", "name", "cadence_hours", "end_at"):
+        if k in body:
+            update[k] = body[k]
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    res = await db.ad_schedules.update_one({"id": sid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Schedule not found")
+    return {"ok": True}
+
+
+@api.delete("/admin/distribution/schedules/{sid}")
+async def delete_schedule(sid: str, user: dict = Depends(_require_admin)):
+    res = await db.ad_schedules.delete_one({"id": sid})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Schedule not found")
+    return {"ok": True}
+
+
+async def _run_due_schedules():
+    """Run any schedules whose next_run_at <= now. Called from the background loop."""
+    now = datetime.now(timezone.utc)
+    due = await db.ad_schedules.find({
+        "enabled": True,
+        "next_run_at": {"$lte": now.isoformat()},
+    }).to_list(50)
+    for s in due:
+        try:
+            # Auto-stop if past end_at
+            if s.get("end_at") and now >= datetime.fromisoformat(s["end_at"].replace("Z", "+00:00")):
+                await db.ad_schedules.update_one({"id": s["id"]}, {"$set": {"enabled": False}})
+                continue
+            ad_ids: list = s.get("ad_ids") or []
+            if not ad_ids:
+                await db.ad_schedules.update_one({"id": s["id"]}, {"$set": {"enabled": False}})
+                continue
+            cursor = (s.get("ad_cursor") or 0) % len(ad_ids)
+            ad_id = ad_ids[cursor]
+            # Broadcast this one ad to the connector set
+            ad = await db.ads.find_one({"id": ad_id})
+            if not ad:
+                # Skip missing ad; advance cursor
+                next_cursor = (cursor + 1) % len(ad_ids)
+                next_run = _next_run(now, now, s["cadence_hours"])
+                await db.ad_schedules.update_one({"id": s["id"]}, {"$set": {"ad_cursor": next_cursor, "next_run_at": next_run.isoformat()}})
+                continue
+            ad = clean_doc(ad)
+            image_full_url = None
+            if ad.get("image_url"):
+                image_full_url = ad["image_url"] if ad["image_url"].startswith("http") else f"https://golumo.app{ad['image_url']}"
+            cq: dict = {"enabled": True}
+            if s.get("connector_ids"):
+                cq["id"] = {"$in": s["connector_ids"]}
+            connectors = await db.connectors.find(cq).to_list(50)
+            ok_count = 0
+            for c in connectors:
+                c = clean_doc(c)
+                poster = POSTERS.get(c["platform"])
+                if not poster:
+                    continue  # silently skip stubs
+                try:
+                    await poster(c["config"], ad, image_full_url)
+                    await db.connectors.update_one({"id": c["id"]}, {"$set": {"last_broadcast_at": now.isoformat()}, "$inc": {"post_count": 1}})
+                    ok_count += 1
+                except Exception as e:
+                    logger.warning(f"Scheduler post to {c['platform']} failed: {e}")
+            # Advance cursor + next run
+            next_cursor = (cursor + 1) % len(ad_ids)
+            next_run = _next_run(now, now, s["cadence_hours"])
+            await db.ad_schedules.update_one({"id": s["id"]}, {
+                "$set": {"ad_cursor": next_cursor, "next_run_at": next_run.isoformat(), "last_run_at": now.isoformat()},
+                "$inc": {"posts_sent": ok_count},
+            })
+            logger.info(f"Schedule '{s.get('name')}' fired: {ok_count} posts, next run {next_run.isoformat()}")
+        except Exception as e:
+            logger.error(f"Schedule {s.get('id')} failed: {e}")
+
+
+_scheduler_task = None
+
+
+async def _scheduler_loop():
+    """Background task that wakes every 60 seconds and runs any due schedules."""
+    while True:
+        try:
+            await _run_due_schedules()
+        except Exception as e:
+            logger.error(f"Scheduler loop iteration failed: {e}")
+        await asyncio.sleep(60)
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # PROGRAMMATIC SEO LANDING PAGES — city × category combinatorial reach
 # ────────────────────────────────────────────────────────────────────────────
 LANDING_CITIES = [
@@ -4633,6 +4784,10 @@ async def on_startup():
         await seed()
     except Exception as e:
         logger.error(f"Seed failed: {e}")
+    # Kick off background scheduler for Distribution drips
+    global _scheduler_task
+    _scheduler_task = asyncio.create_task(_scheduler_loop())
+    logger.info("Distribution scheduler loop started (polls every 60s)")
 
 @app.on_event("shutdown")
 async def on_shutdown():
