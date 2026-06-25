@@ -49,6 +49,12 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithSmsResult = (data) => {
+    localStorage.setItem("lumo_token", data.token);
+    setUser(data.user);
+    return { ok: true, user: data.user, is_new: data.is_new };
+  };
+
   const logout = () => {
     localStorage.removeItem("lumo_token");
     setUser(false);
@@ -61,7 +67,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, updateMe }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, updateMe, loginWithSmsResult }}>
       {children}
     </AuthContext.Provider>
   );

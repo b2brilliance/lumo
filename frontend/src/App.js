@@ -44,12 +44,13 @@ import Autos from "@/pages/Autos";
 import AutoDetail from "@/pages/AutoDetail";
 import AutoList from "@/pages/AutoList";
 import Inquiries from "@/pages/Inquiries";
+import SignIn from "@/pages/SignIn";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
-  if (!user || user === false) return <Navigate to="/login" state={{ from: loc.pathname }} />;
+  if (!user || user === false) return <Navigate to="/signin" state={{ from: loc.pathname }} />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" />;
   return children;
 }
@@ -67,6 +68,7 @@ function App() {
               <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signin" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
 
             <Route path="/customer" element={<Protected roles={["customer", "provider", "retailer", "restaurant"]}><CustomerHub /></Protected>} />

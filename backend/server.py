@@ -5229,6 +5229,10 @@ app.include_router(api)
 from classifieds import create_router as _create_classifieds_router  # noqa: E402
 app.include_router(_create_classifieds_router(db=db, get_current_user=get_current_user))
 
+# Passwordless SMS sign-in / sign-up via Twilio Verify
+from auth_sms import create_router as _create_sms_auth_router  # noqa: E402
+app.include_router(_create_sms_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

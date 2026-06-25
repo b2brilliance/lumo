@@ -21,7 +21,7 @@ export default function Landing() {
               Lumo connects customers with trusted providers for everything from package delivery and home services to retail orders and remote contracts. Post a request, review quotes, and pay safely — all in one app.
             </p>
             <div className="flex flex-wrap gap-3 mt-8">
-              <Link to="/register"><Button size="lg" className="bg-slate-900 hover:bg-slate-800" data-testid="hero-cta-register">Create an account <ArrowUpRight className="ml-1 w-4 h-4" /></Button></Link>
+              <Link to="/signin"><Button size="lg" className="bg-slate-900 hover:bg-slate-800" data-testid="hero-cta-register">Create an account <ArrowUpRight className="ml-1 w-4 h-4" /></Button></Link>
               <Link to="/map"><Button size="lg" variant="outline" data-testid="hero-cta-map">Browse open jobs</Button></Link>
             </div>
           </div>

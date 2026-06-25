@@ -120,8 +120,8 @@ export default function NavBar() {
             </>
           ) : (
             <>
-              <Link to="/login"><Button variant="outline" size="sm" data-testid="nav-login">Sign in</Button></Link>
-              <Link to="/register"><Button size="sm" className="bg-slate-900 hover:bg-slate-800" data-testid="nav-register">Get started <Sparkles className="ml-1 w-3.5 h-3.5" /></Button></Link>
+              <Link to="/signin"><Button variant="outline" size="sm" data-testid="nav-login">Sign in</Button></Link>
+              <Link to="/signin"><Button size="sm" className="bg-slate-900 hover:bg-slate-800" data-testid="nav-register">Get started <Sparkles className="ml-1 w-3.5 h-3.5" /></Button></Link>
             </>
           )}
         </div>

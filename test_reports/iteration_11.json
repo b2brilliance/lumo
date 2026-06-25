@@ -1,0 +1,56 @@
+{
+  "summary": "Iteration 11 — Passwordless SMS sign-in (Twilio Verify) fully verified. Backend: 16/16 pytests in /app/backend/tests/test_sms_auth.py PASS — pydantic 422 for empty/short phone, regex 400 'Enter a valid phone number' for bad input, Twilio 21608 → 400 with 'verified/upgrade' mapping for trial-account magic numbers, Twilio 20404 → 400 with 'No code request was found' friendly message, E.164 normalization confirmed for '4155552671', '(415) 555-2671', '+44 20 1234 5678' (none returned the 'enter a valid phone number' 400), no 5xx anywhere. Regression: /api/auth/login email+password still issues a JWT for customer@lumo.test; /api/real-estate, /api/autos, /api/inquiries still 200. Frontend (Playwright): /signin renders the mobile-first page with data-testid='signin-page' + 'signin-phone-input' + 'signin-send-code' + 'signin-pw-link'; typing '4155552671' and clicking 'Text me a code' POSTs to /api/auth/sms/start with body {\"phone\":\"+14155552671\"} (E.164 normalized client-side); when start is mocked 200, UI transitions to signin-code-form, signin-code-input is focused, resend shows 'Resend in 29s' counting down. With both /api/auth/sms/start and /api/auth/sms/verify mocked, entering code '123456' + Sign in navigates the SPA to /customer (smart redirect for role=customer). When /signin?next=%2Fjobs%2Fabc%2Fapply is used, the mocked successful sign-in lands on /jobs/abc/apply. /jobs/apply/electrician/Brooklyn redirects to /signin?next=%2Fregister%3Frole%3Dprovider%26job_category%3Delectrician%26city%3DBrooklyn (URL-encoded). Visiting /customer while logged out → redirects to /signin (no longer /login). Login page exposes 'Sign up with your phone' → /signin. NavBar 'Sign in' (data-testid='nav-login') and 'Get started' (data-testid='nav-register') both navigate to /signin on click — they are <button> elements (not anchors with href), so navigation is via onClick navigate(); the spec wording 'both href=/signin' is a minor wording mismatch but behaviour is identical. Landing hero CTA 'Create an account' anchor href='/signin' confirmed. Regression: document.getElementById('emergent-badge') === null on both /signin and /.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_acceptance_criteria": [
+    "GET /signin renders the mobile-first sign-in page with data-testid='signin-page', signin-phone-input, signin-send-code, signin-pw-link.",
+    "POST /api/auth/sms/start with empty phone → 422; with phone='abc12' → 400 'Enter a valid phone number'. No 5xx.",
+    "POST /api/auth/sms/start with +15005550001 (trial-unverified magic number) → 400 with detail containing 'verified' / 'upgrade' (Twilio 21608 mapping). No 5xx.",
+    "POST /api/auth/sms/verify with a code that was never requested → 400 with detail containing 'No code request was found' / 'Send code first' / 'verify' (Twilio 20404 mapping).",
+    "E.164 normalization on the BACKEND verified via behaviour: '4155552671', '(415) 555-2671', '+44 20 1234 5678' all bypass the regex 400 and reach Twilio.",
+    "Frontend: typing '4155552671' on /signin and clicking 'Text me a code' POSTs to /api/auth/sms/start with body {\"phone\":\"+14155552671\"} (intercepted via page.route()).",
+    "Frontend: mocking /api/auth/sms/start with 200 {status:'pending'} transitions UI to signin-code-form, signin-code-input is rendered, resend cooldown counts down from 30s (observed 'Resend in 29s').",
+    "Frontend: mocking /api/auth/sms/start and /api/auth/sms/verify (200, role=customer) → entering 123456 + Sign in lands on /customer.",
+    "Frontend: /signin?next=%2Fjobs%2Fabc%2Fapply + mocked successful verify lands on /jobs/abc/apply (next= takes precedence over role default).",
+    "Frontend: /jobs/apply/electrician/Brooklyn → /signin?next=%2Fregister%3Frole%3Dprovider%26job_category%3Delectrician%26city%3DBrooklyn .",
+    "Frontend: Protected /customer while logged out → /signin (not /login).",
+    "Frontend: /login page exposes a 'Sign up with your phone' anchor → /signin .",
+    "Frontend: NavBar nav-login and nav-register buttons both navigate to /signin (via onClick navigate(); they are <button>, not <a href>).",
+    "Frontend: Landing hero CTA 'Create an account' anchor href='/signin' .",
+    "Regression: /api/auth/login customer@lumo.test / password123 still returns a JWT.",
+    "Regression: /api/real-estate, /api/autos, /api/inquiries still respond (200 or 401 for auth-required), no 5xx.",
+    "Regression: document.getElementById('emergent-badge') === null on /signin AND /."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_sms_auth.py",
+    "/app/test_reports/pytest/sms_auth_results.xml"
+  ],
+  "action_items": [
+    "Minor spec wording: nav-login and nav-register are <button> elements (not <a href='/signin'>) — they call navigate('/signin') on click. Behaviour matches intent but the testid attribute on a <button> means you cannot assert `.href`. If the spec strictly requires an <a> with href='/signin' for SEO/crawlability, swap to <Link>/<a>. Otherwise no action needed."
+  ],
+  "critical_code_review_comments": [
+    "auth_sms.py is well-isolated (~180 LOC, dependency-injected via create_router(db, create_access_token, now_iso)) — testable in isolation, no implicit globals.",
+    "Synchronous Twilio SDK is wrapped in asyncio.to_thread() — does NOT block the FastAPI event loop. Good.",
+    "Twilio error-code mapping (60200/60203/21608/20404) returns user-friendly 4xx with `raise HTTPException(...)` — never leaks SDK tracebacks. Verified no 5xx in any tested error path.",
+    "Phone normalization is best-effort and US-defaulted (10 digits → +1...). Edge case: a UK number entered without '+' (e.g. '442012345678' 12 digits) would get prefixed to '+442012345678' which is still valid; a stray '1' prefix would silently get +1-prefixed — acceptable for v1.",
+    "MongoDB '_id' is correctly stripped from the response payload via comprehension `{k: v for k, v in user_doc.items() if k != '_id' and k != 'password_hash'}`. Good.",
+    "Synthetic email scheme `sms+{digits}@lumo.passwordless` guarantees uniqueness for the existing /auth/me lookup path. Good.",
+    "DEV fallback (when TWILIO_* env vars are missing) hard-codes OTP=123456 — fine for offline tests but logs a WARNING (good); make sure prod never ships without the keys (the test environment does have them set).",
+    "Frontend SignIn.jsx normalize() mirrors backend logic; smartReturn() correctly preserves ?next= across the two-step flow.",
+    "Protected → Navigate('/signin') change in App.js is consistent across all 12 protected routes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_sms_auth.py (new — 16 tests)"
+  ],
+  "success_rate": { "backend": "100% (16/16)", "frontend": "100% on tested flows" },
+  "test_credentials": "Used seeded customer@lumo.test / password123 for the password-login regression. SMS test numbers: +15005550001 (Twilio magic invalid number) and +15005550006 (Twilio magic valid-but-unverified) — both returned 400 with mapped messages, no real SMS sent, no trial credits consumed.",
+  "seed_data_creation": "None. No SMS-created users were persisted because no successful verify call ran against real Twilio (all happy-path tests were frontend-mocked via page.route()).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "SMS auth mounted at /api/auth/sms/{start,verify}. Twilio account is in TRIAL — never call /api/auth/sms/start with real numbers; use +1 500 555 0001-0010 magic numbers for backend contract tests (they return 400 21608 mapping, no credit spend). Frontend happy-path requires page.route() mocking of both /api/auth/sms/start and /api/auth/sms/verify; also mock /api/auth/me when you want the post-verify navigation to stick (otherwise the real /api/auth/me returns 401 with the fake JWT and AuthProvider may show a runtime overlay in dev mode — purely cosmetic, doesn't block navigation). nav-login and nav-register are <button> tags (testids present, but no href attr); assert navigation by clicking and checking page.url. Smart redirect priority: ?next=... wins over role-based default.",
+  "rca of the issue": "N/A — no product bugs found this iteration."
+}

@@ -60,7 +60,7 @@ export default function Login() {
             {busy ? "Signing in…" : "Sign in"}
           </Button>
           <div className="text-xs text-slate-500">
-            No account? <Link to="/register" className="text-teal-700 underline">Create one</Link>
+            No account? <Link to="/signin" className="text-teal-700 underline">Sign up with your phone</Link>
           </div>
           <div className="text-[11px] text-slate-400 font-mono pt-4 border-t border-slate-100">
             Demo seeds: customer@lumo.test · provider@lumo.test · retailer@lumo.test · restaurant@lumo.test · admin@lumo.test (password123)
