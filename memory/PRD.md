@@ -27,6 +27,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Escrow + Proof-of-Delivery Payment Release (Feb 25, 2026)
+- New backend module `/app/backend/escrow.py` — six endpoints (`mark-delivered`, `confirm-receipt`, `dispute` × jobs and orders) + background `auto_release_loop` running every 5 min.
+- **Flow**: Provider taps "Mark delivered" → uploads 1-3 photos (required only for **physical** categories: `delivery`, `courier`, `moving`, `ride_share`, `towing` + all `orders`; **non-physical** services skip photos entirely) → row enters `awaiting_confirmation` → customer taps "I received it" (releases payment) OR "Something's wrong" (opens dispute, payment held) → if customer never responds, auto-confirms after 24 h.
+- **Payment math**: Provider's wallet is credited with `gross × 0.90` (= customer cost minus the 10% Lumo cut). Sales tax stays with the customer. Wallet credits are simulated per user direction; Stripe Connect payouts deferred until the new bank account is live.
+- **Frontend**: single reusable `<DeliveryActions>` component renders all four states (idle CTA, awaiting w/ proof gallery + confirm/dispute, confirmed pill, disputed pill). Wired on `JobDetail`, `CustomerHub` orders list, and `ProviderHub` "Your active deliveries" panel.
+- **Tested**: iteration_14 — 19/19 backend pytests + full frontend E2E PASS. Verified $100 → +$90 wallet diff, idempotent confirm, auto-release after backdated 25 h, photo validation (max 3, ≤ 1 MB, no non-image URLs), 403 for wrong-role callers, non-physical optional-photo path, orders parallel flow. Zero bugs.
+
+
 ### Pricing UI Overhaul: Auto-Quote Delivery + Provider Earnings Breakdown (Feb 25, 2026)
 - Customer-side: for `delivery / courier / moving` categories, the `Pay rate` + `Pay unit` + `Estimated time` inputs are now hidden — price is auto-calculated from item details + pickup/dropoff distance (10ths-of-a-mile precision via existing `deliveryPricing.js` engine). Submit button is disabled with the hint "Enter pickup + drop-off addresses to see price" until the auto-quote materializes.
 - Customer-facing copy: every "Driver receives / Movers receive / Driver keeps" surface relabeled to "**Your price**" — verified scrubbed from `/customer`, `/jobs/:id`, `/map`, `/provider` (DOM grep).
