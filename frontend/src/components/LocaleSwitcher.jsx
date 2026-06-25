@@ -37,7 +37,7 @@ export default function LocaleSwitcher() {
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 shadow-xl z-50"
+          className="fixed left-2 right-2 top-14 mt-0 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-72 bg-white border border-slate-200 shadow-xl z-50"
           data-testid="locale-switcher-menu"
         >
           <div className="px-4 py-3 border-b border-slate-100">
