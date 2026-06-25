@@ -12,6 +12,7 @@ import asyncio
 import math
 import secrets
 import requests
+import httpx
 import re
 import json
 import base64
@@ -1933,6 +1934,282 @@ async def serve_ad_object(filename: str):
         logger.error(f"Storage fetch failed: {e}")
         raise HTTPException(404, "Image not found")
     return Response(content=data, media_type=ctype or "image/png")
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# SOCIAL DISTRIBUTION — pluggable connectors to broadcast Ad Studio creatives
+# ────────────────────────────────────────────────────────────────────────────
+CONNECTOR_TYPES = {
+    "discord": {
+        "label": "Discord Webhook",
+        "fields": [{"key": "webhook_url", "label": "Webhook URL", "type": "url", "required": True, "hint": "Channel → Edit → Integrations → Webhooks → New → Copy URL"}],
+        "instant": True,
+    },
+    "telegram": {
+        "label": "Telegram Channel",
+        "fields": [
+            {"key": "bot_token", "label": "Bot token", "type": "text", "required": True, "hint": "Get from @BotFather on Telegram → /newbot"},
+            {"key": "chat_id", "label": "Channel @handle or chat_id", "type": "text", "required": True, "hint": "e.g. @lumo_app or -1001234567890"},
+        ],
+        "instant": True,
+    },
+    "x_twitter": {
+        "label": "X / Twitter",
+        "fields": [
+            {"key": "bearer_token", "label": "OAuth 2.0 Bearer", "type": "password", "required": True, "hint": "developer.x.com — Free tier limits apply"},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+    "linkedin": {
+        "label": "LinkedIn Company Page",
+        "fields": [
+            {"key": "access_token", "label": "OAuth Access Token", "type": "password", "required": True, "hint": "developers.linkedin.com — Marketing Developer Platform"},
+            {"key": "page_urn", "label": "Page URN", "type": "text", "required": True, "hint": "e.g. urn:li:organization:12345678"},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+    "reddit": {
+        "label": "Reddit (your subreddit)",
+        "fields": [
+            {"key": "client_id", "label": "Client ID", "type": "text", "required": True},
+            {"key": "client_secret", "label": "Client Secret", "type": "password", "required": True},
+            {"key": "refresh_token", "label": "Refresh Token", "type": "password", "required": True},
+            {"key": "subreddit", "label": "Subreddit (no /r/)", "type": "text", "required": True, "hint": "e.g. lumo"},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+    "mastodon": {
+        "label": "Mastodon",
+        "fields": [
+            {"key": "instance_url", "label": "Instance URL", "type": "url", "required": True, "hint": "e.g. https://mastodon.social"},
+            {"key": "access_token", "label": "Access Token", "type": "password", "required": True, "hint": "Mastodon Preferences → Development → New Application"},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+    "bluesky": {
+        "label": "Bluesky",
+        "fields": [
+            {"key": "handle", "label": "Handle", "type": "text", "required": True, "hint": "e.g. golumo.bsky.social"},
+            {"key": "app_password", "label": "App password", "type": "password", "required": True, "hint": "bsky.app → Settings → App Passwords"},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+    "pinterest": {
+        "label": "Pinterest",
+        "fields": [
+            {"key": "access_token", "label": "Access Token", "type": "password", "required": True, "hint": "developers.pinterest.com"},
+            {"key": "board_id", "label": "Board ID", "type": "text", "required": True},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+    "threads": {
+        "label": "Threads (Meta)",
+        "fields": [
+            {"key": "access_token", "label": "Access Token", "type": "password", "required": True, "hint": "developers.facebook.com — Threads API"},
+            {"key": "user_id", "label": "User ID", "type": "text", "required": True},
+        ],
+        "instant": False,
+        "todo": "Token UI ready — full implementation lands next session",
+    },
+}
+
+
+class ConnectorBody(BaseModel):
+    platform: str
+    name: str
+    config: dict
+    enabled: bool = True
+
+
+@api.get("/admin/distribution/types")
+async def distribution_types(user: dict = Depends(_require_admin)):
+    return {"types": CONNECTOR_TYPES}
+
+
+@api.get("/admin/distribution/connectors")
+async def list_connectors(user: dict = Depends(_require_admin)):
+    docs = await db.connectors.find({}).sort("created_at", -1).to_list(200)
+    out = []
+    for d in docs:
+        d = clean_doc(d)
+        # Mask any secret fields before sending to UI
+        fields = CONNECTOR_TYPES.get(d.get("platform"), {}).get("fields", [])
+        for f in fields:
+            if f.get("type") == "password" and d.get("config", {}).get(f["key"]):
+                d["config"][f["key"]] = "•" * 8
+        out.append(d)
+    return out
+
+
+@api.post("/admin/distribution/connectors")
+async def add_connector(body: ConnectorBody, user: dict = Depends(_require_admin)):
+    if body.platform not in CONNECTOR_TYPES:
+        raise HTTPException(400, "Unknown platform")
+    # Validate required fields are present
+    fields = CONNECTOR_TYPES[body.platform]["fields"]
+    for f in fields:
+        if f.get("required") and not body.config.get(f["key"]):
+            raise HTTPException(400, f"Missing required field: {f['label']}")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "platform": body.platform,
+        "platform_label": CONNECTOR_TYPES[body.platform]["label"],
+        "name": body.name,
+        "config": body.config,
+        "enabled": body.enabled,
+        "instant": CONNECTOR_TYPES[body.platform].get("instant", False),
+        "created_at": now_iso(),
+        "last_broadcast_at": None,
+        "post_count": 0,
+    }
+    await db.connectors.insert_one(doc)
+    out = clean_doc(doc)
+    # Mask password fields in response
+    for f in fields:
+        if f.get("type") == "password" and out.get("config", {}).get(f["key"]):
+            out["config"][f["key"]] = "•" * 8
+    return out
+
+
+@api.patch("/admin/distribution/connectors/{cid}")
+async def update_connector(cid: str, body: dict, user: dict = Depends(_require_admin)):
+    update = {}
+    if "enabled" in body:
+        update["enabled"] = bool(body["enabled"])
+    if "name" in body:
+        update["name"] = body["name"]
+    if "config" in body and isinstance(body["config"], dict):
+        # Merge config (don't allow overwriting with masked •••• values)
+        existing = await db.connectors.find_one({"id": cid})
+        if not existing:
+            raise HTTPException(404, "Connector not found")
+        merged = {**(existing.get("config") or {})}
+        for k, v in body["config"].items():
+            if isinstance(v, str) and v.startswith("••"):
+                continue  # user didn't edit this masked field; keep existing
+            merged[k] = v
+        update["config"] = merged
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    res = await db.connectors.update_one({"id": cid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Connector not found")
+    return {"ok": True}
+
+
+@api.delete("/admin/distribution/connectors/{cid}")
+async def delete_connector(cid: str, user: dict = Depends(_require_admin)):
+    res = await db.connectors.delete_one({"id": cid})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Connector not found")
+    return {"ok": True}
+
+
+async def _post_to_discord(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    payload = {
+        "content": f"**{ad.get('headline', 'New on Lumo')}**\n\n{ad.get('body', '')}\n\n{ad.get('cta', '')} → https://golumo.app\n\n" + " ".join([f"#{h}" for h in (ad.get('hashtags') or [])[:6]]),
+    }
+    if image_full_url:
+        payload["embeds"] = [{"image": {"url": image_full_url}}]
+    async with httpx.AsyncClient(timeout=12.0) as c:
+        r = await c.post(cfg["webhook_url"], json=payload)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Discord {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+async def _post_to_telegram(cfg: dict, ad: dict, image_full_url: Optional[str]) -> dict:
+    token = cfg["bot_token"]
+    chat_id = cfg["chat_id"]
+    caption = f"*{ad.get('headline', '')}*\n\n{ad.get('body', '')}\n\n{ad.get('cta', '')} → https://golumo.app"
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        if image_full_url:
+            r = await c.post(
+                f"https://api.telegram.org/bot{token}/sendPhoto",
+                json={"chat_id": chat_id, "photo": image_full_url, "caption": caption[:1024], "parse_mode": "Markdown"},
+            )
+        else:
+            r = await c.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": caption[:4096], "parse_mode": "Markdown"},
+            )
+        if r.status_code >= 400:
+            raise RuntimeError(f"Telegram {r.status_code}: {r.text[:200]}")
+        return {"status": "ok"}
+
+
+POSTERS = {"discord": _post_to_discord, "telegram": _post_to_telegram}
+
+
+class BroadcastBody(BaseModel):
+    ad_id: str
+    connector_ids: Optional[List[str]] = None  # None = all enabled
+
+
+@api.post("/admin/distribution/broadcast")
+async def broadcast_ad(body: BroadcastBody, user: dict = Depends(_require_admin)):
+    ad = await db.ads.find_one({"id": body.ad_id})
+    if not ad:
+        raise HTTPException(404, "Ad not found")
+    ad = clean_doc(ad)
+    image_url = ad.get("image_url")
+    image_full_url = None
+    if image_url:
+        image_full_url = image_url if image_url.startswith("http") else f"https://golumo.app{image_url}"
+
+    q: dict = {"enabled": True}
+    if body.connector_ids:
+        q["id"] = {"$in": body.connector_ids}
+    connectors = await db.connectors.find(q).to_list(50)
+    results = []
+    for c in connectors:
+        c = clean_doc(c)
+        platform = c["platform"]
+        poster = POSTERS.get(platform)
+        if not poster:
+            results.append({"connector_id": c["id"], "platform": platform, "name": c.get("name"), "status": "skipped", "reason": CONNECTOR_TYPES.get(platform, {}).get("todo", "Not yet implemented")})
+            continue
+        try:
+            await poster(c["config"], ad, image_full_url)
+            await db.connectors.update_one({"id": c["id"]}, {"$set": {"last_broadcast_at": now_iso()}, "$inc": {"post_count": 1}})
+            results.append({"connector_id": c["id"], "platform": platform, "name": c.get("name"), "status": "ok"})
+        except Exception as e:
+            logger.error(f"Broadcast to {platform} failed: {e}")
+            results.append({"connector_id": c["id"], "platform": platform, "name": c.get("name"), "status": "failed", "reason": str(e)[:200]})
+    return {"ad_id": body.ad_id, "broadcasts": results, "summary": {
+        "total": len(results),
+        "ok": sum(1 for r in results if r["status"] == "ok"),
+        "failed": sum(1 for r in results if r["status"] == "failed"),
+        "skipped": sum(1 for r in results if r["status"] == "skipped"),
+    }}
+
+
+@api.post("/admin/distribution/connectors/{cid}/test")
+async def test_connector(cid: str, user: dict = Depends(_require_admin)):
+    c = await db.connectors.find_one({"id": cid})
+    if not c:
+        raise HTTPException(404, "Connector not found")
+    c = clean_doc(c)
+    poster = POSTERS.get(c["platform"])
+    if not poster:
+        return {"status": "skipped", "reason": "Implementation pending — UI saves your credentials and will activate when we ship the connector."}
+    test_ad = {
+        "headline": "Lumo Distribution test ✓",
+        "body": "If you can read this, the connector works. Real ads will be broadcast from /admin → Ad Studio.",
+        "cta": "Visit Lumo",
+        "hashtags": ["lumo", "test"],
+    }
+    try:
+        await poster(c["config"], test_ad, None)
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(502, f"Test failed: {str(e)[:300]}")
 
 
 # ────────────────────────────────────────────────────────────────────────────
