@@ -8,6 +8,7 @@ import NavBar from "@/components/NavBar";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
 import AutoTranslator from "@/components/AutoTranslator";
+import InstallPrompt from "@/components/InstallPrompt";
 import { Toaster } from "@/components/ui/sonner";
 
 import Landing from "@/pages/Landing";
@@ -102,6 +103,7 @@ function App() {
           </Routes>
           <Toaster position="top-right" richColors />
             <AssistantWidget />
+            <InstallPrompt />
             </CartProvider>
           </AuthProvider>
         </LocaleProvider>
