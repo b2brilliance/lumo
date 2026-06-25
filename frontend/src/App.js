@@ -37,6 +37,13 @@ import RentalInbox from "@/pages/RentalInbox";
 import AdminConsole from "@/pages/AdminConsole";
 import LandingPage from "@/pages/LandingPage";
 import JobApply from "@/pages/JobApply";
+import RealEstate from "@/pages/RealEstate";
+import RealEstateDetail from "@/pages/RealEstateDetail";
+import RealEstateList from "@/pages/RealEstateList";
+import Autos from "@/pages/Autos";
+import AutoDetail from "@/pages/AutoDetail";
+import AutoList from "@/pages/AutoList";
+import Inquiries from "@/pages/Inquiries";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -89,6 +96,14 @@ function App() {
             <Route path="/rentals/inbox" element={<Protected><RentalInbox /></Protected>} />
             <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />
+            <Route path="/real-estate" element={<RealEstate />} />
+            <Route path="/real-estate/list" element={<Protected><RealEstateList /></Protected>} />
+            <Route path="/real-estate/:id" element={<RealEstateDetail />} />
+            <Route path="/autos" element={<Autos />} />
+            <Route path="/autos/list" element={<Protected><AutoList /></Protected>} />
+            <Route path="/autos/:id" element={<AutoDetail />} />
+            <Route path="/inquiries" element={<Protected><Inquiries /></Protected>} />
+            <Route path="/inquiries/:id" element={<Protected><Inquiries /></Protected>} />
             <Route path="/work/:category" element={<LandingPage pageType="work" />} />
             <Route path="/work/:category/:city" element={<LandingPage pageType="work" />} />
             <Route path="/find-help/:category" element={<LandingPage pageType="find-help" />} />

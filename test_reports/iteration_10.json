@@ -1,0 +1,58 @@
+{
+  "summary": "Iteration 10 — Real Estate + Auto Sales + Inquiries (masked chat) feature fully verified. Backend: 28/28 pytests in /app/backend/tests/test_classifieds.py PASS (seed counts, all filter permutations for both verticals, masked-contact contract on single-GET, owner-only DELETE with 403, anti-self-inquiry 400, dedupe of buyer+listing thread, unread-counter increment/reset semantics, regression of /stores /restaurants /rentals). Frontend: /real-estate renders 21 seeded cards with photos; /autos renders 24+ cards; detail pages show photo gallery, price, spec cards, masked seller email (eg c•••r@lumo.test) and 'Message seller' button. End-to-end inquiry flow validated as provider@lumo.test: click 'Message seller' on a real-estate listing → dialog → 'Send message' → redirected to /inquiries/{id} → initial message rendered → composer input → Enter → follow-up message rendered. Inbox /inquiries lists threads sorted by last_message_at. NavBar exposes nav-mp-real-estate, nav-mp-autos under Marketplaces dropdown and nav-inquiries icon link for logged-in users. emergent-badge anchor is absent from the rendered DOM (document.getElementById('emergent-badge') === null).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Inquiry thread /inquiries/{id}", "issues": ["Message thread area has a very large empty white middle region between header and composer when there is only one message — looks visually empty; consider min-height-on-content or top-aligning messages tighter."]}
+    ]
+  },
+  "verified_acceptance_criteria": [
+    "GET /api/classifieds/constants returns all 7 expected lists; auto_makes has 38 entries (>= 35).",
+    "GET /api/real-estate returns 21 seeded listings; each card has id/title/price/photos[]/bedrooms/bathrooms/sqft/listing_kind/property_type.",
+    "Real-estate filters verified: listing_kind=rent, listing_kind=sale, property_type=condo, min_price, max_price, min_beds, city, q — every returned item matches its narrowing predicate.",
+    "GET /api/real-estate/{id} returns seller_email_masked and seller_phone_masked; contact_email, contact_phone, owner_email are all stripped.",
+    "POST /api/real-estate with auth creates an owned listing; GET returns it; DELETE by owner → 200; DELETE by another logged-in user → 403; subsequent GET → 404.",
+    "GET /api/autos returns 24 seeded car listings; each has year/make/model/photos/price.",
+    "Auto filters verified parametrically: make=Tesla, make=Toyota, min_year=2020, max_year=2024, max_mileage=20000, fuel=Electric, body_style=Truck, max_price=30000, min_price=40000 — all narrow correctly.",
+    "GET /api/autos/{id} masks contact (seller_email_masked/seller_phone_masked) and drops contact_email/contact_phone/owner_email.",
+    "POST /api/autos creates car owned by user; DELETE by owner → 200; DELETE by another user → 403.",
+    "POST /api/inquiries with own listing → 400 'Cannot inquire about your own listing'.",
+    "POST /api/inquiries creates thread; second POST by same buyer for the same listing returns the same inquiry id (no duplicate thread).",
+    "GET /api/inquiries?role=buyer and ?role=seller filter correctly to the requesting user's perspective.",
+    "GET /api/inquiries/{id} returns {inquiry, messages[]} ordered ASC by created_at; subsequent GET on same side shows that side's unread_count == 0 (the update is applied after the read).",
+    "POST /api/inquiries/{id}/messages appends a message; the OTHER side's unread counter increments on next fetch.",
+    "Frontend /real-estate renders 21 cards in a responsive grid; nav-mp-real-estate and nav-mp-autos data-testids present under Marketplaces dropdown.",
+    "Frontend /real-estate/{id} renders photo gallery + thumbnail strip, price ($1,095,000), beds/baths/sqft/year-built/lot-size/parking spec cards, contact card with masked email 'c•••r@lumo.test', and 'Message seller' CTA (or 'Remove listing' if you're the owner).",
+    "Frontend /autos/{id} renders gallery, year/used/body-style chips, full spec grid (Year, Mileage, Fuel, Transmission, Drivetrain, Exterior color, Interior color), masked-contact card, and 'Message seller' button.",
+    "End-to-end as provider@lumo.test: click 'Message seller' on real-estate detail → dialog → 'Send message' → redirected to /inquiries/{inquiry-id} with toast 'Message sent. Find it in your Inquiries inbox.' → first message visible → composer input → Enter to send → follow-up message visible.",
+    "Inbox /inquiries lists threads with listing title, seller name, kind tag (Real Estate / Auto), and timestamp; clicking a row opens the thread view.",
+    "NavBar shows nav-inquiries icon link (inbox icon) when logged in.",
+    "document.getElementById('emergent-badge') === null — Made-with-Emergent badge removed from index.html as required. PostHog snippet still loads correctly.",
+    "Regression: GET /api/stores, /api/restaurants, /api/rentals all 200 OK and return arrays."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_classifieds.py",
+    "/app/test_reports/pytest/classifieds_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "classifieds.py is well-isolated (~520 LOC self-contained module) and DI-clean: takes db + get_current_user from caller — perfect for testability and future split of server.py.",
+    "Mask helpers _masked_email/_masked_phone keep raw contact_email and owner_email out of the response on GET /{id}. POST returns the cleaned doc but still includes owner_email (returned to the creator only, which is acceptable since they ARE the owner — and tests confirm this).",
+    "Inquiry dedupe is keyed on (listing_kind, listing_id, buyer_id) — correct contract; no duplicate threads per buyer per listing. Verified at API level.",
+    "City/state filters use case-insensitive exact-match regex anchored with ^...$ — works but means trailing whitespace would miss; acceptable for now.",
+    "Resend email is fire-and-forget via asyncio.create_task — gracefully no-ops when RESEND_API_KEY is unset (verified: no errors in backend logs during inquiry flow).",
+    "Minor: GET /inquiries/{id} returns the pre-update inquiry doc, so the unread_count==0 effect is only observable on the NEXT GET. Not a bug per spec, but if UI relies on a single-roundtrip badge clear it should refetch after open (the Inquiries.jsx polling loop covers this anyway)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_classifieds.py (new)"
+  ],
+  "success_rate": { "backend": "100% (28/28)", "frontend": "100% on tested flows" },
+  "test_credentials": "Used seeded customer@lumo.test and provider@lumo.test (password123). No new accounts created.",
+  "seed_data_creation": "Pytest creates TEST_-prefixed listings during create/delete and inquiry tests; all are deleted in the same test (no residue). The inbox does still contain 3 TEST_inq_target threads created during earlier pytest runs from /api/inquiries (the inquiry-thread teardown is implicit when their underlying listing is deleted; thread documents remain — minor cleanup miss but harmless).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Classifieds module mounted at /api/{real-estate,autos,inquiries,classifieds/constants}. Seeded counts: 21 real-estate, 24 autos. All seeded listings are owned by the seed-runner user (customer@lumo.test in this env) — when testing the inquiry flow from the customer side you'll need to first POST a listing as another user (provider/retailer/restaurant) since customer can't inquire about their own listings. Inbox at /inquiries polls every 5s. Composer in thread view is an <input type=text>, not a textarea, and is submitted via the icon Send button OR by pressing Enter.",
+  "rca of the issue": "N/A — no product bugs found this iteration."
+}

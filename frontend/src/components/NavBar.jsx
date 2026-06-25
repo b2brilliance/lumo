@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox, Home, Car } from "lucide-react";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 const MARKETPLACE_LINKS = [
@@ -11,6 +11,8 @@ const MARKETPLACE_LINKS = [
   { to: "/stores",       label: "Stores",       icon: Store,            blurb: "Retailers with inventory & delivery", testId: "nav-mp-stores" },
   { to: "/restaurants",  label: "Restaurants",  icon: UtensilsCrossed,  blurb: "Order food for delivery", testId: "nav-mp-restaurants" },
   { to: "/rentals",      label: "Rentals",      icon: KeyRound,         blurb: "Rent anything — homes, cars, venues, gear", testId: "nav-mp-rentals" },
+  { to: "/real-estate",  label: "Real Estate",  icon: Home,             blurb: "Homes for sale and for rent", testId: "nav-mp-real-estate" },
+  { to: "/autos",        label: "Auto Sales",   icon: Car,              blurb: "Cars, trucks, SUVs and EVs", testId: "nav-mp-autos" },
 ];
 
 export default function NavBar() {
@@ -100,6 +102,7 @@ export default function NavBar() {
                 </NavLink>
               )}
               <NavLink to="/chats" className="text-slate-500 hover:text-slate-900" data-testid="nav-chats" title="Messages"><MessageSquare className="w-4 h-4" /></NavLink>
+              <NavLink to="/inquiries" className="text-slate-500 hover:text-slate-900" data-testid="nav-inquiries" title="Marketplace inquiries"><Home className="w-4 h-4" /></NavLink>
               <NavLink to="/rentals/inbox" className="text-slate-500 hover:text-slate-900" data-testid="nav-rental-inbox" title="Rental booking inbox"><Inbox className="w-4 h-4" /></NavLink>
               <NavLink to="/cart" className="relative text-slate-500 hover:text-slate-900" data-testid="nav-cart" title="Cart">
                 <ShoppingCart className="w-4 h-4" />
