@@ -27,6 +27,18 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Analytics reset + click-into drill-downs (Feb 26, 2026)
+- **Backend** (`/app/backend/analytics.py`):
+  - New `POST /api/admin/analytics/reset` wipes the `pageviews` collection and writes a `cutoff_at` ISO timestamp to a `analytics_settings` singleton.
+  - All existing aggregates (overview, visitors, signups, orders, providers, revenue) now filter `created_at`/`payment_released_at` >= cutoff so pre-deployment activity disappears from totals while business records remain intact.
+  - New `GET /api/admin/analytics/details/{metric}` drill-down endpoint supporting `visitors`, `pageviews`, `top_paths`, `signups`, `signups_<role>`, `active_jobs`, `completed_jobs`, `active_orders`, `completed_orders`, `gmv`, `commission`, `payouts`, `top_providers`. Accepts `range_key=24h|7d|30d|all` and `limit`/`skip` pagination. Revenue metrics include a `by_category` aggregate.
+- **Frontend** (`/app/frontend/src/components/Analytics.jsx`):
+  - Every stat tile is now a clickable button that opens a `DetailsDialog` modal with a paginated table, range selector, and per-metric column layout.
+  - New `ResetButton` with AlertDialog confirmation in the dashboard header; cutoff timestamp shown as "tracking since…" label.
+  - Per-role signup tiles (customer/provider/retailer/restaurant) each drill into a role-filtered user list.
+  - Sparklines + Top Paths + Top Providers sections also clickable.
+- **Tested**: iteration_19 — 25/25 backend pytests + full frontend E2E pass; reset confirmed wipes pageviews and updates cutoff display in real time.
+
 ### Stripe Connect — real bank payouts (Feb 26, 2026)
 - New module `/app/backend/stripe_connect.py` using official `stripe` Python SDK.
 - Provider onboarding via Stripe-hosted Express AccountLink: `POST /api/stripe/connect/onboard` (creates account if missing, returns hosted URL).
