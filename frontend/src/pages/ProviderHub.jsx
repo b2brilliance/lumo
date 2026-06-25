@@ -11,6 +11,7 @@ import CategoryBadge from "@/components/CategoryBadge";
 import QuoteDialog from "@/components/QuoteDialog";
 import DeliveryActions from "@/components/DeliveryActions";
 import AddressInput from "@/components/AddressInput";
+import StripeConnectCard from "@/components/StripeConnectCard";
 import { checkCredentialMatch } from "@/lib/credentialMatch";
 import { KIND_LABEL } from "@/lib/credentialKinds";
 import { providerEarningsBreakdown } from "@/lib/deliveryPricing";
@@ -200,6 +201,10 @@ export default function ProviderHub() {
           setGroupFilter={setGroupFilter}
           height={400}
         />
+      </div>
+
+      <div className="mt-6">
+        <StripeConnectCard />
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8 mt-8">

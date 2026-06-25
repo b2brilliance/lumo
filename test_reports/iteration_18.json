@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 18 — Stripe Connect plumbing tests (backend + frontend). All endpoints behave correctly. The expected 400 from Stripe (Connect not enabled on the user's dashboard) is surfaced cleanly. Frontend StripeConnectCard renders on /provider and triggers an error toast (not a crash) when onboard fails. 10/10 backend tests passed (1 skipped — no GET escrow endpoint), full frontend smoke passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Stripe Connect onboard return URL",
+        "issue": "StripeConnectCard.jsx builds return_url/refresh_url as `${origin}/provider-hub?stripe=connected` but the actual route is `/provider` (no `-hub` suffix). When the user eventually enables Connect on their Stripe dashboard and completes onboarding, Stripe will redirect back to /provider-hub which 404s. This is currently latent because onboard 400s before any redirect happens — but it WILL bite as soon as Connect is enabled. Fix: change both URLs in StripeConnectCard.jsx onboard() to `/provider?stripe=connected` and `/provider?stripe=refresh`, OR add a `/provider-hub` route alias to App.js.",
+        "affected_selectors": ["stripe-connect-onboard-btn"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Provider Hub (top-right toast)",
+        "issues": ["Sonner toast with the Stripe error renders behind / clipped by the top navigation bar (z-index or top offset too small). Toast text was visible but the right edge was cut off near the user menu. Consider increasing the top offset or z-index of the Toaster."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_stripe_connect_iter18.py",
+    "/app/test_reports/pytest/iter18_stripe_connect.xml"
+  ],
+  "action_items": [
+    "Fix StripeConnectCard.jsx return_url/refresh_url to use `/provider` (not `/provider-hub`) so the post-onboarding redirect works once the user enables Stripe Connect.",
+    "Optionally adjust Toaster z-index/top offset on /provider so toasts don't visually clip behind the header (cosmetic only)."
+  ],
+  "critical_code_review_comments": [
+    "stripe_connect.py uses `getattr(req, 'currently_due', [])` on requirements — Stripe SDK returns dict-like StripeObject, fine, but document.",
+    "stripe_connect.py webhook handler accepts unsigned events in test mode (when WEBHOOK_SECRET unset). This is correct for now but ensure STRIPE_CONNECT_WEBHOOK_SECRET is required before going to production.",
+    "The new STRIPE_CONNECT_SECRET_KEY is a TEST key (`sk_test_…`). attempt_stripe_transfer() will silently no-op if not stripe_payouts_enabled — good defensive behavior, but make sure escrow auto-release UI clearly shows whether a payout was via Stripe vs wallet (currently tracked via wallet_transactions.type='stripe_payout' vs 'credit', which is good).",
+    "Review request mentions `GET /api/me` but actual endpoint is `/api/auth/me` — minor documentation mismatch, not a code bug."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_stripe_connect_iter18.py"
+  ],
+  "success_rate": {"backend": "100% (10/10 tests passed, 1 skipped)", "frontend": "100% (card renders, onboard click handled cleanly, error toast shown, no crash)"},
+  "test_credentials": "provider@lumo.test / password123 (used). admin & customer creds available in /app/memory/test_credentials.md.",
+  "seed_data_creation": "None. Tests are idempotent — call DELETE /api/stripe/connect/disconnect before assertions to keep the provider in 'not connected' state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Once the user enables Stripe Connect on their dashboard (https://dashboard.stripe.com/connect), the onboard endpoint will return 200 with an account-link URL instead of 400. At that point the next iteration should: (1) verify /api/stripe/connect/onboard returns 200 with a URL, (2) hit /api/stripe/connect/status and check connected=true after the account is created, (3) verify the return URL bug above is fixed (test that Stripe's redirect back to the frontend actually lands on the provider hub, not 404). Also worth testing the real Transfer.create path once payouts_enabled becomes true (needs a real bank, so likely a manual test).",
+  "rca of the issue": "N/A — no failing functionality. The single ‘failure’ surfaced during testing was a documentation mismatch in the review request (`/api/me` should be `/api/auth/me`); fixed in the test file. The Stripe `400 You can only create new accounts if you've signed up for Connect` response is the user-acknowledged expected state until they enable Connect on dashboard.stripe.com/connect."
+}

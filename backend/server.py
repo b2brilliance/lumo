@@ -3134,12 +3134,28 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
     bal = float(user.get("wallet_balance", 0.0))
     if body.amount <= 0 or body.amount > bal:
         raise HTTPException(400, "Invalid amount")
+
+    # If the user is Stripe-connected, push the wallet balance through a
+    # real Stripe Transfer instead of simulating. This zeroes out the
+    # in-app balance and moves the money to their bank via Stripe.
+    stripe_paid = False
+    if user.get("stripe_account_id") and user.get("stripe_payouts_enabled"):
+        transfer = await _attempt_stripe_transfer(
+            db=db, provider_id=user["id"], amount_usd=body.amount,
+            reason=f"Wallet withdrawal ({body.method})",
+            ref_kind="withdrawal",
+        )
+        stripe_paid = transfer is not None
+
     wr = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"], "user_name": user["name"], "user_email": user["email"],
-        "amount": body.amount, "method": body.method, "notes": body.notes,
+        "amount": body.amount,
+        "method": "stripe_connect" if stripe_paid else body.method,
+        "notes": body.notes,
         "status": "completed",
         "auto_processed": True,
+        "stripe_paid": stripe_paid,
         "created_at": now_iso(),
         "completed_at": now_iso(),
     }
@@ -3147,7 +3163,8 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
     await db.users.update_one({"id": user["id"]}, {"$inc": {"wallet_balance": -body.amount}})
     await db.wallet_transactions.insert_one({
         "id": str(uuid.uuid4()), "user_id": user["id"], "amount": -body.amount,
-        "type": "debit", "reason": f"Payout via {body.method}",
+        "type": "debit",
+        "reason": f"Payout via {'Stripe Connect' if stripe_paid else body.method}",
         "withdrawal_id": wr["id"], "created_at": now_iso(),
     })
     await db.notifications.insert_one({
@@ -3155,7 +3172,11 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
         "user_id": user["id"],
         "type": "payout_sent",
         "title": f"Payout of ${body.amount:.2f} sent",
-        "body": f"Your ${body.amount:.2f} payout via {body.method.replace('_', ' ')} has been processed.",
+        "body": (
+            f"Your ${body.amount:.2f} payout has been sent to your bank via Stripe."
+            if stripe_paid else
+            f"Your ${body.amount:.2f} payout via {body.method.replace('_', ' ')} has been processed."
+        ),
         "link": "/wallet",
         "withdrawal_id": wr["id"],
         "read": False,
@@ -5456,10 +5477,50 @@ app.include_router(_create_google_auth_router(db=db, create_access_token=create_
 from escrow import create_router as _create_escrow_router, auto_release_loop as _escrow_auto_release_loop  # noqa: E402
 
 
+from stripe_connect import (  # noqa: E402
+    create_router as _create_stripe_connect_router,
+    attempt_stripe_transfer as _attempt_stripe_transfer,
+)
+
+
 async def _credit_provider(*, provider_id: str, amount: float, reason: str,
                            ref_id: Optional[str] = None, ref_kind: Optional[str] = None) -> None:
-    """Shared helper used by escrow.release_payment to credit a provider's
-    wallet (simulated payment release per user direction)."""
+    """Release escrow funds to a provider.
+
+    Preferred path: real Stripe Connect transfer to the provider's bank.
+    Fallback: credit the in-app wallet (simulated payouts).
+    """
+    transfer = await _attempt_stripe_transfer(
+        db=db, provider_id=provider_id, amount_usd=amount,
+        reason=reason, ref_id=ref_id, ref_kind=ref_kind,
+    )
+    if transfer:
+        # Stripe paid the provider directly — record a "credit" entry
+        # tagged with the transfer id so the wallet UI can show the source.
+        await db.wallet_transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": provider_id,
+            "amount": amount,
+            "type": "stripe_payout",
+            "reason": reason,
+            "ref_id": ref_id,
+            "ref_kind": ref_kind,
+            "stripe_transfer_id": transfer["transfer_id"],
+            "created_at": now_iso(),
+        })
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": provider_id,
+            "type": "stripe_payout",
+            "title": f"${amount:.2f} sent to your bank",
+            "body": "Stripe is sending this payout to your connected bank account.",
+            "link": "/provider-hub",
+            "read": False,
+            "created_at": now_iso(),
+        })
+        return
+
+    # Fallback — simulated wallet credit
     await db.users.update_one({"id": provider_id}, {"$inc": {"wallet_balance": amount}})
     await db.wallet_transactions.insert_one({
         "id": str(uuid.uuid4()),
@@ -5475,6 +5536,9 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
 
 app.include_router(_create_escrow_router(db=db, get_current_user=get_current_user,
                                          credit_provider=_credit_provider))
+
+# Stripe Connect — real provider bank onboarding & payouts
+app.include_router(_create_stripe_connect_router(db=db, get_current_user=get_current_user))
 
 
 @app.on_event("startup")
