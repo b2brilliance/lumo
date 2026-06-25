@@ -34,6 +34,7 @@ import RentalDetail from "@/pages/RentalDetail";
 import RentalHost from "@/pages/RentalHost";
 import RentalInbox from "@/pages/RentalInbox";
 import AdminConsole from "@/pages/AdminConsole";
+import LandingPage from "@/pages/LandingPage";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -86,6 +87,14 @@ function App() {
             <Route path="/rentals/inbox" element={<Protected><RentalInbox /></Protected>} />
             <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />
+            <Route path="/work/:category" element={<LandingPage pageType="work" />} />
+            <Route path="/work/:category/:city" element={<LandingPage pageType="work" />} />
+            <Route path="/find-help/:category" element={<LandingPage pageType="find-help" />} />
+            <Route path="/find-help/:category/:city" element={<LandingPage pageType="find-help" />} />
+            <Route path="/sell/:category" element={<LandingPage pageType="sell" />} />
+            <Route path="/sell/:category/:city" element={<LandingPage pageType="sell" />} />
+            <Route path="/rent-out/:category" element={<LandingPage pageType="rent-out" />} />
+            <Route path="/rent-out/:category/:city" element={<LandingPage pageType="rent-out" />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />

@@ -27,6 +27,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Growth Engine: Ad Studio + Programmatic SEO + Realistic Seed Data (Feb 2026)
+- **Realistic marketplace seed**: 5 new retailers (North Shore Books, Lagos Bike Co., Verdant Plant Studio, Circuit Hub Electronics, Mariposa Specialty Foods) + 5 new restaurants (Tony's Brick Oven, Sakura Sushi, Casa del Mar, Saffron Kitchen, Root & Bloom) — each with 5 realistic inventory items. 12 structured career postings emphasizing "keep 90%" + flexibility (full-time, part-time, seasonal, freelance).
+- **AI Ad Studio** at `/admin` → Ad Studio tab: 12 audience archetypes × 19 categories × 3 sizes = 684 unique ad combos. Each ad = Claude-generated headline+body+CTA+2 variants+hashtags + Gemini Nano Banana 1080×1080/1080×1920/1200×628 photoreal image. Worker audiences emphasize 90%/10% & flexibility; customer audiences emphasize instant on-demand; sellers/hosts emphasize same-day delivery + zero monthly fee. Backend `/api/admin/ads/*` (admin-only RBAC), public `/api/storage/ads/{filename}` for image serving.
+- **Programmatic SEO landing pages**: 4 page types (work / find-help / sell / rent-out) × 49 categories × 74 cities = **3,832 unique landing URLs**. Dynamic `<LandingPage />` component sets document.title + OG/Twitter meta tags on render. Internal-link city + category grids on every page for SEO authority.
+- **Dynamic sitemap**: `/api/sitemap.xml` (3832 URLs, refreshed on each request), `/api/robots.txt` (auto-points to sitemap), static `/robots.txt` at root for crawler discovery.
+- **`DISTRIBUTION_PLAYBOOK.md`** — vetted list of ~100 free legitimate distribution channels (search engines, startup directories, niche communities, free PR) + auto-post roadmap.
+- Verified iteration_9: 14/14 new pytests + 17/17 regression + Ad Studio E2E composer→generate→preview→library on live preview URL. Manual smoke screenshot of `/work/delivery/austin` shows perfectly-rendered hero, stats, city grid, category grid.
+
 ### Visible locale switcher in NavBar (Feb 2026)
 - New `LocaleSwitcher.jsx` — flag + currency-code chevron trigger in the top-right of the NavBar, visible on every page (homepage included) for both signed-in and signed-out users.
 - Dropdown lists all 15 countries with flag + name + currency · language; active country shows a check; outside-click + Reset-to-auto-detect both wired.
@@ -133,4 +141,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - **P3**: Index Mongo `reviews` for $group aggregation instead of in-memory loop
 
 ## Next Tasks
-- Split `server.py` (3530 lines) into `APIRouter`-based modules (`routes/admin.py`, `routes/rentals.py`, `routes/cart.py`, `routes/auth.py`)
+- **Phase 3 — Referral tracking**: trackable links `golumo.app/join?ref=xxx&utm_source=tiktok` + admin attribution dashboard + provider referral-bonus system
+- **Phase 4 — Auto-post to social platforms** (separate sessions, requires user to create dev accounts):
+   - Easy first: X/Twitter, LinkedIn, Reddit, Mastodon, Bluesky
+   - Medium: Pinterest, Google Business Profile (per city)
+   - Hard: Meta (FB+IG with business verification), TikTok
+- **Search engine submissions** (user action): Submit `golumo.app/api/sitemap.xml` to Google Search Console, Bing Webmaster, Yandex, Baidu, Naver — instructions in `/app/DISTRIBUTION_PLAYBOOK.md`
+- Split `server.py` (now 4400+ lines) into `APIRouter` modules

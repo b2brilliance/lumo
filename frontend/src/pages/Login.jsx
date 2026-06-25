@@ -63,7 +63,7 @@ export default function Login() {
             No account? <Link to="/register" className="text-teal-700 underline">Create one</Link>
           </div>
           <div className="text-[11px] text-slate-400 font-mono pt-4 border-t border-slate-100">
-            Demo seeds: customer@lumo.test · provider@lumo.test · retailer@lumo.test · restaurant@lumo.test (password123)
+            Demo seeds: customer@lumo.test · provider@lumo.test · retailer@lumo.test · restaurant@lumo.test · admin@lumo.test (password123)
           </div>
         </form>
       </div>

@@ -1934,6 +1934,237 @@ async def serve_ad_object(filename: str):
         raise HTTPException(404, "Image not found")
     return Response(content=data, media_type=ctype or "image/png")
 
+
+# ────────────────────────────────────────────────────────────────────────────
+# PROGRAMMATIC SEO LANDING PAGES — city × category combinatorial reach
+# ────────────────────────────────────────────────────────────────────────────
+LANDING_CITIES = [
+    # North America
+    {"slug": "new-york", "name": "New York", "country": "US", "lat": 40.7128, "lng": -74.0060, "tz": "America/New_York"},
+    {"slug": "los-angeles", "name": "Los Angeles", "country": "US", "lat": 34.0522, "lng": -118.2437},
+    {"slug": "chicago", "name": "Chicago", "country": "US", "lat": 41.8781, "lng": -87.6298},
+    {"slug": "houston", "name": "Houston", "country": "US", "lat": 29.7604, "lng": -95.3698},
+    {"slug": "phoenix", "name": "Phoenix", "country": "US", "lat": 33.4484, "lng": -112.0740},
+    {"slug": "philadelphia", "name": "Philadelphia", "country": "US", "lat": 39.9526, "lng": -75.1652},
+    {"slug": "san-antonio", "name": "San Antonio", "country": "US", "lat": 29.4241, "lng": -98.4936},
+    {"slug": "san-diego", "name": "San Diego", "country": "US", "lat": 32.7157, "lng": -117.1611},
+    {"slug": "dallas", "name": "Dallas", "country": "US", "lat": 32.7767, "lng": -96.7970},
+    {"slug": "san-francisco", "name": "San Francisco", "country": "US", "lat": 37.7749, "lng": -122.4194},
+    {"slug": "seattle", "name": "Seattle", "country": "US", "lat": 47.6062, "lng": -122.3321},
+    {"slug": "boston", "name": "Boston", "country": "US", "lat": 42.3601, "lng": -71.0589},
+    {"slug": "austin", "name": "Austin", "country": "US", "lat": 30.2672, "lng": -97.7431},
+    {"slug": "miami", "name": "Miami", "country": "US", "lat": 25.7617, "lng": -80.1918},
+    {"slug": "atlanta", "name": "Atlanta", "country": "US", "lat": 33.7490, "lng": -84.3880},
+    {"slug": "denver", "name": "Denver", "country": "US", "lat": 39.7392, "lng": -104.9903},
+    {"slug": "portland", "name": "Portland", "country": "US", "lat": 45.5152, "lng": -122.6784},
+    {"slug": "toronto", "name": "Toronto", "country": "CA", "lat": 43.6532, "lng": -79.3832},
+    {"slug": "vancouver", "name": "Vancouver", "country": "CA", "lat": 49.2827, "lng": -123.1207},
+    {"slug": "montreal", "name": "Montreal", "country": "CA", "lat": 45.5017, "lng": -73.5673},
+    {"slug": "mexico-city", "name": "Mexico City", "country": "MX", "lat": 19.4326, "lng": -99.1332},
+    # Europe
+    {"slug": "london", "name": "London", "country": "GB", "lat": 51.5074, "lng": -0.1278},
+    {"slug": "manchester", "name": "Manchester", "country": "GB", "lat": 53.4808, "lng": -2.2426},
+    {"slug": "edinburgh", "name": "Edinburgh", "country": "GB", "lat": 55.9533, "lng": -3.1883},
+    {"slug": "dublin", "name": "Dublin", "country": "IE", "lat": 53.3498, "lng": -6.2603},
+    {"slug": "paris", "name": "Paris", "country": "FR", "lat": 48.8566, "lng": 2.3522},
+    {"slug": "berlin", "name": "Berlin", "country": "DE", "lat": 52.5200, "lng": 13.4050},
+    {"slug": "munich", "name": "Munich", "country": "DE", "lat": 48.1351, "lng": 11.5820},
+    {"slug": "madrid", "name": "Madrid", "country": "ES", "lat": 40.4168, "lng": -3.7038},
+    {"slug": "barcelona", "name": "Barcelona", "country": "ES", "lat": 41.3851, "lng": 2.1734},
+    {"slug": "rome", "name": "Rome", "country": "IT", "lat": 41.9028, "lng": 12.4964},
+    {"slug": "milan", "name": "Milan", "country": "IT", "lat": 45.4642, "lng": 9.1900},
+    {"slug": "amsterdam", "name": "Amsterdam", "country": "NL", "lat": 52.3676, "lng": 4.9041},
+    {"slug": "stockholm", "name": "Stockholm", "country": "SE", "lat": 59.3293, "lng": 18.0686},
+    {"slug": "warsaw", "name": "Warsaw", "country": "PL", "lat": 52.2297, "lng": 21.0122},
+    {"slug": "lisbon", "name": "Lisbon", "country": "PT", "lat": 38.7223, "lng": -9.1393},
+    # Asia
+    {"slug": "tokyo", "name": "Tokyo", "country": "JP", "lat": 35.6762, "lng": 139.6503},
+    {"slug": "osaka", "name": "Osaka", "country": "JP", "lat": 34.6937, "lng": 135.5023},
+    {"slug": "seoul", "name": "Seoul", "country": "KR", "lat": 37.5665, "lng": 126.9780},
+    {"slug": "shanghai", "name": "Shanghai", "country": "CN", "lat": 31.2304, "lng": 121.4737},
+    {"slug": "beijing", "name": "Beijing", "country": "CN", "lat": 39.9042, "lng": 116.4074},
+    {"slug": "hong-kong", "name": "Hong Kong", "country": "HK", "lat": 22.3193, "lng": 114.1694},
+    {"slug": "singapore", "name": "Singapore", "country": "SG", "lat": 1.3521, "lng": 103.8198},
+    {"slug": "bangkok", "name": "Bangkok", "country": "TH", "lat": 13.7563, "lng": 100.5018},
+    {"slug": "manila", "name": "Manila", "country": "PH", "lat": 14.5995, "lng": 120.9842},
+    {"slug": "jakarta", "name": "Jakarta", "country": "ID", "lat": -6.2088, "lng": 106.8456},
+    {"slug": "kuala-lumpur", "name": "Kuala Lumpur", "country": "MY", "lat": 3.1390, "lng": 101.6869},
+    {"slug": "mumbai", "name": "Mumbai", "country": "IN", "lat": 19.0760, "lng": 72.8777},
+    {"slug": "delhi", "name": "Delhi", "country": "IN", "lat": 28.7041, "lng": 77.1025},
+    {"slug": "bengaluru", "name": "Bengaluru", "country": "IN", "lat": 12.9716, "lng": 77.5946},
+    {"slug": "chennai", "name": "Chennai", "country": "IN", "lat": 13.0827, "lng": 80.2707},
+    {"slug": "kolkata", "name": "Kolkata", "country": "IN", "lat": 22.5726, "lng": 88.3639},
+    {"slug": "hyderabad", "name": "Hyderabad", "country": "IN", "lat": 17.3850, "lng": 78.4867},
+    # Middle East & Africa
+    {"slug": "dubai", "name": "Dubai", "country": "AE", "lat": 25.2048, "lng": 55.2708},
+    {"slug": "abu-dhabi", "name": "Abu Dhabi", "country": "AE", "lat": 24.4539, "lng": 54.3773},
+    {"slug": "doha", "name": "Doha", "country": "QA", "lat": 25.2854, "lng": 51.5310},
+    {"slug": "riyadh", "name": "Riyadh", "country": "SA", "lat": 24.7136, "lng": 46.6753},
+    {"slug": "cairo", "name": "Cairo", "country": "EG", "lat": 30.0444, "lng": 31.2357},
+    {"slug": "lagos", "name": "Lagos", "country": "NG", "lat": 6.5244, "lng": 3.3792},
+    {"slug": "nairobi", "name": "Nairobi", "country": "KE", "lat": -1.2921, "lng": 36.8219},
+    {"slug": "johannesburg", "name": "Johannesburg", "country": "ZA", "lat": -26.2041, "lng": 28.0473},
+    {"slug": "cape-town", "name": "Cape Town", "country": "ZA", "lat": -33.9249, "lng": 18.4241},
+    {"slug": "casablanca", "name": "Casablanca", "country": "MA", "lat": 33.5731, "lng": -7.5898},
+    # Latin America
+    {"slug": "sao-paulo", "name": "São Paulo", "country": "BR", "lat": -23.5505, "lng": -46.6333},
+    {"slug": "rio-de-janeiro", "name": "Rio de Janeiro", "country": "BR", "lat": -22.9068, "lng": -43.1729},
+    {"slug": "buenos-aires", "name": "Buenos Aires", "country": "AR", "lat": -34.6037, "lng": -58.3816},
+    {"slug": "santiago", "name": "Santiago", "country": "CL", "lat": -33.4489, "lng": -70.6693},
+    {"slug": "lima", "name": "Lima", "country": "PE", "lat": -12.0464, "lng": -77.0428},
+    {"slug": "bogota", "name": "Bogotá", "country": "CO", "lat": 4.7110, "lng": -74.0721},
+    # Oceania
+    {"slug": "sydney", "name": "Sydney", "country": "AU", "lat": -33.8688, "lng": 151.2093},
+    {"slug": "melbourne", "name": "Melbourne", "country": "AU", "lat": -37.8136, "lng": 144.9631},
+    {"slug": "brisbane", "name": "Brisbane", "country": "AU", "lat": -27.4698, "lng": 153.0251},
+    {"slug": "perth", "name": "Perth", "country": "AU", "lat": -31.9505, "lng": 115.8605},
+    {"slug": "auckland", "name": "Auckland", "country": "NZ", "lat": -36.8485, "lng": 174.7633},
+]
+
+LANDING_PAGE_TYPES = {
+    "work": {
+        "label": "Work on Lumo",
+        "h1_template": "{category} jobs in {city}.",
+        "h1_global": "{category} jobs — everywhere.",
+        "subtitle": "Flexible work, instant pay, and you keep 90% of every job. Set your own hours.",
+        "cta_label": "Sign up to start earning",
+        "cta_path": "/register",
+        "categories": {
+            "delivery": "Delivery driver", "courier": "Same-day courier", "ride-share": "Ride-share driver",
+            "moving": "Mover", "towing": "Tow operator", "handyman": "Handyman",
+            "cleaning": "Cleaner", "landscaping": "Landscaper", "pet-care": "Pet care provider",
+            "childcare": "Babysitter / nanny", "tutoring": "Tutor",
+            "personal-training": "Personal trainer", "beauty": "Beauty professional",
+            "tech": "Tech freelancer", "marketing": "Marketing freelancer", "remote": "Remote work",
+        },
+    },
+    "find-help": {
+        "label": "Find help fast",
+        "h1_template": "Instant {category} help in {city}.",
+        "h1_global": "Instant {category} help, anywhere.",
+        "subtitle": "Vetted professionals respond in minutes. No more waiting days. Book on demand.",
+        "cta_label": "Find help now",
+        "cta_path": "/marketplace",
+        "categories": {
+            "delivery": "delivery", "courier": "same-day courier", "moving": "moving",
+            "ride-share": "ride", "towing": "towing", "handyman": "handyman",
+            "cleaning": "cleaning", "landscaping": "landscaping", "pet-care": "pet care",
+            "childcare": "childcare", "tutoring": "tutoring",
+            "personal-training": "personal training", "beauty": "beauty",
+        },
+    },
+    "sell": {
+        "label": "Sell on Lumo",
+        "h1_template": "Sell your {category} in {city} — same-day delivery built in.",
+        "h1_global": "Sell your {category} on Lumo — everywhere.",
+        "subtitle": "Same-day delivery, zero monthly fee, you keep 90% of every order. Get your first customer in 24 hours.",
+        "cta_label": "List your business",
+        "cta_path": "/register?role=retailer",
+        "categories": {
+            "restaurant": "restaurant", "cafe": "cafe", "bakery": "bakery",
+            "grocery": "grocery", "convenience": "convenience store",
+            "boutique": "boutique", "electronics": "electronics", "bookstore": "bookstore",
+            "plant-shop": "plant shop", "specialty-foods": "specialty foods",
+            "bike-shop": "bike shop", "florist": "florist",
+        },
+    },
+    "rent-out": {
+        "label": "Rent out on Lumo",
+        "h1_template": "Rent out your {category} in {city}.",
+        "h1_global": "Rent out your {category} on Lumo.",
+        "subtitle": "Reach renters worldwide. We handle deposits, payouts, insurance, and the calendar. You keep 90%.",
+        "cta_label": "List your rental",
+        "cta_path": "/rentals/host",
+        "categories": {
+            "property": "property", "venue": "venue", "vehicle": "vehicle",
+            "boat": "boat", "rv": "RV", "equipment": "equipment",
+            "camera": "camera gear", "instrument": "musical instrument",
+            "storage": "storage space", "parking": "parking spot",
+        },
+    },
+}
+
+
+@api.get("/landing/cities")
+async def landing_cities():
+    return {"cities": LANDING_CITIES}
+
+
+@api.get("/landing/types")
+async def landing_types():
+    return {"types": LANDING_PAGE_TYPES}
+
+
+@api.get("/landing/{page_type}/{category_slug}")
+@api.get("/landing/{page_type}/{category_slug}/{city_slug}")
+async def landing_page_data(page_type: str, category_slug: str, city_slug: Optional[str] = None):
+    if page_type not in LANDING_PAGE_TYPES:
+        raise HTTPException(404, "Unknown landing type")
+    page = LANDING_PAGE_TYPES[page_type]
+    if category_slug not in page["categories"]:
+        raise HTTPException(404, "Unknown category")
+    category_label = page["categories"][category_slug]
+    city = next((c for c in LANDING_CITIES if c["slug"] == city_slug), None) if city_slug else None
+    if city_slug and not city:
+        raise HTTPException(404, "Unknown city")
+    h1 = page["h1_template"].format(category=category_label.capitalize(), city=city["name"]) if city else page["h1_global"].format(category=category_label.capitalize())
+    title = f"{h1} | Lumo"
+    description = f"{page['subtitle']} {category_label.capitalize()} on Lumo" + (f" in {city['name']}" if city else "") + "."
+    return {
+        "page_type": page_type, "page_label": page["label"],
+        "category_slug": category_slug, "category_label": category_label,
+        "city": city,
+        "title": title, "h1": h1, "subtitle": page["subtitle"], "description": description,
+        "cta_label": page["cta_label"], "cta_path": page["cta_path"],
+    }
+
+
+@api.get("/landing/sitemap-data")
+async def landing_sitemap_data():
+    """All landing-page URLs for sitemap construction."""
+    urls = []
+    for ptype, pdata in LANDING_PAGE_TYPES.items():
+        for cat in pdata["categories"]:
+            urls.append(f"/{ptype}/{cat}")
+            for city in LANDING_CITIES:
+                urls.append(f"/{ptype}/{cat}/{city['slug']}")
+    return {"urls": urls, "count": len(urls)}
+
+
+@api.get("/sitemap.xml")
+async def sitemap_xml(request: Request):
+    """Dynamic XML sitemap for all landing pages + core marketplace routes."""
+    base = str(request.base_url).rstrip("/")
+    # Drop the trailing /api/sitemap.xml path component because base_url is the FULL URL
+    # base_url here is like https://golumo.app/api/sitemap.xml → strip to root
+    origin = base.split("/api")[0]
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    core_paths = ["/", "/marketplace", "/stores", "/restaurants", "/rentals", "/register", "/login"]
+    for p in core_paths:
+        lines.append(f"  <url><loc>{origin}{p}</loc><changefreq>daily</changefreq><priority>1.0</priority></url>")
+    for ptype, pdata in LANDING_PAGE_TYPES.items():
+        for cat in pdata["categories"]:
+            lines.append(f"  <url><loc>{origin}/{ptype}/{cat}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
+            for city in LANDING_CITIES:
+                lines.append(f"  <url><loc>{origin}/{ptype}/{cat}/{city['slug']}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>")
+    lines.append("</urlset>")
+    return Response(content="\n".join(lines), media_type="application/xml")
+
+
+@api.get("/robots.txt")
+async def robots_txt(request: Request):
+    base = str(request.base_url).rstrip("/")
+    origin = base.split("/api")[0]
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        f"Sitemap: {origin}/api/sitemap.xml\n"
+    )
+    return Response(content=body, media_type="text/plain")
+
 # ────────────────────────────────────────────────────────────────────────────
 # Orders + Bundled 10% Stripe deposit checkout
 # ────────────────────────────────────────────────────────────────────────────
