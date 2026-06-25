@@ -5266,6 +5266,54 @@ app.include_router(_create_escrow_router(db=db, get_current_user=get_current_use
 async def _start_escrow_scheduler():
     asyncio.create_task(_escrow_auto_release_loop(db=db, credit_provider=_credit_provider))
 
+
+# Admin analytics dashboard (visitors, signups, orders, providers, revenue)
+from analytics import create_router as _create_analytics_router  # noqa: E402
+
+
+def _require_admin():
+    """Dependency factory used by the analytics router."""
+    async def dep(user: dict = Depends(get_current_user)):
+        if (user or {}).get("role") != "admin":
+            raise HTTPException(403, "Admin access required")
+        return user
+    return dep
+
+
+app.include_router(_create_analytics_router(db=db, require_admin=_require_admin()))
+
+
+# Make sure the platform owner's email always has admin access on boot.
+OWNER_ADMIN_EMAIL = "julius.a.mason@gmail.com"
+
+
+@app.on_event("startup")
+async def _ensure_owner_admin():
+    existing = await db.users.find_one({"email": OWNER_ADMIN_EMAIL})
+    if existing:
+        if existing.get("role") != "admin":
+            await db.users.update_one(
+                {"id": existing["id"]},
+                {"$set": {"role": "admin"}},
+            )
+            logger.info(f"Promoted {OWNER_ADMIN_EMAIL} to admin role")
+        return
+    await db.users.insert_one({
+        "id": str(uuid.uuid4()),
+        "email": OWNER_ADMIN_EMAIL,
+        "name": "Julius Mason",
+        "role": "admin",
+        "password_hash": None,
+        "auth_provider": "google",  # signs in via Google one-tap
+        "wallet_balance": 0.0,
+        "location": None,
+        "service_radius_miles": 25.0,
+        "categories": [],
+        "storefront": None,
+        "created_at": now_iso(),
+    })
+    logger.info(f"Bootstrapped owner-admin account: {OWNER_ADMIN_EMAIL}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

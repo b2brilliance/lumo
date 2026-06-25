@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 15 — Admin analytics dashboard validated end-to-end. Backend pytest (20/20 in /app/backend/tests/test_analytics_iter15.py): julius.a.mason@gmail.com exists in db.users with role='admin' (verified via Motor query); POST /api/analytics/pageview is PUBLIC and returns {ok:true}; Googlebot User-Agent returns {ok:true, skipped:'bot'} and DOES NOT insert into db.pageviews; firing 3 distinct session_ids increases visitors.last_24h by ≥3 in /api/admin/analytics/overview; overview returns full nested shape (visitors{last_24h,last_7d,last_30d,pageviews_24h}, signups{totals_by_role:{customer,provider,retailer,restaurant},new_24h,new_7d,total}, orders{active_jobs,completed_jobs,active_orders,completed_orders}, revenue{gmv,lumo_commission,provider_payouts,commission_rate:0.10}); no-auth → 403, non-admin (customer) → 403; /admin/analytics/visitors?days=30 returns {timeseries,top_paths} with top_paths sorted desc and length ≤15; /admin/analytics/signups paginated, role=provider filter narrows, q=LUMO is case-insensitive substring on email/name/phone, sort=old is ascending by created_at, password_hash & _id are absent from every row; /admin/analytics/orders kind=all combines jobs+orders each with {id,kind,title,status,amount,created_at}, kind=job narrows, sort=value sorts amounts desc; /admin/analytics/providers returns {payouts_total, lumo_commission_from_provider, gmv_from_provider, avg_rating, reviews_count, jobs_completed, wallet_balance, profile_url='/u/{id}'}, sort=revenue|rating|newest all 200; q filter works; /admin/analytics/revenue?days=30 returns {days,series,totals{provider_payouts,lumo_commission,gmv}} and the cleaning-job fixture (insert TEST_ job → mark-delivered no-photos → confirm-receipt) increased today's provider_payouts by ~+$90 with today's bucket present in series. Frontend (Playwright on https://lumo-bundle-checkout.preview.emergentagent.com, admin@lumo.test login): /admin renders the legacy stat tiles (PENDING CREDS=13, WITHDRAWALS=0, ACTIVE RENTALS=23, PENDING BOOKINGS=1) at the top — regression intact; the new 'Analytics' tab is FIRST and DEFAULT active on mount; data-testid='analytics-page' renders; data-testid='analytics-tiles' shows all 4 visitor/signup/order tiles (tile-visitors-24h, tile-visitors-7d, tile-signups-7d, tile-active-orders) and the 3 revenue tiles (tile-gmv, tile-lumo-commission, tile-provider-payouts); data-testid='analytics-top-paths' renders with the 4 top paths after pageviews fire; clicking data-testid='analytics-sub-signups' triggers /api/admin/analytics/signups call with signups-search/signups-role/signups-sort controls; selecting role='Providers' via the Radix Select fires /api/admin/analytics/signups?role=provider and narrows to 2 provider rows each with data-testid='signup-row-{uid}'; clicking data-testid='analytics-sub-orders' renders orders-kind/orders-status/orders-sort filters and selecting kind='Jobs' fires /api/admin/analytics/orders?kind=job with each row data-testid='order-row-{id}'; clicking data-testid='analytics-sub-providers' shows providers-tile-gmv/commission/payouts plus 2 provider rows each with data-testid='provider-row-{id}' and data-testid='provider-profile-{id}' whose href='/u/{id}'; all existing admin tabs (Credentials, Withdrawals, Reviews, Rentals, Ad Studio, Distribution) click and render without console errors; PageviewPinger fires on initial mount and route changes (/, /map, /stores visited as anonymous browser → localStorage.lumo_pv_session populated, pageviews collection grew by 3 net during the run).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "verified_acceptance_criteria": [
+    "julius.a.mason@gmail.com exists in db.users with role='admin' (passwordless google account, verified by Motor query)",
+    "POST /api/analytics/pageview public → 200 {ok:true}",
+    "POST /api/analytics/pageview with Googlebot UA → 200 {ok:true, skipped:'bot'} + no DB row inserted",
+    "3 distinct session_ids increase visitors.last_24h by ≥3",
+    "GET /api/admin/analytics/overview no auth → 403 / non-admin → 403 / admin → full nested shape with commission_rate=0.10",
+    "GET /api/admin/analytics/visitors?days=30 returns timeseries[] + top_paths[] sorted desc, length ≤ 15",
+    "GET /api/admin/analytics/signups: default paginated, role=provider narrows, q=LUMO case-insensitive substring on email/name/phone, sort=old ascending, password_hash & _id always absent",
+    "GET /api/admin/analytics/orders: kind=all combines jobs+cart orders with required fields; kind=job narrows; sort=value desc by amount",
+    "GET /api/admin/analytics/providers: includes payouts_total, lumo_commission_from_provider, gmv_from_provider, avg_rating, reviews_count, jobs_completed, wallet_balance, profile_url='/u/{id}'; sort=revenue|rating|newest all 200; q filter works",
+    "GET /api/admin/analytics/revenue?days=30 returns {days,series,totals}; cleaning-job fixture (insert→mark-delivered no-photos→confirm-receipt) adds ~+$90 to today's provider_payouts and today's bucket in series",
+    "Frontend /admin: Analytics is DEFAULT active tab, data-testid='analytics-page' present",
+    "data-testid='analytics-tiles' contains all 4 top tiles + 3 revenue tiles render",
+    "data-testid='analytics-top-paths' shows ≥1 row",
+    "Signups sub-tab: filter to role=provider fires /api/admin/analytics/signups?role=provider, rows have data-testid='signup-row-{uid}'",
+    "Orders sub-tab: kind=job fires /api/admin/analytics/orders?kind=job, rows have data-testid='order-row-{id}'",
+    "Providers sub-tab: providers-tile-gmv/commission/payouts + provider-row-{id} + provider-profile-{id} href=/u/{id}",
+    "All legacy admin tabs (Credentials, Withdrawals, Reviews, Rentals, Ad Studio, Distribution) still click without errors",
+    "Regression: legacy 4-tile row (PENDING CREDS / WITHDRAWALS / ACTIVE RENTALS / PENDING BOOKINGS) still renders at top of /admin",
+    "PageviewPinger fires on mount + route change; localStorage 'lumo_pv_session' populated"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_analytics_iter15.py",
+    "/app/test_reports/pytest/iter15_analytics.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "analytics.py is well-factored at ~390 LOC; pure-Mongo aggregation pipelines (no Python loops over collections) keep the listing endpoints fast.",
+    "Bot regex `bot|crawl|spider|slurp|bing|google|preview` will also match 'preview' substring inside genuine UA strings (Chrome PreviewMode, Safari Tech Preview); acceptable trade-off but consider word-boundary `\\b(bot|crawl|spider|slurp|bing|google|preview)\\b` if false-positive skipping ever shows up in pageview counts.",
+    "providers_list iterates per-user with two aggregate calls each (paid_jobs + paid_orders) + a reviews aggregate — O(3N) calls; fine while provider count is small, but should be refactored to a single $facet/$lookup pipeline if the provider table grows past a few hundred rows.",
+    "_ensure_owner_admin uses two @app.on_event('startup') hooks adjacent (one for escrow scheduler, one for owner admin) — both safe and order-independent here, but FastAPI is moving to lifespan context managers; consider consolidating during the next refactor.",
+    "Revenue commission math uses payouts/0.9 to derive gross. This is mathematically exact (and matches escrow.py's gross×0.90 release), but a tiny rounding gap (≤$0.02) can show up on individual rows because each row is round()'d to 2dp before summing. Totals reconcile within the assertion tolerance (<$1) used in tests.",
+    "Analytics.jsx is self-contained and uses a hand-rolled SVG sparkline (no chart library bloat) — clean.",
+    "PageviewPinger correctly debounces by using useLocation()+useRef to avoid double-firing on the same path within a mount; localStorage session id is namespaced under 'lumo_pv_session'.",
+    "The orders_history endpoint loads ALL jobs+orders into memory before slicing — fine at current scale (~165 rows seen during testing) but should switch to per-collection $sort+$limit+$skip pipelines once total > ~5k.",
+    "Signups endpoint correctly projects out password_hash via {password_hash: 0} and _clean() strips _id — defence in depth verified."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_analytics_iter15.py (new — 20 pytest cases)",
+    "/app/test_reports/iteration_15.json (this report)"
+  ],
+  "success_rate": { "backend": "100% (20/20)", "frontend": "100% (all UI acceptance criteria verified)" },
+  "test_credentials": "admin@lumo.test / customer@lumo.test / provider@lumo.test all password123 (seeded). julius.a.mason@gmail.com is bootstrapped passwordless (auth_provider='google', password_hash=null) — verified via Motor query, not via login.",
+  "seed_data_creation": "Test ingested ~9 pageviews with session_id prefix 'TEST_' and 1 TEST_rev_xxxx cleaning job (provider_id pre-assigned, $100 flat rate); all auto-cleaned via the session-scope teardown fixture and explicit finally-block delete. Final cleanup pass returned 0 stragglers.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Shadcn/Radix Select components (signups-role, orders-kind, etc.) are NOT native <select>; Playwright's select_option fails on them. Use page.click('[data-testid=\"signups-role\"]') to open the dropdown then page.locator(\"[role='option']:has-text('Providers')\").click() to pick. Verified by intercepting requests and confirming the URL contains role=provider/kind=job. For the revenue fixture flow, the cleaning category is non-physical so mark-delivered accepts an empty {} body without photos; gross→net math is round(pay_rate × 0.90, 2) ⇒ $90 from $100. Don't try to login as julius.a.mason@gmail.com — the row is passwordless. Default route /admin lands on Analytics tab thanks to AdminConsole.jsx's defaultValue='analytics'.",
+  "rca of the issue": "No defects discovered. The new analytics router, owner-admin bootstrap, PageviewPinger, and AdminConsole tab wiring all align with the acceptance spec; backend math (gross = payouts/0.9, commission = gross × 0.10) is internally consistent and matches escrow.py's release-time multiplier of 0.90. The only minor non-blockers are the bot-regex 'preview' substring match and the per-provider N+1 aggregate pattern noted above."
+}

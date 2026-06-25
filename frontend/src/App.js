@@ -44,6 +44,7 @@ import Autos from "@/pages/Autos";
 import AutoDetail from "@/pages/AutoDetail";
 import AutoList from "@/pages/AutoList";
 import Inquiries from "@/pages/Inquiries";
+import PageviewPinger from "@/components/PageviewPinger";
 import SignIn from "@/pages/SignIn";
 
 function Protected({ children, roles }) {
@@ -65,6 +66,7 @@ function App() {
               <NavBar />
               <NotificationsBridge />
               <AutoTranslator />
+              <PageviewPinger />
               <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />

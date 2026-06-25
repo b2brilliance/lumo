@@ -3,12 +3,14 @@ import { Navigate, Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import AdStudio from "@/components/AdStudio";
 import Distribution from "@/components/Distribution";
+import Analytics from "@/components/Analytics";
 
 const TABS = [
+  { key: "analytics",   label: "Analytics",   icon: BarChart3 },
   { key: "credentials", label: "Credentials", icon: ShieldCheck },
   { key: "withdrawals", label: "Withdrawals", icon: WalletIcon },
   { key: "reviews",     label: "Reviews",     icon: MessageSquare },
@@ -130,7 +132,7 @@ function RentalsTab() {
 
 export default function AdminConsole() {
   const { user } = useAuth();
-  const [tab, setTab] = useState("credentials");
+  const [tab, setTab] = useState("analytics");
   const [stats, setStats] = useState(null);
   useEffect(() => {
     if (user?.role === "admin") {
@@ -175,6 +177,7 @@ export default function AdminConsole() {
       </div>
 
       <div className="mt-6">
+        {tab === "analytics"   && <Analytics />}
         {tab === "credentials" && <CredentialsTab />}
         {tab === "withdrawals" && <WithdrawalsTab />}
         {tab === "reviews"     && <ReviewsTab />}
