@@ -27,6 +27,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Pricing UI Overhaul: Auto-Quote Delivery + Provider Earnings Breakdown (Feb 25, 2026)
+- Customer-side: for `delivery / courier / moving` categories, the `Pay rate` + `Pay unit` + `Estimated time` inputs are now hidden — price is auto-calculated from item details + pickup/dropoff distance (10ths-of-a-mile precision via existing `deliveryPricing.js` engine). Submit button is disabled with the hint "Enter pickup + drop-off addresses to see price" until the auto-quote materializes.
+- Customer-facing copy: every "Driver receives / Movers receive / Driver keeps" surface relabeled to "**Your price**" — verified scrubbed from `/customer`, `/jobs/:id`, `/map`, `/provider` (DOM grep).
+- Provider-side: NEW earnings panel (`data-testid='provider-earnings-breakdown'`) on `/jobs/:id`, plus inline "You keep $X" subtitle on every `/provider` opportunity row and a live take-home preview inside the QuoteDialog. Math: `customer_pays`, `Lumo platform fee (10%)`, `Your take-home = customer_pays × 0.9`. Sales-tax disclaimer: "Customer pays any sales tax at checkout — it doesn't reduce your earnings."
+- New helper: `providerEarningsBreakdown({customerCost})` in `/app/frontend/src/lib/deliveryPricing.js` (constant `LUMO_COMMISSION_RATE = 0.10`).
+- **Tested**: iteration_13 — 5/5 backend pytests + 9/9 frontend E2E PASS. Verified $90→$81 take-home and 5 live opportunity rows. Zero bugs.
+
+
 ### Three-option Sign-in (Google + Phone + Email) (Feb 25, 2026)
 - `/signin` refactored into a chooser with 3 primary buttons:
   - **Continue with Google** → Emergent-managed OAuth (zero setup, no API keys). Backend `POST /api/auth/google/exchange` upserts user by email and issues Lumo JWT.
