@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Send, Trash2, Power, TestTube, Eye, EyeOff, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -126,6 +127,29 @@ export default function Distribution() {
   const instantConnectors = useMemo(() => Object.entries(types).filter(([k, v]) => v.instant).map(([k, v]) => [k, v]), [types]);
   const tokenConnectors = useMemo(() => Object.entries(types).filter(([k, v]) => !v.instant).map(([k, v]) => [k, v]), [types]);
 
+  // ── Auto-pilot panel state ──
+  const [ap, setAp] = useState(null);          // settings doc
+  const [apLog, setApLog] = useState([]);
+  const [apBusy, setApBusy] = useState(false);
+  const loadAp = () => {
+    api.get("/admin/autopilot/settings").then(({ data }) => setAp(data)).catch(() => {});
+    api.get("/admin/autopilot/log?limit=10").then(({ data }) => setApLog(data.items || [])).catch(() => {});
+  };
+  useEffect(() => { loadAp(); }, []);
+  const patchAp = async (patch) => {
+    try { const { data } = await api.patch("/admin/autopilot/settings", patch); setAp(data); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const runAutopilotNow = async () => {
+    setApBusy(true);
+    try {
+      const { data } = await api.post("/admin/autopilot/run-now");
+      toast.success(`Posted "${(data.headline || '').slice(0, 60)}" to ${data.summary.ok} channel${data.summary.ok === 1 ? "" : "s"}`);
+      loadAp();
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setApBusy(false); }
+  };
+
   return (
     <div data-testid="distribution-tab">
       <div className="flex items-end justify-between flex-wrap gap-4">
@@ -136,6 +160,65 @@ export default function Distribution() {
             Add a channel (Discord webhook + Telegram bot work instantly with no developer signup), then 1-click broadcast any Ad Studio creative to all enabled channels at once.
           </p>
         </div>
+      </div>
+
+      {/* AUTO-PILOT */}
+      <div className="mt-6 border border-teal-700/40 bg-teal-50/30 p-5" data-testid="autopilot-panel">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <div className="overline text-teal-800">Daily Auto-pilot</div>
+            <h3 className="font-display text-xl font-black tracking-tight mt-1">Post one ad per day, automatically.</h3>
+            <p className="text-xs text-slate-600 mt-1 max-w-xl">
+              When enabled, Lumo picks one ad from your library and broadcasts it to every enabled channel once a day at the time you choose. Hashtags fly with each post — drop the webhook URLs of <em>public Discord servers, Telegram channels, Slack workspaces, Zapier/Make catch hooks</em> above to maximize reach in open communities.
+            </p>
+          </div>
+          <Button onClick={runAutopilotNow} disabled={apBusy} variant="outline" data-testid="autopilot-run-now">
+            {apBusy ? "Sending…" : "Run a cycle now"}
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-sm">
+          <label className="flex items-center gap-2 border border-slate-200 px-3 py-2 cursor-pointer bg-white">
+            <input
+              type="checkbox"
+              checked={!!ap?.enabled}
+              onChange={(e) => patchAp({ enabled: e.target.checked })}
+              data-testid="autopilot-enabled"
+            />
+            <span><span className="font-bold">{ap?.enabled ? "Enabled" : "Off"}</span> — daily broadcast</span>
+          </label>
+          <div className="border border-slate-200 px-3 py-2 bg-white">
+            <Label className="overline">Run time (UTC)</Label>
+            <Input
+              type="time"
+              value={ap?.daily_time_utc || "14:00"}
+              onChange={(e) => patchAp({ daily_time_utc: e.target.value })}
+              className="mt-1"
+              data-testid="autopilot-time"
+            />
+          </div>
+          <label className="flex items-center gap-2 border border-slate-200 px-3 py-2 cursor-pointer bg-white">
+            <input
+              type="checkbox"
+              checked={ap?.shuffle !== false}
+              onChange={(e) => patchAp({ shuffle: e.target.checked })}
+              data-testid="autopilot-shuffle"
+            />
+            <span>{ap?.shuffle !== false ? "Random ad each day" : "Round-robin through library"}</span>
+          </label>
+        </div>
+        {apLog.length > 0 && (
+          <details className="mt-3">
+            <summary className="text-xs font-mono uppercase tracking-widest text-slate-500 cursor-pointer">Recent activity ({apLog.length})</summary>
+            <div className="mt-2 space-y-1 text-xs font-mono">
+              {apLog.map((l, i) => (
+                <div key={i} className="flex justify-between border-b border-slate-100 py-1" data-testid={`autopilot-log-${i}`}>
+                  <span className="truncate pr-2">{l.headline}{l.manual ? " · manual" : ""}</span>
+                  <span className="text-slate-500">{l.summary?.ok || 0} ok · {l.summary?.failed || 0} failed · {new Date(l.ts).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {/* ADD-CONNECTOR SHELF */}

@@ -967,12 +967,62 @@ async def clear_cart(user: dict = Depends(get_current_user)):
     await db.cart_items.delete_many({"user_id": user["id"]})
     return await _hydrate_cart(user["id"])
 
+# ── Delivery-coverage helper ─────────────────────────────────────────────────
+DELIVERY_CATEGORIES = {"delivery", "courier", "errand", "moving", "ride_share", "towing"}
+
+
+async def _delivery_coverage_for(lat: float, lng: float) -> dict:
+    """Return {covered, providers_in_range, nearest_miles} for a delivery
+    destination. A provider counts if their categories overlap any delivery
+    category, they have an active location, and the destination is within
+    their declared service_radius_miles."""
+    pipeline = [
+        {"$match": {"role": "provider", "categories": {"$in": list(DELIVERY_CATEGORIES)},
+                    "location.lat": {"$ne": None}, "location.lng": {"$ne": None}}},
+        {"$project": {"_id": 0, "id": 1, "location": 1, "service_radius_miles": 1}},
+    ]
+    in_range, nearest = 0, None
+    async for p in db.users.aggregate(pipeline):
+        loc = p.get("location") or {}
+        plat, plng = loc.get("lat"), loc.get("lng")
+        if plat is None or plng is None:
+            continue
+        miles = haversine_miles(lat, lng, float(plat), float(plng))
+        if nearest is None or miles < nearest:
+            nearest = miles
+        if miles <= float(p.get("service_radius_miles") or 25.0):
+            in_range += 1
+    return {
+        "covered": in_range > 0,
+        "providers_in_range": in_range,
+        "nearest_miles": round(nearest, 1) if nearest is not None else None,
+    }
+
+
+@api.get("/delivery/coverage")
+async def delivery_coverage(lat: float, lng: float):
+    """Public — used by the cart to pre-check before a customer hits Pay."""
+    return await _delivery_coverage_for(lat, lng)
+
+
 @api.post("/cart/checkout")
 async def cart_checkout(body: CartCheckoutCreate, req: Request, user: dict = Depends(get_current_user)):
     """Create an order + Stripe deposit checkout for all cart items from one store."""
     items = await db.cart_items.find({"user_id": user["id"], "store_id": body.store_id}).to_list(500)
     if not items:
         raise HTTPException(400, "No items from this store in cart")
+
+    # 🛑 Coverage gating — never let a customer pay if no driver covers their area.
+    addr = body.delivery_address or {}
+    lat, lng = addr.get("lat"), addr.get("lng")
+    if lat is not None and lng is not None:
+        cov = await _delivery_coverage_for(float(lat), float(lng))
+        if not cov["covered"]:
+            raise HTTPException(409, {
+                "code": "no_delivery_coverage",
+                "title": "We're not in your neighborhood yet",
+                "message": "Sorry — we don't have any Lumo drivers available in your area right now, so we can't promise this delivery. We've added your location to our expansion list and will reach out the moment a driver signs on. (No charge has been made.)",
+            })
     item_total = round(sum(float(i["price_usd"]) * int(i["quantity"]) for i in items), 2)
     delivery_fee = round(float(body.delivery_fee), 2)
     item_deposit = round(item_total * 0.10, 2)
@@ -5430,6 +5480,89 @@ app.include_router(_create_escrow_router(db=db, get_current_user=get_current_use
 @app.on_event("startup")
 async def _start_escrow_scheduler():
     asyncio.create_task(_escrow_auto_release_loop(db=db, credit_provider=_credit_provider))
+
+
+# Ad auto-pilot — one ad per day across all enabled connectors
+from ad_autopilot import autopilot_loop as _autopilot_loop, get_settings as _autopilot_get_settings  # noqa: E402
+
+
+async def _autopilot_broadcast(*, ad_id: str, connector_ids=None):
+    """Mirror of /admin/distribution/broadcast minus the FastAPI plumbing —
+    safe to call from the in-process scheduler."""
+    ad = await db.ads.find_one({"id": ad_id})
+    if not ad:
+        return {"total": 0, "ok": 0, "failed": 0, "skipped": 0}
+    ad = clean_doc(ad)
+    image_url = ad.get("image_url")
+    image_full_url = image_url if image_url and image_url.startswith("http") else (f"https://golumo.app{image_url}" if image_url else None)
+    q: dict = {"enabled": True}
+    if connector_ids:
+        q["id"] = {"$in": connector_ids}
+    connectors = await db.connectors.find(q).to_list(50)
+    ok = failed = skipped = 0
+    for c in connectors:
+        c = clean_doc(c)
+        poster = POSTERS.get(c["platform"])
+        if not poster:
+            skipped += 1
+            continue
+        try:
+            await poster(c["config"], ad, image_full_url)
+            await db.connectors.update_one({"id": c["id"]}, {"$set": {"last_broadcast_at": now_iso()}, "$inc": {"post_count": 1}})
+            ok += 1
+        except Exception as e:
+            logger.warning(f"Autopilot broadcast to {c['platform']} failed: {e}")
+            failed += 1
+    return {"total": ok + failed + skipped, "ok": ok, "failed": failed, "skipped": skipped}
+
+
+@app.on_event("startup")
+async def _start_autopilot_scheduler():
+    asyncio.create_task(_autopilot_loop(db=db, broadcast_ad=_autopilot_broadcast))
+
+
+@app.get("/api/admin/autopilot/settings")
+async def autopilot_settings_get(user: dict = Depends(_require_admin)):
+    return await _autopilot_get_settings(db)
+
+
+class AutopilotSettingsBody(BaseModel):
+    enabled: Optional[bool] = None
+    daily_time_utc: Optional[str] = None
+    shuffle: Optional[bool] = None
+
+
+@app.patch("/api/admin/autopilot/settings")
+async def autopilot_settings_update(body: AutopilotSettingsBody, user: dict = Depends(_require_admin)):
+    patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if patch:
+        await db.autopilot_settings.update_one({"_id": "singleton"}, {"$set": patch}, upsert=True)
+    return await _autopilot_get_settings(db)
+
+
+@app.get("/api/admin/autopilot/log")
+async def autopilot_log(limit: int = 50, user: dict = Depends(_require_admin)):
+    items = await db.autopilot_log.find({}).sort("ts", -1).to_list(min(limit, 200))
+    return {"items": [clean_doc(i) for i in items]}
+
+
+@app.post("/api/admin/autopilot/run-now")
+async def autopilot_run_now(user: dict = Depends(_require_admin)):
+    """Operator-triggered immediate cycle (ignores time-of-day gate)."""
+    from ad_autopilot import _pick_ad
+    settings = await _autopilot_get_settings(db)
+    ad, next_cursor = await _pick_ad(db, settings)
+    if not ad:
+        raise HTTPException(400, "Ad Studio library is empty — generate at least one ad first.")
+    summary = await _autopilot_broadcast(ad_id=ad["id"], connector_ids=None)
+    now_iso_str = now_iso()
+    await db.autopilot_settings.update_one(
+        {"_id": "singleton"},
+        {"$set": {"cursor": next_cursor, "last_run_at": now_iso_str, "last_ad_id": ad["id"]}},
+        upsert=True,
+    )
+    await db.autopilot_log.insert_one({"ts": now_iso_str, "ad_id": ad["id"], "headline": ad.get("headline"), "summary": summary, "manual": True})
+    return {"ad_id": ad["id"], "headline": ad.get("headline"), "summary": summary}
 
 
 # Admin analytics dashboard (visitors, signups, orders, providers, revenue)

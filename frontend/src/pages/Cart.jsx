@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Trash2, Plus, Minus, ShoppingCart } from "lucide-react";
 import AddressInput from "@/components/AddressInput";
+import { api } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { formatApiError } from "@/lib/api";
@@ -104,8 +105,27 @@ export default function Cart() {
                       <AddressInput
                         value={f.delivery_address}
                         onChange={(v) => setForm(g.store_id, { delivery_address: v })}
+                        onPlace={(p) => {
+                          setForm(g.store_id, { delivery_address: p.address, delivery_lat: p.lat, delivery_lng: p.lng });
+                          if (p.lat != null && p.lng != null) {
+                            api.get(`/delivery/coverage?lat=${p.lat}&lng=${p.lng}`)
+                              .then(({ data }) => setForm(g.store_id, { coverage: data }))
+                              .catch(() => {});
+                          }
+                        }}
                         placeholder="Where should we deliver?"
                       />
+                      {f.coverage && !f.coverage.covered && (
+                        <div className="mt-2 border border-amber-300 bg-amber-50 text-amber-900 text-xs p-3" data-testid={`cart-no-coverage-${g.store_id}`}>
+                          <p className="font-bold">We&apos;re not in your neighborhood yet.</p>
+                          <p className="mt-1">No Lumo driver is on duty within range of this address right now, so we can&apos;t guarantee this delivery. We&apos;ve added you to our expansion list — you won&apos;t be charged until coverage opens up{f.coverage.nearest_miles != null ? ` (nearest driver: ${f.coverage.nearest_miles.toFixed(1)} mi away)` : ""}.</p>
+                        </div>
+                      )}
+                      {f.coverage && f.coverage.covered && (
+                        <p className="mt-1 text-[11px] font-mono text-teal-700" data-testid={`cart-coverage-ok-${g.store_id}`}>
+                          ✓ {f.coverage.providers_in_range} Lumo driver{f.coverage.providers_in_range === 1 ? "" : "s"} can deliver here
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -136,8 +156,8 @@ export default function Cart() {
                     <span>Pay now (deposit)</span><span data-testid={`cart-deposit-total-${g.store_id}`}>${breakdown.depositTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-slate-500"><span>Remaining due on delivery</span><span>${breakdown.remaining.toFixed(2)}</span></div>
-                  <Button onClick={() => checkout(g.store_id)} disabled={busyStore === g.store_id} className="w-full mt-3 bg-teal-700 hover:bg-teal-800" data-testid={`cart-checkout-${g.store_id}`}>
-                    {busyStore === g.store_id ? "Redirecting…" : "Checkout this store"}
+                  <Button onClick={() => checkout(g.store_id)} disabled={busyStore === g.store_id || (f.coverage && !f.coverage.covered)} className="w-full mt-3 bg-teal-700 hover:bg-teal-800" data-testid={`cart-checkout-${g.store_id}`}>
+                    {busyStore === g.store_id ? "Redirecting…" : (f.coverage && !f.coverage.covered) ? "Not deliverable to this address" : "Checkout this store"}
                   </Button>
                   <p className="text-[10px] uppercase font-mono tracking-widest text-slate-400 text-center mt-2">Pre-tax in local currency: {formatPrice(g.subtotal_usd)}</p>
                 </div>
