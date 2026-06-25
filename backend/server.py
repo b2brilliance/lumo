@@ -2110,12 +2110,95 @@ async def landing_page_data(page_type: str, category_slug: str, city_slug: Optio
     h1 = page["h1_template"].format(category=category_label.capitalize(), city=city["name"]) if city else page["h1_global"].format(category=category_label.capitalize())
     title = f"{h1} | Lumo"
     description = f"{page['subtitle']} {category_label.capitalize()} on Lumo" + (f" in {city['name']}" if city else "") + "."
+
+    # Build Schema.org JobPosting for /work landing pages so Google Jobs indexes them
+    job_posting_ld = None
+    if page_type == "work":
+        # Map slug → backend category for live salary lookup
+        backend_cat_map = {
+            "delivery": "delivery", "courier": "courier", "moving": "moving", "ride-share": "ride_share",
+            "towing": "towing", "handyman": "handyman", "cleaning": "cleaning", "landscaping": "landscaping",
+            "pet-care": "pet_care", "childcare": "education", "tutoring": "education",
+            "personal-training": "personal_care", "beauty": "personal_care",
+            "tech": "digital_tech", "marketing": "marketing", "remote": "remote_work",
+        }
+        backend_cat = backend_cat_map.get(category_slug)
+        sample_jobs = []
+        if backend_cat:
+            sample_jobs = await db.jobs.find({"category": backend_cat, "status": "open"}).limit(50).to_list(50)
+        # Salary range from real open postings (fallback to sensible defaults)
+        rates = [j.get("pay_rate") for j in sample_jobs if isinstance(j.get("pay_rate"), (int, float)) and j.get("pay_rate") > 0]
+        units = [j.get("pay_unit") for j in sample_jobs if j.get("pay_unit")]
+        min_rate = min(rates) if rates else 22.0
+        max_rate = max(rates) if rates else 65.0
+        unit = max(set(units), key=units.count) if units else "hour"
+        unit_text = {"hour": "HOUR", "day": "DAY", "flat": "DAY"}.get(unit, "HOUR")
+        # Posting freshness — every page gets a 30-day rolling window
+        now = datetime.now(timezone.utc)
+        date_posted = now.strftime("%Y-%m-%d")
+        valid_through = (now + timedelta(days=30)).strftime("%Y-%m-%dT23:59:59+00:00")
+        employment_type = ["PART_TIME", "CONTRACTOR", "TEMPORARY", "FULL_TIME"]  # Lumo gigs are all flavors
+        job_posting_ld = {
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            "title": f"{category_label.capitalize()}" + (f" — {city['name']}" if city else ""),
+            "description": (
+                f"<p>{description}</p>"
+                f"<ul>"
+                f"<li>Keep 90% of every job. Lumo charges only a 10% platform fee.</li>"
+                f"<li>Set your own hours — accept the jobs you want, decline the rest.</li>"
+                f"<li>Instant matching with paying customers in your area.</li>"
+                f"<li>Fast payouts. No monthly subscription, no hidden cuts.</li>"
+                f"</ul>"
+            ),
+            "identifier": {"@type": "PropertyValue", "name": "Lumo", "value": f"lumo-{page_type}-{category_slug}" + (f"-{city['slug']}" if city else "")},
+            "datePosted": date_posted,
+            "validThrough": valid_through,
+            "employmentType": employment_type,
+            "directApply": True,
+            "hiringOrganization": {
+                "@type": "Organization",
+                "name": "Lumo",
+                "sameAs": "https://golumo.app",
+                "logo": "https://golumo.app/logo512.png",
+            },
+            "jobLocation": ({
+                "@type": "Place",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressLocality": city["name"],
+                    "addressCountry": city["country"],
+                },
+                "geo": {"@type": "GeoCoordinates", "latitude": city["lat"], "longitude": city["lng"]},
+            } if city else None),
+            "jobLocationType": "TELECOMMUTE" if category_slug in ("remote", "tech", "marketing") else None,
+            "applicantLocationRequirements": (
+                {"@type": "Country", "name": "Global"}
+                if category_slug in ("remote", "tech", "marketing") else None
+            ),
+            "baseSalary": {
+                "@type": "MonetaryAmount",
+                "currency": "USD",
+                "value": {
+                    "@type": "QuantitativeValue",
+                    "minValue": min_rate,
+                    "maxValue": max_rate,
+                    "unitText": unit_text,
+                },
+            },
+            "industry": "Gig Economy / On-Demand Services",
+            "occupationalCategory": category_label,
+        }
+        # Strip None values (Google Search Console treats them as errors)
+        job_posting_ld = {k: v for k, v in job_posting_ld.items() if v is not None}
+
     return {
         "page_type": page_type, "page_label": page["label"],
         "category_slug": category_slug, "category_label": category_label,
         "city": city,
         "title": title, "h1": h1, "subtitle": page["subtitle"], "description": description,
         "cta_label": page["cta_label"], "cta_path": page["cta_path"],
+        "job_posting_ld": job_posting_ld,
     }
 
 

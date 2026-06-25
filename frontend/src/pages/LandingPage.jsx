@@ -33,6 +33,18 @@ function setOG(prop, content) {
   el.setAttribute("content", content);
 }
 
+function setJsonLd(id, data) {
+  // Remove any previous instance with the same id, then inject fresh
+  const existing = document.getElementById(id);
+  if (existing) existing.remove();
+  if (!data) return;
+  const s = document.createElement("script");
+  s.type = "application/ld+json";
+  s.id = id;
+  s.text = JSON.stringify(data);
+  document.head.appendChild(s);
+}
+
 export default function LandingPage({ pageType }) {
   const { category, city } = useParams();
   const navigate = useNavigate();
@@ -56,6 +68,8 @@ export default function LandingPage({ pageType }) {
       setMeta("twitter:card", "summary_large_image");
       setMeta("twitter:title", data.title);
       setMeta("twitter:description", data.description);
+      // Inject Schema.org JobPosting for /work pages so Google Jobs indexes them
+      setJsonLd("lumo-job-posting-ld", data.job_posting_ld);
     }).catch((e) => setError(e?.response?.status === 404 ? "404" : "error"));
 
     Promise.all([
@@ -68,6 +82,12 @@ export default function LandingPage({ pageType }) {
       });
     });
   }, [pageType, category, city]);
+
+  // Cleanup JSON-LD when navigating away
+  useEffect(() => () => {
+    const tag = document.getElementById("lumo-job-posting-ld");
+    if (tag) tag.remove();
+  }, []);
 
   if (error === "404") return (
     <div className="max-w-screen-md mx-auto px-6 py-24 text-center">
