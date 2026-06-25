@@ -27,6 +27,19 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Admin Analytics Dashboard (Feb 25, 2026)
+- New module `/app/backend/analytics.py` — public POST `/api/analytics/pageview` (bot-filtered by UA regex) + admin-only `/api/admin/analytics/{overview,visitors,signups,orders,providers,revenue}`.
+- **Owner bootstrap**: `julius.a.mason@gmail.com` is promoted to `role='admin'` (or created passwordless for Google OAuth) on every backend startup.
+- **Visitor tracking**: `<PageviewPinger>` mounted at App root fires one ping per route change. Session-id stored in `localStorage.lumo_pv_session`. Server filters bots.
+- **Dashboard** in `Analytics.jsx` (new sub-tab inside `/admin`, made the default tab):
+  - **Overview** — visitors 24h/7d/30d, signups by role, active jobs/orders, GMV / Lumo commission / provider payouts, pure-SVG sparklines, top-pages list.
+  - **Signups** — paginated user table, filter by role, search name/email/phone, sort newest/oldest.
+  - **Orders** — combined jobs + cart orders, filter by kind/status, sort newest/oldest/highest-value.
+  - **Providers + Revenue** — per-provider earnings (`payouts_total`, `lumo_commission_from_provider`, `gmv_from_provider`), ratings (avg + count), jobs completed, wallet balance, link to public profile (`/u/{id}`). Sort by top earners / highest rated / newest.
+- All `_id` and `password_hash` fields stripped from responses.
+- **Tested**: iteration_15 — 20/20 backend pytests + full frontend E2E PASS. Verified owner-admin bootstrap, bot filtering, 401/403 gating, password_hash never leaked, fixture cleaning-job → +$90 payout reflected in today's revenue bucket. Zero bugs.
+
+
 ### Escrow + Proof-of-Delivery Payment Release (Feb 25, 2026)
 - New backend module `/app/backend/escrow.py` — six endpoints (`mark-delivered`, `confirm-receipt`, `dispute` × jobs and orders) + background `auto_release_loop` running every 5 min.
 - **Flow**: Provider taps "Mark delivered" → uploads 1-3 photos (required only for **physical** categories: `delivery`, `courier`, `moving`, `ride_share`, `towing` + all `orders`; **non-physical** services skip photos entirely) → row enters `awaiting_confirmation` → customer taps "I received it" (releases payment) OR "Something's wrong" (opens dispute, payment held) → if customer never responds, auto-confirms after 24 h.
