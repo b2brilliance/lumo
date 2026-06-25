@@ -27,6 +27,16 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Three-option Sign-in (Google + Phone + Email) (Feb 25, 2026)
+- `/signin` refactored into a chooser with 3 primary buttons:
+  - **Continue with Google** → Emergent-managed OAuth (zero setup, no API keys). Backend `POST /api/auth/google/exchange` upserts user by email and issues Lumo JWT.
+  - **Continue with phone** → existing Twilio SMS OTP from iter 11.
+  - **Continue with email** → existing email + password `/login` (preserves `?next=`).
+- Synchronous `#session_id=` callback detection: cleans hash, mocks-friendly, smart-redirects to `?next=` or role-based dashboard.
+- Redirect URL derived from `window.location.origin` per Emergent playbook — **no hardcoded URLs**.
+- **Tested**: iteration_12 — 9/9 backend pytests + 9/9 frontend E2E PASS (mocked Twilio + mocked Emergent OAuth for happy paths; real httpx call for 401 path). Zero bugs.
+
+
 ### Passwordless SMS Sign-in via Twilio Verify (Feb 25, 2026)
 - New mobile-first page `/signin` → enter phone → Twilio Verify sends a 6-digit code → enter code → JWT issued, account auto-created if new.
 - Smart redirect: respects `?next=…` (e.g. coming from /jobs/apply/electrician/Brooklyn) — falls back to role-based dashboard.
