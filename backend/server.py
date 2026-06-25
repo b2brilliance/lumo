@@ -2188,6 +2188,7 @@ async def landing_page_data(page_type: str, category_slug: str, city_slug: Optio
             },
             "industry": "Gig Economy / On-Demand Services",
             "occupationalCategory": category_label,
+            "url": "https://golumo.app" + f"/jobs/apply/{category_slug}" + (f"/{city['slug']}" if city else ""),
         }
         # Strip None values (Google Search Console treats them as errors)
         job_posting_ld = {k: v for k, v in job_posting_ld.items() if v is not None}

@@ -35,6 +35,7 @@ import RentalHost from "@/pages/RentalHost";
 import RentalInbox from "@/pages/RentalInbox";
 import AdminConsole from "@/pages/AdminConsole";
 import LandingPage from "@/pages/LandingPage";
+import JobApply from "@/pages/JobApply";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -95,6 +96,8 @@ function App() {
             <Route path="/sell/:category/:city" element={<LandingPage pageType="sell" />} />
             <Route path="/rent-out/:category" element={<LandingPage pageType="rent-out" />} />
             <Route path="/rent-out/:category/:city" element={<LandingPage pageType="rent-out" />} />
+            <Route path="/jobs/apply/:category" element={<JobApply />} />
+            <Route path="/jobs/apply/:category/:city" element={<JobApply />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           <Toaster position="top-right" richColors />
