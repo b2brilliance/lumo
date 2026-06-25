@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox } from "lucide-react";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 const MARKETPLACE_LINKS = [
   { to: "/marketplace",  label: "Marketplace",  icon: ShoppingBag,      blurb: "P2P listings, used goods, gear", testId: "nav-mp-marketplace" },
@@ -90,6 +91,7 @@ export default function NavBar() {
           {rl && <NavLink to={rl.to} className={linkClass} data-testid="nav-hub"><rl.icon className="inline w-3.5 h-3.5 mr-1" />{rl.label}</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <LocaleSwitcher />
           {user && user !== false ? (
             <>
               {user.role === "provider" && (
