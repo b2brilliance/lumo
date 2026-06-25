@@ -27,6 +27,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Passwordless SMS Sign-in via Twilio Verify (Feb 25, 2026)
+- New mobile-first page `/signin` → enter phone → Twilio Verify sends a 6-digit code → enter code → JWT issued, account auto-created if new.
+- Smart redirect: respects `?next=…` (e.g. coming from /jobs/apply/electrician/Brooklyn) — falls back to role-based dashboard.
+- All "Sign in" / "Get started" CTAs across NavBar, Landing, Login fallback, and Google-Jobs `/jobs/apply/...` redirector now point at `/signin`.
+- Backend: new module `/app/backend/auth_sms.py` (`POST /api/auth/sms/start`, `POST /api/auth/sms/verify`) with E.164 normalization, friendly mapping of Twilio error codes (60200, 60203, 20404, 21608), `asyncio.to_thread` so the sync Twilio SDK doesn't block the event loop, and a DEV fallback (OTP `123456`) when keys are missing.
+- Twilio credentials stored in `backend/.env`. **TRIAL mode** — real SMS only delivers to numbers manually verified in the Twilio console (documented in `/app/memory/test_credentials.md`).
+- **Tested**: iteration_11 — 16/16 backend pytests + full frontend E2E PASS. Zero bugs.
+
+
 ### Real Estate + Auto Sales marketplace with Masked Chat (Feb 25, 2026)
 - New `/api/real-estate` and `/api/autos` CRUD endpoints with rich, vertical-specific filters (beds/baths/sqft/year-built for homes; year/make/model/mileage/fuel/transmission/body-style for autos).
 - New `/api/inquiries` thread system (buyer ↔ seller in-app chat with unread counters, 5s poll, masked contact info — seller never sees buyer email/phone and vice versa).
