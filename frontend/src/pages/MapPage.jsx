@@ -6,7 +6,16 @@ import { useAuth } from "@/lib/auth";
 import { milesBetween } from "@/lib/deliveryPricing";
 import MapView from "@/components/MapView";
 
-const RADIUS_MI = 50;
+const RADIUS_OPTIONS = [
+  { value: 5,   label: "5 mi" },
+  { value: 10,  label: "10 mi" },
+  { value: 25,  label: "25 mi" },
+  { value: 50,  label: "50 mi" },
+  { value: 100, label: "100 mi" },
+  { value: 250, label: "250 mi" },
+  { value: 0,   label: "Any" },     // 0 = no distance filter
+];
+const RADIUS_STORAGE_KEY = "lumo.map.radius";
 
 // Format an ISO timestamp as a relative "time ago" string.
 function timeAgo(iso) {
@@ -32,6 +41,15 @@ export default function MapPage() {
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [groupFilter, setGroupFilter] = useState(null);
   const [highlight, setHighlight] = useState(null);
+  // User-selectable radius (persists across visits via localStorage). 0 = Any.
+  const [radius, setRadius] = useState(() => {
+    if (typeof window === "undefined") return 50;
+    const stored = parseInt(window.localStorage.getItem(RADIUS_STORAGE_KEY), 10);
+    return Number.isFinite(stored) ? stored : 50;
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(RADIUS_STORAGE_KEY, String(radius)); } catch (_) { /* localStorage unavailable */ }
+  }, [radius]);
 
   // Anchor for the 50-mile radius filter. Prefer the provider's saved service
   // location, then the customer's saved default delivery address, then null
@@ -57,24 +75,26 @@ export default function MapPage() {
   };
   useEffect(() => { load(); }, [remoteOnly, groupFilter]);
 
-  // Compute distance for each pin from the anchor, then filter to <= 50 mi.
-  // Remote jobs always show (their pin is the geographic centre of the US).
+  // Compute distance for each pin from the anchor, then filter by the selected
+  // radius (0 = Any, no distance filter). Remote jobs always show.
   const feed = useMemo(() => {
     const withDistance = pins.map((p) => {
       if (p.is_remote) return { ...p, distance_miles: null };
       if (!anchor || p.lat == null) return { ...p, distance_miles: null };
       return { ...p, distance_miles: milesBetween({ lat: anchor.lat, lng: anchor.lng }, { lat: p.lat, lng: p.lng }) };
     });
-    const filtered = anchor
-      ? withDistance.filter((p) => p.is_remote || (p.distance_miles != null && p.distance_miles <= RADIUS_MI))
+    const filtered = (anchor && radius > 0)
+      ? withDistance.filter((p) => p.is_remote || (p.distance_miles != null && p.distance_miles <= radius))
       : withDistance;
     // Server already sorts by created_at desc, but in case of stale order, re-sort.
     return filtered.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-  }, [pins, anchor]);
+  }, [pins, anchor, radius]);
 
   const showingMessage = !anchor
     ? "Showing every open job — sign in or set a location in Settings to filter to your area."
-    : `Showing open jobs within ${RADIUS_MI} miles of your saved ${anchor.source === "provider" ? "service location" : "delivery address"}.`;
+    : radius === 0
+      ? "Showing every open job (no distance filter)."
+      : `Showing open jobs within ${radius} miles of your saved ${anchor.source === "provider" ? "service location" : "delivery address"}.`;
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-8">
@@ -98,7 +118,7 @@ export default function MapPage() {
         />
       </div>
 
-      {/* ── Chronological feed (newest first, 50-mile radius) ──────────────── */}
+      {/* ── Chronological feed (newest first, user-selectable radius) ──────── */}
       <div className="mt-12" data-testid="map-job-list">
         <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
           <h2 className="font-display text-2xl font-black tracking-tighter">
@@ -108,12 +128,35 @@ export default function MapPage() {
             Newest first
           </div>
         </div>
+
+        {/* Radius selector — segmented pill bar */}
+        <div className="flex items-center gap-2 flex-wrap mb-2" data-testid="map-radius-selector">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mr-1">Radius</span>
+          {RADIUS_OPTIONS.map((opt) => {
+            const active = radius === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setRadius(opt.value)}
+                className={`text-xs font-mono px-2.5 py-1 border transition-colors ${active
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-300 hover:border-slate-900"}`}
+                data-testid={`radius-opt-${opt.value}`}
+                aria-pressed={active}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
         <p className="text-xs text-slate-500 mb-6" data-testid="map-feed-radius-note">{showingMessage}</p>
 
         {feed.length === 0 && (
           <div className="text-center py-16 border border-slate-200 text-sm text-slate-500" data-testid="map-empty">
-            {anchor
-              ? `No open jobs within ${RADIUS_MI} miles right now. Try toggling Remote-friendly above or widen your search.`
+            {anchor && radius > 0
+              ? `No open jobs within ${radius} miles right now. Try widening the radius above or toggling Remote-friendly.`
               : "No jobs match your filters yet. Try switching off Remote-friendly or picking a different category group above."}
           </div>
         )}

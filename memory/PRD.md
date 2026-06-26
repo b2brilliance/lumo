@@ -27,12 +27,12 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
-### Map page job feed: chronological + 50-mile radius (Feb 26, 2026)
+### Map page job feed: chronological + user-selectable radius (Feb 26, 2026)
 - **Replaced the grouped-by-type listing** under the `/map` page with a clean chronological feed (newest first). The map at top is untouched (same `MapView` component, all category-coloured pins, full filters).
-- **50-mile radius filter** anchored at the user's saved location: providers anchor on `user.location` (their service location), customers on `user.default_delivery_address`. Anonymous users get the unfiltered "show everything" view. Remote jobs always appear regardless of distance.
+- **User-selectable radius** — segmented pill bar with 7 options: `5 / 10 / 25 / 50 / 100 / 250 / Any` miles. Persists to `localStorage` (`lumo.map.radius`) so it remembers between visits. Anchor location: provider's `user.location`, customer's `user.default_delivery_address`, anonymous → no anchor → "show everything". Remote jobs always appear regardless of distance.
 - **New feed row design**: coloured side-rail keyed to category group · category + remote chips · title + 1-line description · stats column with pay rate / distance / time-ago. Hover sync with map highlight. Cleaner than the previous nested groups.
 - **Backend**: `/api/map/jobs` now returns `created_at` + `description` per pin and pre-sorts newest-first so frontend can render a chronological feed without extra fetches.
-- **Tested**: smoke-screenshot as provider@lumo.test (saved NYC location) — 54 total pins on map, 24 within 50 mi shown in feed; old grouped selectors (`map-group-*`, `map-category-*`) all return 0 count. Sort label reads "Newest first"; radius note reads "Showing open jobs within 50 miles of your saved service location".
+- **Tested**: smoke-screenshot as provider@lumo.test (saved NYC location) — pill bar live-filters between 24 jobs (5 mi) → 25 (250 mi) → 54 (Any). Selection persists across page reloads. Old grouped selectors (`map-group-*`, `map-category-*`) return 0 count.
 
 ### Wiring notification_prefs + default_delivery_address pre-fill (Feb 26, 2026)
 - **Server-side notification filter** (`/app/backend/server.py` — new `NOTIF_TYPE_TO_PREF` map + `_filter_notifications_by_prefs`). `GET /api/notifications` now drops items whose `type` maps to a pref the user has disabled (`order_updates` / `job_matches`). 13 lifecycle types gated (quote_*, rental_*, order_*, delivery_marked, plus 2 forward-looking job-match types). Always-show types: `new_message`, `review_*`, `payout_*`.
