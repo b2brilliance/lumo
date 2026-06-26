@@ -2034,6 +2034,28 @@ async def serve_ad_object(filename: str):
     return Response(content=data, media_type=ctype or "image/png")
 
 
+@api.get("/blog-image/{filename}")
+async def serve_local_blog_image(filename: str):
+    safe = filename.replace("..", "").replace("/", "")
+    path = f"/app/backend/storage/blog/{safe}"
+    if not os.path.exists(path):
+        raise HTTPException(404, "Image not found")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@api.get("/storage/blog/{filename}")
+async def serve_blog_object(filename: str):
+    safe = filename.replace("..", "").replace("/", "")
+    try:
+        data, ctype = get_object(f"blog/{safe}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Storage fetch failed: {e}")
+        raise HTTPException(404, "Image not found")
+    return Response(content=data, media_type=ctype or "image/jpeg")
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # SOCIAL DISTRIBUTION — pluggable connectors to broadcast Ad Studio creatives
 # ────────────────────────────────────────────────────────────────────────────
@@ -3091,25 +3113,103 @@ async def landing_sitemap_data():
 
 @api.get("/sitemap.xml")
 async def sitemap_xml(request: Request):
-    """Dynamic XML sitemap for all landing pages + core marketplace routes."""
+    """Dynamic XML sitemap — landing pages, core routes, and published blog posts."""
     base = str(request.base_url).rstrip("/")
-    # Drop the trailing /api/sitemap.xml path component because base_url is the FULL URL
-    # base_url here is like https://golumo.app/api/sitemap.xml → strip to root
     origin = base.split("/api")[0]
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ]
-    core_paths = ["/", "/marketplace", "/stores", "/restaurants", "/rentals", "/register", "/login"]
+    core_paths = [
+        "/", "/about", "/contact", "/terms", "/privacy", "/blog",
+        "/marketplace", "/stores", "/restaurants", "/rentals",
+        "/real-estate", "/autos", "/map", "/register", "/login", "/sign-in",
+    ]
     for p in core_paths:
         lines.append(f"  <url><loc>{origin}{p}</loc><changefreq>daily</changefreq><priority>1.0</priority></url>")
+
+    # Programmatic SEO landing pages (work/<cat>/<city>, etc.)
     for ptype, pdata in LANDING_PAGE_TYPES.items():
         for cat in pdata["categories"]:
             lines.append(f"  <url><loc>{origin}/{ptype}/{cat}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
             for city in LANDING_CITIES:
                 lines.append(f"  <url><loc>{origin}/{ptype}/{cat}/{city['slug']}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>")
+
+    # Auto-generated blog posts
+    try:
+        async for p in db.blog_posts.find({"status": "published"}, {"_id": 0, "slug": 1, "published_at": 1, "updated_at": 1}).sort("published_at", -1).limit(5000):
+            slug = (p.get("slug") or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if not slug:
+                continue
+            lastmod = (p.get("updated_at") or p.get("published_at") or "")[:10]
+            ts = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
+            lines.append(f"  <url><loc>{origin}/blog/{slug}</loc>{ts}<changefreq>weekly</changefreq><priority>0.7</priority></url>")
+    except Exception:
+        pass
+
     lines.append("</urlset>")
     return Response(content="\n".join(lines), media_type="application/xml")
+
+
+@api.get("/llms.txt")
+async def llms_txt(request: Request):
+    """LLM-friendly site description per llmstxt.org spec."""
+    base = str(request.base_url).rstrip("/")
+    origin = base.split("/api")[0]
+    try:
+        blog_count = await db.blog_posts.count_documents({"status": "published"})
+    except Exception:
+        blog_count = 0
+    body = f"""# https://llmstxt.org
+# Lumo — local services & same-day delivery marketplace
+# Live URL: {origin}
+# Blog posts published: {blog_count}
+
+> Lumo connects customers with local providers for same-day delivery,
+> home services, marketplace goods, rentals, real-estate listings, and
+> vehicle sales. Flat 10% commission (vs 15-30% on competitors), escrow
+> protection on every order with 24-hour auto-release, and Stripe-powered
+> bank payouts to providers.
+
+## Core pages
+
+- [Home]({origin}/): Overview, commission story, key features
+- [Blog]({origin}/blog): Auto-generated marketplace insights, twice daily
+- [About]({origin}/about): Mission and team
+- [Contact]({origin}/contact): hello@golumo.app
+- [Live map]({origin}/map): Every open job pinned by category
+- [Real estate]({origin}/real-estate): Local listings (rent + sale)
+- [Autos]({origin}/autos): Used-car marketplace
+- [Restaurants]({origin}/restaurants): Local restaurant catalog + same-day delivery
+- [Stores]({origin}/stores): Retail catalog + same-day delivery
+- [Rentals]({origin}/rentals): Hourly / daily / weekly rentals
+- [Sign in]({origin}/sign-in): Google, phone, or email login
+- [Provider hub]({origin}/provider): Earn money on your schedule
+- [Customer hub]({origin}/customer): Post a job, hire help
+
+## Pricing
+- Provider keeps 90% of every transaction (Lumo takes 10% flat).
+- Customers pay listed price + delivery fee. No hidden surcharges.
+- 1% review cashback for honest feedback (good OR bad).
+
+## Differentiators
+- Half the commission of TaskRabbit/Instacart, third of Uber Eats.
+- Escrow + photo-proof of delivery + 24-hour auto-release.
+- Same-day delivery from ANY retailer/restaurant/individual (not just partners).
+- Distance-based delivery pricing (not provider estimates).
+- AI-generated ads + auto-publishing to social channels (Distribution tab).
+- Auto-generated blog content twice daily.
+- Twice-daily email newsletter to subscribers.
+
+## Legal
+- Terms: {origin}/terms
+- Privacy: {origin}/privacy
+- FTC-compliant — no fake reviews, ever. All testimonials are from verified, paying customers.
+
+## Contact
+hello@golumo.app · support@golumo.app · press@golumo.app
+"""
+    return Response(content=body, media_type="text/plain; charset=utf-8")
 
 
 @api.get("/robots.txt")
@@ -3119,7 +3219,25 @@ async def robots_txt(request: Request):
     body = (
         "User-agent: *\n"
         "Allow: /\n"
+        "Disallow: /admin\n"
+        "Disallow: /admin/\n"
+        "Disallow: /provider-hub\n"
+        "Disallow: /customer-hub\n"
+        "Disallow: /wallet\n"
+        "Disallow: /settings\n"
+        "Disallow: /inbox\n"
+        "Disallow: /api/admin/\n"
+        "\n"
+        "# AI/LLM crawlers welcome\n"
+        "User-agent: GPTBot\nAllow: /\n"
+        "User-agent: ChatGPT-User\nAllow: /\n"
+        "User-agent: ClaudeBot\nAllow: /\n"
+        "User-agent: anthropic-ai\nAllow: /\n"
+        "User-agent: PerplexityBot\nAllow: /\n"
+        "User-agent: Google-Extended\nAllow: /\n"
+        "\n"
         f"Sitemap: {origin}/api/sitemap.xml\n"
+        f"# AI summary: {origin}/api/llms.txt\n"
     )
     return Response(content=body, media_type="text/plain")
 
@@ -5870,6 +5988,14 @@ async def _load_stripe_config_from_db():
         await _refresh_stripe_cache(db)
     except Exception as e:
         logger.warning(f"Could not hydrate Stripe config from DB at startup: {e}")
+
+# Blog auto-publish (2x daily) + email newsletter
+from blog import create_router as _create_blog_router, start_blog_loop  # noqa: E402
+from email_subs import create_router as _create_email_router, start_email_loop  # noqa: E402
+app.include_router(_create_blog_router(db=db, require_admin=_require_admin()))
+app.include_router(_create_email_router(db=db, require_admin=_require_admin()))
+start_blog_loop(app, db)
+start_email_loop(app, db)
 
 
 # Make sure the platform owner's email always has admin access on boot.

@@ -1,0 +1,74 @@
+# https://llmstxt.org
+# This file tells AI/LLM crawlers what Lumo is about.
+
+# Name
+Lumo
+
+# Summary
+Lumo is a local-services and same-day delivery marketplace that connects
+customers with trusted providers for deliveries, gigs, home services,
+rentals, real-estate listings, vehicle sales, and remote work — all
+under one platform with 10% flat commission, escrow payments, and
+Stripe-powered bank payouts.
+
+# Domain
+https://golumo.app
+
+# Categories
+- Local services marketplace (delivery, labor, photography, home services)
+- Peer-to-peer marketplace (goods, rentals)
+- Real-estate listings (rent + sale)
+- Vehicle sales (autos)
+- Restaurant + retail same-day delivery
+- Remote work & digital services
+
+# Differentiators
+- 10% flat commission (vs 15-30% on competitors like TaskRabbit, DoorDash, Uber Eats)
+- Escrow protection on every order with 24-hour auto-release
+- Photo-proof of delivery for physical goods
+- Stripe Connect Express payouts (real bank deposits, ~2 business days)
+- Distance-based delivery pricing (not provider estimates)
+- Coverage gating prevents orders when no providers are in range
+- Multi-option sign-in (Google, SMS, email)
+- AI-generated ads + auto-publishing to social channels
+- Daily auto-generated blog content
+- Twice-daily email newsletter to subscribers
+
+# Important pages
+/                      - Landing page (mission, commission story, features)
+/about                 - About Lumo
+/contact               - Contact information
+/terms                 - Terms of service
+/privacy               - Privacy policy
+/blog                  - Auto-generated blog (2 posts/day)
+/sign-in               - Account creation & login (Google / phone / email)
+/map                   - Live map of every open job
+/customer              - Customer hub (post jobs, order delivery, hire help)
+/provider              - Provider hub (find work, manage gigs)
+/provider-hub          - Provider dashboard (active jobs, wallet, Stripe Connect)
+/real-estate           - Real estate listings
+/autos                 - Vehicle marketplace
+/restaurants           - Restaurant directory + delivery
+/stores                - Retail directory + delivery
+/rentals               - Rental marketplace
+
+# Pricing
+- Customer: pays the listed price + any delivery fee. No platform surcharge.
+- Provider: receives 90% of every completed transaction. Lumo retains 10% commission.
+- Providers can withdraw to a connected bank via Stripe (instant onboarding).
+- 1% of every order is refunded to reviewers who leave honest feedback (cashback).
+
+# Contact
+hello@golumo.app
+support@golumo.app
+press@golumo.app
+
+# Compliance
+- FTC-compliant (no fake reviews — all testimonials are from verified customers)
+- GDPR / DSA aware (EU customers can request data export/deletion)
+- Stripe-backed PCI compliance for payments
+
+# Crawl policy
+Friendly to AI/LLM crawlers. Public read-only pages may be indexed and
+quoted. Personal data, private dashboards, and admin pages are blocked
+via robots.txt.

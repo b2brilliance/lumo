@@ -6,6 +6,7 @@ import {
   Zap, Building2, Clock, Users, ShieldCheck,
 } from "lucide-react";
 import HomeReviewsSection from "@/components/HomeReviewsSection";
+import EmailSubscribeForm from "@/components/EmailSubscribeForm";
 
 export default function Landing() {
   return (
@@ -242,6 +243,24 @@ export default function Landing() {
 
       {/* ── Customer reviews (or founding members block) ────────────────── */}
       <HomeReviewsSection />
+
+      {/* ── Email subscription ──────────────────────────────────────────── */}
+      <section className="max-w-screen-2xl mx-auto px-6 py-16" data-testid="home-subscribe-section">
+        <div className="grid md:grid-cols-12 gap-10 items-center">
+          <div className="md:col-span-6">
+            <div className="overline text-teal-700">Stay in the loop</div>
+            <h2 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-3 leading-[1.05]">
+              Two short emails a day.<br />Worth opening, we promise.
+            </h2>
+            <p className="text-slate-600 mt-4 max-w-xl">
+              A quick note in the morning and one in the afternoon — each highlighting a different way to use Lumo. Unsubscribe in one click whenever.
+            </p>
+          </div>
+          <div className="md:col-span-6">
+            <EmailSubscribeForm source="landing_inline" variant="card" />
+          </div>
+        </div>
+      </section>
 
       {/* ── Final CTA ────────────────────────────────────────────────────── */}
       <section className="max-w-screen-2xl mx-auto px-6 py-20 text-center">

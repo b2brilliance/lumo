@@ -131,6 +131,7 @@ export default function SiteFooter() {
               <Link to="/contact" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-contact">Contact</Link>
               <Link to="/terms"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-terms">Terms of service</Link>
               <Link to="/privacy" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-privacy">Privacy policy</Link>
+              <Link to="/blog"    className="text-slate-700 hover:text-teal-700" data-testid="footer-link-blog">Blog</Link>
               {!isStandalone && (installable || isIOS) && (
                 <button
                   type="button"

@@ -48,6 +48,8 @@ import PageviewPinger from "@/components/PageviewPinger";
 import SignIn from "@/pages/SignIn";
 import SiteFooter from "@/components/SiteFooter";
 import { AboutPage, ContactPage, TermsPage, PrivacyPage } from "@/pages/LegalPages";
+import BlogIndex from "@/pages/BlogIndex";
+import BlogPost from "@/pages/BlogPost";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -125,6 +127,8 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/blog" element={<BlogIndex />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             {/* Catch-all: admin subpaths → /admin, everything else → home.
                 Prevents the "blank screen" after closing nested pages. */}
             <Route path="/admin/*" element={<Navigate to="/admin" replace />} />

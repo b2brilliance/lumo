@@ -1,4 +1,43 @@
 User-agent: *
 Allow: /
+Allow: /about
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /blog
+Allow: /blog/*
+Allow: /sign-in
+Allow: /map
+Allow: /real-estate
+Allow: /autos
+Allow: /restaurants
+Allow: /stores
+Allow: /rentals
+Allow: /customer
+Allow: /provider
+
+# Block private dashboards & admin
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /provider-hub
+Disallow: /customer-hub
+Disallow: /wallet
+Disallow: /settings
+Disallow: /inbox
+Disallow: /api/admin/*
+
+# Allow AI/LLM crawlers
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
 
 Sitemap: /api/sitemap.xml
