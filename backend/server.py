@@ -5652,6 +5652,20 @@ app.include_router(_create_site_router(db=db, require_admin=_require_admin()))
 from admin_data import create_router as _create_admin_data_router  # noqa: E402
 app.include_router(_create_admin_data_router(db=db, require_admin=_require_admin()))
 
+# Admin payments (Stripe API keys editor — encrypted at rest)
+from admin_payments import create_router as _create_admin_payments_router  # noqa: E402
+app.include_router(_create_admin_payments_router(db=db, require_admin=_require_admin()))
+
+# Load saved Stripe config from DB into the live cache (DB > env)
+import asyncio as _asyncio  # noqa: E402
+from stripe_connect import refresh_config_cache as _refresh_stripe_cache  # noqa: E402
+@app.on_event("startup")
+async def _load_stripe_config_from_db():
+    try:
+        await _refresh_stripe_cache(db)
+    except Exception as e:
+        logger.warning(f"Could not hydrate Stripe config from DB at startup: {e}")
+
 
 # Make sure the platform owner's email always has admin access on boot.
 OWNER_ADMIN_EMAIL = "julius.a.mason@gmail.com"

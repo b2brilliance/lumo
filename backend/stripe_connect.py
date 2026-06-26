@@ -41,20 +41,50 @@ CONNECT_KEY = os.environ.get("STRIPE_CONNECT_SECRET_KEY", "").strip()
 WEBHOOK_SECRET = os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET", "").strip()
 PLATFORM_FEE_PERCENT = float(os.environ.get("STRIPE_PLATFORM_FEE_PERCENT", "10"))
 
+# Cache populated by `refresh_config_cache()` — overrides the env values
+# above when the admin saves new keys via the dashboard.
+_LIVE_CONFIG: dict = {"secret_key": CONNECT_KEY, "webhook_secret": WEBHOOK_SECRET,
+                      "platform_fee_percent": PLATFORM_FEE_PERCENT, "source": "env"}
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+
+async def refresh_config_cache(db) -> dict:
+    """Reload the active Stripe config from MongoDB (DB > env)."""
+    try:
+        from admin_payments import get_active_stripe_config
+        cfg = await get_active_stripe_config(db)
+        _LIVE_CONFIG.update(cfg)
+        logger.info(f"Stripe config refreshed — source={cfg['source']}, "
+                    f"key_present={bool(cfg['secret_key'])}")
+    except Exception as e:
+        logger.warning(f"Stripe config refresh failed: {e}")
+    return _LIVE_CONFIG
+
+
+def _active_secret() -> str:
+    return _LIVE_CONFIG.get("secret_key") or CONNECT_KEY
+
+
+def _active_webhook_secret() -> str:
+    return _LIVE_CONFIG.get("webhook_secret") or WEBHOOK_SECRET
 
 
 def _stripe_enabled() -> bool:
-    return bool(CONNECT_KEY and CONNECT_KEY.startswith("sk_"))
+    k = _active_secret()
+    return bool(k and (k.startswith("sk_") or k.startswith("rk_")))
 
 
 def _client() -> stripe:
     if not _stripe_enabled():
         raise HTTPException(503, "Stripe Connect is not configured on the server.")
-    stripe.api_key = CONNECT_KEY
+    stripe.api_key = _active_secret()
     return stripe
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+
 
 
 class OnboardBody(BaseModel):
@@ -243,9 +273,10 @@ def create_router(
         payload = await request.body()
         sig_header = request.headers.get("stripe-signature", "")
 
-        if WEBHOOK_SECRET:
+        ws = _active_webhook_secret()
+        if ws:
             try:
-                event = stripe.Webhook.construct_event(payload, sig_header, WEBHOOK_SECRET)
+                event = stripe.Webhook.construct_event(payload, sig_header, ws)
             except (ValueError, stripe.error.SignatureVerificationError) as e:
                 logger.warning(f"Stripe webhook signature failed: {e}")
                 raise HTTPException(400, "Invalid signature")
@@ -315,7 +346,7 @@ async def attempt_stripe_transfer(
     if not acct_id or not user.get("stripe_payouts_enabled"):
         return None
 
-    stripe.api_key = CONNECT_KEY
+    stripe.api_key = _active_secret()
     amount_cents = int(round(amount_usd * 100))
 
     try:
