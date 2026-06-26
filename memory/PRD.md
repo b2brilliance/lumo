@@ -27,6 +27,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Payments tab + Users tab + Homepage Reviews + Webhook wizard + Install UX (Feb 26, 2026)
+- **Admin Payments tab** (`/admin` → "Payments") — Stripe keys editor encrypted with Fernet at rest. Save/Clear/Test connection. Masked display, source badge (env vs db), fee slider, live mode warning. Cache auto-reloads on save (no restart).
+- **Admin Users tab** (`/admin` → "Users") — polished read-only browser with search, role filter, sort, avatar list. Click any user → side panel showing recent jobs/orders/reviews/wallet/withdrawals. No edit (per user request).
+- **Homepage reviews section** — `/api/site/reviews` public endpoint. When ≥3 verified 4-5 star reviews exist: grid of testimonials with verified badges + 1%-cashback disclosure. Otherwise: "Founding 100" aspirational block (FTC-compliant, no fake reviews).
+- **1% review cashback** — every honest review (4 stars or 1 star) earns 1% of the order back to the reviewer's Lumo wallet. Wallet_transactions entry + notification created.
+- **Webhook setup wizard** — Distribution → Add channel dialog now shows step-by-step setup instructions (3-5 numbered steps) + deep link per platform (Discord, Telegram, Slack, Zapier, Make, IFTTT, Generic, X, LinkedIn, Reddit, Mastodon, Bluesky, Pinterest, Threads). Each step has time estimate.
+- **Simpler Install Lumo UX** — chip says "Install Lumo · one tap" (Android/Chrome) or "show me how" (iOS). iOS modal cut to 2 visual steps. Persistent "Install Lumo" button in footer (only shows on installable browsers).
+- **Tested**: iteration_22 — 12/12 backend + frontend E2E PASS.
+
 ### Mobile sub-nav + Admin Data tools + Map reorg + catch-all routes (Feb 26, 2026)
 - **Mobile sub-nav** (md:hidden second row below the main nav) with 3 large tiles: "Find work" (Provider Hub), "Shop & browse" (opens a slide-up Sheet listing all 6 marketplaces + Live map), "Hire & order" (Customer Hub). Plain names with subtitle for clarity.
 - **Map page** listings rewritten — grouped by category_group (Delivery / Services / Digital / Remote) with a coloured bar header, then by category within each group, then a 3-column responsive card grid. Empty state if no jobs match.
