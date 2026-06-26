@@ -559,7 +559,10 @@ async def me(user: dict = Depends(get_current_user)):
 
 @api.patch("/auth/me")
 async def update_me(body: UserUpdate, user: dict = Depends(get_current_user)):
-    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    # Use exclude_unset so explicit `null` from the client (e.g. clearing a
+    # saved address) is preserved as an actual unset on the document, while
+    # fields the client didn't send are left untouched.
+    update = body.model_dump(exclude_unset=True)
     if update:
         await db.users.update_one({"id": user["id"]}, {"$set": update})
     fresh = await db.users.find_one({"id": user["id"]})

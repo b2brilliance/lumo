@@ -27,6 +27,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### User-facing Settings page redesign + Google Search Console verification (Feb 26, 2026)
+- **Removed** the developer-facing "Restrict your Google Maps API key" section from `/settings` — that was operator advice, not a user preference.
+- **New 6-section Settings page** at `/settings` (logged-in users):
+  1. **Profile** — editable name + phone (read-only email + role)
+  2. **Default delivery address** — Google Places autocomplete + Pin-on-map. Pre-fills checkout dialogs across Marketplace / Stores / Restaurants.
+  3. **Notifications** — 4 toggles: order updates, job matches (providers only), marketing emails, blog digest
+  4. **Accessibility** — toggles for "reduce motion" (kills all transitions/animations) and "larger text" (+15% body font). Applied globally via `<html>` classes by `AccessibilityApplier` mounted at App root.
+  5. **Country & language** — kept (live preview of currency / tax / locale)
+  6. **Account** — Change password (inline card) + Sign out. New endpoint `POST /api/auth/me/password` validates current password + min 6-char new password (passwordless OAuth/SMS users can set a first password).
+- **Sticky bottom save bar** appears only when settings are dirty (deep JSON compare) — single PATCH `/api/auth/me` persists everything.
+- **Backend**: `UserUpdate` extended with `default_delivery_address`, `notification_prefs`, `accessibility_prefs`. PATCH `/api/auth/me` now uses `model_dump(exclude_unset=True)` so explicit `null` properly clears stored fields (was previously dropping nulls).
+- **Google Search Console**: domain ownership verification meta tag (`google-site-verification`) added to `index.html` so the user can submit the sitemap.
+- **Tested**: iteration_25 — 5/5 backend pytests + full frontend E2E PASS. Save bar + all toggles + change-password + country picker verified. Password reset back to baseline at end.
+
 ### Context-aware CTAs + P2P distance-based delivery + SEO meta tags (Feb 26, 2026)
 - **Landing CTAs**: every "Create an account / Sign in / Start earning" CTA on `/` is now context-aware. Logged-in users see "Open your dashboard" → role-routed to `/provider-hub | /retailer | /restaurant | /admin | /customer`; staffing CTA flips to "Find work near you". Anonymous users still see "Create an account" → `/signin`. Hero, staffing, and final CTA all share the same `primaryCta` derivation in `Landing.jsx`.
 - **P2P Marketplace distance-based delivery**: `/marketplace` checkout now mirrors the Stores/Customer-Hub flow. Buy dialog has a Google-Places AddressInput + MapPickerButton; when both the listing's seller pickup location AND the buyer's delivery address have coords, Haversine miles → `computeStoreDeliveryQuote` auto-quotes the delivery fee ($4 base + $1.50/mi) and syncs the editable fee input via `useEffect`. New "Pickup location" field on the create-listing form lets sellers save coords on `listings.location`. Friendly fallback chips: "Seller hasn't set a pickup location" or "Pick your delivery address to get an exact quote".
