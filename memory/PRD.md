@@ -27,6 +27,13 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Mobile sub-nav + Admin Data tools + Map reorg + catch-all routes (Feb 26, 2026)
+- **Mobile sub-nav** (md:hidden second row below the main nav) with 3 large tiles: "Find work" (Provider Hub), "Shop & browse" (opens a slide-up Sheet listing all 6 marketplaces + Live map), "Hire & order" (Customer Hub). Plain names with subtitle for clarity.
+- **Map page** listings rewritten — grouped by category_group (Delivery / Services / Digital / Remote) with a coloured bar header, then by category within each group, then a 3-column responsive card grid. Empty state if no jobs match.
+- **Admin "Data" tab** (new) with full inspect + wipe tools for 17 historical collections (pageviews, users, reviews, ads, notifications, etc.). **Protected** (cannot be wiped): jobs, orders, wallet_transactions, withdrawal_requests, stripe_transfers, site_settings, analytics_settings. Wipe requires typing the collection name to confirm + optional "older than ISO" filter. User-wipe automatically excludes role=admin. Every wipe logs to audit_logs.
+- **Catch-all routes** in `App.js` — `/admin/*` → `/admin`, `/*` → `/` so closing nested admin pages never leaves a blank screen.
+- **Tested**: iteration_21 — 20/20 backend + full E2E (mobile + desktop) PASS.
+
 ### Landing page revamp + commission story (Feb 26, 2026)
 - **Removed** the off-putting "10% deposit / 90% remaining balance" payment block from the homepage.
 - **New section "Keep 90% of what you earn"** — leads with the value to providers; flat 10% commission. Visual comparison bar chart shows Lumo (10%) vs TaskRabbit (15%), Instacart (15%), DoorDash (25%), Uber Eats (30%), Airbnb (14%) — Lumo's bar is shortest and highlighted in teal.
