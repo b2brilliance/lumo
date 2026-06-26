@@ -46,8 +46,8 @@ export default function StripeConnectCard() {
   const onboard = async () => {
     setBusy(true);
     try {
-      const returnUrl = `${window.location.origin}/provider-hub?stripe=connected`;
-      const refreshUrl = `${window.location.origin}/provider-hub?stripe=refresh`;
+      const returnUrl = `${window.location.origin}/provider?stripe=connected`;
+      const refreshUrl = `${window.location.origin}/provider?stripe=refresh`;
       const { data } = await api.post("/stripe/connect/onboard", {
         return_url: returnUrl,
         refresh_url: refreshUrl,

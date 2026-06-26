@@ -14,7 +14,7 @@ export default function Landing() {
   // Logged-in users see context-aware CTAs (jump straight into their hub),
   // anonymous users see "Create an account".
   const dashFor = {
-    provider: "/provider-hub",
+    provider: "/provider",
     retailer: "/retailer",
     restaurant: "/restaurant",
     admin: "/admin",
@@ -193,7 +193,7 @@ export default function Landing() {
               Lumo doesn&apos;t just send you one-off gigs — it places you in front of <strong>every kind of work nearby</strong>, every day. Drive a delivery in the morning, hang drywall in the afternoon, photograph a wedding on the weekend. One profile. One rating. One stream of pay.
             </p>
             <div className="mt-6">
-              <Link to={user ? "/provider-hub" : "/signin"}>
+              <Link to={user ? (user.role === "provider" ? "/provider" : "/map") : "/signin"}>
                 <Button size="lg" className="bg-amber-700 hover:bg-amber-800 text-white" data-testid="staffing-cta">
                   {user ? "Find work near you" : "Start earning"} <ArrowUpRight className="ml-1 w-4 h-4" />
                 </Button>

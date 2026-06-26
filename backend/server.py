@@ -4666,23 +4666,54 @@ async def translate(body: TranslateRequest):
     if not inputs:
         return {"translations": {}}
 
-    # Pull cached
+    # Pull cached translations from Mongo.
     cached_docs = await db.translations.find({"lang": lang, "src": {"$in": inputs}}).to_list(len(inputs))
     cache = {d["src"]: d["tgt"] for d in cached_docs}
+
+    # ── Cache hygiene: drop any cached entry where the source contained a
+    # brand token but the cached target lost it (legacy entries from before
+    # the brand-sentinel guard). Re-translate those.
+    BRAND_TOKENS = ("Lumo", "Lumi", "Stripe")
+    bad_keys = [src for src, tgt in cache.items()
+                if any((b in src and b not in tgt) for b in BRAND_TOKENS)]
+    if bad_keys:
+        await db.translations.delete_many({"lang": lang, "src": {"$in": bad_keys}})
+        for k in bad_keys:
+            cache.pop(k, None)
+
     missing = [s for s in inputs if s not in cache]
 
     new_translations: dict = {}
     if missing:
         lang_descr = SUPPORTED_LANGS[lang]
+        # ── Brand protection ────────────────────────────────────────────────
+        # Wrap brand tokens in a sentinel so the LLM can't accidentally
+        # transliterate or translate them (we've seen "Lumo" → "ル一モ" etc.
+        # despite the system prompt). After the model replies, swap back.
+        BRAND_TOKEN_MAP = {
+            "Lumo": "\u00abLUMO\u00bb",
+            "Lumi": "\u00abLUMI\u00bb",
+            "Stripe": "\u00abSTRIPE\u00bb",
+        }
+        def _wrap(s: str) -> str:
+            for k, v in BRAND_TOKEN_MAP.items():
+                s = re.sub(rf"\b{re.escape(k)}\b", v, s)
+            return s
+        def _unwrap(s: str) -> str:
+            for k, v in BRAND_TOKEN_MAP.items():
+                s = s.replace(v, k)
+            return s
+        wrapped_missing = [_wrap(s) for s in missing]
         system = (
             f"You are a professional localization translator. Translate each numbered English string into {lang_descr}. "
             "Use the way native speakers naturally talk in that region — idiomatic, warm, modern. "
             "Preserve punctuation, line breaks, %s placeholders, and any code-like tokens (e.g. $20, 5km, URLs, emails) exactly. "
             "Do NOT add explanations, quotes, or commentary. "
             "Output exactly N lines, each prefixed with the same number and a tab, in the same order as the input. "
-            "Never translate proper nouns like 'Lumo', 'Lumi', 'Stripe'."
+            "Tokens wrapped in \u00ab\u00bb are sentinels for brand names — keep them VERBATIM, do not translate or transliterate them, "
+            "do not remove the \u00ab\u00bb wrappers; we will substitute the real brand name back after translation."
         )
-        numbered = "\n".join(f"{i+1}.\t{s}" for i, s in enumerate(missing))
+        numbered = "\n".join(f"{i+1}.\t{s}" for i, s in enumerate(wrapped_missing))
         prompt = f"Translate the following {len(missing)} strings into {lang_descr}.\n\n{numbered}\n\nReturn exactly {len(missing)} numbered lines."
         try:
             chat = LlmChat(
@@ -4704,10 +4735,18 @@ async def translate(body: TranslateRequest):
                 continue
             idx = int(m.group(1)) - 1
             if 0 <= idx < len(missing):
-                parsed[missing[idx]] = m.group(2).strip()
-        # For anything LLM missed, fall back to the source string
+                # Unwrap sentinels back into the real brand name.
+                parsed[missing[idx]] = _unwrap(m.group(2).strip())
+        # For anything LLM missed, fall back to the source string. Then
+        # belt-and-braces: if a translation lost any brand token entirely
+        # (LLM dropped the sentinel), discard it and fall back to source.
         for s in missing:
-            new_translations[s] = parsed.get(s, s)
+            tgt = parsed.get(s, s)
+            for brand in BRAND_TOKEN_MAP.keys():
+                if brand in s and brand not in tgt:
+                    tgt = s  # better to ship English than to lose the brand
+                    break
+            new_translations[s] = tgt
 
         # Persist cache
         if new_translations:

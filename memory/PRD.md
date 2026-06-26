@@ -27,6 +27,13 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Brand name preserved in translations + "Find work" link fix (Feb 26, 2026)
+- **🐛 Critical routing bug**: Landing.jsx and StripeConnectCard.jsx referenced `/provider-hub` — a route that DOESN'T EXIST. The real route is `/provider`. The catch-all redirect was sending all "Find work near you" / "Open your dashboard" clicks (and Stripe Connect return URLs) back to the homepage. Now all four references point to `/provider`. Verified live: provider login → Landing → "Find work near you" → `/provider` ✓ / "Open your dashboard" → `/provider` ✓.
+- **Staffing CTA also routes non-provider logged-in users to `/map`** (the public open-jobs view) instead of `/provider` (which requires the provider role).
+- **Brand-name preservation in i18n**: `/api/i18n/translate` now wraps `Lumo`, `Lumi`, and `Stripe` in sentinel markers (`«BRAND»`) before sending to the LLM. The model is instructed to keep the sentinels verbatim; after parsing the reply we swap them back to the real brand. Defense-in-depth: if the LLM strips a sentinel anyway, that translation is discarded and we ship the English source rather than lose the brand.
+- **Cache hygiene**: on each request, any cached entry whose source contains a brand token but whose stored target doesn't is deleted and re-translated with the new prompt. Fixes legacy polluted translations from before this guard.
+- **Verified live**: "Welcome to Lumo" → ES "Bienvenido a Lumo" · JA "Lumoへようこそ" · HI "Lumo में आपका स्वागत है" · AR "مرحباً بك في Lumo". Brand stays as "Lumo" in Latin, Japanese, Hindi, and Arabic scripts — no transliteration.
+
 ### Provider profile-photo requirement at sign-up (Feb 26, 2026)
 - **Backend gate**: `POST /api/auth/register` now returns `400 "Profile photo is required for service providers"` when `role=="provider"` and `avatar_url` is missing. Customers / retailers / restaurants remain optional. `UserCreate`, `UserOut`, and `UserUpdate` extended with `avatar_url`.
 - **New public endpoint** `POST /api/media/upload-avatar` — anonymous (no JWT needed since users register first), image-only (rejects non-`image/*` with 400), 5 MB ceiling (413 on overflow). Stored under `{APP_NAME}/avatars/anon/...` with `kind:"avatar"` tag for future cleanup.
