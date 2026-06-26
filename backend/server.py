@@ -3565,7 +3565,12 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             "category_group": d["category_group"], "is_remote": d["is_remote"],
             "lat": loc["lat"], "lng": loc["lng"], "address": loc.get("address"),
             "pay_rate": d["pay_rate"], "pay_unit": d["pay_unit"],
+            "created_at": d.get("created_at"),
+            "description": d.get("description"),
         })
+    # Newest first so chronological feeds don't have to re-sort client-side
+    # (the map itself doesn't care about order).
+    pins.sort(key=lambda p: p.get("created_at") or "", reverse=True)
     return pins
 
 @api.get("/")

@@ -27,6 +27,13 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Map page job feed: chronological + 50-mile radius (Feb 26, 2026)
+- **Replaced the grouped-by-type listing** under the `/map` page with a clean chronological feed (newest first). The map at top is untouched (same `MapView` component, all category-coloured pins, full filters).
+- **50-mile radius filter** anchored at the user's saved location: providers anchor on `user.location` (their service location), customers on `user.default_delivery_address`. Anonymous users get the unfiltered "show everything" view. Remote jobs always appear regardless of distance.
+- **New feed row design**: coloured side-rail keyed to category group · category + remote chips · title + 1-line description · stats column with pay rate / distance / time-ago. Hover sync with map highlight. Cleaner than the previous nested groups.
+- **Backend**: `/api/map/jobs` now returns `created_at` + `description` per pin and pre-sorts newest-first so frontend can render a chronological feed without extra fetches.
+- **Tested**: smoke-screenshot as provider@lumo.test (saved NYC location) — 54 total pins on map, 24 within 50 mi shown in feed; old grouped selectors (`map-group-*`, `map-category-*`) all return 0 count. Sort label reads "Newest first"; radius note reads "Showing open jobs within 50 miles of your saved service location".
+
 ### Wiring notification_prefs + default_delivery_address pre-fill (Feb 26, 2026)
 - **Server-side notification filter** (`/app/backend/server.py` — new `NOTIF_TYPE_TO_PREF` map + `_filter_notifications_by_prefs`). `GET /api/notifications` now drops items whose `type` maps to a pref the user has disabled (`order_updates` / `job_matches`). 13 lifecycle types gated (quote_*, rental_*, order_*, delivery_marked, plus 2 forward-looking job-match types). Always-show types: `new_message`, `review_*`, `payout_*`.
 - **Marketing email opt-out** (`/app/backend/email_subs.py`). `_run_one()` builds an `opted_out` set in one indexed query (`{email: {$in: emails}, notification_prefs.marketing_emails: False}`) and skips matching subscribers. Subscribers without a user account are treated as opted-in (they explicitly subscribed). Response now exposes `opted_out` count for admin telemetry.
