@@ -54,6 +54,22 @@ export default function BlogPost() {
     })();
   }, [slug]);
 
+  // Update document title + meta description for browser tabs and JS-aware
+  // crawlers (Googlebot renders JS, so this still helps for indexed pages).
+  useEffect(() => {
+    if (!post) return;
+    const prevTitle = document.title;
+    document.title = `${post.title} — Lumo blog`;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    const prevDesc = metaDesc?.getAttribute("content");
+    const summary = (post.body_md || "").replace(/[#*`>_-]/g, "").slice(0, 160);
+    if (metaDesc && summary) metaDesc.setAttribute("content", summary);
+    return () => {
+      document.title = prevTitle;
+      if (metaDesc && prevDesc != null) metaDesc.setAttribute("content", prevDesc);
+    };
+  }, [post]);
+
   if (loading) return <div className="min-h-[60vh] grid place-items-center"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>;
   if (notFound) return (
     <div className="max-w-2xl mx-auto px-6 py-24 text-center" data-testid="blog-post-not-found">

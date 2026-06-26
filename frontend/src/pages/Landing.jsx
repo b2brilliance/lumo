@@ -7,8 +7,16 @@ import {
 } from "lucide-react";
 import HomeReviewsSection from "@/components/HomeReviewsSection";
 import EmailSubscribeForm from "@/components/EmailSubscribeForm";
+import { useAuth } from "@/lib/auth";
 
 export default function Landing() {
+  const { user } = useAuth();
+  // Logged-in users see context-aware CTAs (jump straight into their hub),
+  // anonymous users see "Create an account".
+  const primaryCta = user
+    ? { to: user.role === "provider" ? "/provider-hub" : "/customer", label: "Open your dashboard" }
+    : { to: "/signin", label: "Create an account" };
+
   return (
     <div className="bg-white">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -26,7 +34,7 @@ export default function Landing() {
               Lumo connects customers with trusted providers for everything from package delivery and home services to retail orders and remote contracts. Post a request, review quotes, and pay safely — all in one app.
             </p>
             <div className="flex flex-wrap gap-3 mt-8">
-              <Link to="/signin"><Button size="lg" className="bg-slate-900 hover:bg-slate-800" data-testid="hero-cta-register">Create an account <ArrowUpRight className="ml-1 w-4 h-4" /></Button></Link>
+              <Link to={primaryCta.to}><Button size="lg" className="bg-slate-900 hover:bg-slate-800" data-testid="hero-cta-register">{primaryCta.label} <ArrowUpRight className="ml-1 w-4 h-4" /></Button></Link>
               <Link to="/map"><Button size="lg" variant="outline" data-testid="hero-cta-map">Browse open jobs</Button></Link>
             </div>
           </div>
@@ -179,9 +187,9 @@ export default function Landing() {
               Lumo doesn&apos;t just send you one-off gigs — it places you in front of <strong>every kind of work nearby</strong>, every day. Drive a delivery in the morning, hang drywall in the afternoon, photograph a wedding on the weekend. One profile. One rating. One stream of pay.
             </p>
             <div className="mt-6">
-              <Link to="/signin">
+              <Link to={user ? "/provider-hub" : "/signin"}>
                 <Button size="lg" className="bg-amber-700 hover:bg-amber-800 text-white" data-testid="staffing-cta">
-                  Start earning <ArrowUpRight className="ml-1 w-4 h-4" />
+                  {user ? "Find work near you" : "Start earning"} <ArrowUpRight className="ml-1 w-4 h-4" />
                 </Button>
               </Link>
             </div>
@@ -269,7 +277,7 @@ export default function Landing() {
           Everything you need <span className="text-teal-700">done</span>.
         </h2>
         <div className="flex flex-wrap gap-3 justify-center mt-8">
-          <Link to="/signin"><Button size="lg" className="bg-slate-900 hover:bg-slate-800" data-testid="final-cta-join">Create an account</Button></Link>
+          <Link to={primaryCta.to}><Button size="lg" className="bg-slate-900 hover:bg-slate-800" data-testid="final-cta-join">{primaryCta.label}</Button></Link>
           <Link to="/map"><Button size="lg" variant="outline" data-testid="final-cta-browse">Browse the map</Button></Link>
         </div>
       </section>

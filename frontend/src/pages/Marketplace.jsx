@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,12 +7,16 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
 import AddressInput from "@/components/AddressInput";
+import MapPickerButton from "@/components/MapPickerButton";
 import { MARKETPLACE_CATEGORY_OPTIONS, MARKETPLACE_SCHEMAS } from "@/lib/marketplaceSchemas";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useLocale } from "@/lib/locale";
+import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
+
+// Default fallback fee when seller hasn't provided a pickup location yet.
+const FALLBACK_DELIVERY_FEE = 9.99;
 
 export default function Marketplace() {
   const { user } = useAuth();
@@ -23,9 +27,16 @@ export default function Marketplace() {
   const [form, setForm] = useState({
     title: "", description: "", price: "", category: "other",
     media_url: null, media_type: null, delivery_available: true,
+    pickup_address: "", pickup_lat: null, pickup_lng: null,
   });
   const [orderTarget, setOrderTarget] = useState(null);
-  const [order, setOrder] = useState({ delivery_fee: "9.99", delivery_address: "", notes: "" });
+  const [order, setOrder] = useState({
+    delivery_fee: FALLBACK_DELIVERY_FEE.toFixed(2),
+    delivery_address: "",
+    delivery_lat: null,
+    delivery_lng: null,
+    notes: "",
+  });
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -37,10 +48,22 @@ export default function Marketplace() {
   const create = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/marketplace/listings", { ...form, price: parseFloat(form.price) });
+      const location = (form.pickup_lat != null && form.pickup_lng != null)
+        ? { lat: form.pickup_lat, lng: form.pickup_lng, address: form.pickup_address || "" }
+        : null;
+      await api.post("/marketplace/listings", {
+        ...form,
+        price: parseFloat(form.price),
+        location,
+      });
       toast.success("Listing created");
       setOpenCreate(false);
-      setForm({ title: "", description: "", price: "", category: "other", media_url: null, media_type: null, delivery_available: true, attributes: { subcategory: "" } });
+      setForm({
+        title: "", description: "", price: "", category: "other",
+        media_url: null, media_type: null, delivery_available: true,
+        attributes: { subcategory: "" },
+        pickup_address: "", pickup_lat: null, pickup_lng: null,
+      });
       load();
     } catch (e) {
       toast.error(formatApiError(e));
@@ -53,6 +76,28 @@ export default function Marketplace() {
   const setAttr = (k, v) => setForm((f) => ({ ...f, attributes: { ...(f.attributes || {}), [k]: v } }));
   const visible = (field) => !field.showIf || Object.entries(field.showIf).every(([k, v]) => form.attributes?.[k] === v);
 
+  // Distance-based delivery quote for the buy dialog (mirrors the Customer Hub /
+  // store flow). When seller has a pickup location AND customer has selected an
+  // address with coords, we compute Haversine miles and auto-quote a fair fee.
+  const sellerLoc = orderTarget?.location;
+  const hasSellerCoords = sellerLoc && sellerLoc.lat != null && sellerLoc.lng != null;
+  const deliveryMiles = useMemo(() => {
+    if (!hasSellerCoords || order.delivery_lat == null) return null;
+    return milesBetween(
+      { lat: sellerLoc.lat, lng: sellerLoc.lng },
+      { lat: order.delivery_lat, lng: order.delivery_lng },
+    );
+  }, [hasSellerCoords, sellerLoc, order.delivery_lat, order.delivery_lng]);
+  const deliveryQuote = deliveryMiles != null ? computeStoreDeliveryQuote({ miles: deliveryMiles }) : null;
+
+  // Whenever the computed quote changes, sync the editable delivery_fee input
+  // so the breakdown stays consistent. Users can still override manually.
+  useEffect(() => {
+    if (deliveryQuote) {
+      setOrder((o) => ({ ...o, delivery_fee: deliveryQuote.total.toFixed(2) }));
+    }
+  }, [deliveryMiles, deliveryQuote]);
+
   const checkout = async () => {
     if (!user || user === false) { window.location.href = "/login"; return; }
     setBusy(true);
@@ -62,7 +107,7 @@ export default function Marketplace() {
         delivery_fee: parseFloat(order.delivery_fee || "0"),
         listing_id: orderTarget.id,
         quantity: 1,
-        delivery_address: order.delivery_address ? { address: order.delivery_address } : null,
+        delivery_address: order.delivery_address ? { address: order.delivery_address, lat: order.delivery_lat, lng: order.delivery_lng } : null,
         notes: order.notes,
         origin_url: window.location.origin,
         country,
@@ -108,7 +153,7 @@ export default function Marketplace() {
                 <div className="text-xs text-slate-500 mt-1 flex-1">{it.description}</div>
                 <div className="flex items-center justify-between mt-3">
                   <div className="font-display text-2xl font-bold">${it.price.toFixed(2)}</div>
-                  <Button size="sm" onClick={() => { setOrderTarget(it); setOrder({ delivery_fee: "9.99", delivery_address: "", notes: "" }); }} className="bg-teal-700 hover:bg-teal-800" data-testid={`marketplace-buy-${it.id}`}>Buy</Button>
+                  <Button size="sm" onClick={() => { setOrderTarget(it); setOrder({ delivery_fee: FALLBACK_DELIVERY_FEE.toFixed(2), delivery_address: "", delivery_lat: null, delivery_lng: null, notes: "" }); }} className="bg-teal-700 hover:bg-teal-800" data-testid={`marketplace-buy-${it.id}`}>Buy</Button>
                 </div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-2">{it.seller_name}</div>
               </div>
@@ -145,6 +190,27 @@ export default function Marketplace() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="overline">Pickup location (for distance-based delivery quoting)</Label>
+              <div className="mt-1 flex gap-2 items-start">
+                <div className="flex-1">
+                  <AddressInput
+                    value={form.pickup_address}
+                    onChange={(v) => setForm((f) => ({ ...f, pickup_address: v }))}
+                    onPlace={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
+                    placeholder="Where will buyers pick up or drivers collect this?"
+                    data-testid="listing-pickup-address"
+                  />
+                </div>
+                <MapPickerButton
+                  value={{ lat: form.pickup_lat, lng: form.pickup_lng, address: form.pickup_address }}
+                  onPick={(p) => setForm((f) => ({ ...f, pickup_address: p.address, pickup_lat: p.lat, pickup_lng: p.lng }))}
+                />
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mt-1">
+                Optional — enables Haversine distance pricing for buyers far away
               </div>
             </div>
             {catSchema && (
@@ -194,23 +260,50 @@ export default function Marketplace() {
           <DialogHeader><DialogTitle className="font-display">Buy: {orderTarget?.title}</DialogTitle><DialogDescription>10% bundled deposit on item and delivery. Remaining balance settled on delivery.</DialogDescription></DialogHeader>
           {orderTarget && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="overline">Delivery fee ($)</Label>
-                  <Input type="number" step="0.01" value={order.delivery_fee} onChange={(e) => setOrder({ ...order, delivery_fee: e.target.value })} data-testid="buy-delivery-fee" className="mt-1" />
-                </div>
-                <div>
-                  <Label className="overline">Address</Label>
-                  <div className="mt-1">
+              <div>
+                <Label className="overline">Delivery address</Label>
+                <div className="mt-1 flex gap-2 items-start">
+                  <div className="flex-1">
                     <AddressInput
                       value={order.delivery_address}
                       onChange={(v) => setOrder({ ...order, delivery_address: v })}
+                      onPlace={(p) => setOrder((o) => ({ ...o, delivery_address: p.address, delivery_lat: p.lat, delivery_lng: p.lng }))}
                       placeholder="Where should we deliver?"
                       data-testid="buy-delivery-address"
                     />
                   </div>
+                  <MapPickerButton
+                    value={{ lat: order.delivery_lat, lng: order.delivery_lng, address: order.delivery_address }}
+                    onPick={(p) => setOrder((o) => ({ ...o, delivery_address: p.address, delivery_lat: p.lat, delivery_lng: p.lng }))}
+                  />
                 </div>
               </div>
+              <div>
+                <Label className="overline">Delivery fee ($)</Label>
+                <Input type="number" step="0.01" value={order.delivery_fee} onChange={(e) => setOrder({ ...order, delivery_fee: e.target.value })} data-testid="buy-delivery-fee" className="mt-1" />
+                <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mt-1">
+                  Auto-quoted from distance. Edit if you&apos;ve agreed something different with the seller.
+                </div>
+              </div>
+              {deliveryQuote && (
+                <div className="border border-teal-700/40 bg-teal-50/40 p-3 text-xs font-mono space-y-0.5" data-testid="buy-delivery-quote">
+                  <div className="overline text-teal-800 mb-1">Distance-based delivery quote</div>
+                  <div className="flex justify-between"><span>From {sellerLoc?.address || orderTarget.seller_name}</span><span>{deliveryQuote.miles} mi</span></div>
+                  <div className="flex justify-between"><span>Base</span><span>${deliveryQuote.base_fee.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span>{deliveryQuote.miles} mi × $1.50</span><span>${deliveryQuote.distance_fee.toFixed(2)}</span></div>
+                  <div className="flex justify-between font-bold text-teal-900 border-t border-teal-700/30 pt-1 mt-1"><span>Auto-quote</span><span>${deliveryQuote.total.toFixed(2)}</span></div>
+                </div>
+              )}
+              {!hasSellerCoords && (
+                <div className="text-[11px] font-mono text-amber-700 bg-amber-50 border border-amber-200 p-2" data-testid="buy-no-seller-loc">
+                  Seller hasn&apos;t set a pickup location — using flat default. Edit fee above if needed.
+                </div>
+              )}
+              {hasSellerCoords && order.delivery_lat == null && (
+                <div className="text-[11px] font-mono text-slate-500 bg-slate-50 border border-slate-200 p-2" data-testid="buy-pick-address-hint">
+                  Pick your delivery address above to get an exact distance-based quote.
+                </div>
+              )}
               <div className="border-t border-slate-200 pt-3 space-y-1 font-mono text-sm">
                 <div className="flex justify-between"><span>Item</span><span>${orderTarget.price.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Delivery fee</span><span>${deliveryFeeNum.toFixed(2)}</span></div>

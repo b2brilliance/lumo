@@ -40,4 +40,4 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: /api/sitemap.xml
+Sitemap: https://golumo.app/api/sitemap.xml
