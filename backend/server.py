@@ -5644,6 +5644,10 @@ def _require_admin():
 
 app.include_router(_create_analytics_router(db=db, require_admin=_require_admin()))
 
+# Site-wide settings (social media footer)
+from site_settings import create_router as _create_site_router  # noqa: E402
+app.include_router(_create_site_router(db=db, require_admin=_require_admin()))
+
 
 # Make sure the platform owner's email always has admin access on boot.
 OWNER_ADMIN_EMAIL = "julius.a.mason@gmail.com"

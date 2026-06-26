@@ -46,6 +46,8 @@ import AutoList from "@/pages/AutoList";
 import Inquiries from "@/pages/Inquiries";
 import PageviewPinger from "@/components/PageviewPinger";
 import SignIn from "@/pages/SignIn";
+import SiteFooter from "@/components/SiteFooter";
+import { AboutPage, ContactPage, TermsPage, PrivacyPage } from "@/pages/LegalPages";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -119,7 +121,12 @@ function App() {
             <Route path="/jobs/apply/:category" element={<JobApply />} />
             <Route path="/jobs/apply/:category/:city" element={<JobApply />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
           </Routes>
+          <SiteFooter />
           <Toaster position="top-right" richColors />
             <AssistantWidget />
             <InstallPrompt />

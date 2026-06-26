@@ -1,0 +1,45 @@
+{
+  "summary": "Iter 20 — social media footer + admin editor. Backend pytest 11/11 PASS (public GET, admin PUT auto-prefix, clear, tagline-only, 401/403 gating, unknown-platform drop, public empty-filter, regression). Frontend E2E 12 steps PASS with 0 JS console errors: login → /admin → Social Links tab → 14 platform rows render → blur-save Instagram (toast + green ✓) → Open button has correct https-prefixed href → tagline blur-save toast → live preview icon appears → footer renders on /, /signin, /marketplace, /about, /contact, /terms, /privacy with brand, About/Contact/Terms/Privacy links, © year copyright, social icons (target=_blank, rel=noopener) → Clear button empties input, removes preview icon, footer reverts to 'Social links coming soon' message → Analytics reset btn still visible (regression OK).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/admin/site/social", "issue": "BEFORE FIX: response was `_get_doc(db) | {ok:True}` which is missing `platforms_supported`. Frontend SocialLinksAdmin uses `doc.platforms_supported` to render the 14 rows, so after any save the rows VANISHED. Fixed in site_settings.py — PUT now returns the same shape as GET admin (links, tagline, platforms_supported, updated_at, ok)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_social_links_iter20.py",
+    "/app/test_reports/pytest/iter20_social.xml"
+  ],
+  "action_items": [
+    "Validate the backend PUT-response fix landed in /app/backend/site_settings.py (now returns platforms_supported). 11/11 pytest + full E2E green after the fix.",
+    "(Cosmetic, low-priority) Tagline-only PUT body validates fine, but the body model allows arbitrary `links` keys then silently drops them — consider returning a 4xx with a list of dropped keys to surface admin typos. Currently they vanish silently."
+  ],
+  "critical_code_review_comments": [
+    "site_settings.py — DEFAULT_PLATFORMS is a tuple; tests confirm all 14 are exposed and unknown keys are silently dropped (good).",
+    "site_settings.py:_validate_url — auto-prefixes https:// when scheme is missing; verified `instagram.com/lumo` → `https://instagram.com/lumo`. Also enforces 500-char max.",
+    "_get_doc seeds the doc on first read (insert_one) — idempotent because it queries by _id='social' first. Safe.",
+    "PUT used partial-patch via dotted keys (`links.instagram`) which preserves other platform fields — good for partial saves on blur.",
+    "SiteFooter.jsx: uses `api.get('/site/social')` (public) on mount with silent failure — footer is best-effort. Footer renders unconditionally (showing 'coming soon' message when links={}).",
+    "SocialLinksAdmin.jsx: blur-save UX is clean. The Clear button calls saveLink(key,'') after locally clearing draft — correct flow.",
+    "SocialLinksAdmin.jsx: external `Open` link href falls back to `https://${value}` if value doesn't start with `http`, which is fine but server already prefixes on save — so the fallback only matters mid-edit.",
+    "Live preview at bottom of admin page mirrors footer rendering — confirmed icons appear/disappear in sync.",
+    "Legal pages (About/Contact/Terms/Privacy) all render clean content with prose styling and back-link to /. Good.",
+    "App.js — routes for /about /contact /terms /privacy are public (no Protected wrapper). Footer rendered below <Routes> so appears on every page including /signin and /marketplace (confirmed)."
+  ],
+  "updated_files": [
+    "/app/backend/site_settings.py (PUT response now includes platforms_supported)",
+    "/app/backend/tests/test_social_links_iter20.py (NEW — 11 pytest covering all spec items)"
+  ],
+  "success_rate": {"backend": "100% (11/11 pytest passed)", "frontend": "100% (12/12 E2E steps passed, 0 JS errors)"},
+  "test_credentials": "admin@lumo.test / password123 (used); provider@lumo.test / password123 (non-admin 403 test); customer@lumo.test / password123 (regression).",
+  "seed_data_creation": "Backend test fixture clears all 14 social fields before/after each test. E2E test left Instagram empty + custom tagline 'E2E iter20 tagline ✓' set.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Site social endpoints: GET /api/site/social (public), GET+PUT /api/admin/site/social (admin only). DEFAULT_PLATFORMS = 14 keys [instagram, tiktok, youtube, facebook, twitter, threads, linkedin, pinterest, snapchat, discord, reddit, whatsapp, telegram, twitch]. URL validation auto-prefixes 'https://' to bare domains. Max URL length 500. Unknown keys silently dropped. Public GET filters out empty URLs. Admin GET returns ALL platforms (even empty). PUT response shape matches GET admin (must include platforms_supported for frontend to render rows — was the iter20 bug). Testids verified: site-footer, footer-link-{about,contact,terms,privacy}, footer-social-icons, footer-social-{key}, social-admin-page, social-admin-tagline, social-row-{key}, social-input-{key}, social-saved-{key}, social-open-{key}, social-clear-{key}, page-{about,contact,terms,privacy}. Signin route is /signin (not /sign-in) — same as iter19.",
+  "rca of the issue": "RCA: SocialLinksAdmin.jsx renders the 14 platform rows by mapping over `doc.platforms_supported`. The PUT handler returned `_get_doc(db) | {ok:True}` which yields {links, tagline, updated_at, ok} — missing `platforms_supported`. After any blur-save, setDoc(data) overwrote the platforms_supported with undefined and the row list collapsed to zero, blocking subsequent Clear/Open interactions. Fix: PUT now constructs the same payload as GET admin including `platforms_supported: list(DEFAULT_PLATFORMS)`. Verified via curl + E2E rerun: 'rows still=14' after save."
+}
