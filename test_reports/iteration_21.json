@@ -1,0 +1,37 @@
+{
+  "summary": "Iter 21 — admin Data Management tab + mobile sub-nav + Map page grouped listings + catch-all routes. Backend pytest 20/20 PASS (collections list with full protected set, auth gating, pageviews peek strips password_hash and _id, all 7 protected collections return 404 on GET, protected bulk-delete returns 403 with 'protected' detail, confirm=false → 400, reviews wipe → 200 with deleted count, users wipe preserves admin@lumo.test, delete non-existent notification returns deleted:0, analytics regression OK). Frontend E2E PASS: admin login → /admin → Data tab renders DataManagementTab → 17 collection rows → protected banner lists orders/jobs/wallet_transactions/withdrawal_requests/stripe_transfers → wipe flow on notifications completed (typed confirm + wipe-confirm) → catch-all /some-random-bogus-path → / (Landing) → /admin/non-existent-path → /admin → /signin (Protected, expected) → Map page shows 3 groups, 16 categories, 54 cards, 'open jobs' heading present → Mobile (390x844) sub-nav visible with 3 tiles (work/shop/hire) → tap shop opens marketplaces sheet → tap mobile-mp-map navigates to /map and closes sheet → Desktop (1920x1080) mobile-subnav hidden (md:hidden working).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DataManagementTab.jsx", "issue": "React hydration warning: <div> cannot be a descendant of <p>. AlertDialogDescription renders as <p>, but the component nests <Input> (block element) and <div className='mt-3...'> inside it (lines 187-208). Functionality works but React logs an error every time the wipe modal opens.", "selector": "[data-testid='data-mgmt-page'] AlertDialogDescription", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_data_iter21.py",
+    "/app/test_reports/pytest/iter21_admin_data.xml"
+  ],
+  "action_items": [
+    "(LOW) Fix DOM-nesting warning in /app/frontend/src/components/DataManagementTab.jsx — restructure AlertDialogDescription so the typed-confirm Input + helper <div> + older-than Input live OUTSIDE the description <p>. E.g., put the static text in <AlertDialogDescription> and the form widgets in a sibling <div> inside <AlertDialogHeader> or directly inside <AlertDialogContent> after the header."
+  ],
+  "critical_code_review_comments": [
+    "admin_data.py — clean separation of ALLOWED_COLLECTIONS vs PROTECTED_COLLECTIONS. Protected set covers all 7 spec-required keys. Peek correctly excludes password_hash via projection AND strips _id before serialization. Bulk-delete writes an audit_logs entry (best-effort). Users wipe injects {role: {$ne: admin}} guard — verified admin@lumo.test survives wipe in test.",
+    "admin_data.py:delete_one — falls back to ObjectId lookup if id-string match fails. Good defensive pattern.",
+    "App.js — catch-all order is correct: /admin/* before /*. Combined with Protected wrapper this naturally funnels unauthenticated /admin/* to /signin, and authenticated bogus paths to / — exactly matches spec.",
+    "MapPage.jsx — useMemo on grouped pins (re-groups on pins change only). Empty 'remote' group is correctly omitted when no remote jobs exist. Heading 'Grouped by type & category' has uppercase CSS class so Playwright inner_text returns 'GROUPED BY TYPE & CATEGORY' (false-negative when searching for 'Grouped by'). Source text correct.",
+    "NavBar.jsx — mobile-subnav uses md:hidden so it's hidden on ≥768px viewports (verified). Sheet closes after navigation via React state change in MarketplacesSheet.",
+    "DataManagementTab.jsx — typed confirm uses case-insensitive match (collection.toLowerCase()) — good UX. Older-than Input is optional. Wipe button disabled when count=0 — good.",
+    "Minor (LOW): AlertDialogDescription DOM-nesting warning noted above. Does not affect functionality."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_data_iter21.py (NEW — 20 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (20/20 pytest passed)", "frontend": "100% (all 6 spec-driven E2E flows passed)"},
+  "test_credentials": "admin@lumo.test/password123 (admin), provider@lumo.test/password123 (non-admin 403 test).",
+  "seed_data_creation": "Test wiped 'notifications' and 'reviews' collections via E2E and pytest respectively. Also called bulk-delete on 'users' with older_than_iso=1970-01-02 (essentially no-op due to created_at filter, but proves admin preservation). Pageviews left intact for analytics.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "admin_data router mounted at /api/admin/data/* (server.py line 5653). ALLOWED_COLLECTIONS = 17 keys (pageviews, users, reviews, ads, ad_schedules, ad_autopilot_runs, distribution_channels, notifications, messages, inquiries, audit_logs, ratings, credentials_uploads, rental_bookings, real_estate_listings, auto_listings, marketplace_listings). PROTECTED = {jobs, orders, wallet_transactions, withdrawal_requests, stripe_transfers, site_settings, analytics_settings}. Testids: admin-tab-data, data-mgmt-page, data-mgmt-list, data-row-{key}, data-peek-{key}, data-wipe-{key}, data-peek-dialog, peek-row-{i}, peek-delete-{id}, wipe-type-confirm, wipe-older-than, wipe-cancel, wipe-confirm, mobile-subnav, mobile-nav-{work,shop,hire}, mobile-marketplaces-sheet, mobile-mp-{type}, mobile-mp-map, map-group-{key}, map-category-{name}, map-card-{id}, map-job-list, map-empty. Catch-all: /admin/* → /admin (then Protected → /signin if not admin). Bulk-delete on users always injects role!=admin guard server-side. Peek strips password_hash via projection and _id via dict.pop. SignIn route is /signin (not /sign-in).",
+  "rca of the issue": "N/A — no functional bugs. Single LOW-priority DOM-nesting warning in DataManagementTab AlertDialogDescription should be split into separate <p> (text only) and sibling <div> (form inputs) to silence the React validator."
+}

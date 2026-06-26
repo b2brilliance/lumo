@@ -3,7 +3,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox, Home, Car } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox, Home, Car, HardHat, Handshake } from "lucide-react";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 const MARKETPLACE_LINKS = [
@@ -126,6 +127,104 @@ export default function NavBar() {
           )}
         </div>
       </div>
+
+      {/* ── Mobile sub-nav — three big sections explaining what each offers ── */}
+      <div className="md:hidden border-t border-slate-200 bg-slate-50" data-testid="mobile-subnav">
+        <div className="grid grid-cols-3 divide-x divide-slate-200">
+          <MobileNavTile
+            to="/provider"
+            icon={HardHat}
+            title="Find work"
+            subtitle="Provider Hub"
+            tint="amber"
+            testId="mobile-nav-work"
+          />
+          <MarketplacesSheet />
+          <MobileNavTile
+            to="/customer"
+            icon={Handshake}
+            title="Hire & order"
+            subtitle="Customer Hub"
+            tint="teal"
+            testId="mobile-nav-hire"
+          />
+        </div>
+      </div>
     </header>
+  );
+}
+
+// ── Mobile-only sub-nav helpers ─────────────────────────────────────────────
+function MobileNavTile({ to, icon: Icon, title, subtitle, tint, testId }) {
+  const tintColors = {
+    amber: { bg: "hover:bg-amber-50", icon: "text-amber-700" },
+    teal:  { bg: "hover:bg-teal-50",  icon: "text-teal-700" },
+    blue:  { bg: "hover:bg-blue-50",  icon: "text-blue-700" },
+  }[tint] || { bg: "hover:bg-slate-100", icon: "text-slate-700" };
+  return (
+    <Link
+      to={to}
+      className={`flex flex-col items-center justify-center py-3 px-2 text-center ${tintColors.bg} active:bg-slate-200 transition-colors`}
+      data-testid={testId}
+    >
+      <Icon className={`w-5 h-5 mb-1 ${tintColors.icon}`} />
+      <div className="font-display font-bold text-xs text-slate-900 leading-tight">{title}</div>
+      <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mt-0.5">{subtitle}</div>
+    </Link>
+  );
+}
+
+function MarketplacesSheet() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          className="flex flex-col items-center justify-center py-3 px-2 text-center hover:bg-blue-50 active:bg-slate-200 transition-colors"
+          data-testid="mobile-nav-shop"
+        >
+          <ShoppingBag className="w-5 h-5 mb-1 text-blue-700" />
+          <div className="font-display font-bold text-xs text-slate-900 leading-tight">Shop &amp; browse</div>
+          <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mt-0.5">Marketplaces</div>
+        </button>
+      </SheetTrigger>
+      <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl overflow-y-auto" data-testid="mobile-marketplaces-sheet">
+        <SheetHeader>
+          <SheetTitle className="font-display tracking-tighter text-2xl">Marketplaces</SheetTitle>
+        </SheetHeader>
+        <div className="mt-4 grid grid-cols-1 gap-2">
+          <Link
+            to="/map"
+            onClick={() => setOpen(false)}
+            className="flex items-start gap-3 p-3 border border-slate-200 hover:border-teal-700 hover:bg-slate-50"
+            data-testid="mobile-mp-map"
+          >
+            <MapPin className="w-5 h-5 text-teal-700 mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="font-display font-bold text-slate-900">Live map</div>
+              <div className="text-xs text-slate-500 mt-0.5">Every open job, pinned by category</div>
+            </div>
+          </Link>
+          {MARKETPLACE_LINKS.map((m) => {
+            const Icon = m.icon;
+            return (
+              <Link
+                key={m.to}
+                to={m.to}
+                onClick={() => setOpen(false)}
+                className="flex items-start gap-3 p-3 border border-slate-200 hover:border-teal-700 hover:bg-slate-50"
+                data-testid={`mobile-${m.testId}`}
+              >
+                <Icon className="w-5 h-5 text-teal-700 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="font-display font-bold text-slate-900">{m.label}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{m.blurb}</div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -5648,6 +5648,10 @@ app.include_router(_create_analytics_router(db=db, require_admin=_require_admin(
 from site_settings import create_router as _create_site_router  # noqa: E402
 app.include_router(_create_site_router(db=db, require_admin=_require_admin()))
 
+# Admin data management (purge historical data, EXCEPT orders/revenue)
+from admin_data import create_router as _create_admin_data_router  # noqa: E402
+app.include_router(_create_admin_data_router(db=db, require_admin=_require_admin()))
+
 
 # Make sure the platform owner's email always has admin access on boot.
 OWNER_ADMIN_EMAIL = "julius.a.mason@gmail.com"

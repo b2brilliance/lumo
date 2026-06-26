@@ -3,12 +3,13 @@ import { Navigate, Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2 } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database } from "lucide-react";
 import { toast } from "sonner";
 import AdStudio from "@/components/AdStudio";
 import Distribution from "@/components/Distribution";
 import Analytics from "@/components/Analytics";
 import SocialLinksAdmin from "@/components/SocialLinksAdmin";
+import DataManagementTab from "@/components/DataManagementTab";
 
 const TABS = [
   { key: "analytics",   label: "Analytics",   icon: BarChart3 },
@@ -19,6 +20,7 @@ const TABS = [
   { key: "ads",         label: "Ad Studio",   icon: Megaphone },
   { key: "distribution", label: "Distribution", icon: Send },
   { key: "social",      label: "Social Links", icon: Share2 },
+  { key: "data",        label: "Data",        icon: Database },
 ];
 
 function StatTile({ label, value, icon: Icon, testId }) {
@@ -187,6 +189,7 @@ export default function AdminConsole() {
         {tab === "ads"         && <AdStudio />}
         {tab === "distribution" && <Distribution />}
         {tab === "social" && <SocialLinksAdmin />}
+        {tab === "data" && <DataManagementTab />}
       </div>
     </div>
   );

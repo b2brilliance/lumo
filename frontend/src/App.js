@@ -125,6 +125,10 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            {/* Catch-all: admin subpaths → /admin, everything else → home.
+                Prevents the "blank screen" after closing nested pages. */}
+            <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <SiteFooter />
           <Toaster position="top-right" richColors />
