@@ -1,0 +1,34 @@
+{
+  "summary": "Iter 27 — Provider avatar gating + public anonymous avatar upload + Settings profile-photo widget. Backend: 14/14 pytest pass (public upload happy-path + non-image 400 + >5MB 413 + auth-header tolerated + provider-no-avatar 400 + provider-with-avatar 200 + 3 non-provider roles 200 + PATCH semantics: missing-field preserves, null clears + seeded-login regression). Frontend (preview URL, Playwright): customer defaults PASS (no avatar section, submit='Create account'), provider gating PASS (section appears, submit disabled='Upload photo to continue'), upload→preview→enable PASS (toast 'Photo uploaded'), provider full register+redirect to /provider PASS, switch-back provider→customer hides section PASS, customer full register+redirect to /customer PASS, Settings warning chip visible for provider w/o avatar PASS, upload persists via PATCH /api/auth/me (verified /api/auth/me returns the media_url) PASS, warning disappears after reload PASS, remove brings warning back PASS, /map regression PASS (54 pins, no error overlay). provider@lumo.test RESTORED to avatar_url=null at end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings — country picker (pre-existing, not iter27)", "issues": ["React hydration warning: '<span> cannot be a child of <option>' — Settings.jsx:266 renders a <span> inside <option value=\"US\">. Not introduced by this iteration but shows up loudly in console while testing /settings. Recommend rendering flag emoji directly as text in the <option> or using a custom <select> replacement."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter27_provider_avatar.py",
+    "/app/test_reports/pytest/iter27.xml"
+  ],
+  "action_items": [
+    "(Optional/pre-existing) Fix Settings.jsx country <select> — <span> inside <option> triggers hydration warning. Render p.flag as plain text or replace native select with a custom dropdown.",
+    "(Nice-to-have) Consider adding a content-type sniff (e.g., python-magic) on /api/media/upload-avatar so a malicious client can't bypass the image-only guard by lying about content-type. Today the gate is purely the client-supplied header."
+  ],
+  "critical_code_review_comments": [
+    "server.py:527-528 — provider gating is the right place and the 400 message is user-friendly. Note: the check uses `body.role == 'provider'` BEFORE the duplicate-email check, which means an existing provider re-trying registration without an avatar gets the avatar error first instead of 'email already registered'. Minor UX nit only.",
+    "server.py:631-655 /media/upload-avatar — image-only via content-type prefix and 5 MB ceiling. Stores under '{APP_NAME}/avatars/anon/...' with owner_id='anonymous' and kind='avatar' for later cleanup. Returns the same shape as /media/upload. Clean.",
+    "server.py:568-579 update_me uses model_dump(exclude_unset=True) so a PATCH without avatar_url leaves the field untouched, and PATCH avatar_url:null clears it. Verified by tests test_patch_without_avatar_field_does_not_clear / test_patch_with_avatar_null_clears.",
+    "AvatarUploader.jsx (anonymous mode) hits /api/media/upload-avatar without an Authorization header even if a stale lumo_token sits in localStorage — verified server-side that even a bogus Bearer is ignored by this public endpoint.",
+    "Register.jsx — the role-sync useEffect bug fix (depend only on initialRole) is critical for this whole flow to work; without it the 'Provider' click would snap back to 'Customer' and the test selectors register-role-provider / register-avatar-section would never become reachable. Confirmed working end-to-end."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter27_provider_avatar.py (new — 14 tests, all pass)"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (11/11 critical flows)"},
+  "test_credentials": "provider@lumo.test / password123 (RESTORED to avatar_url=null at end). customer@lumo.test, admin@lumo.test, retailer@lumo.test, restaurant@lumo.test — all login OK with password123.",
+  "seed_data_creation": "Test users created: a handful of TEST_iter27_prov_*/cust_*/retailer/restaurant @lumo.test accounts via /api/auth/register (and 2 via UI). These are stable test accounts; safe to leave in DB. No production data touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter27 backend tests live at /app/backend/tests/test_iter27_provider_avatar.py — re-run via `pytest backend/tests/test_iter27_provider_avatar.py -v`. The tiny PNG bytes are hard-coded in the file. /media/upload-avatar accepts any image/* content-type and rejects >5MB (413) and non-image (400). Provider register without avatar_url → 400 'Profile photo is required for service providers'. PATCH /api/auth/me uses exclude_unset, so to clear an avatar you must explicitly send {avatar_url: null}. Cloudflare on the preview URL rejects raw urllib UA; use a real HTTP client (requests with default UA works) or in-browser fetch via page.evaluate. provider@lumo.test was left in a clean state (avatar_url=null) at the end of this run.",
+  "rca of the issue": "No bugs found in iter27. All gating, persistence, UI, and regression flows pass."
+}

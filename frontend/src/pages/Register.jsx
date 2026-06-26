@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Briefcase, MapPin } from "lucide-react";
+import AvatarUploader from "@/components/AvatarUploader";
 
 const ROLES = [
   { value: "customer", label: "Customer", desc: "Post requests, buy from stores, hire remotely." },
@@ -26,20 +27,29 @@ export default function Register() {
     () => (ROLES.some((r) => r.value === presetRole) ? presetRole : "customer"),
     [presetRole]
   );
-  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", role: initialRole });
+  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", role: initialRole, avatar_url: null });
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
 
+  // Re-sync role when the URL query param changes (e.g. deep-link from a
+  // marketing CTA). Do NOT depend on form.role — that would snap the user
+  // back to the initial role every time they clicked a different one.
   useEffect(() => {
-    if (initialRole && form.role !== initialRole) setForm((f) => ({ ...f, role: initialRole }));
-  }, [initialRole, form.role]);
+    setForm((f) => (f.role !== initialRole ? { ...f, role: initialRole } : f));
+  }, [initialRole]);
 
   const prettyCategory = jobCategory ? jobCategory.replace(/-/g, " ") : null;
   const prettyCity = cityParam ? cityParam.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : null;
   const isApplyFlow = !!(jobCategory && initialRole === "provider");
+  const requiresAvatar = form.role === "provider";
+  const missingAvatar = requiresAvatar && !form.avatar_url;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const submit = async (e) => {
     e.preventDefault();
+    if (missingAvatar) {
+      setErr("Please upload a profile photo — required for service providers.");
+      return;
+    }
     setBusy(true); setErr("");
     const payload = { ...form };
     if (isApplyFlow) {
@@ -107,9 +117,23 @@ export default function Register() {
           <Label className="overline">Password</Label>
           <Input type="password" minLength={6} value={form.password} onChange={(e) => set("password", e.target.value)} required data-testid="register-password" className="mt-1" />
         </div>
+        {requiresAvatar && (
+          <div className="border border-slate-200 bg-slate-50/40 p-4" data-testid="register-avatar-section">
+            <AvatarUploader
+              value={form.avatar_url}
+              onChange={(url) => set("avatar_url", url)}
+              anonymous
+              required
+              testid="register-avatar"
+            />
+            <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
+              Customers see this photo when you respond to their job. A clear, well-lit face photo builds trust and gets you hired faster.
+            </p>
+          </div>
+        )}
         {err && <div className="text-sm text-red-600 border border-red-200 bg-red-50 p-2" data-testid="register-error">{err}</div>}
-        <Button type="submit" disabled={busy} className="w-full bg-slate-900 hover:bg-slate-800" data-testid="register-submit">
-          {busy ? "Creating…" : isApplyFlow ? "Apply & create account" : "Create account"}
+        <Button type="submit" disabled={busy || missingAvatar} className="w-full bg-slate-900 hover:bg-slate-800" data-testid="register-submit">
+          {busy ? "Creating…" : missingAvatar ? "Upload photo to continue" : isApplyFlow ? "Apply & create account" : "Create account"}
         </Button>
         <div className="text-xs text-slate-500">
           Already have an account? <Link to="/login" className="text-teal-700 underline">Sign in</Link>

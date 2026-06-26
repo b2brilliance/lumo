@@ -170,6 +170,7 @@ class UserCreate(BaseModel):
     name: str
     role: Role = "customer"
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None  # Required when role == "provider"
 
 class UserLogin(BaseModel):
     email: str
@@ -181,6 +182,7 @@ class UserOut(BaseModel):
     name: str
     role: str
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
     wallet_balance: float = 0.0
     location: Optional[dict] = None
     service_radius_miles: float = 25.0
@@ -191,6 +193,7 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
     location: Optional[dict] = None  # {lat, lng, address}
     service_radius_miles: Optional[float] = None
     categories: Optional[List[str]] = None
@@ -519,6 +522,10 @@ api = APIRouter(prefix="/api")
 @api.post("/auth/register")
 async def register(body: UserCreate):
     email = body.email.lower()
+    # Providers MUST upload a profile photo at sign-up so customers can see
+    # who's coming to their door. Customers/retailers/restaurants are optional.
+    if body.role == "provider" and not body.avatar_url:
+        raise HTTPException(status_code=400, detail="Profile photo is required for service providers")
     existing = await db.users.find_one({"email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -528,6 +535,7 @@ async def register(body: UserCreate):
         "name": body.name,
         "role": body.role,
         "phone": body.phone,
+        "avatar_url": body.avatar_url,
         "password_hash": hash_password(body.password),
         "wallet_balance": 0.0,
         "location": None,
@@ -615,6 +623,33 @@ async def upload_media(file: UploadFile = File(...), user: dict = Depends(get_cu
         "owner_id": user["id"],
         "is_deleted": False,
         "created_at": now_iso(),
+    }
+    await db.media.insert_one(media_doc)
+    return {"media_url": f"/api/media/{media_doc['id']}", "media_type": media_type, "id": media_doc["id"]}
+
+
+@api.post("/media/upload-avatar")
+async def upload_avatar_public(file: UploadFile = File(...)):
+    """Anonymous avatar upload — used during sign-up before a JWT exists.
+    Restricted to image types + 5 MB to limit storage abuse."""
+    media_type = file.content_type or "application/octet-stream"
+    if not media_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image uploads are allowed for avatars")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Avatar too large (5MB max)")
+    ext = (file.filename or "img").rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
+    path = f"{APP_NAME}/avatars/anon/{uuid.uuid4()}.{ext}"
+    result = put_object(path, data, media_type)
+    media_doc = {
+        "id": str(uuid.uuid4()),
+        "storage_path": result["path"],
+        "media_type": media_type,
+        "size": result.get("size", len(data)),
+        "owner_id": "anonymous",
+        "is_deleted": False,
+        "created_at": now_iso(),
+        "kind": "avatar",
     }
     await db.media.insert_one(media_doc)
     return {"media_url": f"/api/media/{media_doc['id']}", "media_type": media_type, "id": media_doc["id"]}

@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
+import AvatarUploader from "@/components/AvatarUploader";
 
 const DEFAULT_NOTIFS = {
   order_updates: true,
@@ -128,6 +129,24 @@ export default function Settings() {
 
       {/* ── Profile ─────────────────────────────────────────────────────────── */}
       <SettingsSection icon={UserIcon} title="Profile" testid="section-profile" data-no-i18n="true">
+        <div className="mb-6" data-testid="settings-avatar-row">
+          <AvatarUploader
+            value={user.avatar_url}
+            onChange={async (url) => {
+              try {
+                await updateMe({ avatar_url: url });
+                toast.success(url ? "Photo updated" : "Photo removed");
+              } catch (e) { toast.error(formatApiError(e)); }
+            }}
+            required={user.role === "provider"}
+            testid="settings-avatar"
+          />
+          {user.role === "provider" && !user.avatar_url && (
+            <div className="mt-3 text-[11px] font-mono text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2" data-testid="settings-avatar-warning">
+              Service providers need a profile photo so customers can recognise you. Please upload one.
+            </div>
+          )}
+        </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <Label className="overline">Name</Label>
