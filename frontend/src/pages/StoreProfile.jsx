@@ -60,7 +60,14 @@ export default function StoreProfile({ role }) {
       return;
     }
     setTarget(it);
-    setOrder((o) => ({ ...o, quantity: 1, delivery_address: "", delivery_lat: null, delivery_lng: null }));
+    // Pre-fill from user's saved default delivery address (Settings).
+    const def = user.default_delivery_address || {};
+    setOrder((o) => ({
+      ...o, quantity: 1,
+      delivery_address: def.address || "",
+      delivery_lat: def.lat ?? null,
+      delivery_lng: def.lng ?? null,
+    }));
     setOpen(true);
   };
 

@@ -39,6 +39,19 @@ export default function Marketplace() {
   });
   const [busy, setBusy] = useState(false);
 
+  // Pre-fill default delivery address from the user's saved Settings preference.
+  const defaultAddr = user?.default_delivery_address;
+  const openBuy = (it) => {
+    setOrderTarget(it);
+    setOrder({
+      delivery_fee: FALLBACK_DELIVERY_FEE.toFixed(2),
+      delivery_address: defaultAddr?.address || "",
+      delivery_lat: defaultAddr?.lat ?? null,
+      delivery_lng: defaultAddr?.lng ?? null,
+      notes: "",
+    });
+  };
+
   const load = async () => {
     const { data } = await api.get("/marketplace/listings");
     setItems(data);
@@ -153,7 +166,7 @@ export default function Marketplace() {
                 <div className="text-xs text-slate-500 mt-1 flex-1">{it.description}</div>
                 <div className="flex items-center justify-between mt-3">
                   <div className="font-display text-2xl font-bold">${it.price.toFixed(2)}</div>
-                  <Button size="sm" onClick={() => { setOrderTarget(it); setOrder({ delivery_fee: FALLBACK_DELIVERY_FEE.toFixed(2), delivery_address: "", delivery_lat: null, delivery_lng: null, notes: "" }); }} className="bg-teal-700 hover:bg-teal-800" data-testid={`marketplace-buy-${it.id}`}>Buy</Button>
+                  <Button size="sm" onClick={() => openBuy(it)} className="bg-teal-700 hover:bg-teal-800" data-testid={`marketplace-buy-${it.id}`}>Buy</Button>
                 </div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-2">{it.seller_name}</div>
               </div>

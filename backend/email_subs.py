@@ -221,9 +221,26 @@ async def _run_one(db, force: bool = False) -> dict:
         logger.info("Email batch skipped — no active subscribers.")
         return {"ok": True, "topic": topic["key"], "sent": 0, "queued": 0, "skipped_reason": "no_subscribers"}
 
-    sent_count = 0; queued_count = 0; failed_count = 0
+    # ── Respect per-user marketing_emails opt-out from /settings ────────────
+    # Subscribers without an account are treated as opted-in (they explicitly
+    # subscribed via the homepage form). For subscribers WITH an account,
+    # we honor their notification_prefs.marketing_emails toggle.
+    sub_emails = [s["email"] for s in subs]
+    opted_out: set = set()
+    async for u in db.users.find(
+        {"email": {"$in": sub_emails}, "notification_prefs.marketing_emails": False},
+        {"email": 1, "_id": 0},
+    ):
+        opted_out.add(u["email"])
+    if opted_out:
+        logger.info(f"Email batch: skipping {len(opted_out)} subscribers who opted out via Settings.")
+
+    sent_count = 0; queued_count = 0; failed_count = 0; opted_out_count = 0
     batch_id = str(uuid.uuid4())
     for sub in subs:
+        if sub["email"] in opted_out:
+            opted_out_count += 1
+            continue
         unsub_url = f"{BASE_URL}/api/unsubscribe?token={sub['unsubscribe_token']}"
         html = _render_html(topic, unsub_url)
         ok, info = await _send_email(sub["email"], topic["title"], html)
@@ -245,11 +262,15 @@ async def _run_one(db, force: bool = False) -> dict:
         elif info == "no_api_key": queued_count += 1
         else: failed_count += 1
 
-    logger.info(f"Email batch {batch_id}: topic={topic['key']} sent={sent_count} queued={queued_count} failed={failed_count}")
+    logger.info(
+        f"Email batch {batch_id}: topic={topic['key']} sent={sent_count} "
+        f"queued={queued_count} failed={failed_count} opted_out={opted_out_count}"
+    )
     return {
         "ok": True, "batch_id": batch_id, "topic": topic["key"],
         "topic_title": topic["title"],
         "sent": sent_count, "queued": queued_count, "failed": failed_count,
+        "opted_out": opted_out_count,
         "resend_configured": bool(RESEND_API_KEY),
     }
 

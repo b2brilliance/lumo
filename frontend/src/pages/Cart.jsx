@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/locale";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,12 +16,22 @@ import { formatApiError } from "@/lib/api";
 export default function Cart() {
   const { cart, updateItem, removeItem, clearStore, checkoutStore, loading } = useCart();
   const { country, taxLabel, computeBreakdown, formatPrice } = useLocale();
+  const { user } = useAuth();
   const [busyStore, setBusyStore] = useState(null);
   const [storeForm, setStoreForm] = useState({});  // { [store_id]: { delivery_address, delivery_fee, notes, us_state } }
 
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
 
-  const getForm = (sid) => storeForm[sid] || { delivery_address: "", delivery_fee: "9.99", notes: "", us_state: "" };
+  // Pre-fill the cart's per-store address form from the user's saved default.
+  const defAddr = user?.default_delivery_address || {};
+  const getForm = (sid) => storeForm[sid] || {
+    delivery_address: defAddr.address || "",
+    delivery_lat: defAddr.lat ?? null,
+    delivery_lng: defAddr.lng ?? null,
+    delivery_fee: "9.99",
+    notes: "",
+    us_state: "",
+  };
   const setForm = (sid, patch) => setStoreForm((f) => ({ ...f, [sid]: { ...getForm(sid), ...patch } }));
 
   const checkout = async (sid) => {

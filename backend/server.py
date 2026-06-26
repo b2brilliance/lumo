@@ -4395,6 +4395,40 @@ async def withdraw_quote(quote_id: str, user: dict = Depends(require_role("provi
 # ────────────────────────────────────────────────────────────────────────────
 # Notifications
 # ────────────────────────────────────────────────────────────────────────────
+# Maps notification `type` → user notification_prefs key. Any type not in
+# this map is always shown (e.g. chat messages, reviews, payouts).
+NOTIF_TYPE_TO_PREF = {
+    # Order / job lifecycle
+    "quote_received":  "order_updates",
+    "quote_accepted":  "order_updates",
+    "quote_declined":  "order_updates",
+    "rental_request":  "order_updates",
+    "rental_approved": "order_updates",
+    "rental_declined": "order_updates",
+    "order_delivered":      "order_updates",
+    "order_confirmed":      "order_updates",
+    "order_disputed":       "order_updates",
+    "order_auto_released":  "order_updates",
+    "delivery_marked":      "order_updates",
+    # Provider-side job match notifications (forward-looking)
+    "new_job_match":   "job_matches",
+    "job_nearby":      "job_matches",
+}
+
+
+def _filter_notifications_by_prefs(notifs: list, prefs: dict) -> list:
+    """Drop notifications the user has opted out of via Settings → Notifications."""
+    if not prefs:
+        return notifs
+    out = []
+    for n in notifs:
+        pref_key = NOTIF_TYPE_TO_PREF.get(n.get("type"))
+        if pref_key and prefs.get(pref_key) is False:
+            continue
+        out.append(n)
+    return out
+
+
 @api.get("/notifications")
 async def list_notifications(since: Optional[str] = None, unread_only: bool = False, user: dict = Depends(get_current_user)):
     q: dict = {"user_id": user["id"]}
@@ -4403,7 +4437,8 @@ async def list_notifications(since: Optional[str] = None, unread_only: bool = Fa
     if unread_only:
         q["read"] = False
     docs = await db.notifications.find(q).sort("created_at", -1).to_list(100)
-    return [clean_doc(d) for d in docs]
+    cleaned = [clean_doc(d) for d in docs]
+    return _filter_notifications_by_prefs(cleaned, user.get("notification_prefs") or {})
 
 @api.post("/notifications/{notif_id}/read")
 async def mark_read(notif_id: str, user: dict = Depends(get_current_user)):

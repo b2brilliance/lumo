@@ -1,0 +1,51 @@
+{
+  "summary": "Iter 26 — Notification-pref filter + marketing email opt-out + default_delivery_address pre-fill on three checkout dialogs. Backend 18/18 pytest pass (filter + opt-out). Frontend: StoreProfile pre-fill PASS, Cart pre-fill code-review PASS, Marketplace pre-fill FAIL with a CRITICAL infinite render loop ('Maximum update depth exceeded') that crashes the page whenever the saved default_delivery_address contains lat/lng. Marketplace clear→empty PASS (no loop when lat/lng null). Settings 6-section regression PASS; old 'Restrict your Google Maps' is still absent. Login still works for all seeded accounts.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Marketplace.jsx — Buy dialog",
+        "issue": "CRASH: Opening the Buy dialog while the user has a saved default_delivery_address with lat/lng triggers 'Maximum update depth exceeded'. The buy-delivery-address input is therefore never queryable and the dialog content is replaced with the React error overlay. The pre-fill effectively does NOT work for any user who has set their default address via Settings.",
+        "selector": "[data-testid=\"marketplace-buy-{id}\"] → [data-testid=\"buy-dialog\"] → [data-testid=\"buy-delivery-address\"]",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Marketplace default-address pre-fill",
+        "issue": "Infinite re-render originates from /app/frontend/src/pages/Marketplace.jsx — `deliveryQuote` (line 104) is a fresh object every render and is used as a useEffect dependency (line 112). Before iter26, openBuy did NOT seed lat/lng so `deliveryMiles` was null → `deliveryQuote` null → effect no-op. After iter26's openBuy now seeds `delivery_lat`/`delivery_lng` from `user.default_delivery_address`, the FIRST render of the dialog produces a truthy `deliveryQuote` → effect fires setOrder → re-render → new deliveryQuote object reference (===  different) → effect fires again → infinite loop.",
+        "affected_selectors": ["[data-testid=\"buy-dialog\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter26_notif_prefs_email_optout.py",
+    "/app/test_reports/pytest/iter26.xml"
+  ],
+  "action_items": [
+    "(CRITICAL) Fix infinite re-render in /app/frontend/src/pages/Marketplace.jsx. Either (a) memoize `deliveryQuote` with useMemo({...}, [deliveryMiles]), OR (b) change the dep array of the useEffect at line 108–112 from `[deliveryMiles, deliveryQuote]` to `[deliveryMiles]` (or `[deliveryQuote?.total]`). Once fixed, retest the marketplace-buy → buy-delivery-address pre-fill.",
+    "(OPTIONAL) Apply the same memoization pattern to StoreProfile.jsx if it has an analogous delivery-quote effect (works today because the StoreProfile quote effect already only depends on `deliveryMiles`, not the object — please double-check there is no latent twin bug)."
+  ],
+  "critical_code_review_comments": [
+    "Marketplace.jsx:104 → `const deliveryQuote = deliveryMiles != null ? computeStoreDeliveryQuote({ miles: deliveryMiles }) : null;` produces a NEW object identity on each render whenever it's truthy. Combined with `useEffect(..., [deliveryMiles, deliveryQuote])` on lines 108–112 that calls setOrder, this is a classic infinite-loop hazard. Iter26's openBuy now seeds lat/lng, which is exactly the trigger condition. Recommend useMemo.",
+    "Backend NOTIF_TYPE_TO_PREF map + _filter_notifications_by_prefs (server.py:4400–4429) is clean: O(1) lookup per notif, skips when pref==False, allows-by-default for any unmapped type. The 11 order_updates types and 2 job_matches types are covered; new_message / review_received / payout_sent / stripe_payout correctly fall through (verified by parametrized tests).",
+    "email_subs.py:228–243 builds an `opted_out` set in one indexed query (`{email: {$in: sub_emails}, notification_prefs.marketing_emails: False}`), then skips matching subscribers in the send loop and reports `opted_out_count`. Correctly handles subscribers WITHOUT a user account (treated as opted-in). Returns a stable `opted_out` field in the response. Verified end-to-end.",
+    "Cart.jsx:26–28 — getForm default reads user.default_delivery_address?.address. Correct. (E2E couldn't be fully exercised because the cart-add API path isn't easily reproducible from the test harness, but the logic mirrors the working StoreProfile pre-fill.)",
+    "StoreProfile.jsx:57–67 openOrder seeds delivery_address + delivery_lat + delivery_lng. Verified in browser — order-delivery-address input shows '123 Test St, NYC' immediately on dialog open. No render loop because the delivery-fee effect there depends only on deliveryMiles (primitive), not on the quote object.",
+    "Test cleanup: customer@lumo.test notification_prefs restored to all-true; default_delivery_address cleared; the inserted email_subscriber doc for customer@lumo.test was created with status='active' (NOT deleted at end of run — left in place because the seeded customer email needs to remain subscribable for future runs; if you want a clean DB, delete via db.email_subscribers.deleteOne({email:'customer@lumo.test'}))."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter26_notif_prefs_email_optout.py (new — 18 tests, all pass)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "60% (3/5 flows — StoreProfile + Marketplace-clear + Settings regression pass; Marketplace pre-fill fails; Cart pre-fill code-correct but not fully E2E exercised)"},
+  "test_credentials": "customer@lumo.test / password123 ; admin@lumo.test / password123 (both restored to baseline at end of run — notification_prefs all-true, default_delivery_address={})",
+  "seed_data_creation": "Inserted db.email_subscribers row for customer@lumo.test (status=active) so the marketing-email opt-out test can run. Left in place for future re-runs (does NOT affect normal seeded data). Test notifications (id prefixed TEST_) were deleted after each test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend filter + opt-out fully working — re-running /app/backend/tests/test_iter26_notif_prefs_email_optout.py should yield 18/18. The ONE outstanding bug is the Marketplace infinite render loop. Reproduce by: (1) login as customer@lumo.test, (2) PATCH /api/auth/me with default_delivery_address={address,lat,lng} (must include lat+lng), (3) visit /marketplace, (4) click any marketplace-buy-{id}. You'll see 'Uncaught runtime errors: Maximum update depth exceeded' on the page. Fix is a one-liner in Marketplace.jsx — change the useEffect dep array on line 112 from `[deliveryMiles, deliveryQuote]` to `[deliveryMiles]` (deliveryQuote is derived purely from deliveryMiles so it adds nothing). After fix, retest pre-fill (should show '123 Test St, NYC' in buy-delivery-address) and the empty-state (PATCH default_delivery_address={} then reopen → empty). The Cart pre-fill path requires an item in the user's cart — easiest setup: POST /api/cart/add (verify the exact path; the current backend may use a different cart endpoint).",
+  "rca of the issue": "Marketplace.jsx pre-fill regression — RCA: `deliveryQuote = computeStoreDeliveryQuote({miles})` (line 104) returns a NEW object reference every render. The dep array `[deliveryMiles, deliveryQuote]` (line 112) on the setOrder-effect therefore triggers on EVERY render once truthy. Before iter26, openBuy seeded `{delivery_address: '', delivery_lat: null, delivery_lng: null}` → deliveryMiles null → deliveryQuote null → effect was a no-op. Iter26 changed openBuy to seed `delivery_lat: defaultAddr?.lat ?? null, delivery_lng: defaultAddr?.lng ?? null`. When the user has a saved default address WITH coords (the test case 40.7/-74.0), both lat AND lng are present on the FIRST render of the dialog → distance computed → deliveryQuote truthy → effect fires → setOrder → re-render → new deliveryQuote object → effect fires again. React aborts after ~50 nested updates with 'Maximum update depth exceeded' and the entire page is replaced by the red error overlay. Mitigation: useMemo the quote OR drop `deliveryQuote` from the dep array (since it's a pure function of `deliveryMiles`)."
+}
