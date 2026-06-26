@@ -264,7 +264,7 @@ export default function Settings() {
           >
             {Object.entries(COUNTRY_PROFILES).map(([code, p]) => (
               <option key={code} value={code}>
-                {p.flag}  {p.name} — {p.lang.toUpperCase()} · {p.currency}
+                {`${p.flag}  ${p.name} — ${p.lang.toUpperCase()} · ${p.currency}`}
               </option>
             ))}
           </select>

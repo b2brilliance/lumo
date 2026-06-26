@@ -27,6 +27,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Provider profile-photo requirement at sign-up (Feb 26, 2026)
+- **Backend gate**: `POST /api/auth/register` now returns `400 "Profile photo is required for service providers"` when `role=="provider"` and `avatar_url` is missing. Customers / retailers / restaurants remain optional. `UserCreate`, `UserOut`, and `UserUpdate` extended with `avatar_url`.
+- **New public endpoint** `POST /api/media/upload-avatar` — anonymous (no JWT needed since users register first), image-only (rejects non-`image/*` with 400), 5 MB ceiling (413 on overflow). Stored under `{APP_NAME}/avatars/anon/...` with `kind:"avatar"` tag for future cleanup.
+- **Frontend**: new `<AvatarUploader>` component with circular preview + Change/Remove buttons. Rendered conditionally on `Register.jsx` only when Provider role is selected (`requiresAvatar = form.role === "provider"`); submit button reads "Upload photo to continue" + is disabled until a photo is uploaded.
+- **Settings page**: same uploader added to the Profile section. Saves instantly via PATCH `/api/auth/me`. Amber warning chip for providers without an avatar so existing seeded providers can complete their profile.
+- **🐛 Pre-existing bug fixed**: Register.jsx role-sync `useEffect` depended on `form.role`, snapping the role back to `initialRole` on every click. Now depends only on `initialRole` so role buttons actually work.
+- **Tested**: iteration_27 — 14/14 backend pytests (`/app/backend/tests/test_iter27_provider_avatar.py`) + 11/11 frontend flows PASS. Seeded accounts left clean.
+
 ### Map page job feed: chronological + user-selectable radius (Feb 26, 2026)
 - **Replaced the grouped-by-type listing** under the `/map` page with a clean chronological feed (newest first). The map at top is untouched (same `MapView` component, all category-coloured pins, full filters).
 - **User-selectable radius** — segmented pill bar with 7 options: `5 / 10 / 25 / 50 / 100 / 250 / Any` miles. Persists to `localStorage` (`lumo.map.radius`) so it remembers between visits. Anchor location: provider's `user.location`, customer's `user.default_delivery_address`, anonymous → no anchor → "show everything". Remote jobs always appear regardless of distance.
