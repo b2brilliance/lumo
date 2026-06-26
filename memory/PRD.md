@@ -27,6 +27,16 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Wiring notification_prefs + default_delivery_address pre-fill (Feb 26, 2026)
+- **Server-side notification filter** (`/app/backend/server.py` — new `NOTIF_TYPE_TO_PREF` map + `_filter_notifications_by_prefs`). `GET /api/notifications` now drops items whose `type` maps to a pref the user has disabled (`order_updates` / `job_matches`). 13 lifecycle types gated (quote_*, rental_*, order_*, delivery_marked, plus 2 forward-looking job-match types). Always-show types: `new_message`, `review_*`, `payout_*`.
+- **Marketing email opt-out** (`/app/backend/email_subs.py`). `_run_one()` builds an `opted_out` set in one indexed query (`{email: {$in: emails}, notification_prefs.marketing_emails: False}`) and skips matching subscribers. Subscribers without a user account are treated as opted-in (they explicitly subscribed). Response now exposes `opted_out` count for admin telemetry.
+- **Default delivery address pre-fill** across all three checkout flows:
+  - `Marketplace.jsx` — new `openBuy(it)` seeds the buy dialog from `user.default_delivery_address`
+  - `StoreProfile.jsx` — `openOrder()` seeds address + lat + lng so distance quote computes immediately
+  - `Cart.jsx` — `getForm()` default reads the saved address, populating every per-store form
+- **Bug fixed (CRITICAL)**: Marketplace.jsx had a `useEffect` dep array of `[deliveryMiles, deliveryQuote]` where `deliveryQuote` is a fresh object every render → infinite re-render loop when the user had a saved address with coords. Dropped `deliveryQuote` from deps (it's a pure derivation of `deliveryMiles`). Verified live: buy dialog opens cleanly with pre-fill, distance quote computes, zero page errors.
+- **Tested**: iteration_26 backend 18/18 pytest pass, frontend regression verified via main-agent screenshot (NYC→SF Haversine = 2566 mi quote, no crashes).
+
 ### User-facing Settings page redesign + Google Search Console verification (Feb 26, 2026)
 - **Removed** the developer-facing "Restrict your Google Maps API key" section from `/settings` — that was operator advice, not a user preference.
 - **New 6-section Settings page** at `/settings` (logged-in users):

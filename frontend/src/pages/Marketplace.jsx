@@ -105,11 +105,14 @@ export default function Marketplace() {
 
   // Whenever the computed quote changes, sync the editable delivery_fee input
   // so the breakdown stays consistent. Users can still override manually.
+  // NOTE: depend only on `deliveryMiles` (primitive) — `deliveryQuote` is a
+  // fresh object reference on every render which would cause an infinite loop.
   useEffect(() => {
     if (deliveryQuote) {
       setOrder((o) => ({ ...o, delivery_fee: deliveryQuote.total.toFixed(2) }));
     }
-  }, [deliveryMiles, deliveryQuote]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryMiles]);
 
   const checkout = async () => {
     if (!user || user === false) { window.location.href = "/login"; return; }
