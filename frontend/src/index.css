@@ -100,3 +100,18 @@ h1, h2, h3, h4, h5, h6 {
     content: ""; position: absolute; inset: -4px; border-radius: 9999px;
     animation: pulseRing 1.6s ease-out infinite;
 }
+
+
+/* ── Accessibility preferences (driven by Settings → toggles) ─────────── */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
+html.larger-text {
+    font-size: 18.4px; /* 15% bump from default 16px */
+}
+

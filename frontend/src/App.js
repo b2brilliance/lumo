@@ -9,6 +9,7 @@ import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
 import AutoTranslator from "@/components/AutoTranslator";
 import InstallPrompt from "@/components/InstallPrompt";
+import AccessibilityApplier from "@/components/AccessibilityApplier";
 import { Toaster } from "@/components/ui/sonner";
 
 import Landing from "@/pages/Landing";
@@ -70,6 +71,7 @@ function App() {
               <NavBar />
               <NotificationsBridge />
               <AutoTranslator />
+              <AccessibilityApplier />
               <PageviewPinger />
               <Routes>
             <Route path="/" element={<Landing />} />

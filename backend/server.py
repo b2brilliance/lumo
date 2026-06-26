@@ -195,6 +195,10 @@ class UserUpdate(BaseModel):
     service_radius_miles: Optional[float] = None
     categories: Optional[List[str]] = None
     storefront: Optional[dict] = None
+    # User-facing preferences (Settings page)
+    default_delivery_address: Optional[dict] = None  # {lat, lng, address}
+    notification_prefs: Optional[dict] = None  # {order_updates, job_matches, marketing_emails, blog_digest}
+    accessibility_prefs: Optional[dict] = None  # {reduce_motion, larger_text}
 
 class JobCreate(BaseModel):
     title: str
@@ -562,6 +566,31 @@ async def update_me(body: UserUpdate, user: dict = Depends(get_current_user)):
     fresh = clean_doc(fresh)
     fresh.pop("password_hash", None)
     return fresh
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@api.post("/auth/me/password")
+async def change_password(body: PasswordChange, user: dict = Depends(get_current_user)):
+    """Change the current user's password. Requires the current password to match."""
+    fresh = await db.users.find_one({"id": user["id"]})
+    if not fresh:
+        raise HTTPException(404, "User not found")
+    # Passwordless users (Google OAuth, SMS) might not have a password_hash yet —
+    # in that case we let them set one for the first time without the check.
+    existing_hash = fresh.get("password_hash")
+    if existing_hash and not verify_password(body.current_password, existing_hash):
+        raise HTTPException(400, "Current password is incorrect")
+    if len(body.new_password) < 6:
+        raise HTTPException(400, "New password must be at least 6 characters")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(body.new_password)}},
+    )
+    return {"ok": True}
 
 # ────────────────────────────────────────────────────────────────────────────
 # Media upload

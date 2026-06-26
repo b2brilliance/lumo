@@ -1,0 +1,42 @@
+{
+  "summary": "Iter 25 — Settings page redesign (remove Google Maps API dev-section, add 6 user-facing sections + password change). Backend: 5/5 pytest cases pass (test_settings_api.py). Frontend: All section testids render, the old 'Restrict your Google Maps API key' heading is GONE, save-bar dirty-detection works, accessibility toggles immediately add/remove the 'reduce-motion' and 'larger-text' classes on <html>, Save bar disappears after PATCH 200, India country picker shows INR/₹, change-password modal succeeds and closes (POST /api/auth/me/password = 200). Password reset back to 'password123' verified at end of test — login with original creds still works.\n\nBackend pytest pass:\n  • GET /api/auth/me returns user (new fields readable, may be null) ✅\n  • PATCH /api/auth/me persists name/phone/default_delivery_address/notification_prefs/accessibility_prefs, follow-up GET confirms ✅\n  • POST /api/auth/me/password rejects wrong current_password with 400 'Current password is incorrect' ✅\n  • POST /api/auth/me/password rejects <6 char new_password with 400 'must be at least 6 characters' ✅\n  • POST /api/auth/me/password happy-path → new login works, old fails, then reset back to original ✅\n\nFrontend live-browser pass:\n  • section-profile / section-address / section-notifs / section-a11y / section-locale / section-account all render ✅\n  • 'Restrict your Google Maps API key' string NOT present anywhere on /settings ✅\n  • settings-save-bar hidden initially; appears after editing settings-name ✅\n  • Clicking settings-save fires PATCH /api/auth/me → 200, save bar disappears ✅\n  • toggle-reduce-motion immediately toggles documentElement.classList.contains('reduce-motion') ✅\n  • toggle-larger-text immediately toggles documentElement.classList.contains('larger-text') ✅\n  • settings-country-picker → IN updates display to INR (₹), Hindi label ✅\n  • open-change-password reveals change-password-card; pw-submit with valid creds → POST 200, card closes, toast 'Password updated' ✅\n  • Password reset back to 'password123' confirmed via API at end — seeded account intact ✅",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/auth/me", "issue": "Drops None values via comprehension (server.py:562), so sending `default_delivery_address: null` from the frontend is SILENTLY IGNORED. The frontend Settings.jsx line 95 sends `null` when the user clears the address — that field will NEVER actually clear server-side. Workaround in this run was to PATCH with `{}` (empty dict). Recommend: either send `{}` from the frontend when clearing, or change backend to use `body.model_dump(exclude_unset=True)` and allow explicit None to clear."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings → Country & language picker", "issues": ["React hydration warning in dev console: <span> cannot be a child of <option>. Caused by the visual-editor injecting an x-excluded <span> wrapper around the {p.flag} expression at Settings.jsx line 247. Production builds strip these wrappers so it is harmless at runtime, but it spams the console and slightly bloats dev-mode SSR mismatch reports. Optional fix: replace `{p.flag}  {p.name} — …` with a single template literal like `${p.flag}  ${p.name} — …` so the editor cannot wrap individual expressions."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_settings_api.py",
+    "/app/test_reports/pytest/iter25_settings.xml"
+  ],
+  "action_items": [
+    "(MINOR) Consider switching PATCH /api/auth/me to `model_dump(exclude_unset=True)` so explicit nulls can clear stored fields (e.g. clearing default_delivery_address from the UI). Currently `null` is silently dropped.",
+    "(OPTIONAL) Settings.jsx line 247 — single template-literal for the option label to silence the dev-mode <span> hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "Settings.jsx line 95: sends `null` to clear default_delivery_address, but backend PATCH strips None — so the address is undeletable through the UI. Bug-class: silent data inconsistency.",
+    "Backend POST /api/auth/me/password (server.py:577-593) correctly returns 400 for wrong current pw / short new pw, only re-hashes the password (does not touch any other field), and gracefully handles passwordless accounts (Google/SMS) by allowing them to set a first password without the current-check. Clean.",
+    "Settings.jsx accessibility useEffect (lines 68-71) applies classes on EVERY a11y change, including before save. This matches the spec ('immediately, without needing to save') but note: if the user closes the page WITHOUT saving, the classes will revert on next reload via the AccessibilityApplier (which reads from user.accessibility_prefs). Good — unsaved preview state does not persist accidentally.",
+    "Dirty-detection useMemo (lines 73-86) compares JSON.stringify of nested objects — works but fragile if MongoDB ever reorders keys. In practice the order is preserved through the round-trip so it's stable. Acceptable.",
+    "ChangePasswordCard (lines 330-373) does client-side length + match checks before the POST. The server still enforces length (server.py:587), so even a bypassed client would be safe.",
+    "PATCH /api/auth/me returns the cleaned user without password_hash — good. No PII leak.",
+    "No CSRF protection on POST /api/auth/me/password — relies on Bearer token in localStorage (not cookie), so CSRF is not the attack vector. Token-stealing XSS would be. Acceptable for current architecture."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_settings_api.py (new file — 5 tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% on all spec assertions"},
+  "test_credentials": "customer@lumo.test / password123 (auto-seeded; reset back to original at end of test)",
+  "seed_data_creation": "No persistent test data left. PATCH'd user fields (name/phone/address/notifs/a11y/password) were all restored to baseline at end of run. Final state verified: name='Casey Customer', default_delivery_address={}, notification_prefs all true, accessibility_prefs all false, password=password123.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Settings page at /settings has the new six-section layout: section-profile (name/phone/email/role), section-address (AddressInput + MapPickerButton for default_delivery_address), section-notifs (4 Switch toggles), section-a11y (2 Switch toggles wired to <html> classes), section-locale (Country picker → live currency preview), section-account (Change password + Sign out). The save bar (settings-save-bar) appears only when `dirty` is true via deep JSON compare. The change-password card (change-password-card) is rendered conditionally inline below the Account section, NOT in a dialog. AccessibilityApplier at App root re-applies html classes on every user-state refresh, so the preview state set by the toggles in Settings will be restored from user.accessibility_prefs on each page load if saved. Backend gotcha: PATCH /api/auth/me silently drops None values (uses dict comprehension `if v is not None`), so to CLEAR a stored field you must send `{}` not `null`."
+}

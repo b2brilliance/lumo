@@ -1,22 +1,240 @@
-import React from "react";
-import { ExternalLink, ShieldCheck, Globe } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Globe, User as UserIcon, MapPin, Bell, Accessibility, Lock,
+  Save, Loader2, LogOut, AlertCircle,
+} from "lucide-react";
+import { toast } from "sonner";
 import { useLocale, COUNTRY_PROFILES } from "@/lib/locale";
+import { useAuth } from "@/lib/auth";
+import { api, formatApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import AddressInput from "@/components/AddressInput";
+import MapPickerButton from "@/components/MapPickerButton";
+
+const DEFAULT_NOTIFS = {
+  order_updates: true,
+  job_matches: true,
+  marketing_emails: true,
+  blog_digest: true,
+};
+const DEFAULT_A11Y = {
+  reduce_motion: false,
+  larger_text: false,
+};
 
 export default function Settings() {
+  const nav = useNavigate();
   const { country, profile, setCountryOverride, isAutoDetected, formatPrice } = useLocale();
+  const { user, updateMe, logout } = useAuth();
+
+  // ── Profile ────────────────────────────────────────────────────────────────
+  const [name, setName] = useState(user?.name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+
+  // ── Default delivery address ───────────────────────────────────────────────
+  const [addr, setAddr] = useState({
+    address: user?.default_delivery_address?.address || "",
+    lat: user?.default_delivery_address?.lat || null,
+    lng: user?.default_delivery_address?.lng || null,
+  });
+
+  // ── Notifications & a11y ───────────────────────────────────────────────────
+  const [notifs, setNotifs] = useState({ ...DEFAULT_NOTIFS, ...(user?.notification_prefs || {}) });
+  const [a11y, setA11y] = useState({ ...DEFAULT_A11Y, ...(user?.accessibility_prefs || {}) });
+
+  // ── UI state ───────────────────────────────────────────────────────────────
+  const [saving, setSaving] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+
+  // Re-hydrate when the user object first arrives (Auth boots after first paint).
+  useEffect(() => {
+    if (!user) return;
+    setName(user.name || "");
+    setPhone(user.phone || "");
+    setAddr({
+      address: user.default_delivery_address?.address || "",
+      lat: user.default_delivery_address?.lat ?? null,
+      lng: user.default_delivery_address?.lng ?? null,
+    });
+    setNotifs({ ...DEFAULT_NOTIFS, ...(user.notification_prefs || {}) });
+    setA11y({ ...DEFAULT_A11Y, ...(user.accessibility_prefs || {}) });
+  }, [user]);
+
+  // Apply accessibility prefs to the document immediately so the preview is live.
+  useEffect(() => {
+    document.documentElement.classList.toggle("reduce-motion", !!a11y.reduce_motion);
+    document.documentElement.classList.toggle("larger-text", !!a11y.larger_text);
+  }, [a11y.reduce_motion, a11y.larger_text]);
+
+  const dirty = useMemo(() => {
+    if (!user) return false;
+    return (
+      name !== (user.name || "") ||
+      phone !== (user.phone || "") ||
+      JSON.stringify(addr) !== JSON.stringify({
+        address: user.default_delivery_address?.address || "",
+        lat: user.default_delivery_address?.lat ?? null,
+        lng: user.default_delivery_address?.lng ?? null,
+      }) ||
+      JSON.stringify(notifs) !== JSON.stringify({ ...DEFAULT_NOTIFS, ...(user.notification_prefs || {}) }) ||
+      JSON.stringify(a11y) !== JSON.stringify({ ...DEFAULT_A11Y, ...(user.accessibility_prefs || {}) })
+    );
+  }, [user, name, phone, addr, notifs, a11y]);
+
+  const save = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await updateMe({
+        name,
+        phone: phone || null,
+        default_delivery_address: addr.address ? addr : null,
+        notification_prefs: notifs,
+        accessibility_prefs: a11y,
+      });
+      toast.success("Settings saved");
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="max-w-screen-md mx-auto px-6 py-20 text-center text-slate-500">
+        <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+      </div>
+    );
+  }
+  if (user === false) {
+    return (
+      <div className="max-w-screen-md mx-auto px-6 py-20 text-center" data-testid="settings-anon">
+        <h1 className="font-display text-3xl font-black tracking-tighter">Sign in to manage your settings.</h1>
+        <Button className="mt-6" onClick={() => nav("/signin")}>Sign in</Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-screen-md mx-auto px-6 py-10">
+    <div className="max-w-screen-md mx-auto px-6 py-10" data-testid="settings-page">
       <div className="overline">Settings</div>
-      <h1 className="font-display text-4xl font-black tracking-tighter mt-2">Operator notes.</h1>
+      <h1 className="font-display text-4xl font-black tracking-tighter mt-2">Your preferences.</h1>
+      <p className="text-slate-600 mt-3">Tweak how Lumo looks, talks to you, and pre-fills your checkout.</p>
 
-      <section className="mt-10 border border-slate-200 p-6" data-no-i18n="true">
-        <div className="flex items-center gap-2"><Globe className="w-5 h-5 text-teal-700" /><div className="font-display text-xl font-bold">Country & language preview</div></div>
-        <p className="text-slate-600 text-sm mt-3">
-          Lumo auto-detects each visitor's country from their browser locale and timezone, then translates the entire app into their native language and converts prices to their local currency using live FX rates. Use the picker below to preview any country.
+      {/* ── Profile ─────────────────────────────────────────────────────────── */}
+      <SettingsSection icon={UserIcon} title="Profile" testid="section-profile" data-no-i18n="true">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label className="overline">Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" data-testid="settings-name" />
+          </div>
+          <div>
+            <Label className="overline">Phone</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555…" className="mt-1" data-testid="settings-phone" />
+          </div>
+          <div className="sm:col-span-2 grid grid-cols-2 gap-4">
+            <div>
+              <Label className="overline">Email</Label>
+              <div className="mt-1 px-3 py-2 border border-slate-200 bg-slate-50 text-sm font-mono text-slate-600" data-testid="settings-email">{user.email}</div>
+            </div>
+            <div>
+              <Label className="overline">Account type</Label>
+              <div className="mt-1 px-3 py-2 border border-slate-200 bg-slate-50 text-sm font-mono uppercase tracking-wider text-slate-600">{user.role}</div>
+            </div>
+          </div>
+        </div>
+      </SettingsSection>
+
+      {/* ── Default delivery address ────────────────────────────────────────── */}
+      <SettingsSection
+        icon={MapPin}
+        title="Default delivery address"
+        subtitle="Pre-fills your address on Marketplace, Stores, and Restaurant checkout dialogs."
+        testid="section-address"
+      >
+        <div className="flex gap-2 items-start">
+          <div className="flex-1">
+            <AddressInput
+              value={addr.address}
+              onChange={(v) => setAddr({ ...addr, address: v })}
+              onPlace={(p) => setAddr({ address: p.address, lat: p.lat, lng: p.lng })}
+              placeholder="Start typing your address…"
+              data-testid="settings-address-input"
+            />
+          </div>
+          <MapPickerButton
+            value={{ lat: addr.lat, lng: addr.lng, address: addr.address }}
+            onPick={(p) => setAddr({ address: p.address, lat: p.lat, lng: p.lng })}
+          />
+        </div>
+        {addr.lat != null && (
+          <div className="text-[11px] font-mono text-teal-700 mt-2">
+            📍 {addr.lat.toFixed(4)}, {addr.lng.toFixed(4)} — distance-based delivery quotes will use this.
+          </div>
+        )}
+      </SettingsSection>
+
+      {/* ── Notifications ───────────────────────────────────────────────────── */}
+      <SettingsSection icon={Bell} title="Notifications" testid="section-notifs">
+        <ToggleRow
+          label="Order & job updates"
+          desc="Real-time pings when a provider responds, an order ships, or a delivery is confirmed."
+          checked={notifs.order_updates}
+          onChange={(v) => setNotifs({ ...notifs, order_updates: v })}
+          testid="toggle-order-updates"
+        />
+        <ToggleRow
+          label="New nearby job matches"
+          desc="(Providers only) New jobs in your service radius and categories."
+          checked={notifs.job_matches}
+          onChange={(v) => setNotifs({ ...notifs, job_matches: v })}
+          testid="toggle-job-matches"
+        />
+        <ToggleRow
+          label="Marketing emails"
+          desc="Two short emails a day with one Lumo use-case each. Unsubscribe in one click any time."
+          checked={notifs.marketing_emails}
+          onChange={(v) => setNotifs({ ...notifs, marketing_emails: v })}
+          testid="toggle-marketing"
+        />
+        <ToggleRow
+          label="Blog digest"
+          desc="Weekly roundup of the best new posts from the Lumo blog."
+          checked={notifs.blog_digest}
+          onChange={(v) => setNotifs({ ...notifs, blog_digest: v })}
+          testid="toggle-blog-digest"
+        />
+      </SettingsSection>
+
+      {/* ── Accessibility ───────────────────────────────────────────────────── */}
+      <SettingsSection icon={Accessibility} title="Accessibility" testid="section-a11y">
+        <ToggleRow
+          label="Reduce motion"
+          desc="Disable transitions and animated sparklines. Helpful if motion makes you uncomfortable."
+          checked={a11y.reduce_motion}
+          onChange={(v) => setA11y({ ...a11y, reduce_motion: v })}
+          testid="toggle-reduce-motion"
+        />
+        <ToggleRow
+          label="Larger text"
+          desc="Bumps body text +15% across the app."
+          checked={a11y.larger_text}
+          onChange={(v) => setA11y({ ...a11y, larger_text: v })}
+          testid="toggle-larger-text"
+        />
+      </SettingsSection>
+
+      {/* ── Country & language ──────────────────────────────────────────────── */}
+      <SettingsSection icon={Globe} title="Country & language" testid="section-locale" data-no-i18n="true">
+        <p className="text-slate-600 text-sm">
+          Lumo auto-detects your country from your browser. Override below to preview how Lumo looks in any of our 15 supported regions.
         </p>
-
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <label className="text-xs font-mono uppercase tracking-wider text-slate-500" htmlFor="country-picker">Preview country</label>
           <select
             id="country-picker"
@@ -42,64 +260,114 @@ export default function Settings() {
             </button>
           )}
         </div>
-
         <div className="mt-4 bg-slate-50 border border-slate-200 p-4 grid grid-cols-3 gap-3 text-xs font-mono">
-          <div>
-            <div className="text-slate-500 uppercase">Country</div>
-            <div className="text-slate-900 mt-1">{profile.flag} {profile.name}</div>
-          </div>
-          <div>
-            <div className="text-slate-500 uppercase">Language</div>
-            <div className="text-slate-900 mt-1">{profile.lang.toUpperCase()}</div>
-          </div>
-          <div>
-            <div className="text-slate-500 uppercase">Currency</div>
-            <div className="text-slate-900 mt-1">{profile.currency} ({profile.symbol})</div>
-          </div>
-          <div>
-            <div className="text-slate-500 uppercase">{profile.taxLabel}</div>
-            <div className="text-slate-900 mt-1">{(profile.taxRate * 100).toFixed(profile.taxRate * 100 % 1 ? 1 : 0)}%</div>
-          </div>
-          <div className="col-span-2">
-            <div className="text-slate-500 uppercase">$25 example, tax-inclusive</div>
-            <div className="text-slate-900 mt-1 text-sm">{formatPrice(25 * (1 + profile.taxRate))}</div>
-          </div>
-          <div className="col-span-3 pt-2 border-t border-slate-200 mt-1">
-            <div className="text-slate-500 uppercase">Pre-tax price ($25 USD → local)</div>
-            <div className="text-slate-900 mt-1 text-base">{formatPrice(25)}</div>
+          <div><div className="text-slate-500 uppercase">Country</div><div className="text-slate-900 mt-1">{profile.flag} {profile.name}</div></div>
+          <div><div className="text-slate-500 uppercase">Language</div><div className="text-slate-900 mt-1">{profile.lang.toUpperCase()}</div></div>
+          <div><div className="text-slate-500 uppercase">Currency</div><div className="text-slate-900 mt-1">{profile.currency} ({profile.symbol})</div></div>
+          <div><div className="text-slate-500 uppercase">{profile.taxLabel}</div><div className="text-slate-900 mt-1">{(profile.taxRate * 100).toFixed(profile.taxRate * 100 % 1 ? 1 : 0)}%</div></div>
+          <div className="col-span-2"><div className="text-slate-500 uppercase">$25 example, tax-inclusive</div><div className="text-slate-900 mt-1 text-sm">{formatPrice(25 * (1 + profile.taxRate))}</div></div>
+        </div>
+      </SettingsSection>
+
+      {/* ── Account ─────────────────────────────────────────────────────────── */}
+      <SettingsSection icon={Lock} title="Account" testid="section-account">
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={() => setPwOpen(true)} data-testid="open-change-password">Change password</Button>
+          <Button variant="outline" onClick={() => { logout(); nav("/"); }} data-testid="settings-signout">
+            <LogOut className="w-3.5 h-3.5 mr-1" /> Sign out
+          </Button>
+        </div>
+        {pwOpen && <ChangePasswordCard onClose={() => setPwOpen(false)} />}
+      </SettingsSection>
+
+      {/* ── Sticky save bar ────────────────────────────────────────────────── */}
+      {dirty && (
+        <div className="sticky bottom-4 mt-10 z-30" data-testid="settings-save-bar">
+          <div className="bg-slate-900 text-white shadow-xl px-5 py-3 flex items-center justify-between gap-4 border border-slate-800">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertCircle className="w-4 h-4 text-amber-400" />
+              <span>You have unsaved changes</span>
+            </div>
+            <Button onClick={save} disabled={saving} className="bg-teal-600 hover:bg-teal-700" data-testid="settings-save">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        <p className="text-xs text-slate-500 mt-4">
-          Tip: {profile.taxLabel} of {(profile.taxRate * 100).toFixed(profile.taxRate * 100 % 1 ? 1 : 0)}% is added at checkout and collected 100% upfront in the deposit so Lumo always covers tax remittance — no matter how the remaining balance is paid. Demo jobs are seeded in major cities across <strong>15 countries</strong> (US, UK, Canada, Australia, India, Germany, France, Japan, Brazil, Mexico, Spain, Nigeria, UAE, Singapore, South Africa). Visit the <a className="text-teal-700 underline" href="/map">Map</a> or the <a className="text-teal-700 underline" href="/customer">Customer Hub</a> to see them.
-        </p>
-      </section>
+// ────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ────────────────────────────────────────────────────────────────────────────
+function SettingsSection({ icon: Icon, title, subtitle, children, testid, ...rest }) {
+  return (
+    <section className="mt-8 border border-slate-200 p-6 bg-white" data-testid={testid} {...rest}>
+      <div className="flex items-center gap-2">
+        <Icon className="w-5 h-5 text-teal-700" />
+        <div className="font-display text-xl font-bold">{title}</div>
+      </div>
+      {subtitle && <p className="text-slate-600 text-sm mt-3">{subtitle}</p>}
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
 
-      <section className="mt-10 border border-slate-200 p-6" data-no-i18n="true">
-        <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-teal-700" /><div className="font-display text-xl font-bold">Restrict your Google Maps API key</div></div>
-        <p className="text-slate-600 text-sm mt-3">
-          You are using Google Maps in production — lock your API key down before going live so nobody else can run up your billing.
-        </p>
-        <ol className="mt-5 space-y-3 text-sm text-slate-700 list-decimal pl-5">
-          <li>Go to <a className="text-teal-700 underline inline-flex items-center gap-1" href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noreferrer">Google Cloud Console → APIs &amp; Services → Credentials <ExternalLink className="w-3 h-3" /></a>.</li>
-          <li>Click the pencil icon next to your Maps API key.</li>
-          <li>Under <span className="font-mono">Application restrictions</span> select <strong>HTTP referrers (websites)</strong> and add:
-            <pre className="bg-slate-50 border border-slate-200 px-3 py-2 mt-2 font-mono text-xs">https://yourdomain.com/*{"\n"}https://*.yourdomain.com/*{"\n"}https://*.preview.emergentagent.com/*</pre>
-          </li>
-          <li>Under <span className="font-mono">API restrictions</span> select <strong>Restrict key</strong> and enable only:
-            <ul className="list-disc pl-5 mt-1 text-slate-600">
-              <li>Maps JavaScript API</li>
-              <li>Places API (if you use autocomplete)</li>
-              <li>Geocoding API (if you geocode addresses server-side)</li>
-            </ul>
-          </li>
-          <li>Click <strong>Save</strong>. Allow ~5 minutes for restrictions to propagate.</li>
-          <li>(Optional, recommended) In <span className="font-mono">Billing → Budgets & alerts</span>, set a monthly budget alert (e.g. $50) so you get an email if usage spikes.</li>
-        </ol>
-        <p className="text-xs text-slate-500 mt-5 font-mono">
-          Tip: For backend-only calls (Geocoding, Directions), create a second key with <strong>IP address</strong> restrictions instead of HTTP referrer — restrict it to your server outbound IPs.
-        </p>
-      </section>
+function ToggleRow({ label, desc, checked, onChange, testid }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100 last:border-b-0">
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-slate-900 text-sm">{label}</div>
+        {desc && <div className="text-xs text-slate-500 mt-1 leading-relaxed">{desc}</div>}
+      </div>
+      <Switch checked={!!checked} onCheckedChange={onChange} data-testid={testid} />
+    </div>
+  );
+}
+
+function ChangePasswordCard({ onClose }) {
+  const [cur, setCur] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (next.length < 6) { toast.error("New password must be at least 6 characters"); return; }
+    if (next !== confirm) { toast.error("Passwords don't match"); return; }
+    setBusy(true);
+    try {
+      await api.post("/auth/me/password", { current_password: cur, new_password: next });
+      toast.success("Password updated");
+      onClose();
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="mt-5 border border-slate-200 p-4 bg-slate-50 space-y-3" data-testid="change-password-card">
+      <div>
+        <Label className="overline">Current password</Label>
+        <Input type="password" value={cur} onChange={(e) => setCur(e.target.value)} className="mt-1" data-testid="pw-current" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="overline">New password</Label>
+          <Input type="password" value={next} onChange={(e) => setNext(e.target.value)} className="mt-1" data-testid="pw-new" />
+        </div>
+        <div>
+          <Label className="overline">Confirm</Label>
+          <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="mt-1" data-testid="pw-confirm" />
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <Button variant="ghost" onClick={onClose} data-testid="pw-cancel">Cancel</Button>
+        <Button onClick={submit} disabled={busy} className="bg-slate-900 hover:bg-slate-800" data-testid="pw-submit">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}{busy ? "Saving…" : "Update password"}
+        </Button>
+      </div>
     </div>
   );
 }
