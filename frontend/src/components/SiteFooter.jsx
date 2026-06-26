@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import {
-  Instagram, Youtube, Facebook, Linkedin, Twitch, MessageCircle,
+  Instagram, Youtube, Facebook, Linkedin, Twitch, MessageCircle, Download,
 } from "lucide-react";
+import { triggerInstall, useInstallable, IOSInstallModal } from "@/components/InstallPrompt";
 
 /* Lucide doesn't ship icons for every brand we want, so we render some
  * platforms with inline SVGs. Each one is a 16×16 outline. */
@@ -75,6 +76,13 @@ export { PLATFORM_META };
 
 export default function SiteFooter() {
   const [social, setSocial] = useState({ links: {}, tagline: "" });
+  const [iosModalOpen, setIosModalOpen] = useState(false);
+  const installable = useInstallable();
+  const isStandalone = typeof window !== "undefined" && (
+    window.matchMedia?.("(display-mode: standalone)").matches
+    || window.navigator.standalone === true
+  );
+  const isIOS = typeof window !== "undefined" && /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 
   useEffect(() => {
     (async () => {
@@ -123,6 +131,20 @@ export default function SiteFooter() {
               <Link to="/contact" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-contact">Contact</Link>
               <Link to="/terms"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-terms">Terms of service</Link>
               <Link to="/privacy" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-privacy">Privacy policy</Link>
+              {!isStandalone && (installable || isIOS) && (
+                <button
+                  type="button"
+                  onClick={() => triggerInstall(() => setIosModalOpen(true))}
+                  className="text-left text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1.5 mt-1"
+                  data-testid="footer-install-btn"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Install Lumo
+                  <span className="text-[9px] font-mono uppercase tracking-wider bg-teal-100 text-teal-800 px-1 py-0.5 ml-0.5">
+                    {installable ? "1 tap" : "iOS"}
+                  </span>
+                </button>
+              )}
             </nav>
           </div>
 
@@ -171,6 +193,7 @@ export default function SiteFooter() {
           <div className="font-mono">Built for everyday hustle.</div>
         </div>
       </div>
+      {iosModalOpen && <IOSInstallModal onClose={() => setIosModalOpen(false)} />}
     </footer>
   );
 }

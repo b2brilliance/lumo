@@ -1204,6 +1204,54 @@ async def create_review(body: ReviewCreate, user: dict = Depends(get_current_use
         "created_at": now_iso(),
     }
     await db.reviews.insert_one(doc)
+
+    # ── 1% commission cashback for honest reviewers ──────────────────────
+    # Lumo charges 10% commission on every job/order. We refund 10% of that
+    # back to the reviewer (= 1% of the gross transaction value) regardless
+    # of whether the review is positive or negative — the incentive is for
+    # sharing experience, not for sharing praise.
+    cashback = 0.0
+    try:
+        if body.target_type == "provider" and body.job_id and 'job' in locals():
+            gross = float(job.get("pay_rate") or 0) * float(job.get("estimated_hours") or 1)
+            # Some jobs store flat pay_rate as the full amount; fallback if estimated_hours is missing
+            if not gross:
+                gross = float(job.get("pay_rate") or 0)
+            cashback = round(gross * 0.01, 2)
+        elif body.target_type == "store" and body.order_id and 'order' in locals():
+            gross = float(order.get("item_total") or 0) + float(order.get("delivery_fee") or 0)
+            cashback = round(gross * 0.01, 2)
+
+        if cashback > 0:
+            # Mark this review as cashback-issued so we never double-pay
+            await db.reviews.update_one({"id": doc["id"]}, {"$set": {
+                "cashback_amount": cashback,
+                "cashback_issued_at": now_iso(),
+            }})
+            await db.users.update_one({"id": user["id"]}, {"$inc": {"wallet_balance": cashback}})
+            await db.wallet_transactions.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "amount": cashback,
+                "type": "credit",
+                "reason": "Review cashback (1% of order)",
+                "ref_id": doc["id"],
+                "ref_kind": "review_cashback",
+                "created_at": now_iso(),
+            })
+            await db.notifications.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "type": "review_cashback",
+                "title": f"You earned ${cashback:.2f} for your review",
+                "body": f"Thanks for sharing your honest feedback — we&apos;ve added ${cashback:.2f} to your Lumo wallet.",
+                "link": "/wallet",
+                "read": False,
+                "created_at": now_iso(),
+            })
+    except Exception as _cb_err:
+        logger.warning(f"Cashback issue failed for review {doc['id']}: {_cb_err}")
+
     # Notify the reviewed party
     await db.notifications.insert_one({
         "id": str(uuid.uuid4()),
@@ -1216,7 +1264,7 @@ async def create_review(body: ReviewCreate, user: dict = Depends(get_current_use
         "read": False,
         "created_at": now_iso(),
     })
-    return clean_doc(doc)
+    return clean_doc(doc) | {"cashback_amount": cashback}
 
 @api.get("/reviews/target/{target_type}/{target_id}")
 async def list_reviews_for_target(target_type: str, target_id: str, limit: int = 50):
@@ -1994,6 +2042,17 @@ CONNECTOR_TYPES = {
         "label": "Discord Webhook",
         "fields": [{"key": "webhook_url", "label": "Webhook URL", "type": "url", "required": True, "hint": "Channel → Edit → Integrations → Webhooks → New → Copy URL"}],
         "instant": True,
+        "setup": {
+            "summary": "2 minutes · no signup if you already use Discord",
+            "deep_link": "https://discord.com/channels/@me",
+            "deep_link_label": "Open Discord",
+            "steps": [
+                "Open Discord and go to the server where you want Lumo to post.",
+                "Click the gear ⚙️ next to the channel name → Integrations → Webhooks.",
+                "Click 'New Webhook' → give it a name like 'Lumo Ads' → click 'Copy Webhook URL'.",
+                "Paste the URL in the field below and click Save.",
+            ],
+        },
     },
     "telegram": {
         "label": "Telegram Channel",
@@ -2002,6 +2061,18 @@ CONNECTOR_TYPES = {
             {"key": "chat_id", "label": "Channel @handle or chat_id", "type": "text", "required": True, "hint": "e.g. @lumo_app or -1001234567890"},
         ],
         "instant": True,
+        "setup": {
+            "summary": "5 minutes · need a Telegram account",
+            "deep_link": "https://t.me/BotFather",
+            "deep_link_label": "Open @BotFather",
+            "steps": [
+                "In Telegram, message @BotFather and send /newbot. Follow the prompts to name your bot.",
+                "BotFather replies with an API token like 1234567890:ABC… — copy it (this is your Bot token).",
+                "Create a Telegram channel (or pick an existing one). Open it → Manage → Administrators → Add your new bot.",
+                "Use the channel's @handle (e.g. @lumo) for chat_id, OR forward any channel message to @userinfobot to get the numeric ID.",
+                "Paste both values below and click Save.",
+            ],
+        },
     },
     "x_twitter": {
         "label": "X / Twitter",
@@ -2010,6 +2081,17 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "30-60 minutes · requires X Developer account (free tier OK)",
+            "deep_link": "https://developer.x.com/en/portal/dashboard",
+            "deep_link_label": "Open X Developer Portal",
+            "steps": [
+                "Go to developer.x.com → sign up for a Free developer account. Approval is usually instant.",
+                "Create a new Project → New App → name it 'Lumo'.",
+                "In the app's 'Keys and tokens' tab, click 'Generate' next to OAuth 2.0 Bearer Token.",
+                "Copy the bearer token and paste it below. Free tier = 1,500 posts/month.",
+            ],
+        },
     },
     "linkedin": {
         "label": "LinkedIn Company Page",
@@ -2019,6 +2101,18 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "1-7 days · requires LinkedIn dev approval",
+            "deep_link": "https://www.linkedin.com/developers/apps/new",
+            "deep_link_label": "Create LinkedIn App",
+            "steps": [
+                "Create a LinkedIn Company Page if you don't have one (linkedin.com/company/setup/new).",
+                "Go to developers.linkedin.com → My Apps → Create app. Link it to your Company Page.",
+                "Request the 'Share on LinkedIn' + 'Marketing Developer Platform' products. Approval takes a few days.",
+                "After approval, use the OAuth 2.0 tool in the dev console to get an access token.",
+                "Your Page URN is in your Company Page admin → Page Info — looks like urn:li:organization:12345678.",
+            ],
+        },
     },
     "reddit": {
         "label": "Reddit (your subreddit)",
@@ -2030,6 +2124,18 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "20 minutes · need a Reddit account that mods the subreddit",
+            "deep_link": "https://www.reddit.com/prefs/apps",
+            "deep_link_label": "Reddit App Prefs",
+            "steps": [
+                "Create the subreddit (e.g. /r/lumo) if you haven't yet. You must be a moderator to post via API.",
+                "Go to reddit.com/prefs/apps → 'Create another app' → choose 'script' type.",
+                "Name = 'Lumo Ads', redirect URI = http://localhost. Copy the Client ID (under the app name) and Client Secret.",
+                "Use a tool like reddit-token-helper to generate a refresh token for 'submit' + 'identity' scopes.",
+                "Paste everything below + your subreddit name (without the /r/).",
+            ],
+        },
     },
     "mastodon": {
         "label": "Mastodon",
@@ -2039,6 +2145,17 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "3 minutes · pick any Mastodon instance",
+            "deep_link": "https://joinmastodon.org/servers",
+            "deep_link_label": "Find a Mastodon Server",
+            "steps": [
+                "Pick a Mastodon instance and sign up (e.g. mastodon.social, mas.to, infosec.exchange).",
+                "Once logged in, go to Preferences → Development → New Application.",
+                "Name it 'Lumo Ads', leave the default redirect, check 'write' permissions, click Submit.",
+                "Click your new app and copy the 'Your access token' value. Paste it below along with the instance URL.",
+            ],
+        },
     },
     "bluesky": {
         "label": "Bluesky",
@@ -2048,6 +2165,16 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "2 minutes · need a Bluesky account",
+            "deep_link": "https://bsky.app/settings/app-passwords",
+            "deep_link_label": "Open Bluesky App Passwords",
+            "steps": [
+                "Log into Bluesky and go to Settings → App passwords.",
+                "Click 'Add app password' → name it 'Lumo' → copy the generated password.",
+                "Paste your handle (e.g. golumo.bsky.social) and the app password below.",
+            ],
+        },
     },
     "pinterest": {
         "label": "Pinterest",
@@ -2057,6 +2184,17 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "15 minutes · need a Pinterest business account",
+            "deep_link": "https://developers.pinterest.com/apps/",
+            "deep_link_label": "Pinterest Developer Apps",
+            "steps": [
+                "Convert your Pinterest profile to a Business account at business.pinterest.com (free).",
+                "Go to developers.pinterest.com/apps → Create app. Fill in basic details.",
+                "After approval, generate an access token with 'pins:write' + 'boards:read' scopes.",
+                "Create a board on Pinterest to receive Lumo pins — copy its Board ID from the URL (pinterest.com/<user>/<board>/ → the board id appears in the page's HTML).",
+            ],
+        },
     },
     "threads": {
         "label": "Threads (Meta)",
@@ -2066,22 +2204,67 @@ CONNECTOR_TYPES = {
         ],
         "instant": False,
         "todo": "Token UI ready — full implementation lands next session",
+        "setup": {
+            "summary": "30-90 minutes · requires Meta dev review",
+            "deep_link": "https://developers.facebook.com/apps/",
+            "deep_link_label": "Meta for Developers",
+            "steps": [
+                "Sign up at developers.facebook.com if you don't have a Meta dev account.",
+                "Create a new app → choose 'Business' type → add the 'Threads API' product.",
+                "Connect your Threads account → run through OAuth to get a long-lived access token.",
+                "Your User ID is shown in the Threads API console after OAuth completes.",
+            ],
+        },
     },
-    # ── Zero-OAuth "paste a URL and go" channels — instantly usable ──
     "slack": {
         "label": "Slack (Incoming Webhook)",
         "fields": [{"key": "webhook_url", "label": "Incoming Webhook URL", "type": "url", "required": True, "hint": "Slack → Apps → Incoming Webhooks → Add to Slack"}],
         "instant": True,
+        "setup": {
+            "summary": "3 minutes · need a Slack workspace you own",
+            "deep_link": "https://api.slack.com/apps?new_app=1",
+            "deep_link_label": "Create Slack App",
+            "steps": [
+                "Go to api.slack.com/apps → Create New App → 'From scratch'. Pick your workspace.",
+                "In the app settings, click 'Incoming Webhooks' → toggle it on.",
+                "Click 'Add New Webhook to Workspace' → pick the channel where Lumo should post → Allow.",
+                "Copy the Webhook URL Slack gives you (https://hooks.slack.com/services/T…/B…/…) and paste below.",
+            ],
+        },
     },
     "zapier": {
         "label": "Zapier (Catch Hook) → routes to X / FB / IG / LinkedIn / Pinterest",
         "fields": [{"key": "hook_url", "label": "Catch Hook URL", "type": "url", "required": True, "hint": "Zapier → Webhooks → Catch Hook → copy URL. Add steps to post to any platform Zapier supports."}],
         "instant": True,
+        "setup": {
+            "summary": "5 minutes · free Zapier account (5 Zaps free)",
+            "deep_link": "https://zapier.com/app/zaps",
+            "deep_link_label": "Open Zapier",
+            "steps": [
+                "Sign up at zapier.com (free tier).",
+                "Create a new Zap → choose 'Webhooks by Zapier' as the trigger → 'Catch Hook'.",
+                "Zapier shows a 'Custom Webhook URL' — copy it.",
+                "Add Action steps to that Zap to post to X, Facebook, Instagram, LinkedIn, or Pinterest (Zapier handles the OAuth).",
+                "Paste the hook URL below — Lumo will fire that webhook with each ad, and Zapier handles the rest.",
+            ],
+        },
     },
     "make": {
         "label": "Make.com (Custom Webhook)",
         "fields": [{"key": "hook_url", "label": "Custom Webhook URL", "type": "url", "required": True, "hint": "Make.com → Webhooks → Custom webhook → copy address. Route to any social platform Make supports."}],
         "instant": True,
+        "setup": {
+            "summary": "5 minutes · free Make.com account",
+            "deep_link": "https://www.make.com/en/register",
+            "deep_link_label": "Sign up for Make.com",
+            "steps": [
+                "Sign up at make.com (free tier = 1,000 ops/month).",
+                "Create a new Scenario → add a 'Webhooks → Custom webhook' module → click 'Add' → name it 'Lumo'.",
+                "Make shows a Webhook URL — copy it.",
+                "Add downstream modules to post to your platforms (Make handles all the OAuth).",
+                "Paste the webhook URL below and save.",
+            ],
+        },
     },
     "ifttt": {
         "label": "IFTTT (Webhooks → applet)",
@@ -2090,6 +2273,18 @@ CONNECTOR_TYPES = {
             {"key": "key", "label": "IFTTT Webhooks key", "type": "password", "required": True, "hint": "ifttt.com/maker_webhooks → Documentation"},
         ],
         "instant": True,
+        "setup": {
+            "summary": "5 minutes · need an IFTTT Pro account ($3/mo) for custom Webhooks",
+            "deep_link": "https://ifttt.com/maker_webhooks",
+            "deep_link_label": "IFTTT Webhooks",
+            "steps": [
+                "Sign up at ifttt.com. The Webhooks trigger requires IFTTT Pro ($3/mo).",
+                "Open the Webhooks service: ifttt.com/maker_webhooks → click 'Documentation' to get your key.",
+                "Create an Applet using Webhooks as the trigger. Pick any event name (e.g. 'lumo_ad').",
+                "Add an action (Twitter, Instagram, etc.). Save the Applet.",
+                "Paste your event name + key below.",
+            ],
+        },
     },
     "webhook": {
         "label": "Generic Webhook (any URL accepting POST JSON)",
@@ -2098,6 +2293,16 @@ CONNECTOR_TYPES = {
             {"key": "auth_header", "label": "Authorization header (optional)", "type": "password", "required": False, "hint": "e.g. Bearer abc123 — leave blank if not needed"},
         ],
         "instant": True,
+        "setup": {
+            "summary": "30 seconds · for developers",
+            "deep_link": None,
+            "deep_link_label": None,
+            "steps": [
+                "Use any HTTPS endpoint that accepts POST application/json.",
+                "Optional: paste an Authorization header value (e.g. 'Bearer abc123') if your endpoint requires auth.",
+                "The body Lumo sends includes: headline, body, image_url, video_url, hashtags, source_ad_id.",
+            ],
+        },
     },
 }
 

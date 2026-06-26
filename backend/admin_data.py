@@ -190,4 +190,83 @@ def create_router(*, db, require_admin) -> APIRouter:
             "older_than_iso": body.older_than_iso,
         }
 
+    # ── Polished Users list (read-only with search/filter + per-user stats) ─
+    @router.get("/api/admin/users")
+    async def list_users_rich(
+        q: str = Query("", description="search name/email/phone"),
+        role: str = Query("any", description="any|customer|provider|admin|retailer|restaurant"),
+        sort: str = Query("recent", description="recent|oldest|name|earnings"),
+        limit: int = Query(50, le=200),
+        skip: int = 0,
+        _admin: dict = Depends(require_admin),
+    ):
+        import re
+        f: dict = {}
+        if q.strip():
+            rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+            f["$or"] = [{"name": rx}, {"email": rx}, {"phone": rx}]
+        if role and role != "any":
+            f["role"] = role
+
+        sort_field = {
+            "recent":   ("created_at", -1),
+            "oldest":   ("created_at", 1),
+            "name":     ("name", 1),
+            "earnings": ("wallet_balance", -1),
+        }.get(sort, ("created_at", -1))
+
+        total = await db.users.count_documents(f)
+        cursor = (db.users.find(f, {"password_hash": 0})
+                  .sort(*sort_field).skip(skip).limit(limit))
+        items = []
+        async for u in cursor:
+            u.pop("_id", None)
+            # Lightweight stats per row
+            uid = u["id"]
+            jobs_done = await db.jobs.count_documents({"provider_id": uid, "status": "completed"})
+            orders_done = await db.orders.count_documents({"customer_id": uid, "status": "completed"})
+            reviews_count = await db.reviews.count_documents({"target_id": uid})
+            items.append({
+                "id": uid,
+                "name": u.get("name"),
+                "email": u.get("email"),
+                "phone": u.get("phone"),
+                "role": u.get("role"),
+                "avatar_url": u.get("avatar_url"),
+                "wallet_balance": float(u.get("wallet_balance") or 0),
+                "created_at": u.get("created_at"),
+                "last_login_at": u.get("last_login_at"),
+                "is_verified": bool(u.get("verified") or u.get("kyc_verified")),
+                "stripe_payouts_enabled": bool(u.get("stripe_payouts_enabled")),
+                "jobs_completed": jobs_done,
+                "orders_completed": orders_done,
+                "reviews_count": reviews_count,
+            })
+        return {"total": total, "items": items}
+
+    @router.get("/api/admin/users/{user_id}/detail")
+    async def user_detail(user_id: str, _admin: dict = Depends(require_admin)):
+        """Return a user + their recent activity for the side panel."""
+        u = await db.users.find_one({"id": user_id}, {"password_hash": 0})
+        if not u:
+            raise HTTPException(404, "User not found")
+        u.pop("_id", None)
+
+        async def _recent(coll, q, n=10):
+            cursor = coll.find(q).sort("created_at", -1).limit(n)
+            rows = []
+            async for d in cursor:
+                d.pop("_id", None)
+                rows.append(d)
+            return rows
+
+        return {
+            "user": u,
+            "jobs":     await _recent(db.jobs,                {"$or": [{"provider_id": user_id}, {"customer_id": user_id}]}),
+            "orders":   await _recent(db.orders,              {"$or": [{"provider_id": user_id}, {"customer_id": user_id}]}),
+            "reviews":  await _recent(db.reviews,             {"$or": [{"reviewer_id": user_id}, {"target_id": user_id}]}),
+            "wallet":   await _recent(db.wallet_transactions, {"user_id": user_id}, n=20),
+            "withdrawals": await _recent(db.withdrawal_requests, {"user_id": user_id}),
+        }
+
     return router

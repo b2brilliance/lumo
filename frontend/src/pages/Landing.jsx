@@ -5,6 +5,7 @@ import {
   ArrowUpRight, ShoppingBag, Store, Briefcase, Wallet,
   Zap, Building2, Clock, Users, ShieldCheck,
 } from "lucide-react";
+import HomeReviewsSection from "@/components/HomeReviewsSection";
 
 export default function Landing() {
   return (
@@ -238,6 +239,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* ── Customer reviews (or founding members block) ────────────────── */}
+      <HomeReviewsSection />
 
       {/* ── Final CTA ────────────────────────────────────────────────────── */}
       <section className="max-w-screen-2xl mx-auto px-6 py-20 text-center">

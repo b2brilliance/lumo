@@ -131,4 +131,26 @@ def create_router(*, db, require_admin) -> APIRouter:
             "ok": True,
         }
 
+    # ── Public homepage reviews feed ──────────────────────────────────────
+    @router.get("/api/site/reviews")
+    async def get_homepage_reviews(limit: int = 12):
+        """Latest 4-5 star reviews + summary stats for the landing page."""
+        cursor = db.reviews.find(
+            {"overall_stars": {"$gte": 4}},
+            {"_id": 0, "id": 1, "reviewer_name": 1, "target_type": 1,
+             "overall_stars": 1, "body": 1, "created_at": 1, "cashback_amount": 1},
+        ).sort("created_at", -1).limit(min(limit, 50))
+        items = [d async for d in cursor]
+
+        stats_cursor = db.reviews.aggregate([
+            {"$group": {"_id": None, "count": {"$sum": 1},
+                        "avg": {"$avg": "$overall_stars"}}}
+        ])
+        stats = {"count": 0, "avg": 0.0}
+        async for s in stats_cursor:
+            stats = {"count": int(s.get("count") or 0),
+                     "avg": round(float(s.get("avg") or 0), 2)}
+
+        return {"items": items, "stats": stats}
+
     return router

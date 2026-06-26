@@ -444,11 +444,42 @@ export default function Distribution() {
       {/* ADD CONFIG MODAL */}
       {showAdd && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
-          <div className="bg-white w-full max-w-lg border border-slate-200" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-lg border border-slate-200 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-slate-100">
               <div className="overline">Add channel</div>
               <h3 className="font-display text-2xl font-black tracking-tight mt-1">{types[newPlatform]?.label}</h3>
+              {types[newPlatform]?.setup?.summary && (
+                <p className="text-[11px] font-mono uppercase tracking-wider text-teal-700 mt-1">{types[newPlatform].setup.summary}</p>
+              )}
             </div>
+
+            {/* Setup walk-through */}
+            {types[newPlatform]?.setup?.steps?.length > 0 && (
+              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="overline text-slate-700">How to set this up</div>
+                  {types[newPlatform].setup.deep_link && (
+                    <a
+                      href={types[newPlatform].setup.deep_link}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-xs font-mono uppercase tracking-wider text-teal-700 hover:underline"
+                      data-testid={`connector-deeplink-${newPlatform}`}
+                    >
+                      {types[newPlatform].setup.deep_link_label || "Open"} ↗
+                    </a>
+                  )}
+                </div>
+                <ol className="space-y-2 text-xs text-slate-700">
+                  {types[newPlatform].setup.steps.map((s, i) => (
+                    <li key={i} className="flex gap-2 leading-relaxed">
+                      <span className="flex-shrink-0 w-5 h-5 grid place-items-center bg-slate-900 text-white font-mono text-[10px]">{i + 1}</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
             <div className="px-5 py-5 space-y-4">
               <div>
                 <label className="overline text-slate-500">Display name</label>
