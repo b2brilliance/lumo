@@ -27,6 +27,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Landing page revamp + commission story (Feb 26, 2026)
+- **Removed** the off-putting "10% deposit / 90% remaining balance" payment block from the homepage.
+- **New section "Keep 90% of what you earn"** — leads with the value to providers; flat 10% commission. Visual comparison bar chart shows Lumo (10%) vs TaskRabbit (15%), Instacart (15%), DoorDash (25%), Uber Eats (30%), Airbnb (14%) — Lumo's bar is shortest and highlighted in teal.
+- **New "Anything from anywhere, delivered today" banner** (dark, full-width) emphasizing same-day on-demand delivery from retailers, restaurants, AND individuals (peer-to-peer drops).
+- **New "Personal staffing agency" section** for workers — amber palette, 12-skill grid, CTA to /signin.
+- **New "Find help in minutes, not weeks" section** for businesses — blue palette, asymmetric layout, 4-tile grid, CTAs to post a job + browse providers.
+- **Kept** existing hero, use-case tiles, and look-and-feel; added a final centered CTA section.
+- **Payment options highlighted** as quiet 3-card row under the commission story: Escrow / Pay how you want / Auto-release in 24h.
+
 ### Analytics reset + click-into drill-downs (Feb 26, 2026)
 - **Backend** (`/app/backend/analytics.py`):
   - New `POST /api/admin/analytics/reset` wipes the `pageviews` collection and writes a `cutoff_at` ISO timestamp to a `analytics_settings` singleton.
