@@ -27,6 +27,29 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Auto-blog + Email newsletter + SEO (sitemap/llms.txt) (Feb 26, 2026)
+- **Auto-blog** (`/app/backend/blog.py`):
+  - 6-topic rotation (local hustle / marketplace economics / city spotlights / how-tos / founder updates / industry trends)
+  - 2x daily auto-publish loop (default 09:00 + 17:00 UTC, configurable)
+  - Emergent LLM key → Claude Sonnet 4.5 for body + Gemini Nano Banana for hero image
+  - **Lumo logo watermark** applied bottom-right via PIL on every hero image
+  - Optional auto-share to Distribution channels (default on)
+  - Admin "Blog & email" tab: status panel, pause/resume, generate-now, post list with view/unpublish/delete
+  - Public `/blog` index + `/blog/:slug` post pages with minimal-but-safe markdown rendering
+- **Email newsletter** (`/app/backend/email_subs.py`):
+  - 10-topic rotation (delivery / hire / earn / marketplace / real-estate / autos / food / rentals / stripe-payouts / business-hire)
+  - 2x daily send loop (default 10:00 + 18:00 UTC, configurable)
+  - Resend integration with graceful fallback — when no `RESEND_API_KEY`, emails are queued + logged so no subscribers are lost
+  - One-click unsubscribe link in every email (no login required)
+  - Public POST `/api/subscribe` + form on homepage
+  - Admin sub-tab: stats tiles (active/unsubscribed/sent/last-send), search, send-now, delete subscriber
+- **SEO endpoints** (existing `/api/sitemap.xml` enhanced):
+  - Sitemap now includes /about, /contact, /terms, /privacy, /blog AND every published blog post as /blog/{slug}
+  - NEW `/api/llms.txt` — site description per llmstxt.org with core pages, pricing, differentiators
+  - `/api/robots.txt` upgraded with AI-crawler welcomes (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) and Disallow rules for /admin and other private dashboards
+  - Static `/llms.txt` and `/robots.txt` also live in `/app/frontend/public/` as backups
+- **Tested**: iteration_23 — 22/22 backend pytest + full frontend E2E PASS. The run-now endpoint actually called Emergent LLM and produced a real watermarked post.
+
 ### Payments tab + Users tab + Homepage Reviews + Webhook wizard + Install UX (Feb 26, 2026)
 - **Admin Payments tab** (`/admin` → "Payments") — Stripe keys editor encrypted with Fernet at rest. Save/Clear/Test connection. Masked display, source badge (env vs db), fee slider, live mode warning. Cache auto-reloads on save (no restart).
 - **Admin Users tab** (`/admin` → "Users") — polished read-only browser with search, role filter, sort, avatar list. Click any user → side panel showing recent jobs/orders/reviews/wallet/withdrawals. No edit (per user request).
