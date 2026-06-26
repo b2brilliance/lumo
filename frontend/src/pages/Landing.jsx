@@ -13,8 +13,14 @@ export default function Landing() {
   const { user } = useAuth();
   // Logged-in users see context-aware CTAs (jump straight into their hub),
   // anonymous users see "Create an account".
+  const dashFor = {
+    provider: "/provider-hub",
+    retailer: "/retailer",
+    restaurant: "/restaurant",
+    admin: "/admin",
+  };
   const primaryCta = user
-    ? { to: user.role === "provider" ? "/provider-hub" : "/customer", label: "Open your dashboard" }
+    ? { to: dashFor[user.role] || "/customer", label: "Open your dashboard" }
     : { to: "/signin", label: "Create an account" };
 
   return (

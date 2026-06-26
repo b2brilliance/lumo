@@ -27,6 +27,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Context-aware CTAs + P2P distance-based delivery + SEO meta tags (Feb 26, 2026)
+- **Landing CTAs**: every "Create an account / Sign in / Start earning" CTA on `/` is now context-aware. Logged-in users see "Open your dashboard" → role-routed to `/provider-hub | /retailer | /restaurant | /admin | /customer`; staffing CTA flips to "Find work near you". Anonymous users still see "Create an account" → `/signin`. Hero, staffing, and final CTA all share the same `primaryCta` derivation in `Landing.jsx`.
+- **P2P Marketplace distance-based delivery**: `/marketplace` checkout now mirrors the Stores/Customer-Hub flow. Buy dialog has a Google-Places AddressInput + MapPickerButton; when both the listing's seller pickup location AND the buyer's delivery address have coords, Haversine miles → `computeStoreDeliveryQuote` auto-quotes the delivery fee ($4 base + $1.50/mi) and syncs the editable fee input via `useEffect`. New "Pickup location" field on the create-listing form lets sellers save coords on `listings.location`. Friendly fallback chips: "Seller hasn't set a pickup location" or "Pick your delivery address to get an exact quote".
+- **SEO meta tags** (`/app/frontend/public/index.html`): comprehensive OpenGraph (og:title, description, image 1200×630, url, locale), Twitter `summary_large_image` card, `meta name=keywords/author/robots/googlebot`, `<link rel="canonical">`, and JSON-LD `@graph` with Organization + WebSite (incl. SearchAction → `/map?q={search_term_string}`). All tags render in the served HTML for static crawlers (Twitter/Facebook/LinkedIn).
+- **BlogPost dynamic title**: `/blog/:slug` now updates `document.title` to `"{post title} — Lumo blog"` and overwrites the meta description with a 160-char post snippet on mount; restores both on unmount.
+- **robots.txt**: sitemap line absolutized to `https://golumo.app/api/sitemap.xml`.
+- **Note on search-engine submission**: Google + Bing deprecated their public ping APIs in 2023. The sitemap is auto-discoverable via `robots.txt` and must be submitted manually via Google Search Console + Bing Webmaster Tools (one-time).
+- **Tested**: iteration_24 — all targeted frontend assertions pass; testing agent verified logged-out/logged-in CTA flips, full SEO tag set in HTML, Marketplace buy-dialog UI states, and code-reviewed the dynamic title flow and quote-block trigger.
+
 ### Auto-blog + Email newsletter + SEO (sitemap/llms.txt) (Feb 26, 2026)
 - **Auto-blog** (`/app/backend/blog.py`):
   - 6-topic rotation (local hustle / marketplace economics / city spotlights / how-tos / founder updates / industry trends)
