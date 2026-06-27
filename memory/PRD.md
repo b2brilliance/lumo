@@ -27,6 +27,12 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Settings → Provider profile editor + /map W-2 job-board filters (Feb 27, 2026)
+- **Settings provider profile** (`ProviderProfileSection.jsx`, mounted in Settings.jsx): only shown for `role === "provider"`. Mirrors the Register-wizard step 3 — 4 employment-type tiles · 20 category checkboxes with expanding sub-categories (live from `SERVICE_SCHEMAS`) · bio · certifications · work history. Independent save button (only appears when dirty). Saves via PATCH `/api/auth/me`.
+- **/map W-2 + remote job-board filters** (`MapPage.jsx`): when `?employment=w2` or `?employment=remote`, an Indeed-style filter bar appears above the feed. Inputs: keyword search (title + description, case-insensitive) · min/max **annualised** pay (hourly is auto-multiplied by 2080, monthly by 12, weekly by 52, daily by 250) · 4-pill schedule selector (Full-time · Part-time · Contract · Flexible) · clear-all link.
+- **🐛 Caught + fixed in iter 33**: `<button>`-inside-`<button>` hydration warning where Radix `<Checkbox>` was nested in the category-row outer button. Replaced the Checkbox with an inline SVG checkmark icon in both ProviderProfileSection AND Register.jsx so the warning is gone.
+- **Tested**: iteration_33 — 11/11 frontend behaviors PASS. Keyword filter narrowed 6 W-2 jobs → 2 with "engineer". Min-pay $150k filter narrowed 6 → 1 (only the $165k Senior software engineer remains). Provider state restored to baseline at end.
+
 ### Big portal restructure: wizard sign-up/sign-in + nav reorg + W-2/remote seed (Feb 27, 2026)
 - **3-step Register wizard** (`Register.jsx` rewrite): Step 1 = role tiles (Customer · Service provider · Retailer · Restaurant — mutually exclusive). Step 2 = name/email/phone/password + avatar (required for providers, locked behind "Upload photo to continue"). Step 3 (provider-only) = employment-type tiles (On-demand · Staffing & temp · Remote · W-2 — multi-select) + 20 category checkboxes with expanding sub-category lists from `SERVICE_SCHEMAS` (hard filter on feed) + optional bio · certifications · work history.
 - **2-step Login wizard** (`Login.jsx` rewrite): Step 1 = role tiles. Step 2 = email/password with the picked role echoed in a green badge. "Change account type" back link + "Use phone or Google instead" → `/signin`. Mismatched role on login warns via toast but doesn't block — account's real role wins.

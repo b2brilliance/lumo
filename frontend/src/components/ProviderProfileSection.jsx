@@ -126,9 +126,18 @@ export default function ProviderProfileSection() {
                   onClick={() => toggle("categories", cat.key)}
                   className={`w-full flex items-center justify-between p-3 text-left transition-colors ${active ? "bg-teal-50/30" : "hover:bg-slate-50"}`}
                   data-testid={`pp-cat-${cat.key}`}
+                  aria-pressed={active}
                 >
                   <div className="flex items-center gap-3">
-                    <Checkbox checked={active} onCheckedChange={() => toggle("categories", cat.key)} />
+                    {/* Custom checkbox icon — using a real Radix Checkbox here
+                        would nest a button inside this button and React warns
+                        about that. The outer button drives the toggle. */}
+                    <span
+                      aria-hidden="true"
+                      className={`w-4 h-4 border flex items-center justify-center flex-shrink-0 ${active ? "bg-teal-700 border-teal-700" : "bg-white border-slate-300"}`}
+                    >
+                      {active && <svg viewBox="0 0 16 16" className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3"><path d="M3 8l3.5 3.5L13 5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                    </span>
                     <span className={`font-semibold text-sm ${active ? "text-teal-800" : "text-slate-800"}`}>{cat.label}</span>
                   </div>
                   <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
