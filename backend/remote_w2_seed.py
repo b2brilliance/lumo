@@ -154,13 +154,14 @@ _JOBS = [
 
 
 async def seed_remote_w2_jobs(db) -> dict:
-    """Idempotently seed remote / W-2 listings. Safe to run on every boot."""
-    existing = await db.jobs.count_documents({"seeded": SEED_TAG})
-    if existing >= len(_JOBS):
-        return {"ok": True, "skipped": True, "existing": existing}
+    """Idempotently seed remote / W-2 listings. Safe to run on every boot.
 
-    # Wipe partial seeds so re-runs of this seed always reflect the current list.
-    await db.jobs.delete_many({"seeded": SEED_TAG})
+    We dedupe on the SEED_TAG marker AND on (title, employment_type) so that
+    older seed-tag runs (e.g. remote_w2_v1) don't leave orphan rows behind.
+    """
+    # Wipe ANY previously-seeded remote/W-2 row (any seed tag version) before
+    # re-inserting from the current truth list.
+    await db.jobs.delete_many({"seeded": {"$regex": "^remote_w2_"}})
 
     docs = []
     for j in _JOBS:

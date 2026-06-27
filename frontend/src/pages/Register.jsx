@@ -168,21 +168,21 @@ export default function Register() {
           <div className="overline">Account details</div>
           <div>
             <Label className="text-xs">Full name</Label>
-            <Input value={form.name} onChange={(e) => set("name", e.target.value)} required data-testid="register-name" className="mt-1" />
+            <Input name="name" value={form.name} onChange={(e) => set("name", e.target.value)} required data-testid="register-name" className="mt-1" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required data-testid="register-email" className="mt-1" />
+              <Input name="email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} required data-testid="register-email" className="mt-1" />
             </div>
             <div>
               <Label className="text-xs">Phone (optional)</Label>
-              <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} data-testid="register-phone" className="mt-1" />
+              <Input name="phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} data-testid="register-phone" className="mt-1" />
             </div>
           </div>
           <div>
             <Label className="text-xs">Password</Label>
-            <Input type="password" minLength={6} value={form.password} onChange={(e) => set("password", e.target.value)} required data-testid="register-password" className="mt-1" />
+            <Input name="password" type="password" minLength={6} value={form.password} onChange={(e) => set("password", e.target.value)} required data-testid="register-password" className="mt-1" />
             <p className="text-[11px] text-slate-400 mt-1">At least 6 characters.</p>
           </div>
           {isProvider && (

@@ -3610,7 +3610,16 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
     if category_group_filter:
         q["category_group"] = category_group_filter
     if employment_type:
-        q["employment_type"] = employment_type
+        if employment_type == "on_demand":
+            # Legacy jobs predate the employment_type field — treat them as
+            # on_demand so the default Work-tab view doesn't render empty.
+            q["$or"] = [
+                {"employment_type": "on_demand"},
+                {"employment_type": {"$exists": False}},
+                {"employment_type": None},
+            ]
+        else:
+            q["employment_type"] = employment_type
     docs = await db.jobs.find(q).to_list(500)
     pins = []
     for d in docs:
