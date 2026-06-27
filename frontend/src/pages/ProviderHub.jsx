@@ -295,12 +295,12 @@ export default function ProviderHub() {
                     );
                   })()}
                 </div>
-                <div className="col-span-1 text-right flex flex-col gap-1">
-                  <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800 h-7 px-2 text-xs" data-testid={`accept-job-${j.id}`}>
-                    Accept
+                <div className="col-span-1 text-right flex flex-col gap-1.5">
+                  <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800 h-8 px-3 text-xs font-semibold" data-testid={`accept-job-${j.id}`}>
+                    Accept job
                   </Button>
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuoteTarget(j); }} className="h-7 px-2 text-xs" data-testid={`quote-job-${j.id}`}>
-                    Quote
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuoteTarget(j); }} className="h-8 px-3 text-xs" data-testid={`quote-job-${j.id}`}>
+                    Send quote
                   </Button>
                 </div>
               </div>

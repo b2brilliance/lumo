@@ -13,6 +13,7 @@ import DataManagementTab from "@/components/DataManagementTab";
 import PaymentsAdmin from "@/components/PaymentsAdmin";
 import UsersAdmin from "@/components/UsersAdmin";
 import BlogAdmin from "@/components/BlogAdmin";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const TABS = [
   { key: "analytics",   label: "Analytics",   icon: BarChart3 },
@@ -187,18 +188,26 @@ export default function AdminConsole() {
       </div>
 
       <div className="mt-6">
-        {tab === "analytics"   && <Analytics />}
-        {tab === "credentials" && <CredentialsTab />}
-        {tab === "withdrawals" && <WithdrawalsTab />}
-        {tab === "reviews"     && <ReviewsTab />}
-        {tab === "rentals"     && <RentalsTab />}
-        {tab === "ads"         && <AdStudio />}
-        {tab === "distribution" && <Distribution />}
-        {tab === "social" && <SocialLinksAdmin />}
-        {tab === "data" && <DataManagementTab />}
-        {tab === "payments" && <PaymentsAdmin />}
-        {tab === "users" && <UsersAdmin />}
-        {tab === "blog" && <BlogAdmin />}
+        <ErrorBoundary
+          key={tab}
+          label={`the ${TABS.find((t) => t.key === tab)?.label || tab} tab`}
+          onReset={() => setTab("analytics")}
+          resetLabel="Analytics tab"
+          testid="admin-tab-error"
+        >
+          {tab === "analytics"   && <Analytics />}
+          {tab === "credentials" && <CredentialsTab />}
+          {tab === "withdrawals" && <WithdrawalsTab />}
+          {tab === "reviews"     && <ReviewsTab />}
+          {tab === "rentals"     && <RentalsTab />}
+          {tab === "ads"         && <AdStudio />}
+          {tab === "distribution" && <Distribution />}
+          {tab === "social" && <SocialLinksAdmin />}
+          {tab === "data" && <DataManagementTab />}
+          {tab === "payments" && <PaymentsAdmin />}
+          {tab === "users" && <UsersAdmin />}
+          {tab === "blog" && <BlogAdmin />}
+        </ErrorBoundary>
       </div>
     </div>
   );

@@ -51,6 +51,7 @@ import SiteFooter from "@/components/SiteFooter";
 import { AboutPage, ContactPage, TermsPage, PrivacyPage } from "@/pages/LegalPages";
 import BlogIndex from "@/pages/BlogIndex";
 import BlogPost from "@/pages/BlogPost";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -73,6 +74,12 @@ function App() {
               <AutoTranslator />
               <AccessibilityApplier />
               <PageviewPinger />
+              <ErrorBoundary
+                label="this page"
+                onReset={() => { window.location.href = "/"; }}
+                resetLabel="home"
+                testid="app-error"
+              >
               <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -136,6 +143,7 @@ function App() {
             <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+              </ErrorBoundary>
           <SiteFooter />
           <Toaster position="top-right" richColors />
             <AssistantWidget />

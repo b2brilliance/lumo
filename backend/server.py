@@ -3181,8 +3181,11 @@ async def landing_sitemap_data():
 @api.get("/sitemap.xml")
 async def sitemap_xml(request: Request):
     """Dynamic XML sitemap — landing pages, core routes, and published blog posts."""
-    base = str(request.base_url).rstrip("/")
-    origin = base.split("/api")[0]
+    # Use the public canonical domain so Search Console accepts the URLs.
+    # Cloudflare/Kubernetes ingress passes the internal cluster URL via
+    # `request.base_url`, which Google rejects because the URLs inside the
+    # sitemap MUST match the host the sitemap is served from.
+    origin = os.environ.get("PUBLIC_BASE_URL", "https://golumo.app").rstrip("/")
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -3221,8 +3224,7 @@ async def sitemap_xml(request: Request):
 @api.get("/llms.txt")
 async def llms_txt(request: Request):
     """LLM-friendly site description per llmstxt.org spec."""
-    base = str(request.base_url).rstrip("/")
-    origin = base.split("/api")[0]
+    origin = os.environ.get("PUBLIC_BASE_URL", "https://golumo.app").rstrip("/")
     try:
         blog_count = await db.blog_posts.count_documents({"status": "published"})
     except Exception:
@@ -3281,8 +3283,7 @@ hello@golumo.app · support@golumo.app · press@golumo.app
 
 @api.get("/robots.txt")
 async def robots_txt(request: Request):
-    base = str(request.base_url).rstrip("/")
-    origin = base.split("/api")[0]
+    origin = os.environ.get("PUBLIC_BASE_URL", "https://golumo.app").rstrip("/")
     body = (
         "User-agent: *\n"
         "Allow: /\n"

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import {
-  Instagram, Youtube, Facebook, Linkedin, Twitch, MessageCircle, Download,
+  Instagram, Youtube, Facebook, Linkedin, Twitch, MessageCircle, Download, ShieldCheck,
 } from "lucide-react";
 import { triggerInstall, useInstallable, IOSInstallModal } from "@/components/InstallPrompt";
 
@@ -75,6 +76,7 @@ const PLATFORM_META = {
 export { PLATFORM_META };
 
 export default function SiteFooter() {
+  const { user } = useAuth();
   const [social, setSocial] = useState({ links: {}, tagline: "" });
   const [iosModalOpen, setIosModalOpen] = useState(false);
   const installable = useInstallable();
@@ -132,6 +134,11 @@ export default function SiteFooter() {
               <Link to="/terms"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-terms">Terms of service</Link>
               <Link to="/privacy" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-privacy">Privacy policy</Link>
               <Link to="/blog"    className="text-slate-700 hover:text-teal-700" data-testid="footer-link-blog">Blog</Link>
+              {user?.role === "admin" && (
+                <Link to="/admin" className="text-slate-700 hover:text-teal-700 inline-flex items-center gap-1" data-testid="footer-link-admin">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Admin dashboard
+                </Link>
+              )}
               {!isStandalone && (installable || isIOS) && (
                 <button
                   type="button"

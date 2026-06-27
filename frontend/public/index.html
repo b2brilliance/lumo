@@ -79,6 +79,37 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Lumo — On-demand jobs, delivery, rentals worldwide</title>
+        <script>
+            // ── Service Worker killswitch ────────────────────────────────────
+            // Some users (mainly iOS Safari) have a Service Worker cached from
+            // an earlier deploy that intercepts every fetch and never times
+            // out, causing the homepage to "not be reachable" outside of
+            // Private/Incognito mode. This block proactively unregisters any
+            // SW the browser may have left behind, and clears all caches.
+            // Once executed, a single reload puts the user on a clean state.
+            (function () {
+                if (!('serviceWorker' in navigator)) return;
+                try {
+                    var alreadyReloaded = false;
+                    try { alreadyReloaded = sessionStorage.getItem('lumo_sw_killswitch') === '1'; } catch (e) {}
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        if (!regs || regs.length === 0) return;
+                        var hadSw = regs.length > 0;
+                        regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+                        if (window.caches && caches.keys) {
+                            caches.keys().then(function (keys) { keys.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); });
+                        }
+                        // Hard-reload once so the freshly-unregistered worker
+                        // doesn't keep intercepting THIS page load. Guard with
+                        // sessionStorage so we never loop forever.
+                        if (hadSw && !alreadyReloaded) {
+                            try { sessionStorage.setItem('lumo_sw_killswitch', '1'); } catch (e) {}
+                            setTimeout(function () { window.location.reload(); }, 50);
+                        }
+                    }).catch(function () {});
+                } catch (e) {}
+            })();
+        </script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>
