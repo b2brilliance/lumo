@@ -1,0 +1,25 @@
+{
+  "summary": "Verified Google Search Console URL-prefix verification routes on the preview pod. All 4 user-facing requirements pass: (a) GET / returns 200 HTML containing <meta name=\"google-site-verification\" content=\"QLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0\" />, (b) GET /googleQLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0.html returns 200 with Content-Type text/html and body line 'google-site-verification: googleQLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0.html', (c) GET / has Lumo <title>, (d) GET /api/health returns 200 {\"ok\":true} and GET /sitemap.xml returns 200 XML sitemap-index pointing to https://golumo.app/api/sitemap.xml. 8/8 pytest cases pass against the public preview URL.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_gsc_verification.py",
+    "/app/test_reports/pytest/iter28_gsc.xml"
+  ],
+  "action_items": [
+    "User must still add the DNS TXT record at their domain registrar themselves if they choose the 'Domain name provider' method — no code path for that. The two URL-prefix methods (meta tag + HTML file) are now both correctly served from the preview pod and will also be served from golumo.app once deployed."
+  ],
+  "critical_code_review_comments": [
+    "Both verification artifacts use the same token QLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0 and are static-only, no backend changes — safe and minimal.",
+    "Note: the HTML file is served by CRA's dev/preview static handler at /public; ensure the production build/deploy of golumo.app also ships the file under the same path (it lives in /app/frontend/public/ so CRA's build will include it automatically — no extra config needed)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_gsc_verification.py (new — regression suite for GSC verification routes)"
+  ],
+  "success_rate": { "backend": "100% (8/8)", "frontend": "n/a (skipped per request)" },
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Static GSC verification: /app/frontend/public/index.html line 12 has the meta tag; /app/frontend/public/googleQLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0.html serves the HTML-file method. Regression covered by /app/backend/tests/test_gsc_verification.py. Token: QLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0.",
+  "rca of the issue": "Not a bug — task was a verification of static-file delivery for two alternate GSC URL-prefix verification methods. Both methods serve correctly; original failure was that the user selected the 'Domain name provider' (DNS TXT) method in GSC which requires a registrar-side DNS change, not code, so no code fix can satisfy that path."
+}
