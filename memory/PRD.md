@@ -27,6 +27,13 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### Mobile scroll lock + payment-method default + commission bar fix (Feb 27, 2026)
+- **🐛 Mobile horizontal-swipe lock** — applied `overflow-x: hidden` + `max-width: 100vw` to the `<html>` element only (not `<body>`), plus mobile-only `touch-action: pan-y` and `overscroll-behavior-x: none`. Two iterations were needed because the first attempt put `overflow-x: hidden` on body too, which (combined with body `height: 100%`) silently promoted `<body>` to the scrolling container — breaking `window.scrollY`, scroll restoration, IntersectionObserver, sticky headers, and analytics. iteration_31 confirms the clean fix: window/html scroll normally, body stays `overflow: visible`, horizontal swipe is blocked.
+- **Default "Allowed payment methods"**: CustomerHub post-a-job form and StoreProfile order dialog now default to `['app']` only instead of all three (`app`, `cash`, `card`). Users opt-IN to extra methods rather than opt-out.
+- **Commission-compared bar chart**: switched from `grid grid-cols-12` (col-span-3 / col-span-7 / col-span-2) to a flex layout with a 28% fixed name column, flex-1 bar middle, and 12px-wide right-aligned percentage cell + gap-3. Long names like "TaskRabbit" and "Airbnb (host)" no longer bleed into the bar on mobile. Verified: all 6 rows have `offsetWidth === scrollWidth` on both mobile and desktop.
+- **GSC verification flexibility**: added `googleQLpfJ_Vp5XhTC6VRffLMXJKpI3qPAN8mTpjLY6OqUn0.html` at `/app/frontend/public/` so users can verify via HTML-file method if meta-tag fails. iteration_28 confirmed all four GSC paths work (meta tag, HTML file, sitemap-index, dynamic /api/sitemap.xml).
+- **Tested**: iteration_28 (GSC) 8/8 · iteration_30 (4/5, regression caught) · iteration_31 (8/8, regression fixed).
+
 ### "Live map" → "Jobs near you" + "P2P" → "Community Market" (Feb 27, 2026)
 - **"Live map" renamed** to **"Jobs near you"** across the NavBar Marketplaces sheet and the MapPage overline. Clearer about what the button does for first-time visitors.
 - **"P2P / Peer-to-peer" replaced with "Community Market"** throughout user-facing copy:
