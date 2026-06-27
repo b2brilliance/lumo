@@ -91,6 +91,15 @@ export default function JobDetail() {
                 ✓ Match: {job.credential_match.matched_kind.toUpperCase()}
               </span>
             )}
+            {isParticipant && job.status !== "completed" && (
+              <Link
+                to={`/jobs/${id}/track`}
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-700 bg-teal-700 text-white text-xs font-mono uppercase tracking-wider hover:bg-teal-800"
+                data-testid="job-detail-track-link"
+              >
+                Track live →
+              </Link>
+            )}
           </div>
         )}
         <div className="font-mono text-sm mt-3">

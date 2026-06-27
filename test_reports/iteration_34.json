@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 34 — Uber-style live tracking (POST accept/location/status, GET tracking, quote-accept notification) + NavBar Sign-in overflow fix + ProviderHub 'Not interested' (dismiss) persistence. All backend tests PASSED (6/6) and every spec'd frontend behavior PASSED.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_behaviors": {
+    "B1_accept_sets_tracking_status_and_notif": "PASS — POST /api/jobs/{id}/accept returns tracking_status='accepted'; customer notification 'provider_accepted' inserted with link /jobs/{id}/track.",
+    "B2_location_endpoint": "PASS — provider-only (customer→403); valid ping stores provider_live_location {lat,lng,heading,speed,updated_at}; after job completed, further pings return 400.",
+    "B3_status_endpoint": "PASS — invalid status→400; non-assigned-provider caller (customer)→403; on_the_way/arrived/in_progress/completed accepted; in_progress flips job.status to in_progress; completed flips job.status to completed and sets completed_at; customer receives tracking_{status} notifications.",
+    "B4_get_tracking_payload_and_eta": "PASS — payload contains tracking_status, tracking_timestamps, provider_live_location, destination (=dropoff), pickup/dropoff, eta_minutes, job_status, job_title. ETA matches haversine_miles/25 mph * 60 within 0.2 min tolerance. RBAC: customer & assigned provider 200, admin/third-party 403.",
+    "B5_quote_accept_tracking": "PASS — POST /api/quotes/{id}/accept sets job.tracking_status='accepted' and inserts customer notification 'provider_accepted' with link /jobs/{id}/track.",
+    "B6_provider_dismiss_job_persist": "PASS — POST /api/provider/dismiss-job/{id} returns ok:true; job id appears in user.dismissed_jobs.",
+    "F1_navbar_signin_visible_mobile_375": "PASS — data-testid=nav-login fits inside viewport at 375px (x=297, w=62 → right=359 < 375).",
+    "F2_navbar_signin_visible_desktop_1280": "PASS — fits at 1280px (x=1072, w=62 → right=1134 < 1280).",
+    "F3_provider_tracker_panel": "PASS — /jobs/:id/track for provider shows tracker-status-pill ('Accepted'→'On the way' after click), provider-status-actions block, all 4 buttons set-status-on_the_way/arrived/in_progress/completed, tracker-eta, tracker-last-update.",
+    "F4_status_button_polling_5s": "PASS — clicking set-status-on_the_way → pill updates to 'On the way' within 5-7 s of polling. No JS console errors during the geolocation pinger lifecycle.",
+    "F5_customer_tracker_view": "PASS — customer sees status pill, ETA, Last ping label, chat aside; provider-status-actions hidden as expected.",
+    "F6_jobdetail_track_link": "PASS — data-testid=job-detail-track-link visible for assigned job (TRACK LIVE → button rendered on JobDetail header).",
+    "F7_customerhub_track_button": "PASS — /customer my-jobs-list contains 8 track-job-{id} links (route /jobs/{id}/track) for active assigned jobs.",
+    "F8_providerhub_open_tracker": "PASS — /provider my-deliveries-section contains 8 provider-track-{id} links to /jobs/{id}/track.",
+    "F9_providerhub_dismiss_persist": "PASS — 37 dismiss-job-{id} buttons rendered on opportunity rows; click optimistically removes the row, and after a full reload the row stays hidden, confirming dismissed_jobs persistence on the user document. Undismissed for cleanup."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter34_live_tracking.py",
+    "/app/test_reports/pytest/iter34_tracking.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ChatPanel: customer-tracker page works, but ChatPanel doesn't have a 'job-chat-panel' data-testid — only the surrounding <aside> was used to detect it. Consider adding data-testid to ChatPanel root for more robust test targeting.",
+    "LiveTrack.jsx polls GET /api/jobs/{id}/tracking every 5 s using setInterval. For long-lived sessions this is fine, but consider switching to WebSocket / SSE later for ETA accuracy and lower cost as adoption grows.",
+    "Backend /api/jobs/{id}/location accepts arbitrary lat/lng with no range check (-90..90, -180..180). Add Pydantic ge/le validators on LocationPing to reject obviously invalid coordinates.",
+    "Backend update_tracking_status: when body.status='accepted' (allowed by TRACKING_STATUSES) no notification is sent (correct), but tracking_timestamps.accepted is still overwritten on every call. Minor: consider $setOnInsert-style logic so an accidental re-accept doesn't reset the original accepted timestamp.",
+    "Frontend route is /customer and /provider — not /hub/customer or /hub/provider. The previous iteration tests in this repo refer to /hub/* in some places; verify all docs/links are consistent with App.js routes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter34_live_tracking.py (new)"
+  ],
+  "success_rate": { "backend": "6/6 (100%)", "frontend": "9/9 (100%)" },
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123, admin@lumo.test / password123 — all auto-seeded.",
+  "seed_data_creation": "Created 6 fresh TEST_iter34* on_demand delivery jobs (each test gets its own job to avoid cross-test pollution). One additional TEST_iter34_ui job created from the Playwright flow. None of them were explicitly deleted (no delete-job endpoint surfaced) but they are completed/cancelled and clearly labeled TEST_iter34* so they're easy to identify.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All Uber-style tracking endpoints + UI verified end-to-end against the preview URL. Critical: frontend routes for hubs are /customer and /provider (NOT /hub/*). Provider tracker page successfully drives status transitions via 5-second polling. Geolocation watchPosition runs silently for the provider — useProviderLocationPinger hook fires but Playwright's default geolocation grant was not set; verified no console errors thrown (catch path is silent). Both pending fixes (NavBar overflow + dismiss-job persistence) are working.",
+  "rca of the issue": "n/a — no functional bugs found in this iteration."
+}

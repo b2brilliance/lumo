@@ -23,6 +23,7 @@ import StoreProfile from "@/pages/StoreProfile";
 import Marketplace from "@/pages/Marketplace";
 import MapPage from "@/pages/MapPage";
 import JobDetail from "@/pages/JobDetail";
+import LiveTrack from "@/pages/LiveTrack";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import CheckoutCancel from "@/pages/CheckoutCancel";
 import Wallet from "@/pages/Wallet";
@@ -99,6 +100,7 @@ function App() {
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
+            <Route path="/jobs/:id/track" element={<Protected><LiveTrack /></Protected>} />
 
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />

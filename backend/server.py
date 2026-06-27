@@ -467,6 +467,18 @@ class QuoteCreate(BaseModel):
     quoted_estimated_units: float = 1.0
     notes: Optional[str] = None
 
+# Tracking — Uber-style live provider location + status updates
+TRACKING_STATUSES = ["accepted", "on_the_way", "arrived", "in_progress", "completed"]
+
+class LocationPing(BaseModel):
+    lat: float
+    lng: float
+    heading: Optional[float] = None   # degrees, 0-360 (optional)
+    speed: Optional[float] = None     # m/s (optional)
+
+class TrackingStatusUpdate(BaseModel):
+    status: str  # one of TRACKING_STATUSES
+
 # ────────────────────────────────────────────────────────────────────────────
 # Anti-poach message sanitizer
 # ────────────────────────────────────────────────────────────────────────────
@@ -758,10 +770,24 @@ async def accept_job(job_id: str, user: dict = Depends(require_role("provider"))
         if not cred:
             raise HTTPException(403, f"This job requires a verified {lic_req.replace('_', ' / ').upper()} credential. Add or verify one in Credentials.")
         match_info = {"matched_kind": cred["kind"], "required": lic_req}
-    update = {"status": "accepted", "provider_id": user["id"], "provider_name": user["name"], "accepted_at": now_iso()}
+    update = {"status": "accepted", "provider_id": user["id"], "provider_name": user["name"], "accepted_at": now_iso(), "tracking_status": "accepted"}
     if match_info:
         update["credential_match"] = match_info
     await db.jobs.update_one({"id": job_id}, {"$set": update})
+    # Push the customer a "track your provider" notification so they get
+    # routed straight into the Uber-style live tracker.
+    if j.get("customer_id"):
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": j["customer_id"],
+            "type": "provider_accepted",
+            "title": f"{user['name']} accepted your request",
+            "body": f"Tap to track {user['name']} live and message them.",
+            "link": f"/jobs/{job_id}/track",
+            "job_id": job_id,
+            "read": False,
+            "created_at": now_iso(),
+        })
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
 
@@ -775,6 +801,112 @@ async def complete_job(job_id: str, user: dict = Depends(get_current_user)):
     await db.jobs.update_one({"id": job_id}, {"$set": {"status": "completed", "completed_at": now_iso()}})
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Live tracking — Uber-style provider location pings + status updates
+# ────────────────────────────────────────────────────────────────────────────
+def _tracking_destination(job: dict) -> Optional[dict]:
+    """Where the provider is heading: dropoff for deliveries, otherwise pickup/onsite."""
+    return job.get("dropoff_location") or job.get("pickup_location")
+
+def _eta_minutes(prov: dict, dest: dict) -> Optional[float]:
+    """Rough ETA assuming 25 mph average urban travel."""
+    if not prov or not dest:
+        return None
+    if prov.get("lat") is None or dest.get("lat") is None:
+        return None
+    miles = haversine_miles(prov["lat"], prov["lng"], dest["lat"], dest["lng"])
+    return round((miles / 25.0) * 60.0, 1)
+
+@api.post("/jobs/{job_id}/location")
+async def update_provider_location(job_id: str, body: LocationPing, user: dict = Depends(require_role("provider"))):
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if j.get("provider_id") != user["id"]:
+        raise HTTPException(403, "Not your job")
+    if j.get("status") in ("completed", "cancelled"):
+        raise HTTPException(400, "Job is finished")
+    payload = {
+        "lat": body.lat,
+        "lng": body.lng,
+        "heading": body.heading,
+        "speed": body.speed,
+        "updated_at": now_iso(),
+    }
+    await db.jobs.update_one({"id": job_id}, {"$set": {"provider_live_location": payload}})
+    return {"ok": True, "provider_live_location": payload}
+
+@api.post("/jobs/{job_id}/status")
+async def update_tracking_status(job_id: str, body: TrackingStatusUpdate, user: dict = Depends(require_role("provider"))):
+    if body.status not in TRACKING_STATUSES:
+        raise HTTPException(400, f"Invalid status. Must be one of {TRACKING_STATUSES}")
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if j.get("provider_id") != user["id"]:
+        raise HTTPException(403, "Not your job")
+    updates = {
+        "tracking_status": body.status,
+        f"tracking_timestamps.{body.status}": now_iso(),
+    }
+    # When provider marks completed, also flip the job status so existing
+    # escrow / reviews flows trigger.
+    if body.status == "completed":
+        updates["status"] = "completed"
+        updates["completed_at"] = now_iso()
+    elif body.status == "in_progress":
+        updates["status"] = "in_progress"
+    await db.jobs.update_one({"id": job_id}, {"$set": updates})
+    # Notify customer of every status change so they can re-open the tracker.
+    status_copy = {
+        "on_the_way": ("Your provider is on the way", f"{user['name']} is heading to you. Tap to track."),
+        "arrived": ("Your provider has arrived", f"{user['name']} has arrived. Meet them at the location."),
+        "in_progress": ("Job started", f"{user['name']} has started the job."),
+        "completed": ("Job complete", f"{user['name']} marked the job as complete."),
+    }
+    if body.status in status_copy and j.get("customer_id"):
+        title, body_txt = status_copy[body.status]
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": j["customer_id"],
+            "type": f"tracking_{body.status}",
+            "title": title,
+            "body": body_txt,
+            "link": f"/jobs/{job_id}/track",
+            "job_id": job_id,
+            "read": False,
+            "created_at": now_iso(),
+        })
+    j = await db.jobs.find_one({"id": job_id})
+    return clean_doc(j)
+
+@api.get("/jobs/{job_id}/tracking")
+async def get_tracking(job_id: str, user: dict = Depends(get_current_user)):
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if user["id"] not in (j.get("customer_id"), j.get("provider_id")):
+        raise HTTPException(403, "Not your job")
+    dest = _tracking_destination(j)
+    prov_loc = j.get("provider_live_location")
+    eta = _eta_minutes(prov_loc, dest) if prov_loc else None
+    return {
+        "job_id": job_id,
+        "tracking_status": j.get("tracking_status") or ("accepted" if j.get("provider_id") else None),
+        "tracking_timestamps": j.get("tracking_timestamps") or {},
+        "provider_id": j.get("provider_id"),
+        "provider_name": j.get("provider_name"),
+        "customer_id": j.get("customer_id"),
+        "customer_name": j.get("customer_name"),
+        "provider_live_location": prov_loc,
+        "destination": dest,
+        "pickup_location": j.get("pickup_location"),
+        "dropoff_location": j.get("dropoff_location"),
+        "eta_minutes": eta,
+        "job_status": j.get("status"),
+        "job_title": j.get("title"),
+    }
 
 # ────────────────────────────────────────────────────────────────────────────
 # Provider opportunity polling — toast feed (filtered by radius + categories)
@@ -4421,6 +4553,7 @@ async def accept_quote(quote_id: str, user: dict = Depends(get_current_user)):
         "provider_id": q["provider_id"],
         "provider_name": q["provider_name"],
         "accepted_at": now_iso(),
+        "tracking_status": "accepted",
         "pay_rate": q["quoted_pay_rate"],
         "pay_unit": q["quoted_pay_unit"],
         "estimated_units": q["quoted_estimated_units"],
@@ -4432,6 +4565,18 @@ async def accept_quote(quote_id: str, user: dict = Depends(get_current_user)):
         {"job_id": job["id"], "id": {"$ne": quote_id}, "status": "pending"},
         {"$set": {"status": "declined"}}
     )
+    # Notify the customer with a direct link to the live tracker.
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "type": "provider_accepted",
+        "title": f"{q['provider_name']} is your provider",
+        "body": f"Tap to track {q['provider_name']} live and message them.",
+        "link": f"/jobs/{job['id']}/track",
+        "job_id": job["id"],
+        "read": False,
+        "created_at": now_iso(),
+    })
     # Notify accepted provider
     await db.notifications.insert_one({
         "id": str(uuid.uuid4()),

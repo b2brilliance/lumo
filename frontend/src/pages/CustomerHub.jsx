@@ -419,6 +419,15 @@ export default function CustomerHub() {
                       {j.provider_name && ` · ${j.provider_name}`}
                     </div>
                   </div>
+                  {j.provider_id && j.status !== "completed" && (
+                    <Link
+                      to={`/jobs/${j.id}/track`}
+                      className="text-[10px] font-mono uppercase tracking-wider border border-teal-700 bg-teal-700 text-white px-2.5 py-1.5 hover:bg-teal-800 whitespace-nowrap"
+                      data-testid={`track-job-${j.id}`}
+                    >
+                      Track →
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>

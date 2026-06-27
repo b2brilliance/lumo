@@ -234,8 +234,17 @@ export default function ProviderHub() {
                         <div className="font-display font-bold truncate">
                           <Link to={`/jobs/${j.id}`} className="hover:underline">{j.title}</Link>
                         </div>
-                        <div className="text-xs text-slate-500 mt-1 font-mono uppercase">{j.category} · {j.delivery_status || j.status}</div>
+                        <div className="text-xs text-slate-500 mt-1 font-mono uppercase">
+                          {j.category} · {j.tracking_status || j.delivery_status || j.status}
+                        </div>
                       </div>
+                      <Link
+                        to={`/jobs/${j.id}/track`}
+                        className="text-[10px] font-mono uppercase tracking-wider border border-teal-700 bg-teal-700 text-white px-2.5 py-1.5 hover:bg-teal-800 whitespace-nowrap"
+                        data-testid={`provider-track-${j.id}`}
+                      >
+                        Open tracker →
+                      </Link>
                     </div>
                     <DeliveryActions
                       row={j} kind="job" viewerRole="provider"
