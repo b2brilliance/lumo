@@ -27,6 +27,18 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 
 ## Implemented — most recent first
 
+### "Live map" → "Jobs near you" + "P2P" → "Community Market" (Feb 27, 2026)
+- **"Live map" renamed** to **"Jobs near you"** across the NavBar Marketplaces sheet and the MapPage overline. Clearer about what the button does for first-time visitors.
+- **"P2P / Peer-to-peer" replaced with "Community Market"** throughout user-facing copy:
+  - NavBar Marketplaces dropdown: "Community Market — Goods from your neighbors — used, gear, drops"
+  - `/marketplace` page overline + heading: "COMMUNITY MARKET / From your neighbors."
+  - Map legend chip: "Delivery & local sellers" (was "Delivery & P2P")
+  - Landing.jsx hero pictograms: "People — From your neighbors"
+  - Marketplace create-listing dialog copy
+  - Login.jsx side card: "Local + courier" (was "P2P + courier")
+- Internal/code-comment references to "P2P" left untouched (engineering jargon stays where it belongs).
+- **Verified live**: page renders correctly with new copy in screenshot.
+
 ### Mobile load fix (Service Worker killswitch) + Search Console sitemap fix + Admin safety net (Feb 27, 2026)
 - **🚨 iPhone "site can't be reached" mobile bug — root cause + fix**: The symptom (works in incognito, fails in regular Safari) is the textbook signature of a stale Service Worker registered by an earlier deploy that's still cached on user devices. Shipped a **killswitch SW** at `/service-worker.js` that unregisters itself + wipes all caches on first fetch, plus a tiny script in `index.html` that proactively unregisters any SW on every page load and hard-reloads once (guarded by sessionStorage so it can never loop). On next user visit their browser cleans itself up and the site loads normally.
 - **Provider accept-job button now prominent**: existed at `data-testid="accept-job-{id}"` but was crammed into a `col-span-1` slot with `h-7 px-2` — easy to miss. Bumped to `h-8 px-3 font-semibold`, relabelled "Accept job" / "Send quote" so providers can find them.

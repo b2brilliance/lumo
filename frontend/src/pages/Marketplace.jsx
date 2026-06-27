@@ -143,8 +143,8 @@ export default function Marketplace() {
     <div className="max-w-screen-2xl mx-auto px-6 py-10">
       <div className="flex items-end justify-between flex-wrap gap-4">
         <div>
-          <div className="overline">Marketplace</div>
-          <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-2">Peer-to-peer.</h1>
+          <div className="overline">Community Market</div>
+          <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-2">From your neighbors.</h1>
           <p className="text-slate-600 mt-2 max-w-xl">List anything. Bundled 10% deposit. Delivery wired in.</p>
         </div>
         {user && user !== false && (
@@ -181,7 +181,7 @@ export default function Marketplace() {
       {/* Create listing */}
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent data-testid="listing-dialog">
-          <DialogHeader><DialogTitle className="font-display">New listing</DialogTitle><DialogDescription>Create a P2P marketplace listing with optional photo or video.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display">New listing</DialogTitle><DialogDescription>List an item on the Community Market with an optional photo or video.</DialogDescription></DialogHeader>
           <form onSubmit={create} className="space-y-4">
             <div>
               <Label className="overline">Title</Label>

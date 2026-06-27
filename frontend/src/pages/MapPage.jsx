@@ -98,7 +98,7 @@ export default function MapPage() {
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-8">
-      <div className="overline">Live map</div>
+      <div className="overline">Jobs near you</div>
       <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-2">Every open job.</h1>
       <p className="text-slate-600 mt-2 max-w-xl">
         Pins coloured by category. Toggle <span className="text-teal-700 font-semibold">Remote-friendly</span> for remote-only opportunities.

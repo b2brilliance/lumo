@@ -35,7 +35,7 @@ export default function Login() {
           One platform for every kind of work and every kind of order. Deliveries, handymen, remote contracts, your local boutique — all in one hub.
         </p>
         <div className="absolute bottom-12 left-12 right-12 grid grid-cols-4 gap-3 text-xs">
-          <div className="border-l-2 border-red-500 pl-2"><div className="text-slate-400 uppercase tracking-widest">Delivery</div><div className="font-mono">P2P + courier</div></div>
+          <div className="border-l-2 border-red-500 pl-2"><div className="text-slate-400 uppercase tracking-widest">Delivery</div><div className="font-mono">Local + courier</div></div>
           <div className="border-l-2 border-blue-500 pl-2"><div className="text-slate-400 uppercase tracking-widest">Local</div><div className="font-mono">Handyman + more</div></div>
           <div className="border-l-2 border-amber-500 pl-2"><div className="text-slate-400 uppercase tracking-widest">Digital</div><div className="font-mono">Tech + creative</div></div>
           <div className="border-l-2 border-teal-500 pl-2"><div className="text-slate-400 uppercase tracking-widest">Remote</div><div className="font-mono">Anywhere work</div></div>

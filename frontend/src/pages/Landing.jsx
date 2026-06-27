@@ -80,7 +80,7 @@ export default function Landing() {
             {[
               { Icon: ShoppingBag, t: "Retailers", d: "Any store, any item" },
               { Icon: Store,       t: "Restaurants", d: "Full local catalog" },
-              { Icon: Users,       t: "People",  d: "Peer-to-peer drops" },
+              { Icon: Users,       t: "People",  d: "From your neighbors" },
             ].map((b) => (
               <div key={b.t} className="bg-slate-900 p-5 text-center">
                 <b.Icon className="w-5 h-5 text-amber-400 mx-auto" />

@@ -20,7 +20,7 @@ export function formatApiError(err) {
 }
 
 export const CATEGORY_COLORS = {
-  physical_delivery: { hex: "#DC2626", tw: "bg-red-600", label: "Delivery & P2P", dot: "dot-physical" },
+  physical_delivery: { hex: "#DC2626", tw: "bg-red-600", label: "Delivery & local sellers", dot: "dot-physical" },
   local_services: { hex: "#2563EB", tw: "bg-blue-600", label: "Local Services", dot: "dot-local" },
   tech_digital: { hex: "#D97706", tw: "bg-amber-600", label: "Digital & Tech", dot: "dot-tech" },
   remote_jobs: { hex: "#0F766E", tw: "bg-teal-700", label: "Remote Jobs", dot: "dot-remote" },

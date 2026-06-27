@@ -8,7 +8,7 @@ import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcas
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 const MARKETPLACE_LINKS = [
-  { to: "/marketplace",  label: "Marketplace",  icon: ShoppingBag,      blurb: "P2P listings, used goods, gear", testId: "nav-mp-marketplace" },
+  { to: "/marketplace",  label: "Community Market",  icon: ShoppingBag,      blurb: "Goods from your neighbors — used, gear, drops", testId: "nav-mp-marketplace" },
   { to: "/stores",       label: "Stores",       icon: Store,            blurb: "Retailers with inventory & delivery", testId: "nav-mp-stores" },
   { to: "/restaurants",  label: "Restaurants",  icon: UtensilsCrossed,  blurb: "Order food for delivery", testId: "nav-mp-restaurants" },
   { to: "/rentals",      label: "Rentals",      icon: KeyRound,         blurb: "Rent anything — homes, cars, venues, gear", testId: "nav-mp-rentals" },
@@ -201,7 +201,7 @@ function MarketplacesSheet() {
           >
             <MapPin className="w-5 h-5 text-teal-700 mt-0.5 flex-shrink-0" />
             <div>
-              <div className="font-display font-bold text-slate-900">Live map</div>
+              <div className="font-display font-bold text-slate-900">Jobs near you</div>
               <div className="text-xs text-slate-500 mt-0.5">Every open job, pinned by category</div>
             </div>
           </Link>
