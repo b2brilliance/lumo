@@ -1,0 +1,32 @@
+{
+  "summary": "Verified the mobile horizontal-lock CSS fix in /app/frontend/src/index.css. All horizontal-overflow checks PASS on Landing /, /marketplace, /map at 390x844 and on Desktop 1280x800. However a vertical-scroll REGRESSION was detected on mobile: window.scrollTo(0, 600) and mouse wheel both leave window.scrollY = 0 (the page visually scrolls because body.scrollTop advances instead). This breaks any code that relies on window.scrollY / window scroll events.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "global mobile CSS (/app/frontend/src/index.css lines ~131-140)",
+        "issue": "On mobile viewport (<=768px), body becomes the scroll container instead of html/window. After window.scrollTo(0,600): window.scrollY=0, document.documentElement.scrollTop=0, but document.body.scrollTop=600 and document.body.scrollHeight=8943 while document.documentElement.scrollHeight=844. window.scrollTo() and window 'scroll' listeners therefore no longer work on mobile. Caused by body { position: relative; width: 100%; } inside the @media (max-width: 768px) block combining with html { max-width: 100vw; overflow-x: hidden }.",
+        "selector": "html, body",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Remove (or rework) the body { position: relative; width: 100%; } rule inside the @media (max-width: 768px) block in /app/frontend/src/index.css. The horizontal-lock objective is already fully achieved by the global html, body { max-width: 100vw; overflow-x: hidden } plus overscroll-behavior-x:none + touch-action:pan-y. The 'position: relative; width: 100%' on body is what shifts the scroll container off the viewport on mobile.",
+    "After fix, re-verify with: window.scrollTo(0, 600) → window.scrollY > 0 on mobile."
+  ],
+  "critical_code_review_comments": [
+    "Avoid putting position: relative or width: 100% on body when the html already has overflow-x: hidden. Some Chromium versions promote body to the scrolling element in that combo, which silently breaks window-level scroll APIs and many libraries (sticky headers, scroll-to-top, IntersectionObserver root, react-router scroll restoration).",
+    "Global overflow-x:hidden on html, body is fine on its own; the @media block only needs overscroll-behavior-x:none and touch-action:pan-y."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "80%"},
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Horizontal lock works: scrollWidth==innerWidth on /, /marketplace, /map at 390x844; body overflowX=hidden, touchAction=pan-y, overscrollBehaviorX=none; horizontal mouse drag from x=350->20 keeps window.scrollX=0. Desktop 1280x800 also has overflow-x hidden, touchAction=auto (correct, mobile media query inactive). Only remaining issue is the vertical scroll regression described above.",
+  "rca of the issue": "On mobile media query (<=768px), the rule `body { position: relative; width: 100%; }` together with `html { max-width: 100vw; overflow-x: hidden }` causes Chromium to use the body element (rather than the document/viewport) as the scrolling root. Symptoms: document.documentElement.scrollHeight is clamped to the viewport height (844px) while body.scrollHeight is the real 8943px; window.scrollTo / window.scrollY / window 'scroll' listeners stop working, although the user still sees the page move because body.scrollTop changes. Reproduction: viewport 390x844, navigate to /, run `window.scrollTo(0, 600); window.scrollY` -> returns 0. Mitigation: drop the `position: relative; width: 100%` declarations from the mobile block (the global overflow-x:hidden + touch-action:pan-y + overscroll-behavior-x:none already prevent horizontal swiping). After the change, html/window remain the scroll container and window.scrollY behaves normally."
+}

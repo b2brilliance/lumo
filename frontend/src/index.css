@@ -115,3 +115,27 @@ html.larger-text {
     font-size: 18.4px; /* 15% bump from default 16px */
 }
 
+
+
+
+/* ── Mobile: lock horizontal panning ───────────────────────────────────────
+ * Some sections (long horizontal grids, wide tables, third-party iframes)
+ * can briefly exceed the viewport width and let mobile users swipe the
+ * whole page sideways. Clamp body width and disable horizontal touch
+ * actions on small screens so the page stays put.
+ */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+@media (max-width: 768px) {
+    html, body {
+        overscroll-behavior-x: none;
+        touch-action: pan-y;
+    }
+    body {
+        /* Prevent iOS Safari rubber-band horizontal scroll. */
+        position: relative;
+        width: 100%;
+    }
+}
