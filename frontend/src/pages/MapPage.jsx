@@ -17,6 +17,20 @@ const RADIUS_OPTIONS = [
 ];
 const RADIUS_STORAGE_KEY = "lumo.map.radius";
 
+// Convert a pin's pay_rate into a comparable annualised dollar amount so the
+// pay-range filter can mix hourly, flat, and yearly listings.
+function normalizedAnnualPay(p) {
+  const r = Number(p.pay_rate || 0);
+  if (!Number.isFinite(r) || r <= 0) return 0;
+  const unit = (p.pay_unit || "").toLowerCase();
+  if (unit === "year") return r;
+  if (unit === "month") return r * 12;
+  if (unit === "week") return r * 52;
+  if (unit === "day") return r * 250;     // ~working days/yr
+  if (unit === "hour") return r * 2080;   // ~40 h x 52 w
+  return r;
+}
+
 // Format an ISO timestamp as a relative "time ago" string.
 function timeAgo(iso) {
   if (!iso) return "—";
@@ -78,6 +92,14 @@ export default function MapPage() {
   };
   useEffect(() => { load(); }, [remoteOnly, groupFilter, employmentFilter]);
 
+  // Job-board-style filters for W-2 + Remote views (keyword/pay/schedule).
+  // Hidden for on_demand / staffing where they're less useful.
+  const showJobBoardFilters = employmentFilter === "w2" || employmentFilter === "remote";
+  const [keyword, setKeyword] = useState("");
+  const [minPay, setMinPay] = useState("");
+  const [maxPay, setMaxPay] = useState("");
+  const [scheduleFilter, setScheduleFilter] = useState(null); // 'Full-time' | 'Part-time' | 'Contract' | null
+
   // Compute distance for each pin from the anchor, then filter by the selected
   // radius (0 = Any, no distance filter). Remote jobs always show.
   const feed = useMemo(() => {
@@ -86,12 +108,30 @@ export default function MapPage() {
       if (!anchor || p.lat == null) return { ...p, distance_miles: null };
       return { ...p, distance_miles: milesBetween({ lat: anchor.lat, lng: anchor.lng }, { lat: p.lat, lng: p.lng }) };
     });
-    const filtered = (anchor && radius > 0)
+    let filtered = (anchor && radius > 0)
       ? withDistance.filter((p) => p.is_remote || (p.distance_miles != null && p.distance_miles <= radius))
       : withDistance;
-    // Server already sorts by created_at desc, but in case of stale order, re-sort.
+
+    // Job-board filters (only used when on /map?employment=w2 or =remote)
+    if (showJobBoardFilters) {
+      const kw = keyword.trim().toLowerCase();
+      if (kw) {
+        filtered = filtered.filter((p) =>
+          (p.title || "").toLowerCase().includes(kw) ||
+          (p.description || "").toLowerCase().includes(kw)
+        );
+      }
+      const min = parseFloat(minPay);
+      const max = parseFloat(maxPay);
+      if (Number.isFinite(min)) filtered = filtered.filter((p) => normalizedAnnualPay(p) >= min);
+      if (Number.isFinite(max)) filtered = filtered.filter((p) => normalizedAnnualPay(p) <= max);
+      if (scheduleFilter) {
+        filtered = filtered.filter((p) => (p.schedule || "").toLowerCase().includes(scheduleFilter.toLowerCase()));
+      }
+    }
+
     return filtered.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-  }, [pins, anchor, radius]);
+  }, [pins, anchor, radius, showJobBoardFilters, keyword, minPay, maxPay, scheduleFilter]);
 
   const showingMessage = !anchor
     ? "Showing every open job — sign in or set a location in Settings to filter to your area."
@@ -155,6 +195,76 @@ export default function MapPage() {
         </div>
 
         <p className="text-xs text-slate-500 mb-6" data-testid="map-feed-radius-note">{showingMessage}</p>
+
+        {/* Job-board filters (only for W-2 / Remote views) */}
+        {showJobBoardFilters && (
+          <div className="border border-slate-200 bg-slate-50/60 p-4 mb-6 grid sm:grid-cols-4 gap-3" data-testid="map-job-board-filters">
+            <div className="sm:col-span-2">
+              <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Search title or description</label>
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="React · nursing · marketing…"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 bg-white text-sm"
+                data-testid="map-filter-keyword"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Min pay (annualised $)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={minPay}
+                onChange={(e) => setMinPay(e.target.value)}
+                placeholder="50000"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 bg-white text-sm"
+                data-testid="map-filter-min-pay"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Max pay (annualised $)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={maxPay}
+                onChange={(e) => setMaxPay(e.target.value)}
+                placeholder="200000"
+                className="mt-1 w-full px-3 py-2 border border-slate-300 bg-white text-sm"
+                data-testid="map-filter-max-pay"
+              />
+            </div>
+            <div className="sm:col-span-4">
+              <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mr-2">Schedule</label>
+              <div className="inline-flex flex-wrap gap-1.5 mt-1">
+                {["Full-time", "Part-time", "Contract", "Flexible"].map((s) => {
+                  const active = scheduleFilter === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setScheduleFilter(active ? null : s)}
+                      className={`text-xs font-mono px-2.5 py-1 border transition-colors ${active ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-300 hover:border-slate-900"}`}
+                      data-testid={`map-filter-schedule-${s.toLowerCase().replace(/[^a-z]/g, '-')}`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+                {(keyword || minPay || maxPay || scheduleFilter) && (
+                  <button
+                    type="button"
+                    onClick={() => { setKeyword(""); setMinPay(""); setMaxPay(""); setScheduleFilter(null); }}
+                    className="text-xs underline text-slate-500 hover:text-slate-900 ml-2"
+                    data-testid="map-filter-clear"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {feed.length === 0 && (
           <div className="text-center py-16 border border-slate-200 text-sm text-slate-500" data-testid="map-empty">

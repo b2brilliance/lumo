@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import AvatarUploader from "@/components/AvatarUploader";
+import ProviderProfileSection from "@/components/ProviderProfileSection";
 
 const DEFAULT_NOTIFS = {
   order_updates: true,
@@ -168,6 +169,9 @@ export default function Settings() {
           </div>
         </div>
       </SettingsSection>
+
+      {/* ── Provider profile (role==provider only) ─────────────────────── */}
+      <ProviderProfileSection />
 
       {/* ── Default delivery address ────────────────────────────────────────── */}
       <SettingsSection
