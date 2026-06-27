@@ -29,7 +29,7 @@ export default function StoreProfile({ role }) {
   const [order, setOrder] = useState({
     quantity: 1, delivery_address: "", delivery_fee: "0", notes: "",
     delivery_lat: null, delivery_lng: null,
-    payment_methods: ["app", "cash", "card"], terms: "",
+    payment_methods: ["app"], terms: "",
   });
   const [busy, setBusy] = useState(false);
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;

@@ -25,7 +25,7 @@ export default function CustomerHub() {
     title: "", description: "", category: "delivery",
     pay_rate: "", pay_unit: "flat", estimated_units: "1",
     payment_terms: "",
-    allowed_payment_methods: ["app", "cash", "card"],
+    allowed_payment_methods: ["app"],
     pickup_address: "", pickup_lat: null, pickup_lng: null,
     dropoff_address: "", dropoff_lat: null, dropoff_lng: null,
     media_url: null, media_type: null,

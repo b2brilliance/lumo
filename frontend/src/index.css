@@ -133,9 +133,4 @@ html, body {
         overscroll-behavior-x: none;
         touch-action: pan-y;
     }
-    body {
-        /* Prevent iOS Safari rubber-band horizontal scroll. */
-        position: relative;
-        width: 100%;
-    }
 }

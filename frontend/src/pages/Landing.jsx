@@ -141,11 +141,11 @@ export default function Landing() {
                 { name: "Uber Eats",    pct: 30 },
                 { name: "Airbnb (host)", pct: 14 },
               ].map((c) => (
-                <div key={c.name} className="grid grid-cols-12 items-center px-4 py-3" data-testid={`compare-${c.name.toLowerCase().replace(/[^a-z]/g, '-')}`}>
-                  <div className={`col-span-3 font-display font-bold ${c.hi ? "text-teal-700" : "text-slate-700"}`}>
+                <div key={c.name} className="flex items-center gap-3 sm:gap-4 px-4 py-3" data-testid={`compare-${c.name.toLowerCase().replace(/[^a-z]/g, '-')}`}>
+                  <div className={`w-[28%] sm:w-[26%] shrink-0 font-display font-bold text-sm sm:text-base leading-tight ${c.hi ? "text-teal-700" : "text-slate-700"}`}>
                     {c.name}
                   </div>
-                  <div className="col-span-7">
+                  <div className="flex-1 min-w-0">
                     <div className="h-2 bg-slate-100 relative">
                       <div
                         className={`absolute inset-y-0 left-0 ${c.hi ? "bg-teal-600" : "bg-slate-400"}`}
@@ -153,7 +153,7 @@ export default function Landing() {
                       />
                     </div>
                   </div>
-                  <div className={`col-span-2 text-right font-mono text-sm tabular-nums ${c.hi ? "text-teal-700 font-bold" : "text-slate-500"}`}>
+                  <div className={`w-12 shrink-0 text-right font-mono text-sm tabular-nums ${c.hi ? "text-teal-700 font-bold" : "text-slate-500"}`}>
                     {c.pct}%
                   </div>
                 </div>

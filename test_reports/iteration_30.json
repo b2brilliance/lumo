@@ -1,0 +1,34 @@
+{
+  "summary": "Tested three batched fixes. PASS: (B) Allowed-payment-methods default in CustomerHub post-a-job AND StoreProfile order dialog — only 'In-app' is checked, 'Card' and 'Cash' are unchecked on fresh load (verified via aria-checked + visual screenshot). PASS: (C) Commission-comparison chart at /, both 390x844 and 1280x800 — all six rows (Lumo, TaskRabbit, Instacart, DoorDash, Uber Eats, Airbnb (host)) have row.offsetWidth === row.scrollWidth (no overflow), names fit within their 28%/26% column (nameRight <= barLeft), percentages right-aligned and fully visible. FAIL: (A) Mobile vertical-scroll regression is NOT fixed — removing `position: relative; width: 100%` from the @media (max-width: 768px) block was insufficient. The page still uses BODY (not html/window) as the scrolling element on BOTH mobile 390x844 and desktop 1280x800. After window.scrollTo(0,600): window.scrollY=0, html.scrollTop=0, body.scrollTop=600 (mouse-wheel) and html.scrollHeight is clamped to innerHeight (844 mobile / 800 desktop) while body.scrollHeight is the real content height (~8910/4843).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "global CSS — /app/frontend/src/index.css lines 34-36 + 127-130",
+        "issue": "Body is the scrolling element instead of html/window on BOTH mobile and desktop. Cause: the combination `html, body, #root { height: 100% }` (line 34-36) clamps html to viewport height, then `html, body { max-width: 100vw; overflow-x: hidden }` (line 127-130) — when overflow-x is set on body, Chromium computes body.overflow-y as `auto` (observed: getComputedStyle(body).overflow = 'hidden auto'), which makes body its OWN scrolling container with body.scrollHeight=8910 (mobile) / 4843 (desktop) and body.scrollTop tracking the scroll position. Effects: window.scrollTo() / window.scrollY / window 'scroll' listeners stop working everywhere; sticky headers, scroll-restoration, IntersectionObserver(root=null), react-router scrollTo(0,0) and any analytics that read window.scrollY all silently break.",
+        "selector": "html, body",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix the body-as-scroller bug in /app/frontend/src/index.css. Recommended fix: drop body from the overflow-x:hidden rule (keep it ONLY on html). Replace lines 127-130 with: `html { max-width: 100vw; overflow-x: hidden; }` (no body). Body's overflow then stays `visible` and html/window remain the scroll container. Optionally also drop `body` from the `height: 100%` rule at line 34 — only html and #root need that. After change, verify: at 390x844 and 1280x800, run `window.scrollTo(0,600); window.scrollY` -> ~600, and `document.body.scrollTop` -> 0.",
+    "Keep the @media (max-width: 768px) overscroll-behavior-x / touch-action rules — those don't cause the bug.",
+    "After the fix re-run this iteration's mobile horizontal-lock checks: htmlScrollWidth <= innerWidth, and a horizontal mouse drag from x=350 to x=20 should keep window.scrollX === 0."
+  ],
+  "critical_code_review_comments": [
+    "Setting overflow-x: hidden on body (especially combined with body { height: 100% }) is a well-known foot-gun. The browser will silently promote body to the scrolling root and break window-level scroll APIs. Prefer overflow-x: clip on body (which doesn't establish a scroll container) or apply overflow-x: hidden ONLY on the html element.",
+    "Iteration_29's RCA was partially correct but incomplete — the position:relative/width:100% rules were a contributor on mobile, but the underlying root cause (overflow-x:hidden + height:100% on body) was missed. The current fix attempt left the deeper cause intact and now the regression is visible on desktop too."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "80% (4/5 fixes verified)"},
+  "test_credentials": "customer@lumo.test / password123 — works (logged in via /api/auth/login, token stored in localStorage as lumo_token).",
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Payment-methods default fix (CustomerHub.jsx L28 and StoreProfile.jsx L32) is fully verified — visual screenshot shows only In-App checked in both flows. Commission-chart flex layout (Landing.jsx L143-160) is fully verified — all 6 rows have offsetWidth==scrollWidth on both mobile and desktop, screenshots saved. The ONE remaining issue is the body-as-scroller CSS bug in index.css. Repro on desktop 1280x800: go to /, run `await page.mouse.wheel(0,600)` then read `window.scrollY` (=0) and `document.body.scrollTop` (=600). Same on mobile 390x844. Suggested one-line fix: remove `body` from the `html, body { max-width: 100vw; overflow-x: hidden }` selector at index.css line 127.",
+  "rca of the issue": "Root cause = `body { overflow-x: hidden }` (inherited from `html, body { ... overflow-x: hidden }` at index.css line 127) combined with `body { height: 100% }` from line 34. CSS: when an element has overflow set on one axis (`hidden`), the other axis defaults to `auto` if content overflows, so body becomes a scrollable container. With body height fixed to 100% of html (which is 100% of viewport) and body content larger than the viewport, body now scrolls internally while window/html stay put. document.scrollingElement still reports HTML (per CSS spec), but window.scrollTo()/window.scrollY only move/read html.scrollTop which is always 0 because html has no overflow. Mitigation: drop `body` from the overflow-x:hidden selector — apply that rule ONLY to html. The mobile @media block with overscroll-behavior-x and touch-action does not need to change. After fix: window.scrollY moves normally and the chart/cart-overlay calculations that rely on window.scrollY will start working again."
+}
