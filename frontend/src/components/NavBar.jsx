@@ -63,12 +63,12 @@ export default function NavBar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200" data-testid="nav-bar">
-      <div className="max-w-screen-2xl mx-auto px-6 flex items-center gap-6 h-14">
-        <Link to="/" className="flex items-center gap-2" data-testid="nav-logo">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 flex items-center gap-3 sm:gap-6 h-14">
+        <Link to="/" className="flex items-center gap-2 flex-shrink-0" data-testid="nav-logo">
           <div className="w-7 h-7 bg-slate-900 text-white flex items-center justify-center font-display font-black text-sm">L</div>
           <span className="font-display font-bold text-lg tracking-tight">Lumo</span>
         </Link>
-        <nav className="hidden md:flex items-center gap-1 h-full">
+        <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden">
           <NavLink to="/map" className={linkClass} data-testid="nav-map"><MapPin className="inline w-3.5 h-3.5 mr-1" />Jobs near you</NavLink>
           {/* Work dropdown — on-demand, staffing, remote, W-2 */}
           <div ref={workRef} className="relative h-full flex items-center">
@@ -146,18 +146,18 @@ export default function NavBar() {
           <NavLink to="/customer" className={linkClass} data-testid="nav-customer"><User className="inline w-3.5 h-3.5 mr-1" />Customer</NavLink>
           {rl && rl.to !== "/customer" && <NavLink to={rl.to} className={linkClass} data-testid="nav-hub"><rl.icon className="inline w-3.5 h-3.5 mr-1" />{rl.label}</NavLink>}
         </nav>
-        <div className="ml-auto flex items-center gap-2">
-          <LocaleSwitcher />
+        <div className="ml-auto flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          <div className="hidden sm:block"><LocaleSwitcher /></div>
           {user && user !== false ? (
             <>
               {user.role === "provider" && (
-                <NavLink to="/wallet" className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1 border border-slate-200" data-testid="nav-wallet">
+                <NavLink to="/wallet" className="text-xs sm:text-sm text-slate-600 hover:text-slate-900 px-2 sm:px-3 py-1 border border-slate-200 whitespace-nowrap" data-testid="nav-wallet">
                   <Wallet className="inline w-3.5 h-3.5 mr-1" /> ${Number(user.wallet_balance || 0).toFixed(2)}
                 </NavLink>
               )}
-              <NavLink to="/chats" className="text-slate-500 hover:text-slate-900" data-testid="nav-chats" title="Messages"><MessageSquare className="w-4 h-4" /></NavLink>
-              <NavLink to="/inquiries" className="text-slate-500 hover:text-slate-900" data-testid="nav-inquiries" title="Marketplace inquiries"><Home className="w-4 h-4" /></NavLink>
-              <NavLink to="/rentals/inbox" className="text-slate-500 hover:text-slate-900" data-testid="nav-rental-inbox" title="Rental booking inbox"><Inbox className="w-4 h-4" /></NavLink>
+              <NavLink to="/chats" className="text-slate-500 hover:text-slate-900 hidden lg:inline-flex" data-testid="nav-chats" title="Messages"><MessageSquare className="w-4 h-4" /></NavLink>
+              <NavLink to="/inquiries" className="text-slate-500 hover:text-slate-900 hidden lg:inline-flex" data-testid="nav-inquiries" title="Marketplace inquiries"><Home className="w-4 h-4" /></NavLink>
+              <NavLink to="/rentals/inbox" className="text-slate-500 hover:text-slate-900 hidden lg:inline-flex" data-testid="nav-rental-inbox" title="Rental booking inbox"><Inbox className="w-4 h-4" /></NavLink>
               <NavLink to="/cart" className="relative text-slate-500 hover:text-slate-900" data-testid="nav-cart" title="Cart">
                 <ShoppingCart className="w-4 h-4" />
                 {cart && cart.total_items > 0 && (
@@ -167,15 +167,15 @@ export default function NavBar() {
                 )}
               </NavLink>
               <NavLink to="/settings" className="text-slate-500 hover:text-slate-900" data-testid="nav-settings"><Settings className="w-4 h-4" /></NavLink>
-              <span className="text-sm text-slate-700 hidden md:inline" data-testid="nav-user-name">{user.name}</span>
-              <Button variant="ghost" size="sm" onClick={() => { logout(); nav("/"); }} data-testid="nav-logout">
-                <LogOut className="w-3.5 h-3.5 mr-1" /> Sign out
+              <span className="text-sm text-slate-700 hidden xl:inline" data-testid="nav-user-name">{user.name}</span>
+              <Button variant="ghost" size="sm" onClick={() => { logout(); nav("/"); }} data-testid="nav-logout" className="whitespace-nowrap">
+                <LogOut className="w-3.5 h-3.5 mr-1" /> <span className="hidden sm:inline">Sign out</span>
               </Button>
             </>
           ) : (
             <>
-              <Link to="/login"><Button variant="outline" size="sm" data-testid="nav-login">Sign in</Button></Link>
-              <Link to="/register"><Button size="sm" className="bg-slate-900 hover:bg-slate-800" data-testid="nav-register">Get started <Sparkles className="ml-1 w-3.5 h-3.5" /></Button></Link>
+              <Link to="/login"><Button variant="outline" size="sm" data-testid="nav-login" className="whitespace-nowrap">Sign in</Button></Link>
+              <Link to="/register" className="hidden sm:block"><Button size="sm" className="bg-slate-900 hover:bg-slate-800 whitespace-nowrap" data-testid="nav-register">Get started <Sparkles className="ml-1 w-3.5 h-3.5" /></Button></Link>
             </>
           )}
         </div>

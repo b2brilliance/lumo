@@ -145,6 +145,19 @@ export default function ProviderHub() {
     }
   };
 
+  const dismiss = async (id) => {
+    // Optimistic: drop the row immediately, then persist server-side so the
+    // job stays hidden across refreshes. Customer isn't notified.
+    setOpps((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await api.post(`/provider/dismiss-job/${id}`);
+      toast.message("Hidden from your feed");
+    } catch (e) {
+      toast.error(formatApiError(e));
+      loadOpps(); // rollback by re-fetching
+    }
+  };
+
   const withdrawQuote = async (qid) => {
     try { await api.delete(`/quotes/${qid}`); toast.success("Quote withdrawn"); loadMyQuotes(); }
     catch (e) { toast.error(formatApiError(e)); }
@@ -302,6 +315,14 @@ export default function ProviderHub() {
                   <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuoteTarget(j); }} className="h-8 px-3 text-xs" data-testid={`quote-job-${j.id}`}>
                     Send quote
                   </Button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); dismiss(j.id); }}
+                    className="text-[10px] font-mono uppercase tracking-wider text-slate-400 hover:text-red-600 hover:underline mt-0.5"
+                    data-testid={`dismiss-job-${j.id}`}
+                  >
+                    Not interested
+                  </button>
                 </div>
               </div>
             );})}

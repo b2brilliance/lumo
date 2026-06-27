@@ -794,8 +794,11 @@ async def provider_opportunities(
     categories = set(user.get("categories") or [])
     subcategories = set(user.get("subcategories") or [])
     employment_types = set(user.get("employment_types") or [])
+    dismissed = set(user.get("dismissed_jobs") or [])
     for d in docs:
         d = clean_doc(d)
+        if d.get("id") in dismissed:
+            continue
         emp = d.get("employment_type") or "on_demand"
         # Hard filter: skip jobs whose employment type the provider didn't pick.
         # (If the provider didn't specify any employment_types, show all — they
@@ -823,6 +826,28 @@ async def provider_opportunities(
         d["distance_miles"] = round(miles, 1) if miles is not None else None
         results.append(d)
     return results
+
+
+@api.post("/provider/dismiss-job/{job_id}")
+async def dismiss_job(job_id: str, user: dict = Depends(require_role("provider"))):
+    """Mark a job as 'not interested' so it disappears from the provider's
+    feed. The customer is NOT notified — this is purely a per-provider hide.
+    Stored as a $addToSet on `users.dismissed_jobs`."""
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$addToSet": {"dismissed_jobs": job_id}},
+    )
+    return {"ok": True}
+
+
+@api.post("/provider/undismiss-job/{job_id}")
+async def undismiss_job(job_id: str, user: dict = Depends(require_role("provider"))):
+    """Undo a dismissal — useful for a 'restore' link or test cleanup."""
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$pull": {"dismissed_jobs": job_id}},
+    )
+    return {"ok": True}
 
 # ────────────────────────────────────────────────────────────────────────────
 # Marketplace listings
