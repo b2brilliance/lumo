@@ -471,8 +471,8 @@ class QuoteCreate(BaseModel):
 TRACKING_STATUSES = ["accepted", "on_the_way", "arrived", "in_progress", "completed"]
 
 class LocationPing(BaseModel):
-    lat: float
-    lng: float
+    lat: float = Field(..., ge=-90.0, le=90.0)
+    lng: float = Field(..., ge=-180.0, le=180.0)
     heading: Optional[float] = None   # degrees, 0-360 (optional)
     speed: Optional[float] = None     # m/s (optional)
 

@@ -26,6 +26,24 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Uber-style live order tracking + auto-routed chat (Feb 27, 2026)
+- **Why**: User asked for the same flow Uber has — when a provider accepts a customer request, the customer should be able to track the provider live on a map, get an ETA, see status changes (on the way / arrived / in progress / complete), and chat with them.
+- **Backend (`server.py`)**:
+  - New Pydantic models `LocationPing` (lat/lng with -90/-180 bounds, optional heading + speed) and `TrackingStatusUpdate` (5 allowed statuses).
+  - `POST /api/jobs/{id}/location` — provider-only; stores `provider_live_location = {lat,lng,heading,speed,updated_at}` on the job. 403 if not assigned, 400 if job completed/cancelled.
+  - `POST /api/jobs/{id}/status` — provider-only; statuses: `accepted | on_the_way | arrived | in_progress | completed`. Sets `tracking_status` + `tracking_timestamps.{status}`; flips job.status when in_progress/completed; pushes a customer notification (`tracking_{status}`) with link `/jobs/{id}/track`.
+  - `GET /api/jobs/{id}/tracking` — customer or assigned provider; returns tracking_status, tracking_timestamps, provider_live_location, destination (= dropoff || pickup), pickup/dropoff, eta_minutes (haversine / 25 mph * 60), job_status, job_title.
+  - `POST /api/jobs/{id}/accept` and `POST /api/quotes/{id}/accept` now both set initial `tracking_status="accepted"` and insert a `provider_accepted` notification for the customer with direct link to the tracker.
+- **Frontend**:
+  - New page `LiveTrack.jsx` at `/jobs/:id/track` (Protected route). Renders a 520px Google Map with two custom SVG pins (teal arrow = provider, red drop pin = destination) + a teal polyline connecting them, a status pill with icon, ETA in min, "Last ping Xs ago" label, and an embedded `ChatPanel`. Polls `/api/jobs/{id}/tracking` every 5 s.
+  - When viewer is the assigned provider → 4 status-update buttons appear ("On the way", "Arrived", "Job in progress", "Complete") + a note that location is being shared until completed.
+  - New hook `useProviderLocationPinger` (`/app/frontend/src/hooks/useProviderLocationPinger.js`) wraps `navigator.geolocation.watchPosition` and POSTs every ~12 s while a job is live. Auto-cleans up on unmount or completion.
+  - `JobDetail.jsx` shows a prominent **Track live →** button on the assigned-provider row.
+  - `CustomerHub.jsx` shows a **Track →** button on each job row that has a provider and isn't completed.
+  - `ProviderHub.jsx` "Your active deliveries" shows **Open tracker →** for each row.
+- **Tested**: iteration_34 — 6/6 backend + 9/9 frontend PASS. ETA matches haversine/25 mph within 0.2 min. RBAC verified (third-party = 403). NavBar overflow + dismiss-job persistence also re-tested and pass.
+
+
 
 ### Settings → Provider profile editor + /map W-2 job-board filters (Feb 27, 2026)
 - **Settings provider profile** (`ProviderProfileSection.jsx`, mounted in Settings.jsx): only shown for `role === "provider"`. Mirrors the Register-wizard step 3 — 4 employment-type tiles · 20 category checkboxes with expanding sub-categories (live from `SERVICE_SCHEMAS`) · bio · certifications · work history. Independent save button (only appears when dirty). Saves via PATCH `/api/auth/me`.
