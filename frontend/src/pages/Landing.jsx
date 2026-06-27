@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import HomeReviewsSection from "@/components/HomeReviewsSection";
 import EmailSubscribeForm from "@/components/EmailSubscribeForm";
+import LanguageBar from "@/components/LanguageBar";
 import { useAuth } from "@/lib/auth";
 
 export default function Landing() {
@@ -25,6 +26,7 @@ export default function Landing() {
 
   return (
     <div className="bg-white">
+      <LanguageBar />
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="border-b border-slate-200 relative overflow-hidden">
         <div className="max-w-screen-2xl mx-auto px-6 py-20 grid lg:grid-cols-12 gap-12 items-end">

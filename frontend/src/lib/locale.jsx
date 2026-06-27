@@ -74,6 +74,11 @@ export function LocaleProvider({ children }) {
   const profile = COUNTRY_PROFILES[country] || COUNTRY_PROFILES.US;
   const [rates, setRates] = useState({ USD: 1.0 });
   const [ratesLoaded, setRatesLoaded] = useState(false);
+  // Independent language override. Lets a user pick (e.g.) Italian while
+  // keeping USD pricing — decouples language from country.
+  const [langOverride, setLangOverride] = useState(() => {
+    return localStorage.getItem("lumo_lang_override") || null;
+  });
 
   // Fetch live FX rates on mount
   useEffect(() => {
@@ -100,6 +105,16 @@ export function LocaleProvider({ children }) {
       localStorage.removeItem("lumo_country_override");
       const fresh = detectCountry();
       setCountry(fresh.country);
+    }
+  }, []);
+
+  const setLangOverrideValue = useCallback((next) => {
+    if (next) {
+      localStorage.setItem("lumo_lang_override", next);
+      setLangOverride(next);
+    } else {
+      localStorage.removeItem("lumo_lang_override");
+      setLangOverride(null);
     }
   }, []);
 
@@ -133,7 +148,10 @@ export function LocaleProvider({ children }) {
   const value = useMemo(() => ({
     country,
     profile,
-    lang: profile.lang,
+    lang: langOverride || profile.lang,
+    langOverride,
+    isLangOverridden: !!langOverride,
+    setLangOverride: setLangOverrideValue,
     currency: profile.currency,
     symbol: profile.symbol,
     locale: profile.locale,
@@ -159,7 +177,7 @@ export function LocaleProvider({ children }) {
     convert,
     formatPrice,
     isAutoDetected: !localStorage.getItem("lumo_country_override"),
-  }), [country, profile, rates, ratesLoaded, setCountryOverride, convert, formatPrice]);
+  }), [country, profile, rates, ratesLoaded, setCountryOverride, convert, formatPrice, langOverride, setLangOverrideValue]);
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }

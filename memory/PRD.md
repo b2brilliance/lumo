@@ -26,6 +26,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Centered homepage language bar + 24 new languages (Feb 27, 2026)
+- **Why**: User reported the language picker that used to sit at the top-middle of the homepage was gone, and wanted more languages.
+- **Backend**: `SUPPORTED_LANGS` expanded from 10 → **34** languages. New additions: Portuguese (Portugal), Italian, Dutch, Polish, Russian, Ukrainian, Turkish, Swedish, Korean, Traditional Chinese, Bengali, Urdu, Hebrew, Persian/Farsi, Vietnamese, Thai, Indonesian, Malay, Filipino/Tagalog, Swahili, Hausa, Yoruba, Amharic, Greek. `LANG_LABELS` updated with native-script labels (한국어, ไทย, বাংলা, etc.).
+- **Frontend `locale.jsx`**: language is now decoupled from country — added independent `langOverride` state (stored under `lumo_lang_override` in localStorage) with `setLangOverride(code | null)` setter. `useLocale().lang` resolves to `langOverride || profile.lang`. A French-speaking user in the US can now keep USD pricing.
+- **New `LanguageBar.jsx`**: centered horizontal pill bar at the top of `Landing.jsx`. Fetches `/api/i18n/languages` live (so future backend additions auto-appear). Shows 7 pills by default with a `+ N more` expander; active pill flips to teal with a check; `↺ Auto` reset appears when overridden. All inner labels are marked `data-no-i18n` so the AutoTranslator doesn't mangle them.
+- **Smoke-tested**: bar renders at y=57 px (1920px viewport), 8 pills visible (7 langs + expander), 34 languages returned by API. Clicking `Español` flips the active pill correctly; AutoTranslator picks up the new lang and rewrites copy across the DOM asynchronously (already covered in prior iterations).
+
+
 ### Uber-style live order tracking + auto-routed chat (Feb 27, 2026)
 - **Why**: User asked for the same flow Uber has — when a provider accepts a customer request, the customer should be able to track the provider live on a map, get an ETA, see status changes (on the way / arrived / in progress / complete), and chat with them.
 - **Backend (`server.py`)**:
