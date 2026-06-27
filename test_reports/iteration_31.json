@@ -1,0 +1,23 @@
+{
+  "summary": "Retest of iteration_30 fix #A (vertical-scroll + horizontal-lock combo). VERIFIED FIXED. Removing `body` from the `html, body { max-width:100vw; overflow-x:hidden }` rule in /app/frontend/src/index.css restored window/html as the scrolling container. window.scrollTo(0,600) now produces window.scrollY=600 on ALL tested pages (/, /map, /marketplace) for BOTH desktop 1280x800 and mobile 390x844. document.body.scrollTop is 0 (html scrolls, not body). Horizontal lock still works on both viewports: scrollX stays 0 after a 350→20 horizontal mouse drag, and document.documentElement.scrollWidth equals innerWidth on /. Computed styles confirm: body.overflow={visible visible visible} and html.overflowX=hidden. document.scrollingElement === HTML. Visual sanity check on landing renders normally — no layout regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix is clean and minimal — body now has overflow:visible on both axes (verified via getComputedStyle), html keeps overflow-x:hidden + max-width:100vw, and the mobile @media block keeps overscroll-behavior-x:none + touch-action:pan-y. This is the textbook correct CSS pattern for clamping horizontal pan on mobile without breaking window-level scroll APIs.",
+    "Minor observation (not a regression — pre-existing): on mobile /map, document.documentElement.scrollWidth=417 vs innerWidth=390 (some inner element overflows ~27px). html's overflow-x:hidden still clips it visually and scrollX stays 0 after drag, so the user impact is none. If the team wants the document.scrollWidth to also match viewport on /map, hunt down the wide child in /map; otherwise leave as-is."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100% (8/8 checks pass: 6 vertical-scroll + 2 horizontal-lock)"},
+  "test_credentials": "n/a — public pages only",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration_30 #A bug is fully fixed in iteration_31. Verified results: window.scrollY=600 after scrollTo(0,600) on / /map /marketplace at both 1280x800 and 390x844. body.scrollTop=0, html.scrollTop=600, scrollingElement=HTML. Horizontal drag (350→20) keeps scrollX=0 on both viewports. Computed CSS: body overflow visible on both axes, html overflow-x:hidden. The 1-line CSS fix (remove `body` from the selector at line 133) was the correct mitigation as predicted by iteration_30's RCA.",
+  "rca of the issue": "Already documented and resolved in iteration_30 RCA. Fix applied: index.css line 133 selector reduced from `html, body` to just `html`, so overflow-x:hidden no longer promotes body to the scrolling container. window/html is now the scroller again, and all window.scrollY-dependent code (sticky headers, scroll-restoration, IntersectionObserver root=null, react-router scrollTo, analytics) is unbroken."
+}

@@ -121,10 +121,16 @@ html.larger-text {
 /* ── Mobile: lock horizontal panning ───────────────────────────────────────
  * Some sections (long horizontal grids, wide tables, third-party iframes)
  * can briefly exceed the viewport width and let mobile users swipe the
- * whole page sideways. Clamp body width and disable horizontal touch
- * actions on small screens so the page stays put.
+ * whole page sideways. Clamp the html element to 100vw and disable
+ * horizontal touch actions on small screens so the page stays put.
+ *
+ * IMPORTANT: only apply overflow-x:hidden to <html>, never to <body>. When
+ * body has both overflow-x:hidden AND height:100%, Chromium silently
+ * promotes <body> to the scrolling container and window.scrollY stops
+ * tracking the real scroll position (breaks sticky headers, scroll
+ * restoration, IntersectionObserver, analytics, react-router scrollTo).
  */
-html, body {
+html {
     max-width: 100vw;
     overflow-x: hidden;
 }
