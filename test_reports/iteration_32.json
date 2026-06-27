@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 32 — wizard signup/signin + nav reorg + employment-type seeding + provider hard-filters. Backend: 10/11 pytest pass (1 minor query bug in /api/map/jobs?employment_type=on_demand — legacy jobs missing the field aren't returned). Frontend: register wizard (3-step with role tiles for customer/provider/retailer/restaurant), provider Step 2 avatar gate, provider Step 3 employment-type tiles + categories + sub-categories + bio/cert/work-history, login wizard 2-step with role tiles, NavBar reorg (Jobs near you · Work dropdown w/ 4 items · Marketplaces · Customer, Sign in → /login), mobile sub-bar tiles, /map?employment=w2 returns 12 W-2 pins with EXTERNAL APPLY chips pointing to indeed.com/linkedin.com in new tabs. Customer login (customer@lumo.test) → /customer works. Provider opportunities hard filter by employment_types AND subcategories both work correctly. Provider state restored to empty arrays at end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/map/jobs?employment_type=on_demand",
+        "issue": "Returns 0 pins because the Mongo query is exact-equality {'employment_type':'on_demand'} but legacy seeded jobs have no employment_type field at all. The response coerces missing values to 'on_demand' (so unfiltered output shows 54 such pins), so the filter is inconsistent with the response. Fix: change the query to {'$or':[{'employment_type':'on_demand'},{'employment_type':{'$exists':False}},{'employment_type':None}]} when filter==on_demand. The other filters (w2/remote/staffing) work fine because those jobs explicitly set the field."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter32_wizard_signup_map.py",
+    "/app/test_reports/pytest/iter32.xml"
+  ],
+  "action_items": [
+    "Fix /api/map/jobs?employment_type=on_demand to also include legacy jobs missing the employment_type field (use $or with $exists:false). Currently returns 0 pins; spec said it should return the rest (~54)."
+  ],
+  "critical_code_review_comments": [
+    "remote_w2_seed.py appears to re-seed on every backend startup without idempotency — the /map W-2 feed shows the same job titles repeated with different created_at timestamps (e.g. 'Diesel mechanic — Memphis, TN' appears at 13m ago AND 19m ago). Recommend adding a unique check or skipping seed when at least N rows already exist by (title, employment_type='w2') key.",
+    "On the /register Step 2 form, the 'Full name' input has no name attribute (also email/password). Not user-visible but it blocks any automated test using selectors by name and breaks browser autofill heuristics. Add name='name' / name='email' / name='password'.",
+    "server.py is now 6228 lines — well past the 700-line guideline. The /map/jobs, /provider/opportunities, /auth/register handlers should each move into focused modules (e.g. backend/routes/map.py, backend/routes/auth.py)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter32_wizard_signup_map.py (new)"
+  ],
+  "success_rate": {
+    "backend": "10/11 (91%)",
+    "frontend": "100% — register wizard 3 steps, login wizard 2 steps, NavBar dropdown (4 work items), mobile sub-bar tiles, /map?employment=w2 with External-apply chips all verified"
+  },
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123 (employment_types and subcategories restored to [] after tests).",
+  "seed_data_creation": "Created two TEST_-prefixed users via /auth/register (one provider, one customer). They remain in the DB; not cleaned up. Subsequent runs will use new timestamp-suffixed emails so there is no collision.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All happy-path flows in the iteration_32 request are confirmed working except the one query-construction bug in /api/map/jobs?employment_type=on_demand. After the main agent applies the $or/$exists:false fix, retest by curling that URL and asserting len > 0 (expected ~54). All other flows — register wizard (customer→2-step, provider→3-step with avatar gate), login wizard with role tiles, NavBar Work dropdown (On-demand · Staffing & temp · Remote · W-2 jobs all visible after click on Work), Sign in → /login, /map?employment=w2 showing EXTERNAL APPLY chips with indeed.com/linkedin.com target=_blank links — are all green. Provider opportunities hard-filter works for both employment_types and subcategories.",
+  "rca of the issue": "The /api/map/jobs endpoint at backend/server.py:3612 sets q['employment_type'] = employment_type when the param is provided. In Mongo, this matches documents where the field equals exactly that string AND excludes documents where the field is missing or null. The response code at line 3633 ('employment_type': d.get('employment_type') or 'on_demand') coerces missing/None to 'on_demand' for display. So legacy jobs are reported as 'on_demand' but cannot be filtered to as 'on_demand'. Reproduction: GET /api/map/jobs (no filter) → 78 pins, 54 reported as on_demand; GET /api/map/jobs?employment_type=on_demand → 0 pins. Mitigation: in the if-branch use q['$or']=[{'employment_type':'on_demand'},{'employment_type':{'$exists':False}},{'employment_type':None}] when employment_type=='on_demand', else keep the exact equality (w2/remote/staffing seeds set the field explicitly so they're unaffected)."
+}

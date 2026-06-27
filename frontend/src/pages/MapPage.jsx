@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { MapPin, Clock, DollarSign, Globe } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { MapPin, Clock, DollarSign, Globe, ExternalLink } from "lucide-react";
 import { api, CATEGORY_COLORS } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { milesBetween } from "@/lib/deliveryPricing";
@@ -37,6 +37,8 @@ function timeAgo(iso) {
 
 export default function MapPage() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
+  const employmentFilter = params.get("employment");
   const [pins, setPins] = useState([]);
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [groupFilter, setGroupFilter] = useState(null);
@@ -70,10 +72,11 @@ export default function MapPage() {
     const params = new URLSearchParams();
     if (remoteOnly) params.set("remote_only", "true");
     if (groupFilter) params.set("category_group_filter", groupFilter);
+    if (employmentFilter) params.set("employment_type", employmentFilter);
     const { data } = await api.get(`/map/jobs?${params}`);
     setPins(data);
   };
-  useEffect(() => { load(); }, [remoteOnly, groupFilter]);
+  useEffect(() => { load(); }, [remoteOnly, groupFilter, employmentFilter]);
 
   // Compute distance for each pin from the anchor, then filter by the selected
   // radius (0 = Any, no distance filter). Remote jobs always show.
@@ -186,9 +189,26 @@ function FeedRow({ pin, highlight, onHover }) {
       className={`group transition-colors ${highlight ? "bg-teal-50/60" : "hover:bg-slate-50"}`}
       data-testid={`feed-row-${pin.id}`}
     >
-      <Link to={`/jobs/${pin.id}`} className="flex items-stretch gap-0">
-        {/* Coloured side rail keyed by category group */}
-        <div className="w-1 flex-shrink-0" style={{ background: groupColor }} aria-hidden="true" />
+      {/* W-2 and remote sourced listings link out to the external posting,
+          everyone else clicks into the in-app job detail. */}
+      {pin.apply_url ? (
+        <a href={pin.apply_url} target="_blank" rel="noopener noreferrer" className="flex items-stretch gap-0">
+          <FeedRowContent pin={pin} groupColor={groupColor} distLabel={distLabel} external />
+        </a>
+      ) : (
+        <Link to={`/jobs/${pin.id}`} className="flex items-stretch gap-0">
+          <FeedRowContent pin={pin} groupColor={groupColor} distLabel={distLabel} />
+        </Link>
+      )}
+    </li>
+  );
+}
+
+function FeedRowContent({ pin, groupColor, distLabel, external }) {
+  return (
+    <>
+      {/* Coloured side rail keyed by category group */}
+      <div className="w-1 flex-shrink-0" style={{ background: groupColor }} aria-hidden="true" />
 
         <div className="flex-1 min-w-0 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           {/* Title + description */}
@@ -197,9 +217,19 @@ function FeedRow({ pin, highlight, onHover }) {
               <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 border" style={{ color: groupColor, borderColor: groupColor }}>
                 {pin.category}
               </span>
+              {pin.employment_type && pin.employment_type !== "on_demand" && (
+                <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 border border-amber-700 text-amber-700">
+                  {pin.employment_type.replace(/_/g, " ")}
+                </span>
+              )}
               {pin.is_remote && (
                 <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 border border-teal-700 text-teal-700 flex items-center gap-1">
                   <Globe className="w-2.5 h-2.5" /> Remote
+                </span>
+              )}
+              {external && (
+                <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 border border-slate-400 text-slate-500 flex items-center gap-1">
+                  <ExternalLink className="w-2.5 h-2.5" /> External apply
                 </span>
               )}
             </div>
@@ -228,7 +258,6 @@ function FeedRow({ pin, highlight, onHover }) {
             </div>
           </div>
         </div>
-      </Link>
-    </li>
+    </>
   );
 }

@@ -171,6 +171,11 @@ class UserCreate(BaseModel):
     role: Role = "customer"
     phone: Optional[str] = None
     avatar_url: Optional[str] = None  # Required when role == "provider"
+    # Provider-only signup fields (ignored for other roles)
+    employment_types: Optional[List[str]] = None  # ['on_demand','staffing','w2','remote']
+    categories: Optional[List[str]] = None        # top-level category keys
+    subcategories: Optional[List[str]] = None     # specific sub-services (hard filter)
+    provider_profile: Optional[dict] = None       # {bio, certifications:[], work_history:[]}
 
 class UserLogin(BaseModel):
     email: str
@@ -189,19 +194,24 @@ class UserOut(BaseModel):
     categories: List[str] = []
     storefront: Optional[dict] = None
     created_at: str
+    employment_types: List[str] = []
+    subcategories: List[str] = []
+    provider_profile: Optional[dict] = None
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     avatar_url: Optional[str] = None
-    location: Optional[dict] = None  # {lat, lng, address}
+    location: Optional[dict] = None
     service_radius_miles: Optional[float] = None
     categories: Optional[List[str]] = None
     storefront: Optional[dict] = None
-    # User-facing preferences (Settings page)
-    default_delivery_address: Optional[dict] = None  # {lat, lng, address}
-    notification_prefs: Optional[dict] = None  # {order_updates, job_matches, marketing_emails, blog_digest}
-    accessibility_prefs: Optional[dict] = None  # {reduce_motion, larger_text}
+    employment_types: Optional[List[str]] = None
+    subcategories: Optional[List[str]] = None
+    provider_profile: Optional[dict] = None
+    default_delivery_address: Optional[dict] = None
+    notification_prefs: Optional[dict] = None
+    accessibility_prefs: Optional[dict] = None
 
 class JobCreate(BaseModel):
     title: str
@@ -540,8 +550,11 @@ async def register(body: UserCreate):
         "wallet_balance": 0.0,
         "location": None,
         "service_radius_miles": 25.0,
-        "categories": [],
+        "categories": body.categories or [],
         "storefront": None,
+        "employment_types": body.employment_types or [],
+        "subcategories": body.subcategories or [],
+        "provider_profile": body.provider_profile or None,
         "created_at": now_iso(),
     }
     await db.users.insert_one(user_doc)
@@ -774,16 +787,23 @@ async def provider_opportunities(
     q: dict = {"status": "open"}
     if since:
         q["created_at"] = {"$gt": since}
-    docs = await db.jobs.find(q).sort("created_at", -1).to_list(200)
+    docs = await db.jobs.find(q).sort("created_at", -1).to_list(500)
     results = []
     provider_loc = user.get("location") or {}
     radius = user.get("service_radius_miles") or 25.0
     categories = set(user.get("categories") or [])
+    subcategories = set(user.get("subcategories") or [])
+    employment_types = set(user.get("employment_types") or [])
     for d in docs:
         d = clean_doc(d)
+        emp = d.get("employment_type") or "on_demand"
+        # Hard filter: skip jobs whose employment type the provider didn't pick.
+        # (If the provider didn't specify any employment_types, show all — they
+        #  haven't completed onboarding yet and we don't want a blank feed.)
+        if employment_types and emp not in employment_types:
+            continue
         miles = None
-        # remote jobs always pass
-        if d.get("is_remote"):
+        if d.get("is_remote") or emp in ("remote", "w2"):
             miles = 0.0
         else:
             pl = d.get("pickup_location") or d.get("dropoff_location") or {}
@@ -791,11 +811,15 @@ async def provider_opportunities(
                 miles = haversine_miles(provider_loc["lat"], provider_loc["lng"], pl["lat"], pl["lng"])
                 if miles > radius:
                     continue
-            else:
-                miles = None
         if categories and d.get("category") not in categories and not d.get("is_remote"):
-            # if provider specified categories, filter
             continue
+        # Hard filter on subcategories: if provider picked specific sub-services,
+        # only show jobs whose `details.subcategory` is in their list. Jobs
+        # with no subcategory pass through (legacy jobs).
+        if subcategories:
+            sub = (d.get("details") or {}).get("subcategory")
+            if sub and sub not in subcategories:
+                continue
         d["distance_miles"] = round(miles, 1) if miles is not None else None
         results.append(d)
     return results
@@ -3579,12 +3603,14 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
 # Map data
 # ────────────────────────────────────────────────────────────────────────────
 @api.get("/map/jobs")
-async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None):
+async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None, employment_type: Optional[str] = None):
     q = {"status": "open"}
     if remote_only:
         q["is_remote"] = True
     if category_group_filter:
         q["category_group"] = category_group_filter
+    if employment_type:
+        q["employment_type"] = employment_type
     docs = await db.jobs.find(q).to_list(500)
     pins = []
     for d in docs:
@@ -3598,11 +3624,15 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
                 continue
         pins.append({
             "id": d["id"], "title": d["title"], "category": d["category"],
-            "category_group": d["category_group"], "is_remote": d["is_remote"],
+            "category_group": d.get("category_group") or category_group(d["category"]),
+            "is_remote": d.get("is_remote", False),
             "lat": loc["lat"], "lng": loc["lng"], "address": loc.get("address"),
             "pay_rate": d["pay_rate"], "pay_unit": d["pay_unit"],
             "created_at": d.get("created_at"),
             "description": d.get("description"),
+            "employment_type": d.get("employment_type") or "on_demand",
+            "apply_url": d.get("apply_url"),
+            "schedule": d.get("schedule"),
         })
     # Newest first so chronological feeds don't have to re-sort client-side
     # (the map itself doesn't care about order).
@@ -6014,6 +6044,18 @@ app.include_router(_create_stripe_connect_router(db=db, get_current_user=get_cur
 @app.on_event("startup")
 async def _start_escrow_scheduler():
     asyncio.create_task(_escrow_auto_release_loop(db=db, credit_provider=_credit_provider))
+
+
+# Seed remote / W-2 job listings on first boot.
+from remote_w2_seed import seed_remote_w2_jobs as _seed_remote_w2_jobs  # noqa: E402
+
+
+@app.on_event("startup")
+async def _start_remote_w2_seed():
+    try:
+        await _seed_remote_w2_jobs(db)
+    except Exception as e:
+        logger.warning(f"Remote/W-2 seed failed (non-fatal): {e}")
 
 
 # Ad auto-pilot — one ad per day across all enabled connectors
