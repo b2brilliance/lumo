@@ -381,10 +381,23 @@ export default function MapPage() {
         )}
 
         {feed.length === 0 && (
-          <div className="text-center py-16 border border-slate-200 text-sm text-slate-500" data-testid="map-empty">
-            {anchor && radius > 0
-              ? `No open jobs within ${radius} miles right now. Try widening the radius above or toggling Remote-friendly.`
-              : "No jobs match your filters yet. Try switching off Remote-friendly or picking a different category group above."}
+          <div className="text-center py-12 border border-slate-200 text-sm text-slate-600" data-testid="map-empty">
+            {anchor && radius > 0 ? (
+              <>
+                <div className="font-display text-lg font-bold mb-1">No jobs within {radius} miles right now.</div>
+                <p className="text-slate-500 mb-4">Try widening the radius — or remove the distance filter entirely.</p>
+                <button
+                  type="button"
+                  onClick={() => setRadius(0)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white font-mono uppercase tracking-wider text-xs hover:bg-teal-800"
+                  data-testid="map-expand-radius"
+                >
+                  Show every open job (any distance) →
+                </button>
+              </>
+            ) : (
+              "No jobs match your filters yet. Try switching off Remote-friendly or picking a different work type above."
+            )}
           </div>
         )}
 
@@ -461,8 +474,11 @@ function FeedRow({ pin, highlight, onHover, user }) {
   // Provider can one-tap accept any in-app on-demand job. External W-2 /
   // remote listings (apply_url) keep their "Apply externally" link.
   const empType = pin.employment_type || "on_demand";
-  const isProvider = user && user !== false && user.role === "provider";
-  const canQuickAccept = isProvider && empType === "on_demand" && !pin.apply_url;
+  // Anyone signed in can accept an on-demand job. The backend still
+  // enforces credential gates for regulated categories (medical / legal)
+  // and prevents customers from accepting their own jobs.
+  const isLoggedIn = user && user !== false;
+  const canQuickAccept = isLoggedIn && empType === "on_demand" && !pin.apply_url;
 
   const acceptAndTrack = async (e) => {
     e.preventDefault();

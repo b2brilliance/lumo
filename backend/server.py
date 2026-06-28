@@ -754,12 +754,18 @@ async def get_job(job_id: str):
     return clean_doc(j)
 
 @api.post("/jobs/{job_id}/accept")
-async def accept_job(job_id: str, user: dict = Depends(require_role("provider"))):
+async def accept_job(job_id: str, user: dict = Depends(get_current_user)):
     j = await db.jobs.find_one({"id": job_id})
     if not j:
         raise HTTPException(404, "Job not found")
     if j["status"] != "open":
         raise HTTPException(400, "Job is not open")
+    # Don't let the customer accept their own posting
+    if j.get("customer_id") == user["id"]:
+        raise HTTPException(400, "You can't accept your own job")
+    # External aggregated listings link out — they're not in-app acceptable
+    if j.get("apply_url"):
+        raise HTTPException(400, "This is an external listing — use the apply link")
     if not await _has_verified_credential(user["id"], j["category"]):
         raise HTTPException(403, f"A verified credential is required to accept {j['category']} jobs. Add one in Provider Hub → Credentials.")
     # If the job specifies a license_required, verify the provider holds a matching credential
@@ -804,7 +810,7 @@ async def complete_job(job_id: str, user: dict = Depends(get_current_user)):
     return clean_doc(j)
 
 @api.post("/jobs/{job_id}/cancel-acceptance")
-async def cancel_acceptance(job_id: str, body: dict, user: dict = Depends(require_role("provider"))):
+async def cancel_acceptance(job_id: str, body: dict, user: dict = Depends(get_current_user)):
     """Provider backs out of a job they accepted. Resets the job to 'open'
     so other providers can pick it up, and notifies the customer."""
     j = await db.jobs.find_one({"id": job_id})
@@ -871,7 +877,7 @@ def _eta_minutes(prov: dict, dest: dict) -> Optional[float]:
     return round((miles / 25.0) * 60.0, 1)
 
 @api.post("/jobs/{job_id}/location")
-async def update_provider_location(job_id: str, body: LocationPing, user: dict = Depends(require_role("provider"))):
+async def update_provider_location(job_id: str, body: LocationPing, user: dict = Depends(get_current_user)):
     j = await db.jobs.find_one({"id": job_id})
     if not j:
         raise HTTPException(404, "Job not found")
@@ -890,7 +896,7 @@ async def update_provider_location(job_id: str, body: LocationPing, user: dict =
     return {"ok": True, "provider_live_location": payload}
 
 @api.post("/jobs/{job_id}/status")
-async def update_tracking_status(job_id: str, body: TrackingStatusUpdate, user: dict = Depends(require_role("provider"))):
+async def update_tracking_status(job_id: str, body: TrackingStatusUpdate, user: dict = Depends(get_current_user)):
     if body.status not in TRACKING_STATUSES:
         raise HTTPException(400, f"Invalid status. Must be one of {TRACKING_STATUSES}")
     j = await db.jobs.find_one({"id": job_id})

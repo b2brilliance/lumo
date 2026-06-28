@@ -49,7 +49,11 @@ export default function JobDetail() {
 
   if (!job) return <div className="p-10 text-slate-500">Loading…</div>;
   const img = job.media_url ? (job.media_url.startsWith("http") ? job.media_url : `${BACKEND_URL}${job.media_url}`) : null;
-  const isProvider = user && user !== false && user.role === "provider";
+  // Loosened role check: any signed-in user (other than the customer who
+  // posted the job) can accept it. Backend enforces credential gates for
+  // regulated categories so we don't have to gate the UI.
+  const isCustomer = user && user !== false && job.customer_id === user.id;
+  const isProvider = user && user !== false && !isCustomer;
   const isParticipant = user && user !== false && (user.id === job.customer_id || user.id === job.provider_id);
   const canChat = user && user !== false && (isParticipant || (isProvider && job.status === "open"));
 
@@ -78,7 +82,6 @@ export default function JobDetail() {
     catch (e) { toast.error(formatApiError(e)); }
   };
 
-  const isCustomer = user && user !== false && user.id === job.customer_id;
   const myProviderQuote = isProvider ? quotes.find((q) => q.provider_id === user.id) : null;
 
   return (
