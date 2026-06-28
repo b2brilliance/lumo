@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { MapPin, Clock, DollarSign, Globe, ExternalLink, Zap, Sparkles, Calendar, Briefcase } from "lucide-react";
 import { api, CATEGORY_COLORS, formatApiError } from "@/lib/api";
@@ -61,8 +61,19 @@ export default function MapPage() {
   const [highlight, setHighlight] = useState(null);
   // GPS anchor (browser geolocation). Lets visitors without a saved
   // service address still get a radius-filtered W-2 / on-demand feed.
-  const [gpsAnchor, setGpsAnchor] = useState(null);
+  // Persisted in sessionStorage so it survives route changes but isn't
+  // permanent (we want to re-ask on a new session for privacy).
+  const [gpsAnchor, setGpsAnchor] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("lumo_gps_anchor");
+      if (raw) return JSON.parse(raw);
+    } catch (_) { /* sessionStorage unavailable */ }
+    return null;
+  });
   const [gpsBusy, setGpsBusy] = useState(false);
+  // Remember a "don't auto-ask again" flag so we don't pester users who
+  // declined the OS permission prompt.
+  const gpsAutoTriedRef = useRef(false);
   // User-selectable radius (persists across visits via localStorage). 0 = Any.
   const [radius, setRadius] = useState(() => {
     if (typeof window === "undefined") return 50;
@@ -88,22 +99,44 @@ export default function MapPage() {
     return null;
   }, [user, gpsAnchor]);
 
-  const requestGps = async () => {
+  const requestGps = async (opts = { silent: false }) => {
     setGpsBusy(true);
     try {
       const pos = await getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
-      setGpsAnchor({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      toast.success("Using your current GPS location");
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setGpsAnchor(next);
+      try { sessionStorage.setItem("lumo_gps_anchor", JSON.stringify(next)); } catch (_) { /* sessionStorage unavailable */ }
+      if (!opts.silent) toast.success("Using your current GPS location");
     } catch (err) {
-      toast.error(
-        err?.code === 1 || /denied/i.test(err?.message || "")
-          ? "Location permission denied. Enable it in your browser/device settings or set a service address in Settings."
-          : "Couldn't read your location. Try again or set a service address in Settings."
-      );
+      if (!opts.silent) {
+        toast.error(
+          err?.code === 1 || /denied/i.test(err?.message || "")
+            ? "Location permission denied. Enable it in your browser/device settings or set a service address in Settings."
+            : "Couldn't read your location. Try again or set a service address in Settings."
+        );
+      } else {
+        // Remember the denial so we don't keep asking on every navigation
+        try { sessionStorage.setItem("lumo_gps_denied", "1"); } catch (_) { /* ignore */ }
+      }
     } finally {
       setGpsBusy(false);
     }
   };
+
+  // Auto-detect location on first mount if the user has no saved anchor and
+  // hasn't previously declined this session. Silent — falls back to the
+  // "Use my GPS" button if it fails.
+  useEffect(() => {
+    if (gpsAutoTriedRef.current) return;
+    gpsAutoTriedRef.current = true;
+    if (gpsAnchor) return;                                            // already have one
+    if (user?.location?.lat || user?.default_delivery_address?.lat) return; // saved address wins
+    try {
+      if (sessionStorage.getItem("lumo_gps_denied") === "1") return;
+    } catch (_) { /* ignore */ }
+    requestGps({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const load = async () => {
     const params = new URLSearchParams();
