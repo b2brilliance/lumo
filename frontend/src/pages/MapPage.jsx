@@ -184,8 +184,8 @@ export default function MapPage() {
         Pins coloured by category. Toggle <span className="text-teal-700 font-semibold">Remote-friendly</span> for remote-only opportunities.
       </p>
 
-      {/* ── Map (untouched — same component, same height) ──────────────────── */}
-      <div className="mt-6">
+      {/* ── Map (sticky on desktop, feed scrolls beneath it) ───────────────── */}
+      <div className="mt-6 lg:sticky lg:top-4 lg:z-10 bg-white">
         <MapView
           pins={pins}
           highlightId={highlight}
