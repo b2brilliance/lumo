@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { MapPin, Clock, DollarSign, Globe, ExternalLink, Zap } from "lucide-react";
+import { MapPin, Clock, DollarSign, Globe, ExternalLink, Zap, Sparkles, Calendar, Briefcase } from "lucide-react";
 import { api, CATEGORY_COLORS, formatApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { milesBetween } from "@/lib/deliveryPricing";
@@ -181,8 +181,13 @@ export default function MapPage() {
       <div className="overline">Jobs near you</div>
       <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-2">Every open job.</h1>
       <p className="text-slate-600 mt-2 max-w-xl">
-        Pins coloured by category. Toggle <span className="text-teal-700 font-semibold">Remote-friendly</span> for remote-only opportunities.
+        Pins coloured by category. Pick a work type below to filter — or leave on All for everything in your area.
       </p>
+
+      {/* Employment-type pills — absorbed from the old "Work" nav dropdown so
+          every kind of job (on-demand · staffing · remote · W-2) is one tap
+          away from the same page. */}
+      <WorkTypePills active={employmentFilter} />
 
       {/* ── Map (sticky on desktop, feed scrolls beneath it) ───────────────── */}
       <div className="mt-6 lg:sticky lg:top-4 lg:z-10 bg-white">
@@ -358,6 +363,55 @@ export default function MapPage() {
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Work-type filter pills — absorbed from the old NavBar "Work" dropdown.
+// Each pill flips ?employment=... on the same /map page so all 4 kinds of
+// work live in one feed instead of being scattered across the navbar.
+function WorkTypePills({ active }) {
+  const navigate = useNavigate();
+  const options = [
+    { value: null,         label: "All work",  icon: MapPin,    blurb: "Everything" },
+    { value: "on_demand",  label: "On-demand", icon: Sparkles,  blurb: "Same-day gigs" },
+    { value: "staffing",   label: "Staffing & temp", icon: Calendar, blurb: "Shifts & fill-ins" },
+    { value: "remote",     label: "Remote",    icon: Globe,     blurb: "Work from anywhere" },
+    { value: "w2",         label: "W-2 jobs",  icon: Briefcase, blurb: "Salaried with benefits" },
+  ];
+  const setFilter = (v) => {
+    const url = new URL(window.location.href);
+    if (v) url.searchParams.set("employment", v);
+    else url.searchParams.delete("employment");
+    navigate(`${url.pathname}${url.search}`);
+  };
+  return (
+    <div className="mt-4 flex items-center gap-2 flex-wrap" data-testid="map-worktype-pills">
+      {options.map((o) => {
+        const isActive = active === o.value || (!active && o.value === null);
+        const Icon = o.icon;
+        return (
+          <button
+            key={o.value || "all"}
+            type="button"
+            onClick={() => setFilter(o.value)}
+            className={`group inline-flex items-center gap-2 px-3.5 py-2 border transition-colors text-sm font-mono ${
+              isActive
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-300 hover:border-slate-900 hover:text-slate-900"
+            }`}
+            data-testid={`worktype-pill-${o.value || "all"}`}
+            aria-pressed={isActive}
+          >
+            <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-teal-700"}`} />
+            <span className="font-bold uppercase tracking-wider text-[11px]">{o.label}</span>
+            <span className={`hidden md:inline text-[10px] tracking-widest ${isActive ? "text-white/70" : "text-slate-400"}`}>
+              {o.blurb}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

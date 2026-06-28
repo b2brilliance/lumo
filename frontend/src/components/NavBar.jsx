@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox, Home, Car, HardHat, Globe, Calendar } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, ChevronDown, KeyRound, Inbox, Home, Car, HardHat } from "lucide-react";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 // Marketplaces dropdown — physical goods and inventory.
@@ -17,28 +17,16 @@ const MARKETPLACE_LINKS = [
   { to: "/autos",        label: "Auto Sales",   icon: Car,              blurb: "Cars, trucks, SUVs and EVs", testId: "nav-mp-autos" },
 ];
 
-// Work dropdown — every place a provider can earn. Each link points to the
-// /map page with an employment_type filter pre-applied via query string.
-const WORK_LINKS = [
-  { to: "/map?employment=on_demand", label: "On-demand", icon: Sparkles,  blurb: "Same-day gigs and local pickups", testId: "nav-work-on-demand" },
-  { to: "/map?employment=staffing",  label: "Staffing & temp", icon: Calendar, blurb: "Short-term shifts and fill-in work", testId: "nav-work-staffing" },
-  { to: "/map?employment=remote",    label: "Remote",   icon: Globe,     blurb: "1099 / contract roles done from anywhere", testId: "nav-work-remote" },
-  { to: "/map?employment=w2",        label: "W-2 jobs", icon: Briefcase, blurb: "Salaried, benefits-eligible openings", testId: "nav-work-w2" },
-];
-
 export default function NavBar() {
   const { user, logout } = useAuth();
   const { cart } = useCart() || { cart: { total_items: 0 } };
   const nav = useNavigate();
   const [mpOpen, setMpOpen] = useState(false);
-  const [workOpen, setWorkOpen] = useState(false);
   const mpRef = useRef(null);
-  const workRef = useRef(null);
 
   useEffect(() => {
     const onClick = (e) => {
       if (mpRef.current && !mpRef.current.contains(e.target)) setMpOpen(false);
-      if (workRef.current && !workRef.current.contains(e.target)) setWorkOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
@@ -70,46 +58,10 @@ export default function NavBar() {
         </Link>
         <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden">
           <NavLink to="/map" className={linkClass} data-testid="nav-map"><MapPin className="inline w-3.5 h-3.5 mr-1" />Jobs near you</NavLink>
-          {/* Work dropdown — on-demand, staffing, remote, W-2 */}
-          <div ref={workRef} className="relative h-full flex items-center">
-            <button
-              onClick={() => { setWorkOpen((v) => !v); setMpOpen(false); }}
-              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1 ${workOpen ? "border-teal-700 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-900"}`}
-              data-testid="nav-work-toggle"
-              aria-expanded={workOpen}
-            >
-              Work <ChevronDown className={`w-3.5 h-3.5 transition-transform ${workOpen ? "rotate-180" : ""}`} />
-            </button>
-            {workOpen && (
-              <div
-                className="absolute left-0 top-full mt-0.5 w-80 bg-white border border-slate-200 shadow-2xl divide-y divide-slate-100 z-50"
-                data-testid="nav-work-menu"
-              >
-                {WORK_LINKS.map((m) => {
-                  const Icon = m.icon;
-                  return (
-                    <Link
-                      key={m.to}
-                      to={m.to}
-                      onClick={() => setWorkOpen(false)}
-                      className="flex items-start gap-3 p-3 hover:bg-slate-50 transition-colors"
-                      data-testid={m.testId}
-                    >
-                      <Icon className="w-5 h-5 text-amber-700 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="font-display font-bold text-slate-900">{m.label}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{m.blurb}</div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
           {/* Marketplaces dropdown */}
           <div ref={mpRef} className="relative h-full flex items-center">
             <button
-              onClick={() => { setMpOpen((v) => !v); setWorkOpen(false); }}
+              onClick={() => setMpOpen((v) => !v)}
               className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1 ${mpOpen ? "border-teal-700 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-900"}`}
               data-testid="nav-marketplaces-toggle"
               aria-expanded={mpOpen}
