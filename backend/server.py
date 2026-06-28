@@ -3812,6 +3812,45 @@ async def root():
     return {"app": "lumo", "status": "ok"}
 
 # ────────────────────────────────────────────────────────────────────────────
+# Visitor geo-IP — used by analytics.py to enrich pageviews with country.
+# ────────────────────────────────────────────────────────────────────────────
+# Tiny in-memory cache so we don't re-lookup every IP. Capped to ~5k IPs.
+_IP_COUNTRY_CACHE: dict[str, str] = {}
+
+async def country_for_request(request: Request) -> str:
+    """Resolve country for the incoming request. Prefers CDN headers
+    (instant + free), falls back to a free public IP lookup with caching."""
+    headers = request.headers
+    # 1. Cloudflare / common CDN headers — set automatically when behind one.
+    for h in ("cf-ipcountry", "x-vercel-ip-country", "x-country", "x-geo-country", "x-appengine-country"):
+        v = headers.get(h)
+        if v and v.upper() not in ("XX", "T1"):
+            return v.upper()[:2]
+    fwd = headers.get("x-forwarded-for") or ""
+    ip = (fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")) or ""
+    if ip in _IP_COUNTRY_CACHE:
+        return _IP_COUNTRY_CACHE[ip]
+    # 3. Skip private / loopback IPs
+    if not ip or ip.startswith(("10.", "192.168.", "127.", "172.16.", "::1")):
+        _IP_COUNTRY_CACHE[ip] = "—"
+        return "—"
+    # 4. Public lookup (ip-api.com — free, no key, ~45 req/min)
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=4) as client:
+            r = await client.get(f"https://ip-api.com/json/{ip}?fields=countryCode")
+            if r.status_code == 200:
+                code = (r.json() or {}).get("countryCode") or "—"
+                if len(_IP_COUNTRY_CACHE) > 5000:
+                    _IP_COUNTRY_CACHE.clear()
+                _IP_COUNTRY_CACHE[ip] = code
+                return code
+    except Exception:
+        pass
+    return "—"
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # External job aggregator admin (USAJobs, Greenhouse, RemoteOK, WWR)
 # ────────────────────────────────────────────────────────────────────────────
 @api.get("/admin/aggregators")

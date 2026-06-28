@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useLocale } from "@/lib/locale";
 
 const SESSION_KEY = "lumo_pv_session";
 
@@ -24,6 +25,7 @@ function getSessionId() {
 export default function PageviewPinger() {
   const loc = useLocation();
   const { user } = useAuth();
+  const { country } = useLocale();
   const lastPath = useRef(null);
 
   useEffect(() => {
@@ -35,8 +37,9 @@ export default function PageviewPinger() {
       path,
       referrer: document.referrer || null,
       user_id: (user && user.id) || null,
+      country_hint: country || null,
     }).catch(() => { /* ignore — analytics is best-effort */ });
-  }, [loc.pathname, user]);
+  }, [loc.pathname, user, country]);
 
   return null;
 }

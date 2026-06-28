@@ -34,6 +34,10 @@ class PageviewBody(BaseModel):
     path: str = Field(min_length=1, max_length=300)
     referrer: Optional[str] = Field(default=None, max_length=500)
     user_id: Optional[str] = None
+    # Optional client-side country hint (from useLocale's timezone+lang
+    # detection). Used only when the server-side header / IP-lookup path
+    # can't resolve a country.
+    country_hint: Optional[str] = Field(default=None, max_length=2)
 
 
 def _now() -> datetime:
@@ -96,6 +100,16 @@ def create_router(*, db, require_admin) -> APIRouter:
         ua = (request.headers.get("user-agent") or "")[:300]
         if BOT_RE.search(ua):
             return {"ok": True, "skipped": "bot"}
+        try:
+            from server import country_for_request
+            country = await country_for_request(request)
+        except Exception:
+            country = "—"
+        # Fallback to client-supplied hint when ingress strips headers
+        # (preview env / non-CDN deploys). The frontend useLocale detects
+        # via Intl timezone + Accept-Language so the hint is usually right.
+        if country in (None, "", "—") and body.country_hint:
+            country = (body.country_hint or "").upper()[:2] or "—"
         await db.pageviews.insert_one({
             "id": str(uuid.uuid4()),
             "session_id": body.session_id,
@@ -103,9 +117,54 @@ def create_router(*, db, require_admin) -> APIRouter:
             "referrer": (body.referrer or "")[:500] or None,
             "user_id": body.user_id,
             "user_agent": ua,
+            "country": country,
             "ts": _iso(),
         })
-        return {"ok": True}
+        return {"ok": True, "country": country}
+
+    # ── Country breakdown (admin) ────────────────────────────────────────
+    @router.get("/admin/analytics/countries")
+    async def countries(_admin: dict = Depends(require_admin), hours: int = 24):
+        cutoff = (_now() - timedelta(hours=hours)).isoformat()
+        cur = db.pageviews.aggregate([
+            {"$match": {"ts": {"$gte": cutoff}}},
+            {"$group": {
+                "_id": "$country",
+                "visits": {"$sum": 1},
+                "uniq": {"$addToSet": "$session_id"},
+            }},
+            {"$project": {
+                "country": "$_id",
+                "visits": 1,
+                "unique_visitors": {"$size": "$uniq"},
+            }},
+            {"$sort": {"visits": -1}},
+            {"$limit": 60},
+        ])
+        rows = [{
+            "country": (d.get("country") or "—"),
+            "visits": d.get("visits", 0),
+            "unique_visitors": d.get("unique_visitors", 0),
+        } async for d in cur]
+        total = await db.pageviews.count_documents({"ts": {"$gte": cutoff}})
+        recent_cur = db.pageviews.find(
+            {"ts": {"$gte": cutoff}}, {"_id": 0}
+        ).sort("ts", -1).limit(50)
+        recent = []
+        async for d in recent_cur:
+            recent.append({
+                "ts": d.get("ts"),
+                "country": d.get("country") or "—",
+                "path": d.get("path"),
+                "referrer": d.get("referrer"),
+                "session_id": d.get("session_id"),
+            })
+        return {
+            "hours": hours,
+            "total_pageviews": total,
+            "by_country": rows,
+            "recent": recent,
+        }
 
     # ── Overview ──────────────────────────────────────────────────────────
     @router.get("/admin/analytics/overview")

@@ -3,7 +3,7 @@ import { Navigate, Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe } from "lucide-react";
 import { toast } from "sonner";
 import AdStudio from "@/components/AdStudio";
 import Distribution from "@/components/Distribution";
@@ -28,6 +28,7 @@ const TABS = [
   { key: "distribution", label: "Distribution", icon: Send },
   { key: "social",      label: "Social Links", icon: Share2 },
   { key: "data",        label: "Data",        icon: Database },
+  { key: "visitors",    label: "Visitors",    icon: Globe },
 ];
 
 function StatTile({ label, value, icon: Icon, testId }) {
@@ -38,6 +39,139 @@ function StatTile({ label, value, icon: Icon, testId }) {
     </div>
   );
 }
+
+// ── Visitors tab — where each visit comes from (country + path + recent feed)
+const COUNTRY_NAMES = {
+  US: "United States", CA: "Canada", GB: "United Kingdom", MX: "Mexico", BR: "Brazil",
+  AR: "Argentina", FR: "France", DE: "Germany", IT: "Italy", ES: "Spain", PT: "Portugal",
+  NL: "Netherlands", BE: "Belgium", CH: "Switzerland", AT: "Austria", IE: "Ireland",
+  PL: "Poland", CZ: "Czechia", SE: "Sweden", NO: "Norway", DK: "Denmark", FI: "Finland",
+  RU: "Russia", UA: "Ukraine", TR: "Türkiye", GR: "Greece", RO: "Romania", HU: "Hungary",
+  IN: "India", PK: "Pakistan", BD: "Bangladesh", LK: "Sri Lanka", NP: "Nepal",
+  CN: "China", TW: "Taiwan", HK: "Hong Kong", JP: "Japan", KR: "South Korea",
+  ID: "Indonesia", PH: "Philippines", VN: "Vietnam", TH: "Thailand", MY: "Malaysia", SG: "Singapore",
+  AU: "Australia", NZ: "New Zealand", ZA: "South Africa", EG: "Egypt", NG: "Nigeria", KE: "Kenya",
+  GH: "Ghana", ET: "Ethiopia", MA: "Morocco", IL: "Israel", AE: "United Arab Emirates",
+  SA: "Saudi Arabia", QA: "Qatar", JO: "Jordan", LB: "Lebanon", IR: "Iran", IQ: "Iraq",
+  CO: "Colombia", PE: "Peru", CL: "Chile", VE: "Venezuela", UY: "Uruguay", EC: "Ecuador",
+};
+function flagFromCode(code) {
+  if (!code || code === "—" || code.length !== 2) return "🌐";
+  const A = 0x1F1E6, base = "A".charCodeAt(0);
+  return String.fromCodePoint(A + (code.charCodeAt(0) - base)) + String.fromCodePoint(A + (code.charCodeAt(1) - base));
+}
+function fmtTimeAgo(iso) {
+  if (!iso) return "—";
+  const secs = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
+  return `${Math.floor(secs/86400)}d ago`;
+}
+
+function VisitorsTab() {
+  const [hours, setHours] = useState(24);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = (h) => {
+    setLoading(true);
+    api.get(`/admin/analytics/countries?hours=${h}`)
+      .then(({ data }) => setData(data))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(hours); }, [hours]);
+
+  const max = (data?.by_country || []).reduce((m, r) => Math.max(m, r.visits), 1);
+
+  return (
+    <div className="space-y-8" data-testid="admin-visitors-tab">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="font-display text-2xl font-bold">Where visitors come from</h2>
+        <div className="flex gap-1" data-testid="visitors-range">
+          {[1, 24, 24 * 7, 24 * 30].map((h) => (
+            <button
+              key={h}
+              onClick={() => setHours(h)}
+              className={`text-[11px] font-mono uppercase tracking-wider px-2.5 py-1 border ${hours === h ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-300 hover:border-slate-900"}`}
+              data-testid={`visitors-range-${h}`}
+            >
+              {h === 1 ? "Last hour" : h === 24 ? "24h" : h === 168 ? "7 days" : "30 days"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <StatTile label="Total pageviews" value={data?.total_pageviews ?? "—"} icon={BarChart3} testId="visitors-stat-total" />
+        <StatTile label="Countries" value={data?.by_country?.length ?? "—"} icon={Globe} testId="visitors-stat-countries" />
+        <StatTile label="Unique visitors (top country)" value={data?.by_country?.[0]?.unique_visitors ?? "—"} icon={Users} testId="visitors-stat-uniq" />
+      </div>
+
+      <div>
+        <h3 className="font-display text-lg font-bold mb-3">Country breakdown</h3>
+        {loading && <div className="text-slate-500 text-sm">Loading…</div>}
+        {!loading && (!data?.by_country || data.by_country.length === 0) && (
+          <div className="text-slate-500 text-sm border border-dashed border-slate-300 p-6 text-center" data-testid="visitors-empty">
+            No pageviews recorded in this window yet. As visitors hit the site, they&apos;ll appear here.
+          </div>
+        )}
+        {!loading && data?.by_country?.length > 0 && (
+          <div className="border border-slate-200 divide-y divide-slate-100" data-testid="visitors-by-country">
+            {data.by_country.map((row) => {
+              const pct = (row.visits / max) * 100;
+              const name = COUNTRY_NAMES[row.country] || row.country || "Unknown";
+              return (
+                <div key={row.country || "_"} className="flex items-center gap-3 px-4 py-2.5 text-sm" data-testid={`visitor-country-${row.country}`}>
+                  <span className="text-xl leading-none w-7 text-center" data-no-i18n="true">{flagFromCode(row.country)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-display font-bold text-slate-900 truncate">{name}</span>
+                      <span className="font-mono text-[11px] uppercase tracking-widest text-slate-400">{row.country || "—"}</span>
+                    </div>
+                    <div className="mt-1 h-1 bg-slate-100 relative overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 bg-teal-700" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 w-32">
+                    <div className="font-mono text-sm font-bold text-slate-900">{row.visits.toLocaleString()}</div>
+                    <div className="font-mono text-[10px] uppercase tracking-widest text-slate-400">{row.unique_visitors} uniq</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h3 className="font-display text-lg font-bold mb-3">Recent visits</h3>
+        {!loading && (!data?.recent || data.recent.length === 0) && (
+          <div className="text-slate-500 text-sm">No recent activity.</div>
+        )}
+        {!loading && data?.recent?.length > 0 && (
+          <div className="border border-slate-200 divide-y divide-slate-100 max-h-[400px] overflow-y-auto" data-testid="visitors-recent">
+            {data.recent.map((r, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
+                <span className="text-base leading-none w-6 text-center" data-no-i18n="true">{flagFromCode(r.country)}</span>
+                <span className="font-mono uppercase tracking-widest w-8 text-slate-500" data-no-i18n="true">{r.country || "—"}</span>
+                <span className="font-mono text-slate-900 flex-1 truncate" data-no-i18n="true">{r.path}</span>
+                {r.referrer && (
+                  <span className="hidden sm:inline font-mono text-[10px] text-slate-400 max-w-[200px] truncate" title={r.referrer} data-no-i18n="true">
+                    ← {(() => { try { return new URL(r.referrer).hostname; } catch { return r.referrer.slice(0, 30); } })()}
+                  </span>
+                )}
+                <span className="font-mono text-[10px] text-slate-400 shrink-0 w-16 text-right" data-no-i18n="true">{fmtTimeAgo(r.ts)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function CredentialsTab() {
   const [items, setItems] = useState([]);
@@ -207,6 +341,7 @@ export default function AdminConsole() {
           {tab === "payments" && <PaymentsAdmin />}
           {tab === "users" && <UsersAdmin />}
           {tab === "blog" && <BlogAdmin />}
+          {tab === "visitors" && <VisitorsTab />}
         </ErrorBoundary>
       </div>
     </div>
