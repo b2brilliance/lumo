@@ -26,6 +26,29 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Affiliate / referral engine + Insurance + Cities SEO hubs (Jun 28, 2026)
+- **Affiliate engine** (`/app/backend/affiliates.py`):
+  - Mongo collections: `affiliate_offers`, `affiliate_clicks`, `affiliate_settings`.
+  - 64 pre-seeded partner offers across **autos, real-estate, marketplace, restaurants, provider, wallet, customer, rentals, stores, global** + **insurance** subcategory (Progressive, GEICO, Root, The Zebra, Lemonade, Policygenius, Thimble, Next Insurance, Hiscox, Simply Business, Ethos, Ladder, Trupanion, Hippo, World Nomads, SafetyWing).
+  - Endpoints: `GET /api/affiliates/offers?category=&country=`, `GET /api/affiliates/click/{slug}` (302 redirect with tracking ID injection), `GET /api/affiliates/subcategory-labels`, `GET/POST/PATCH/DELETE /api/admin/affiliates/offers`, `GET/POST /api/admin/affiliates/settings`, `GET /api/admin/affiliates/analytics`, `POST /api/admin/affiliates/reseed`.
+  - URL templating: `{placeholder}` tokens (e.g. `{amazon_tag}`, `{impact_click_id}`) are replaced at click time from `affiliate_settings.keys`.
+  - Offers grouped by `subcategory` (loans / insurance / warranty / sell / banking / investing / hotels / flights / tours / etc.) — front-end renders one section per subcategory with intent-driven headers.
+- **AffiliateBlock component** (`/app/frontend/src/components/AffiliateBlock.jsx`) embedded in Autos, RealEstate, Marketplace, Directory (Stores/Restaurants/Rentals), ProviderHub, Wallet, CustomerHub, CityHub. Renders FTC-compliant disclosure, "Sponsored" badge, per-offer "Admin: add tracking ID" hint when keys are missing.
+- **Admin Console "Affiliates" tab** (`/app/frontend/src/pages/admin/AffiliatesTab.jsx`):
+  - **Offers** — list 64+ offers, add/edit/delete with subcategory dropdown
+  - **Tracking IDs** — auto-populated form with every unique placeholder across all offers (~30 fields)
+  - **Clicks** — analytics: total + per-offer click counts
+  - **Signup guide** — numbered checklist of 48 affiliate networks/programs with direct signup URLs and tracking-ID hints
+- **Cities SEO hub** (`/cities` + `/cities/:slug`) — single index page + 73 per-city hubs that fan out to every `find-help/work/sell/rent-out` × `category` × `city` landing page. Adds ~2,500 new programmatic SEO surfaces.
+- **LANDING_PAGE_TYPES expanded** — find-help and work types now include notary, mechanic, locksmith, appliance-repair, IT support, errands, security, junk removal, snow removal, auto detailing, tax prep, legal help, translator, photographer, event staff.
+- **NavBar "Earn" link** for anonymous visitors (data-testid `nav-earn`) → `/become-a-provider`.
+- **Footer reorganized** — 4-column layout: Earn (Become a provider / List your stuff / Host a rental / All cities), Marketplaces, Lumo, Follow us.
+- **Landing.jsx Helmet** — LocalBusiness, BreadcrumbList, Speakable JSON-LD for rich-result eligibility.
+- **Sitemap** — total URLs grew from ~3,500 to **6,096**.
+- **Hardened admin patch endpoint** with `AffiliateOfferPatch` Pydantic partial model so arbitrary fields can't be injected.
+- Backend pytest: **22/22 PASSED** (`/app/backend/tests/test_iter35_affiliates_seo.py`).
+
+
 ### External job aggregator + sticky map + GPS-gated W-2 (Feb 27, 2026)
 - **Why**: User asked to ingest jobs/rentals/listings from "every publicly available source." I scoped it to **legal-only** sources (no scraping of any kind — Airbnb/Vrbo/Indeed/LinkedIn/Craigslist explicitly excluded due to ToS).
 - **New `aggregators.py`** module — pulls every 6h from 4 ToS-permitted public APIs:

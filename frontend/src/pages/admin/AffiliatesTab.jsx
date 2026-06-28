@@ -126,6 +126,7 @@ function OfferForm({ existing, onClose, onSaved }) {
   const [name, setName] = useState(existing?.name || "");
   const [network, setNetwork] = useState(existing?.network || "");
   const [category, setCategory] = useState(existing?.category || "marketplace");
+  const [subcategory, setSubcategory] = useState(existing?.subcategory || "general");
   const [country, setCountry] = useState((existing?.country || ["*"]).join(","));
   const [blurb, setBlurb] = useState(existing?.blurb || "");
   const [payout, setPayout] = useState(existing?.payout || "");
@@ -139,7 +140,7 @@ function OfferForm({ existing, onClose, onSaved }) {
     setBusy(true);
     try {
       const payload = {
-        name, network, category,
+        name, network, category, subcategory,
         country: country.split(",").map((s) => s.trim()).filter(Boolean),
         blurb, payout, logo, url_template, signup_url,
         priority: Number(priority) || 0, active: true,
@@ -163,6 +164,17 @@ function OfferForm({ existing, onClose, onSaved }) {
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full border border-slate-300 px-2 py-1.5 text-sm" data-testid="offer-form-category">
             {["autos", "real-estate", "rentals", "marketplace", "stores", "restaurants", "provider", "wallet", "customer", "city", "global"].map((c) => (
               <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label>Subcategory (groups inside the page)</Label>
+          <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} className="w-full border border-slate-300 px-2 py-1.5 text-sm" data-testid="offer-form-subcategory">
+            {["general", "loans", "insurance", "warranty", "sell", "rent-out", "mortgage", "agents",
+              "shopping", "cashback", "gig", "restaurants", "banking", "investing", "credit",
+              "credit-cards", "hotels", "vacation-rentals", "tours", "flights", "platforms",
+              "services", "tools"].map((s) => (
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
         </div>
@@ -328,6 +340,23 @@ function SignupGuide() {
     { name: "Discover Refer",       url: "https://www.discover.com/credit-cards/refer-a-friend",     keys: ["discover_ref"], note: "Existing cardholders only. Refer for cashback bonus." },
     { name: "Chase Cards (CardRatings)", url: "https://www.cardratings.com/affiliates.html",         keys: ["chase_cell"], note: "Apply with CardRatings to promote Chase cards." },
     { name: "Amex Refer-a-Friend",  url: "https://www.americanexpress.com/en-us/business/loyalty/referrals/", keys: ["amex_ref"], note: "Existing Amex cardholders only — refer friends for points." },
+    // ── INSURANCE NETWORKS ─────────────────────────────────────────────
+    { name: "Progressive (CJ)",     url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Auto insurance — high-volume, pays per completed quote. CJ network." },
+    { name: "GEICO (CJ)",           url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Auto + rideshare insurance. Apply via CJ Affiliate." },
+    { name: "Root Insurance (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/Root-Insurance.brand", keys: ["impact_click_id"], note: "Pay-by-driving auto insurance. Impact network." },
+    { name: "The Zebra (Impact)",   url: "https://app.impact.com/campaign-mediapartner-signup/The-Zebra.brand",        keys: ["impact_click_id"], note: "Insurance comparison engine — covers Progressive, GEICO, State Farm, more." },
+    { name: "Policygenius (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/Policygenius.brand",   keys: ["impact_click_id"], note: "Life, home, auto, disability marketplace. Up to $80 per policy." },
+    { name: "Thimble (Impact)",     url: "https://app.impact.com/campaign-mediapartner-signup/Thimble.brand",          keys: ["impact_click_id"], note: "On-demand business liability — perfect for gig-worker handymen, photographers." },
+    { name: "Next Insurance (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/Next-Insurance.brand", keys: ["impact_click_id"], note: "Small-biz general liability + workers comp." },
+    { name: "Hiscox (CJ)",          url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Professional liability for consultants and contractors." },
+    { name: "Simply Business (FlexOffers)", url: "https://publisher.flexoffers.com/signup/?Refid=lumo", keys: ["flexoffers_id"], note: "Small-business insurance marketplace, US + UK." },
+    { name: "Ethos Life (Impact)",  url: "https://app.impact.com/campaign-mediapartner-signup/Ethos-Life.brand",       keys: ["impact_click_id"], note: "Term life insurance — most under $1M skip the medical exam." },
+    { name: "Ladder Life (FlexOffers)", url: "https://publisher.flexoffers.com/signup/?Refid=lumo",  keys: ["flexoffers_id"], note: "Flexible term life that can scale up or down." },
+    { name: "Lemonade Pet (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/Lemonade.brand",        keys: ["impact_click_id"], note: "Pet insurance from $10/mo — same Impact campaign covers renters too." },
+    { name: "Trupanion (CJ)",       url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Pet health insurance with direct pay at vet's office." },
+    { name: "Hippo Home (CJ)",      url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Modern home-insurance quotes in 60 seconds." },
+    { name: "World Nomads (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/World-Nomads.brand",   keys: ["impact_click_id"], note: "Travel + adventure-sports insurance — strong for travel pages." },
+    { name: "SafetyWing",           url: "https://safetywing.com/affiliate-program",                 keys: ["safetywing_ref"], note: "Nomad health + travel insurance. 10% recurring commission." },
   ];
 
   return (
@@ -362,7 +391,7 @@ function SignupGuide() {
         <ol className="list-decimal list-inside space-y-1 text-amber-900 mt-2">
           <li>Sign up for <strong>Skimlinks</strong> first — auto-monetizes every outbound merchant link with one ID.</li>
           <li>Sign up for <strong>Amazon Associates</strong> (24-hour cookie covers most marketplace traffic).</li>
-          <li>Apply to <strong>Impact</strong> + <strong>CJ Affiliate</strong> + <strong>FlexOffers</strong> + <strong>Awin</strong> — 4 networks unlock most of the offers on this list.</li>
+          <li>Apply to <strong>Impact</strong> + <strong>CJ Affiliate</strong> + <strong>FlexOffers</strong> + <strong>Awin</strong> — 4 networks unlock most of the offers on this list including ALL insurance partners.</li>
           <li>Then open referrals for <strong>Chime, SoFi, Robinhood, Wise, DoorDash, Uber, Coinbase</strong> from your existing accounts (no approval needed).</li>
           <li>Travel: <strong>Booking, Expedia Group, Viator, GetYourGuide</strong>.</li>
         </ol>

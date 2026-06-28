@@ -43,6 +43,73 @@ AFFILIATE_CATEGORIES = {
 }
 
 
+# Sub-grouping within each category so the front-end can render
+# "Auto loans" / "Insurance" / "Warranty" sections instead of one
+# long undifferentiated grid. Keyed by slug → subcategory.
+SUBCATEGORY_MAP = {
+    # autos
+    "carvana": "loans", "capitalone-auto": "loans", "autocredit-express": "loans",
+    "carmax": "sell", "turo-host": "rent-out", "endurance-warranty": "warranty",
+    # real-estate
+    "rocket-mortgage": "mortgage", "better-mortgage": "mortgage",
+    "homelight": "agents", "hippo-insurance": "insurance",
+    # marketplace
+    "amazon": "shopping", "rakuten-cashback": "cashback", "ebay": "shopping",
+    "walmart": "shopping", "target": "shopping", "etsy": "shopping",
+    "wayfair": "shopping", "best-buy": "shopping",
+    # restaurants
+    "doordash-refer": "gig", "ubereats-refer": "gig", "instacart-shopper": "gig",
+    "grubhub": "restaurants",
+    # provider
+    "chime": "banking", "earnin": "banking", "sofi-bank": "banking",
+    "stride-tax": "insurance",
+    # wallet
+    "robinhood": "investing", "coinbase": "investing", "wise": "banking",
+    "credit-karma": "credit", "lemonade": "insurance",
+    # customer
+    "chase-business": "credit-cards", "amex-platinum": "credit-cards",
+    "discover": "credit-cards",
+    # rentals (travel)
+    "booking": "hotels", "expedia": "hotels", "hotels-com": "hotels",
+    "agoda": "hotels", "vrbo": "vacation-rentals",
+    "viator": "tours", "getyourguide": "tours",
+    "skyscanner": "flights", "kayak": "flights",
+    # stores
+    "shopify-partners": "platforms", "square-business": "platforms",
+    "namecheap": "platforms", "fiverr-affiliate": "services",
+    # global
+    "skimlinks": "tools",
+}
+
+
+# Human-readable section labels for the front-end grouping.
+SUBCATEGORY_LABELS = {
+    "loans": "Auto loans & financing",
+    "warranty": "Extended warranties",
+    "insurance": "Insurance",
+    "sell": "Sell your car",
+    "rent-out": "Earn renting it out",
+    "mortgage": "Mortgage & pre-approval",
+    "agents": "Find a top agent",
+    "shopping": "Shop with cashback",
+    "cashback": "Cashback portals",
+    "gig": "Drive / shop / deliver",
+    "restaurants": "Food delivery",
+    "banking": "Better banking",
+    "investing": "Investing & crypto",
+    "credit": "Credit & taxes",
+    "credit-cards": "Credit cards",
+    "hotels": "Hotels",
+    "vacation-rentals": "Vacation rentals",
+    "tours": "Tours & attractions",
+    "flights": "Flights",
+    "platforms": "Build your business",
+    "services": "Freelance services",
+    "tools": "Money-making tools",
+    "general": "More partners",
+}
+
+
 # ── Default catalog ─────────────────────────────────────────────────────────
 # Each offer has:
 #   id (slug), name, network, category, country (ISO2 list or ["*"]),
@@ -106,6 +173,152 @@ DEFAULT_OFFERS = [
      "url_template": "https://turo.com/list-your-car?refer={turo_ref}",
      "signup_url": "https://turo.com/us/en/become-a-host",
      "priority": 5},
+
+    # ── INSURANCE (auto, home, business, rideshare, life, pet, health) ──
+    {"slug": "progressive-auto", "name": "Progressive — auto insurance",
+     "network": "CJ Affiliate",
+     "category": "autos", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Compare rates and switch in 4 minutes. Pays per completed quote.",
+     "payout": "$8–$25 per quote",
+     "logo": "https://logo.clearbit.com/progressive.com",
+     "url_template": "https://www.progressive.com/?PID={cj_pid}&AID={cj_aid}",
+     "signup_url": "https://signup.cj.com/member/signup/publisher/",
+     "priority": 9},
+    {"slug": "geico", "name": "GEICO — 15 minutes could save 15%",
+     "network": "CJ Affiliate",
+     "category": "autos", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Auto + rideshare insurance. Quotes in under 2 minutes.",
+     "payout": "$5–$20 per quote",
+     "logo": "https://logo.clearbit.com/geico.com",
+     "url_template": "https://www.geico.com/?PID={cj_pid}&AID={cj_aid}",
+     "signup_url": "https://signup.cj.com/member/signup/publisher/",
+     "priority": 8},
+    {"slug": "root-insurance", "name": "Root — pay-by-driving",
+     "network": "Impact",
+     "category": "autos", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Insurance rates based on how you actually drive. Safe drivers save up to 52%.",
+     "payout": "$5–$30 per policy",
+     "logo": "https://logo.clearbit.com/joinroot.com",
+     "url_template": "https://www.joinroot.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Root-Insurance.brand",
+     "priority": 6},
+    {"slug": "thezebra", "name": "The Zebra — compare every insurer",
+     "network": "Impact",
+     "category": "autos", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Free real-time rates from 200+ companies in 90 seconds.",
+     "payout": "$5–$15 per quote",
+     "logo": "https://logo.clearbit.com/thezebra.com",
+     "url_template": "https://www.thezebra.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/The-Zebra.brand",
+     "priority": 5},
+    {"slug": "lemonade-home", "name": "Lemonade — renters & home insurance",
+     "network": "Impact",
+     "category": "real-estate", "subcategory": "insurance", "country": ["US", "GB", "DE", "FR", "NL"],
+     "blurb": "From $5/mo, instant claims via app. Up to $15 per active policy.",
+     "payout": "$15+ per policy",
+     "logo": "https://logo.clearbit.com/lemonade.com",
+     "url_template": "https://www.lemonade.com/?irclickid={impact_click_id}&utm_source=lumo",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Lemonade.brand",
+     "priority": 7},
+    {"slug": "policygenius", "name": "Policygenius — compare life + home insurance",
+     "network": "Impact",
+     "category": "real-estate", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Marketplace for life, home, auto, disability. Up to $80 per policy.",
+     "payout": "$20–$80 per policy",
+     "logo": "https://logo.clearbit.com/policygenius.com",
+     "url_template": "https://www.policygenius.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Policygenius.brand",
+     "priority": 5},
+    {"slug": "thimble", "name": "Thimble — on-demand business insurance",
+     "network": "Impact",
+     "category": "provider", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Hourly, daily or monthly liability insurance for handymen, photographers, contractors. Buy on your phone in 60 seconds.",
+     "payout": "$10–$40 per policy",
+     "logo": "https://logo.clearbit.com/thimble.com",
+     "url_template": "https://www.thimble.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Thimble.brand",
+     "priority": 10},
+    {"slug": "next-insurance", "name": "Next Insurance — small-biz coverage",
+     "network": "Impact",
+     "category": "provider", "subcategory": "insurance", "country": ["US"],
+     "blurb": "General liability, workers comp, commercial auto — built for solopreneurs.",
+     "payout": "$25–$80 per policy",
+     "logo": "https://logo.clearbit.com/nextinsurance.com",
+     "url_template": "https://www.nextinsurance.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Next-Insurance.brand",
+     "priority": 9},
+    {"slug": "hiscox", "name": "Hiscox — professional liability",
+     "network": "CJ Affiliate",
+     "category": "provider", "subcategory": "insurance", "country": ["US", "GB"],
+     "blurb": "Online quote + binding for consultants, IT pros, real-estate agents.",
+     "payout": "$10–$45 per policy",
+     "logo": "https://logo.clearbit.com/hiscox.com",
+     "url_template": "https://www.hiscox.com/?PID={cj_pid}&AID={cj_aid}",
+     "signup_url": "https://signup.cj.com/member/signup/publisher/",
+     "priority": 7},
+    {"slug": "simply-business", "name": "Simply Business — small biz liability",
+     "network": "FlexOffers",
+     "category": "provider", "subcategory": "insurance", "country": ["US", "GB"],
+     "blurb": "Marketplace for 100+ small-business insurers, quote in 10 minutes.",
+     "payout": "$8–$35 per quote",
+     "logo": "https://logo.clearbit.com/simplybusiness.com",
+     "url_template": "https://www.simplybusiness.com/?utm_source=lumo&sub={flexoffers_id}",
+     "signup_url": "https://publisher.flexoffers.com/signup/?Refid=lumo",
+     "priority": 6},
+    {"slug": "ethos-life", "name": "Ethos — term life insurance online",
+     "network": "Impact",
+     "category": "customer", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Term life insurance from $9/mo. No medical exam for most under $1M.",
+     "payout": "$15–$80 per policy",
+     "logo": "https://logo.clearbit.com/ethoslife.com",
+     "url_template": "https://www.ethoslife.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Ethos-Life.brand",
+     "priority": 6},
+    {"slug": "ladder-life", "name": "Ladder — flexible term life insurance",
+     "network": "FlexOffers",
+     "category": "customer", "subcategory": "insurance", "country": ["US"],
+     "blurb": "Term life that scales up or down. Instant decision online.",
+     "payout": "$20–$60 per policy",
+     "logo": "https://logo.clearbit.com/ladderlife.com",
+     "url_template": "https://www.ladderlife.com/?utm_source=lumo&sub={flexoffers_id}",
+     "signup_url": "https://publisher.flexoffers.com/signup/?Refid=lumo",
+     "priority": 5},
+    {"slug": "lemonade-pet", "name": "Lemonade Pet — pet insurance",
+     "network": "Impact",
+     "category": "customer", "subcategory": "insurance", "country": ["US", "GB"],
+     "blurb": "Pet insurance starting at $10/mo. AI-powered claims.",
+     "payout": "$15–$40 per policy",
+     "logo": "https://logo.clearbit.com/lemonade.com",
+     "url_template": "https://www.lemonade.com/pet?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/Lemonade.brand",
+     "priority": 4},
+    {"slug": "world-nomads-travel", "name": "World Nomads — travel insurance",
+     "network": "Impact",
+     "category": "rentals", "subcategory": "insurance", "country": ["*"],
+     "blurb": "Travel + adventure-sports insurance for 150+ activities, 200 countries.",
+     "payout": "5–10% of premium",
+     "logo": "https://logo.clearbit.com/worldnomads.com",
+     "url_template": "https://www.worldnomads.com/?irclickid={impact_click_id}",
+     "signup_url": "https://app.impact.com/campaign-mediapartner-signup/World-Nomads.brand",
+     "priority": 8},
+    {"slug": "safetywing", "name": "SafetyWing — nomad health insurance",
+     "network": "Direct",
+     "category": "rentals", "subcategory": "insurance", "country": ["*"],
+     "blurb": "Global health + travel insurance built for remote workers. $42/mo.",
+     "payout": "10% recurring per active user",
+     "logo": "https://logo.clearbit.com/safetywing.com",
+     "url_template": "https://safetywing.com/?referenceID={safetywing_ref}",
+     "signup_url": "https://safetywing.com/affiliate-program",
+     "priority": 7},
+    {"slug": "trupanion", "name": "Trupanion — pet health insurance",
+     "network": "CJ Affiliate",
+     "category": "customer", "subcategory": "insurance", "country": ["US", "CA"],
+     "blurb": "90% coverage of vet bills, direct pay at vet's office.",
+     "payout": "$20–$60 per policy",
+     "logo": "https://logo.clearbit.com/trupanion.com",
+     "url_template": "https://www.trupanion.com/?PID={cj_pid}&AID={cj_aid}",
+     "signup_url": "https://signup.cj.com/member/signup/publisher/",
+     "priority": 3},
 
     # ── REAL ESTATE ────────────────────────────────────────────────────────
     {"slug": "rocket-mortgage", "name": "Rocket Mortgage — pre-approval",
@@ -508,6 +721,7 @@ class AffiliateOfferIn(BaseModel):
     name: str
     network: str
     category: str
+    subcategory: str = "general"
     country: list[str] = ["*"]
     blurb: str
     payout: str = ""
@@ -516,6 +730,23 @@ class AffiliateOfferIn(BaseModel):
     signup_url: str = ""
     priority: int = 5
     active: bool = True
+
+
+class AffiliateOfferPatch(BaseModel):
+    """Only the fields admins may legitimately edit. Anything else (e.g.
+    `_id`, `slug`, `created_at`) is rejected at the schema layer."""
+    name: Optional[str] = None
+    network: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    country: Optional[list[str]] = None
+    blurb: Optional[str] = None
+    payout: Optional[str] = None
+    logo: Optional[str] = None
+    url_template: Optional[str] = None
+    signup_url: Optional[str] = None
+    priority: Optional[int] = None
+    active: Optional[bool] = None
 
 
 class AffiliateSettings(BaseModel):
@@ -592,8 +823,11 @@ def create_affiliates_router(db, get_current_user, require_role):
                 "ip": request.client.host if request.client else "",
                 "at": _now(),
             })
-        except Exception:
-            pass
+        except Exception as e:
+            # Don't block the redirect on logging failure, but surface so a
+            # broken DB doesn't go unnoticed.
+            import logging
+            logging.getLogger("lumo.affiliates").warning("affiliate click log failed: %s", e)
         return RedirectResponse(url=url, status_code=302)
 
     # ── Admin ──────────────────────────────────────────────────────────────
@@ -614,9 +848,11 @@ def create_affiliates_router(db, get_current_user, require_role):
         return {"ok": True, "slug": slug}
 
     @admin_router.patch("/offers/{slug}")
-    async def admin_update_offer(slug: str, body: dict, _admin: dict = Depends(require_role("admin"))):
-        body.pop("slug", None)
-        await db.affiliate_offers.update_one({"slug": slug}, {"$set": body})
+    async def admin_update_offer(slug: str, body: AffiliateOfferPatch, _admin: dict = Depends(require_role("admin"))):
+        updates = {k: v for k, v in body.model_dump(exclude_none=True).items()}
+        if not updates:
+            return {"ok": True, "updated": 0}
+        await db.affiliate_offers.update_one({"slug": slug}, {"$set": updates})
         return {"ok": True}
 
     @admin_router.delete("/offers/{slug}")
@@ -652,17 +888,26 @@ def create_affiliates_router(db, get_current_user, require_role):
     @admin_router.post("/reseed")
     async def admin_reseed(_admin: dict = Depends(require_role("admin"))):
         """Insert any offers from DEFAULT_OFFERS that aren't already in the DB.
-        Safe to call repeatedly — never overwrites custom edits."""
+        Safe to call repeatedly — never overwrites custom edits. Also
+        backfills `subcategory` on existing rows."""
         count = 0
         for o in DEFAULT_OFFERS:
+            sub = o.get("subcategory") or SUBCATEGORY_MAP.get(o["slug"], "general")
+            insert_payload = {k: v for k, v in o.items() if k != "subcategory"}
+            insert_payload.update({"active": True, "created_at": _now()})
             res = await db.affiliate_offers.update_one(
                 {"slug": o["slug"]},
-                {"$setOnInsert": {**o, "active": True, "created_at": _now()}},
+                {"$setOnInsert": insert_payload, "$set": {"subcategory": sub}},
                 upsert=True,
             )
             if res.upserted_id:
                 count += 1
         return {"ok": True, "inserted": count, "total_defaults": len(DEFAULT_OFFERS)}
+
+    @router.get("/subcategory-labels")
+    async def get_subcat_labels():
+        """Front-end uses this to render section headers like 'Auto loans'."""
+        return {"labels": SUBCATEGORY_LABELS}
 
     # Stitch sub-routers together for include_router convenience.
     out = APIRouter()
@@ -672,12 +917,19 @@ def create_affiliates_router(db, get_current_user, require_role):
 
 
 async def seed_default_offers(db) -> int:
-    """Idempotent seed — runs at startup. Inserts any missing default offers."""
+    """Idempotent seed — runs at startup. Inserts any missing default offers
+    and backfills `subcategory` on existing rows so the front-end can group
+    offers by intent (loans / insurance / warranty / etc.)."""
     inserted = 0
     for o in DEFAULT_OFFERS:
+        sub = o.get("subcategory") or SUBCATEGORY_MAP.get(o["slug"], "general")
+        # `$setOnInsert` payload must NOT include the same fields as `$set`,
+        # so strip subcategory from the insert blob and let $set handle it.
+        insert_payload = {k: v for k, v in o.items() if k != "subcategory"}
+        insert_payload.update({"active": True, "created_at": _now()})
         res = await db.affiliate_offers.update_one(
             {"slug": o["slug"]},
-            {"$setOnInsert": {**o, "active": True, "created_at": _now()}},
+            {"$setOnInsert": insert_payload, "$set": {"subcategory": sub}},
             upsert=True,
         )
         if res.upserted_id:

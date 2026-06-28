@@ -7,20 +7,59 @@ import { useLocale } from "@/lib/locale";
  *
  *   <AffiliateBlock category="autos" />
  *
- * Pulls offers from /api/affiliates/offers, filtered by category + visitor
- * country, and renders FTC-compliant cards. Clicks bounce through
- * /api/affiliates/click/<slug> so we can log + inject tracking IDs server-
- * side.                                                                  */
+ * Pulls offers from /api/affiliates/offers, groups them by subcategory
+ * (loans / insurance / warranty / etc.) and renders each group with its
+ * own section header. Clicks bounce through /api/affiliates/click/<slug>
+ * so we can log + inject tracking IDs server-side.                       */
+const FALLBACK_LABELS = {
+  "loans": "Loans & financing",
+  "warranty": "Warranties",
+  "insurance": "Insurance",
+  "sell": "Sell your asset",
+  "rent-out": "Earn renting it out",
+  "mortgage": "Mortgage",
+  "agents": "Top agents",
+  "shopping": "Shop with cashback",
+  "cashback": "Cashback portals",
+  "gig": "Drive / shop / deliver",
+  "restaurants": "Food delivery",
+  "banking": "Better banking",
+  "investing": "Investing & crypto",
+  "credit": "Credit & taxes",
+  "credit-cards": "Credit cards",
+  "hotels": "Hotels",
+  "vacation-rentals": "Vacation rentals",
+  "tours": "Tours & attractions",
+  "flights": "Flights",
+  "platforms": "Build your business",
+  "services": "Freelance services",
+  "tools": "Tools",
+  "general": "More partners",
+};
+
+let _labelsCache = null;
+async function loadLabels() {
+  if (_labelsCache) return _labelsCache;
+  try {
+    const { data } = await api.get("/affiliates/subcategory-labels");
+    _labelsCache = { ...FALLBACK_LABELS, ...(data?.labels || {}) };
+  } catch {
+    _labelsCache = FALLBACK_LABELS;
+  }
+  return _labelsCache;
+}
+
 export default function AffiliateBlock({
   category,
   citySlug = "",
   title,
   subtitle,
-  limit = 8,
+  limit = 24,
   variant = "grid", // "grid" or "compact"
 }) {
   const { country } = useLocale() || {};
   const [offers, setOffers] = useState([]);
+  const [labels, setLabels] = useState(FALLBACK_LABELS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,10 +67,14 @@ export default function AffiliateBlock({
     setLoading(true);
     (async () => {
       try {
-        const { data } = await api.get("/affiliates/offers", {
-          params: { category, country: country || "" },
-        });
-        if (alive) setOffers((data?.offers || []).slice(0, limit));
+        const [{ data }, lbl] = await Promise.all([
+          api.get("/affiliates/offers", { params: { category, country: country || "" } }),
+          loadLabels(),
+        ]);
+        if (alive) {
+          setOffers((data?.offers || []).slice(0, limit));
+          setLabels(lbl);
+        }
       } catch {
         if (alive) setOffers([]);
       } finally {
@@ -54,9 +97,23 @@ export default function AffiliateBlock({
   if (offers.length === 0) return null;
 
   const headline = title || "Partner offers";
-  const blurb = subtitle || "These partners pay Lumo when you sign up — no extra cost to you.";
+  const blurb = subtitle || "Lumo earns a small commission when you sign up — no extra cost to you.";
   const clickHref = (slug) =>
     `${API}/affiliates/click/${slug}${citySlug ? `?city_slug=${encodeURIComponent(citySlug)}` : ""}`;
+
+  // Group offers by subcategory, preserving priority sort within each group.
+  const groups = {};
+  for (const o of offers) {
+    const k = o.subcategory || "general";
+    (groups[k] = groups[k] || []).push(o);
+  }
+  // Order subcategories: insurance first if present (highest commercial intent),
+  // then by group size desc.
+  const orderedKeys = Object.keys(groups).sort((a, b) => {
+    if (a === "insurance" && b !== "insurance") return -1;
+    if (b === "insurance" && a !== "insurance") return 1;
+    return groups[b].length - groups[a].length;
+  });
 
   if (variant === "compact") {
     return (
@@ -99,48 +156,59 @@ export default function AffiliateBlock({
           <Info className="w-3.5 h-3.5 text-slate-400" /> {blurb}
         </p>
 
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-slate-200 border border-slate-200">
-          {offers.map((o) => (
-            <a
-              key={o.slug}
-              href={clickHref(o.slug)}
-              target="_blank"
-              rel="sponsored noopener noreferrer"
-              className="bg-white p-4 hover:bg-slate-50 transition-colors flex flex-col h-full group"
-              data-testid={`affiliate-link-${o.slug}`}
-            >
-              <div className="flex items-start gap-3">
-                {o.logo && (
-                  <img
-                    src={o.logo}
-                    alt=""
-                    className="w-10 h-10 object-contain bg-white border border-slate-100 p-1 flex-shrink-0"
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="font-display font-bold text-sm leading-tight">{o.name}</div>
-                  {o.payout && (
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-teal-700 mt-0.5">
-                      {o.payout}
+        {orderedKeys.map((sk) => (
+          <div key={sk} className="mt-8" data-testid={`affiliate-group-${category}-${sk}`}>
+            <div className="flex items-center gap-3 mb-3">
+              <h3 className="font-display text-lg font-black tracking-tight">{labels[sk] || sk}</h3>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                {groups[sk].length} partner{groups[sk].length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-slate-200 border border-slate-200">
+              {groups[sk].map((o) => (
+                <a
+                  key={o.slug}
+                  href={clickHref(o.slug)}
+                  target="_blank"
+                  rel="sponsored noopener noreferrer"
+                  className="bg-white p-4 hover:bg-slate-50 transition-colors flex flex-col h-full group"
+                  data-testid={`affiliate-link-${o.slug}`}
+                >
+                  <div className="flex items-start gap-3">
+                    {o.logo && (
+                      <img
+                        src={o.logo}
+                        alt=""
+                        className="w-10 h-10 object-contain bg-white border border-slate-100 p-1 flex-shrink-0"
+                        loading="lazy"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display font-bold text-sm leading-tight">{o.name}</div>
+                      {o.payout && (
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-teal-700 mt-0.5">
+                          {o.payout}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-3 leading-relaxed flex-1">{o.blurb}</p>
+                  <div className="mt-3 inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-slate-500 group-hover:text-teal-700">
+                    Open offer <ExternalLink className="w-3 h-3" />
+                  </div>
+                  {o.needs_setup && (
+                    <div className="mt-1 text-[9px] font-mono uppercase tracking-wider text-amber-700">
+                      Admin: add tracking ID
                     </div>
                   )}
-                </div>
-              </div>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed flex-1">{o.blurb}</p>
-              <div className="mt-3 inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-slate-500 group-hover:text-teal-700">
-                Open offer <ExternalLink className="w-3 h-3" />
-              </div>
-              {o.needs_setup && (
-                <div className="mt-1 text-[9px] font-mono uppercase tracking-wider text-amber-700">
-                  Admin: add tracking ID
-                </div>
-              )}
-            </a>
-          ))}
-        </div>
-        <div className="text-[10px] text-slate-400 mt-3 font-mono uppercase tracking-wider">
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="text-[10px] text-slate-400 mt-6 font-mono uppercase tracking-wider">
           Disclosure: Lumo may earn a commission when you sign up or purchase through these links. FTC-compliant.
         </div>
       </div>
