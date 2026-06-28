@@ -6453,6 +6453,14 @@ async def on_startup():
             logger.info(f"Seeded {inserted} new affiliate offers")
     except Exception as e:
         logger.warning(f"Affiliate seed could not run: {e}")
+    # Demo-data photo migration — replaces mismatched stock photos on seeded
+    # cars, rentals, and marketplace inventory so listings actually show what
+    # they're advertising.
+    try:
+        from photo_catalog import migrate_demo_photos
+        await migrate_demo_photos(db)
+    except Exception as e:
+        logger.warning(f"Demo-photo migration could not run: {e}")
 
 @app.on_event("shutdown")
 async def on_shutdown():

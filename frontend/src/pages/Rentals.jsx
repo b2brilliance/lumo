@@ -25,10 +25,22 @@ function PriceTag({ pricing }) {
 function RentalCard({ r }) {
   const cat = RENTAL_CATEGORIES[r.category] || {};
   const Icon = cat.icon;
+  // Prefer media_url, fall back to first entry in media[]
+  const cover = r.media_url || (Array.isArray(r.media) && r.media[0]?.url) || null;
   return (
     <Link to={`/rentals/${r.id}`} className="block border border-slate-200 hover:border-slate-900 transition-colors group" data-testid={`rental-card-${r.id}`}>
-      <div className={`aspect-[4/3] flex items-center justify-center ${cat.color || "bg-slate-100"} relative`}>
-        {Icon && <Icon className="w-12 h-12 opacity-40" />}
+      <div className={`aspect-[4/3] flex items-center justify-center ${cat.color || "bg-slate-100"} relative overflow-hidden`}>
+        {cover ? (
+          <img
+            src={cover}
+            alt={r.title}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        ) : (
+          Icon && <Icon className="w-12 h-12 opacity-40" />
+        )}
         <div className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-widest bg-white/90 px-2 py-1 border border-slate-200">
           {cat.label}
         </div>

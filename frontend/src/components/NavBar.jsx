@@ -56,6 +56,9 @@ export default function NavBar() {
           <div className="w-7 h-7 bg-slate-900 text-white flex items-center justify-center font-display font-black text-sm">L</div>
           <span className="font-display font-bold text-lg tracking-tight">Lumo</span>
         </Link>
+        {/* Language / currency selector — pinned right of the logo per user
+            preference so it's the first control they see. */}
+        <div className="hidden sm:block flex-shrink-0" data-testid="nav-locale-left"><LocaleSwitcher /></div>
         <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden">
           <NavLink to="/map" className={linkClass} data-testid="nav-map"><MapPin className="inline w-3.5 h-3.5 mr-1" />Jobs near you</NavLink>
           {/* Marketplaces dropdown */}
@@ -105,7 +108,6 @@ export default function NavBar() {
           )}
         </nav>
         <div className="ml-auto flex items-center gap-1 sm:gap-2 flex-shrink-0">
-          <div className="hidden sm:block"><LocaleSwitcher /></div>
           {user && user !== false ? (
             <>
               {user.role === "provider" && (
