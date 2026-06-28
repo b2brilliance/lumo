@@ -960,4 +960,23 @@ export const SERVICE_SCHEMAS = {
       { name: "venue_capacity", label: "Approx. guest / attendance count", type: "number", min: 1 },
     ],
   },
+
+  // Catch-all for any request that doesn't fit one of the 27 structured
+  // categories. Forces the universal "Other → describe" flow by making
+  // `other` the only subcategory.
+  other: {
+    subcategoryLabel: "What kind of help?",
+    subcategories: {
+      other: { label: "Other (describe in detail)" },
+    },
+    baseFields: [
+      { name: "urgency", label: "When do you need it?", type: "select", required: true, options: [
+        { value: "now", label: "Now / within 2 hours" },
+        { value: "today", label: "Today" },
+        { value: "this_week", label: "This week" },
+        { value: "scheduled", label: "Schedule a date" },
+      ]},
+      { name: "scheduled_for", label: "If scheduled, when?", type: "datetime-local", showIf: { urgency: "scheduled" } },
+    ],
+  },
 };

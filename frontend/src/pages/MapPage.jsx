@@ -132,7 +132,11 @@ export default function MapPage() {
       return { ...p, distance_miles: milesBetween({ lat: anchor.lat, lng: anchor.lng }, { lat: p.lat, lng: p.lng }) };
     });
     let filtered = (anchor && radius > 0)
-      ? withDistance.filter((p) => p.is_remote || (p.distance_miles != null && p.distance_miles <= radius))
+      ? withDistance.filter((p) =>
+          p.is_remote                              // remote always passes
+          || (p.source && !p.lat)                  // aggregated job w/o coords — keep
+          || (p.distance_miles != null && p.distance_miles <= radius)
+        )
       : withDistance;
 
     // W-2 jobs are strictly local — they only make sense within a commutable
@@ -419,7 +423,7 @@ function FeedRow({ pin, highlight, onHover, user }) {
     ? "Remote"
     : pin.distance_miles != null
       ? `${pin.distance_miles.toFixed(1)} mi away`
-      : pin.address || "—";
+      : (pin.address || (pin.source ? "Location TBD" : "—"));
 
   // Provider can one-tap accept any in-app on-demand job. External W-2 /
   // remote listings (apply_url) keep their "Apply externally" link.

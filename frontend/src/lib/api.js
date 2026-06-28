@@ -46,6 +46,7 @@ export const ALL_CATEGORIES = [
   { value: "appliance_repair", label: "Appliance repair", group: "local_services", location_mode: "onsite" },
   { value: "locksmith", label: "Locksmith", group: "local_services", location_mode: "onsite" },
   { value: "security", label: "Security / Bodyguard", group: "local_services", location_mode: "onsite" },
+  { value: "other", label: "Other (describe what you need)", group: "local_services", location_mode: "onsite" },
   { value: "digital_tech", label: "Digital & Tech", group: "remote_jobs", location_mode: "remote" },
   { value: "marketing", label: "Marketing", group: "remote_jobs", location_mode: "remote" },
   { value: "business_admin", label: "Business / Admin", group: "remote_jobs", location_mode: "remote" },

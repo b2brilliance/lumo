@@ -60,7 +60,7 @@ ALL_CATEGORIES = [
     "delivery", "courier", "moving", "ride_share", "towing",
     # local services
     "handyman", "cleaning", "landscaping", "auto", "pet_care", "personal_care", "events", "medical",
-    "notary", "it_support", "errand", "appliance_repair", "locksmith", "security",
+    "notary", "it_support", "errand", "appliance_repair", "locksmith", "security", "other",
     # tech/digital + remote
     "digital_tech", "marketing", "business_admin", "education",
     "legal", "financial", "remote_work", "research",
@@ -800,6 +800,57 @@ async def complete_job(job_id: str, user: dict = Depends(get_current_user)):
     if user["id"] not in (j.get("provider_id"), j.get("customer_id")):
         raise HTTPException(403, "Not your job")
     await db.jobs.update_one({"id": job_id}, {"$set": {"status": "completed", "completed_at": now_iso()}})
+    j = await db.jobs.find_one({"id": job_id})
+    return clean_doc(j)
+
+@api.post("/jobs/{job_id}/cancel-acceptance")
+async def cancel_acceptance(job_id: str, body: dict, user: dict = Depends(require_role("provider"))):
+    """Provider backs out of a job they accepted. Resets the job to 'open'
+    so other providers can pick it up, and notifies the customer."""
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if j.get("provider_id") != user["id"]:
+        raise HTTPException(403, "Not your job")
+    if j.get("status") not in ("accepted", "in_progress"):
+        raise HTTPException(400, "Job is not in an acceptance state")
+    if j.get("tracking_status") == "completed":
+        raise HTTPException(400, "Job already complete")
+    reason = (body.get("reason") or "").strip()[:300] if isinstance(body, dict) else ""
+    # Audit trail so admins can spot patterns of provider flake-outs
+    await db.job_cancellations.insert_one({
+        "id": str(uuid.uuid4()),
+        "job_id": job_id,
+        "provider_id": user["id"],
+        "provider_name": user["name"],
+        "reason": reason,
+        "cancelled_at": now_iso(),
+    })
+    # Reset the job back to open
+    await db.jobs.update_one(
+        {"id": job_id},
+        {
+            "$set": {"status": "open"},
+            "$unset": {
+                "provider_id": "", "provider_name": "", "accepted_at": "",
+                "tracking_status": "", "tracking_timestamps": "",
+                "provider_live_location": "", "credential_match": "",
+            },
+        },
+    )
+    # Notify the customer
+    if j.get("customer_id"):
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": j["customer_id"],
+            "type": "provider_cancelled",
+            "title": f"{user['name']} can no longer make it",
+            "body": f"Your request is back on the board — another provider can pick it up. {('Reason: ' + reason) if reason else ''}".strip(),
+            "link": f"/jobs/{job_id}",
+            "job_id": job_id,
+            "read": False,
+            "created_at": now_iso(),
+        })
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
 
@@ -3778,22 +3829,28 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             ]
         else:
             q["employment_type"] = employment_type
-    docs = await db.jobs.find(q).to_list(500)
+    docs = await db.jobs.find(q).to_list(2000)
     pins = []
     for d in docs:
         d = clean_doc(d)
         loc = d.get("pickup_location") or d.get("dropoff_location")
-        if not loc or loc.get("lat") is None:
-            # remote without explicit loc — give a default
+        has_coords = bool(loc and loc.get("lat") is not None)
+        if not has_coords:
             if d.get("is_remote"):
+                # Remote roles don't have a real location — drop a centroid pin
+                # so the map still shows them and the feed shows "Remote".
                 loc = {"lat": 39.8283, "lng": -98.5795, "address": "Remote"}
+            elif d.get("source") and d.get("apply_url"):
+                # Aggregated external listing with no coords — surface it in
+                # the feed list without a map pin. lat/lng stay null.
+                loc = {"lat": None, "lng": None, "address": (loc or {}).get("address")}
             else:
                 continue
         pins.append({
             "id": d["id"], "title": d["title"], "category": d["category"],
             "category_group": d.get("category_group") or category_group(d["category"]),
             "is_remote": d.get("is_remote", False),
-            "lat": loc["lat"], "lng": loc["lng"], "address": loc.get("address"),
+            "lat": loc.get("lat"), "lng": loc.get("lng"), "address": loc.get("address"),
             "pay_rate": d["pay_rate"], "pay_unit": d["pay_unit"],
             "created_at": d.get("created_at"),
             "description": d.get("description"),

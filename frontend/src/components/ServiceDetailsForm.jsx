@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -92,8 +92,17 @@ function FieldRenderer({ field, value, onChange }) {
 export default function ServiceDetailsForm({ category, details, onChange }) {
   const schema = SERVICE_SCHEMAS[category];
 
-  // Reset details when category changes and current fields don't match
-  // (parent controls details, just guards rendering)
+  // Auto-select the single subcategory option when a schema only exposes
+  // one — e.g. the "Other" catch-all category — so the universal
+  // describe-what-you-need textarea appears without a redundant click.
+  useEffect(() => {
+    if (!schema || details.subcategory) return;
+    const subs = Object.keys(schema.subcategories || {});
+    if (subs.length === 1) {
+      onChange({ ...details, subcategory: subs[0] });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, schema]);
 
   const fields = useMemo(() => {
     if (!schema) return [];

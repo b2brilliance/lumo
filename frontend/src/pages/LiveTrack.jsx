@@ -101,6 +101,22 @@ export default function LiveTrack() {
     } finally { setBusy(false); }
   };
 
+  const cancelAcceptance = async () => {
+    const reason = window.prompt(
+      "Cancel this job? Other providers will be able to pick it up.\n\nOptional — tell the customer why:"
+    );
+    if (reason === null) return;
+    setBusy(true);
+    try {
+      await api.post(`/jobs/${id}/cancel-acceptance`, { reason });
+      toast.success("Acceptance cancelled — customer notified");
+      window.location.href = "/provider";
+    } catch (e) {
+      toast.error(formatApiError(e));
+      setBusy(false);
+    }
+  };
+
   if (error) return (
     <div className="max-w-screen-md mx-auto px-6 py-16 text-sm text-slate-500" data-testid="tracker-error">
       {error}
@@ -233,6 +249,15 @@ export default function LiveTrack() {
             <p className="text-[11px] text-slate-500 mt-3 leading-snug">
               Your live location is being shared with the customer while this job is active. It stops automatically when you mark it complete.
             </p>
+            <button
+              type="button"
+              onClick={cancelAcceptance}
+              disabled={busy}
+              className="mt-3 text-[11px] font-mono uppercase tracking-widest text-rose-600 hover:text-rose-800 underline disabled:opacity-60"
+              data-testid="cancel-acceptance-btn"
+            >
+              Can&apos;t make it — cancel this job
+            </button>
           </div>
         )}
 
