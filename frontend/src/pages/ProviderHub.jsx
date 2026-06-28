@@ -17,10 +17,11 @@ import { KIND_LABEL } from "@/lib/credentialKinds";
 import { providerEarningsBreakdown } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 import { Wallet, MapPin, Briefcase } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function ProviderHub() {
   const { user, updateMe } = useAuth();
+  const navigate = useNavigate();
   const [pins, setPins] = useState([]);
   const [opps, setOpps] = useState([]);
   const [highlightId, setHighlightId] = useState(null);
@@ -138,8 +139,8 @@ export default function ProviderHub() {
   const accept = async (id) => {
     try {
       await api.post(`/jobs/${id}/accept`);
-      toast.success("Job accepted");
-      loadOpps(); loadPins(); loadMyQuotes();
+      toast.success("Job accepted — opening live tracker");
+      navigate(`/jobs/${id}/track`);
     } catch (e) {
       toast.error(formatApiError(e));
     }

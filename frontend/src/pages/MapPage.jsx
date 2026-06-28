@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { MapPin, Clock, DollarSign, Globe, ExternalLink } from "lucide-react";
-import { api, CATEGORY_COLORS } from "@/lib/api";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { MapPin, Clock, DollarSign, Globe, ExternalLink, Zap } from "lucide-react";
+import { api, CATEGORY_COLORS, formatApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { milesBetween } from "@/lib/deliveryPricing";
 import MapView from "@/components/MapView";
+import { toast } from "sonner";
 
 const RADIUS_OPTIONS = [
   { value: 5,   label: "5 mi" },
@@ -276,7 +277,7 @@ export default function MapPage() {
 
         <ul className="divide-y divide-slate-200 border border-slate-200" data-testid="map-feed-list">
           {feed.map((p) => (
-            <FeedRow key={p.id} pin={p} highlight={highlight === p.id} onHover={() => setHighlight(p.id)} />
+            <FeedRow key={p.id} pin={p} highlight={highlight === p.id} onHover={() => setHighlight(p.id)} user={user} />
           ))}
         </ul>
       </div>
@@ -285,13 +286,36 @@ export default function MapPage() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-function FeedRow({ pin, highlight, onHover }) {
+function FeedRow({ pin, highlight, onHover, user }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
   const groupColor = CATEGORY_COLORS[pin.category_group]?.hex || "#475569";
   const distLabel = pin.is_remote
     ? "Remote"
     : pin.distance_miles != null
       ? `${pin.distance_miles.toFixed(1)} mi away`
       : pin.address || "—";
+
+  // Provider can one-tap accept any in-app on-demand job. External W-2 /
+  // remote listings (apply_url) keep their "Apply externally" link.
+  const empType = pin.employment_type || "on_demand";
+  const isProvider = user && user !== false && user.role === "provider";
+  const canQuickAccept = isProvider && empType === "on_demand" && !pin.apply_url;
+
+  const acceptAndTrack = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.post(`/jobs/${pin.id}/accept`);
+      toast.success("Job accepted — opening live tracker");
+      navigate(`/jobs/${pin.id}/track`);
+    } catch (err) {
+      toast.error(formatApiError(err));
+      setBusy(false);
+    }
+  };
 
   return (
     <li
@@ -307,14 +331,19 @@ function FeedRow({ pin, highlight, onHover }) {
         </a>
       ) : (
         <Link to={`/jobs/${pin.id}`} className="flex items-stretch gap-0">
-          <FeedRowContent pin={pin} groupColor={groupColor} distLabel={distLabel} />
+          <FeedRowContent
+            pin={pin}
+            groupColor={groupColor}
+            distLabel={distLabel}
+            acceptCta={canQuickAccept ? { onClick: acceptAndTrack, busy } : null}
+          />
         </Link>
       )}
     </li>
   );
 }
 
-function FeedRowContent({ pin, groupColor, distLabel, external }) {
+function FeedRowContent({ pin, groupColor, distLabel, external, acceptCta }) {
   return (
     <>
       {/* Coloured side rail keyed by category group */}
@@ -367,6 +396,22 @@ function FeedRowContent({ pin, groupColor, distLabel, external }) {
               {timeAgo(pin.created_at)}
             </div>
           </div>
+
+          {/* Provider one-tap accept (on-demand only) — Uber-style: accept
+              and the next screen is the live tracker with chat + GPS. */}
+          {acceptCta && (
+            <button
+              type="button"
+              onClick={acceptCta.onClick}
+              disabled={acceptCta.busy}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white font-mono uppercase tracking-wider text-[11px] hover:bg-teal-800 disabled:opacity-60 sm:self-center"
+              data-testid={`feed-accept-${pin.id}`}
+              data-no-i18n="true"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              {acceptCta.busy ? "Accepting…" : "Accept & track"}
+            </button>
+          )}
         </div>
     </>
   );

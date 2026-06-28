@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, locationModeFor, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 export default function JobDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [job, setJob] = useState(null);
   const [threads, setThreads] = useState([]);
   const [selectedThread, setSelectedThread] = useState(null);
@@ -56,13 +57,21 @@ export default function JobDetail() {
   const isCustomerBrowsingThreads = user && user !== false && user.id === job.customer_id && !job.provider_id;
 
   const accept = async () => {
-    try { await api.post(`/jobs/${id}/accept`); toast.success("Job accepted"); load(); }
-    catch { toast.error("Failed to accept"); }
+    try {
+      await api.post(`/jobs/${id}/accept`);
+      toast.success("Job accepted — opening live tracker");
+      navigate(`/jobs/${id}/track`);
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
   };
 
   const acceptQuote = async (qid) => {
-    try { await api.post(`/quotes/${qid}/accept`); toast.success("Quote accepted — provider assigned."); load(); loadQuotes(); }
-    catch (e) { toast.error(formatApiError(e)); }
+    try {
+      await api.post(`/quotes/${qid}/accept`);
+      toast.success("Quote accepted — opening live tracker");
+      navigate(`/jobs/${id}/track`);
+    } catch (e) { toast.error(formatApiError(e)); }
   };
   const declineQuote = async (qid) => {
     try { await api.post(`/quotes/${qid}/decline`); toast.success("Quote declined"); loadQuotes(); }

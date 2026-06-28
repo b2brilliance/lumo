@@ -53,7 +53,7 @@ const LANG_META = {
  * matches the backend's SUPPORTED_LANGS.
  */
 export default function LanguageBar() {
-  const { lang, setLangOverride, isLangOverridden } = useLocale();
+  const { lang, setLangOverride, isLangOverridden, profile } = useLocale();
   const [langs, setLangs] = useState([]);
   const [expanded, setExpanded] = useState(false);
 
@@ -70,8 +70,28 @@ export default function LanguageBar() {
 
   if (langs.length === 0) return null;
 
+  // The "assumed" language is the user's currently-applied lang (which
+  // already resolves to either an explicit override OR the country-detected
+  // language). Pin it to the front; everything else sorts alphabetically
+  // by their LANG_META code so the bar reads A-Z after the active pill.
+  const sortedLangs = (() => {
+    const out = [...langs];
+    out.sort((a, b) => {
+      const ca = (LANG_META[a.code]?.code || a.code).toUpperCase();
+      const cb = (LANG_META[b.code]?.code || b.code).toUpperCase();
+      return ca.localeCompare(cb);
+    });
+    const assumed = lang || profile?.lang || "en";
+    const idx = out.findIndex((l) => l.code === assumed);
+    if (idx > 0) {
+      const [first] = out.splice(idx, 1);
+      out.unshift(first);
+    }
+    return out;
+  })();
+
   const PREVIEW_COUNT = 8;
-  const visible = expanded ? langs : langs.slice(0, PREVIEW_COUNT);
+  const visible = expanded ? sortedLangs : sortedLangs.slice(0, PREVIEW_COUNT);
 
   return (
     <div
@@ -118,7 +138,7 @@ export default function LanguageBar() {
               data-testid="lang-pill-more"
               data-no-i18n="true"
             >
-              {expanded ? "− Less" : `+ ${langs.length - PREVIEW_COUNT} more`}
+              {expanded ? "− Less" : `+ ${sortedLangs.length - PREVIEW_COUNT} more`}
             </button>
           )}
 
