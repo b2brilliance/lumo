@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet";
 import { ArrowRight, MapPin, Briefcase, Sparkles, Store, KeyRound } from "lucide-react";
 import { api } from "@/lib/api";
+import AffiliateBlock from "@/components/AffiliateBlock";
 
 /* Per-city hub — one indexable page per city that fans out to every
  * find-help / work / sell / rent-out landing page for that city. This is
@@ -143,6 +144,8 @@ export default function CityHub() {
           </div>
         </section>
       ))}
+      <AffiliateBlock category="city" citySlug={slug} title={`Travel & local picks — ${cityName}`} subtitle="Hotels, tours, transport — vetted partners for your trip." />
+      <AffiliateBlock category="rentals" citySlug={slug} variant="compact" />
     </div>
   );
 }

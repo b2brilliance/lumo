@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import AffiliateBlock from "@/components/AffiliateBlock";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Home, BedDouble, Bath, Maximize, MapPin } from "lucide-react";
 
@@ -142,6 +143,9 @@ export default function RealEstate() {
           {items.map((r) => <ListingCard key={r.id} r={r} />)}
         </div>
       )}
+      <div className="mt-12 -mx-4 sm:-mx-6">
+        <AffiliateBlock category="real-estate" title="Mortgage & home services partners" subtitle="Get pre-approved, find a top agent, lock in home insurance." />
+      </div>
     </div>
   );
 }

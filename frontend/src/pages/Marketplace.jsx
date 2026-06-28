@@ -3,6 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import AffiliateBlock from "@/components/AffiliateBlock";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
@@ -338,6 +339,9 @@ export default function Marketplace() {
           )}
         </DialogContent>
       </Dialog>
+      <div className="mt-10 -mx-4 sm:-mx-6">
+        <AffiliateBlock category="marketplace" title="Earn cashback while you shop" subtitle="Cashback portals, gift cards, and exclusive deals from our partners." />
+      </div>
     </div>
   );
 }

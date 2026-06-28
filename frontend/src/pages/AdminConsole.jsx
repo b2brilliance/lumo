@@ -3,7 +3,7 @@ import { Navigate, Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import AdStudio from "@/components/AdStudio";
 import Distribution from "@/components/Distribution";
@@ -14,6 +14,7 @@ import PaymentsAdmin from "@/components/PaymentsAdmin";
 import UsersAdmin from "@/components/UsersAdmin";
 import BlogAdmin from "@/components/BlogAdmin";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import AffiliatesTab from "@/pages/admin/AffiliatesTab";
 
 const TABS = [
   { key: "analytics",   label: "Analytics",   icon: BarChart3 },
@@ -29,6 +30,7 @@ const TABS = [
   { key: "social",      label: "Social Links", icon: Share2 },
   { key: "data",        label: "Data",        icon: Database },
   { key: "visitors",    label: "Visitors",    icon: Globe },
+  { key: "affiliates",  label: "Affiliates",  icon: DollarSign },
 ];
 
 function StatTile({ label, value, icon: Icon, testId }) {
@@ -342,6 +344,7 @@ export default function AdminConsole() {
           {tab === "users" && <UsersAdmin />}
           {tab === "blog" && <BlogAdmin />}
           {tab === "visitors" && <VisitorsTab />}
+          {tab === "affiliates" && <AffiliatesTab />}
         </ErrorBoundary>
       </div>
     </div>

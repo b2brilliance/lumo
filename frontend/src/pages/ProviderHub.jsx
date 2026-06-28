@@ -3,6 +3,7 @@ import { api, ALL_CATEGORIES, CATEGORY_COLORS, formatApiError } from "@/lib/api"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import AffiliateBlock from "@/components/AffiliateBlock";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/lib/auth";
@@ -421,6 +422,9 @@ export default function ProviderHub() {
         job={quoteTarget}
         onSubmitted={() => { loadMyQuotes(); }}
       />
+      <div className="mt-10 -mx-4 sm:-mx-6">
+        <AffiliateBlock category="provider" title="Get paid earlier — partner banks & tools" subtitle="Earn referral bonuses while getting better banking, tax, and gig-worker perks." />
+      </div>
     </div>
   );
 }

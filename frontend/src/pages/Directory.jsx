@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { ReviewSummaryBadge } from "@/components/ReviewsSection";
 import { Search, Store, UtensilsCrossed, KeyRound, Car, ShoppingBag, X } from "lucide-react";
+import AffiliateBlock from "@/components/AffiliateBlock";
 import { useLocale } from "@/lib/locale";
 
 const SECTIONS = [
@@ -155,6 +156,9 @@ export default function Directory({ role }) {
           <ResultGrid items={results} formatPrice={formatPrice} />
         </div>
       )}
+      <div className="mt-10 -mx-4 sm:-mx-6">
+        <AffiliateBlock category={active === "restaurants" ? "restaurants" : active === "rentals" ? "rentals" : active === "autos" ? "autos" : active === "marketplace" ? "marketplace" : "stores"} />
+      </div>
     </div>
   );
 }

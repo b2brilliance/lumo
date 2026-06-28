@@ -6445,6 +6445,14 @@ async def on_startup():
         logger.info("Aggregator loop started (every 6h)")
     except Exception as e:
         logger.warning(f"Aggregator loop could not start: {e}")
+    # Affiliate offer catalog — idempotent seed of well-known referral programs
+    try:
+        from affiliates import seed_default_offers
+        inserted = await seed_default_offers(db)
+        if inserted:
+            logger.info(f"Seeded {inserted} new affiliate offers")
+    except Exception as e:
+        logger.warning(f"Affiliate seed could not run: {e}")
 
 @app.on_event("shutdown")
 async def on_shutdown():
@@ -6464,6 +6472,10 @@ app.include_router(_create_sms_auth_router(db=db, create_access_token=create_acc
 # Emergent-managed Google sign-in (one-tap OAuth → Lumo JWT)
 from auth_google import create_router as _create_google_auth_router  # noqa: E402
 app.include_router(_create_google_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
+
+# Affiliate / referral offer engine — surfaces partner offers per category.
+from affiliates import create_affiliates_router as _create_affiliates_router  # noqa: E402
+app.include_router(_create_affiliates_router(db=db, get_current_user=get_current_user, require_role=require_role))
 
 # Escrow + proof-of-delivery payment release (jobs & orders)
 from escrow import create_router as _create_escrow_router, auto_release_loop as _escrow_auto_release_loop  # noqa: E402

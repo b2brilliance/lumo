@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import AffiliateBlock from "@/components/AffiliateBlock";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Car, Gauge, Fuel, MapPin } from "lucide-react";
 
@@ -141,6 +142,9 @@ export default function Autos() {
           {items.map((r) => <ListingCard key={r.id} r={r} />)}
         </div>
       )}
+      <div className="mt-12 -mx-4 sm:-mx-6">
+        <AffiliateBlock category="autos" title="Auto loans, warranties & cash offers" subtitle="Pre-qualify for financing, get a real cash offer, or protect your purchase." />
+      </div>
     </div>
   );
 }

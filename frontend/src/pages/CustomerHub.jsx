@@ -3,6 +3,7 @@ import { api, ALL_CATEGORIES, LOCATION_COPY, locationModeFor, locationLabelsFor,
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import AffiliateBlock from "@/components/AffiliateBlock";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -457,6 +458,9 @@ export default function CustomerHub() {
             </div>
           </div>
         </div>
+      </div>
+      <div className="mt-10 -mx-4 sm:-mx-6">
+        <AffiliateBlock category="customer" title="Stretch your dollar — partner cards & cashback" subtitle="Credit cards, cashback portals, and cards we use ourselves." />
       </div>
     </div>
   );
