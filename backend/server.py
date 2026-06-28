@@ -1110,6 +1110,129 @@ async def list_restaurants():
         out.append({"id": d["id"], "name": d["name"], "storefront": d.get("storefront")})
     return out
 
+# ────────────────────────────────────────────────────────────────────────────
+# Unified marketplace search — one query across stores, restaurants, rentals,
+# autos, and community-market listings. Returns a normalized result shape so
+# the frontend can render mixed cards.
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/search/marketplaces")
+async def search_marketplaces(
+    q: str = "",
+    types: str = "stores,restaurants,rentals,autos,marketplace",
+    limit: int = 30,
+):
+    types_set = {t.strip() for t in types.split(",") if t.strip()}
+    q_norm = (q or "").strip()
+    rx = {"$regex": re.escape(q_norm), "$options": "i"} if q_norm else None
+    results: List[dict] = []
+
+    # Stores (retailers)
+    if "stores" in types_set:
+        filt: dict = {"role": "retailer", "storefront": {"$ne": None}}
+        if rx:
+            filt["$or"] = [
+                {"storefront.name": rx}, {"name": rx},
+                {"storefront.category": rx}, {"storefront.address": rx},
+                {"storefront.description": rx},
+            ]
+        async for d in db.users.find(filt).limit(limit):
+            d = clean_doc(d)
+            sf = d.get("storefront") or {}
+            results.append({
+                "type": "store", "id": d["id"],
+                "title": sf.get("name") or d.get("name"),
+                "subtitle": sf.get("category") or "Retailer",
+                "address": sf.get("address"),
+                "image_url": sf.get("logo_url"),
+                "link": f"/stores/{d['id']}",
+            })
+
+    # Restaurants
+    if "restaurants" in types_set:
+        filt = {"role": "restaurant", "storefront": {"$ne": None}}
+        if rx:
+            filt["$or"] = [
+                {"storefront.name": rx}, {"name": rx},
+                {"storefront.cuisine": rx}, {"storefront.address": rx},
+                {"storefront.description": rx},
+            ]
+        async for d in db.users.find(filt).limit(limit):
+            d = clean_doc(d)
+            sf = d.get("storefront") or {}
+            results.append({
+                "type": "restaurant", "id": d["id"],
+                "title": sf.get("name") or d.get("name"),
+                "subtitle": sf.get("cuisine") or "Restaurant",
+                "address": sf.get("address"),
+                "image_url": sf.get("logo_url"),
+                "link": f"/restaurants/{d['id']}",
+            })
+
+    # Rentals
+    if "rentals" in types_set:
+        filt = {"status": "active"}
+        if rx:
+            filt["$or"] = [
+                {"title": rx}, {"description": rx},
+                {"category": rx}, {"city": rx},
+            ]
+        async for d in db.rentals.find(filt).limit(limit):
+            d = clean_doc(d)
+            imgs = d.get("photos") or d.get("images") or []
+            results.append({
+                "type": "rental", "id": d["id"],
+                "title": d.get("title"),
+                "subtitle": d.get("category") or "Rental",
+                "address": d.get("city") or d.get("address"),
+                "price": d.get("price_per_night") or d.get("price"),
+                "price_unit": "night" if d.get("price_per_night") else None,
+                "image_url": imgs[0] if imgs else None,
+                "link": f"/rentals/{d['id']}",
+            })
+
+    # Auto sales (classifieds)
+    if "autos" in types_set:
+        filt = {"status": "active"}
+        if rx:
+            filt["$or"] = [{"make": rx}, {"model": rx}, {"title": rx}, {"description": rx}]
+        async for d in db.autos.find(filt).limit(limit):
+            d = clean_doc(d)
+            imgs = d.get("photos") or d.get("images") or []
+            title = d.get("title") or f"{d.get('year','')} {d.get('make','')} {d.get('model','')}".strip()
+            results.append({
+                "type": "auto", "id": d["id"],
+                "title": title,
+                "subtitle": f"{d.get('year','')} · {d.get('mileage','?')} mi · {d.get('condition','')}".strip(' ·'),
+                "address": f"{d.get('city','')}, {d.get('state','')}".strip(", "),
+                "price": d.get("price"),
+                "image_url": imgs[0] if imgs else None,
+                "link": f"/autos/{d['id']}",
+            })
+
+    # Community Market (P2P listings)
+    if "marketplace" in types_set:
+        filt = {"status": "active"}
+        if rx:
+            filt["$or"] = [{"title": rx}, {"description": rx}, {"category": rx}]
+        async for d in db.listings.find(filt).limit(limit):
+            d = clean_doc(d)
+            imgs = d.get("photos") or d.get("images") or []
+            results.append({
+                "type": "marketplace", "id": d["id"],
+                "title": d.get("title"),
+                "subtitle": d.get("category") or "Community Market",
+                "address": d.get("city") or None,
+                "price": d.get("price"),
+                "image_url": imgs[0] if imgs else None,
+                "link": f"/marketplace/{d['id']}",
+            })
+
+    # If a query was provided, sort by simple title-match relevance
+    if q_norm:
+        q_lower = q_norm.lower()
+        results.sort(key=lambda r: 0 if q_lower in (r.get("title") or "").lower() else 1)
+    return results[:limit * 5]
+
 @api.get("/storefronts/{store_id}")
 async def get_storefront(store_id: str):
     d = await db.users.find_one({"id": store_id})

@@ -128,12 +128,23 @@ export default function MapPage() {
   // "Use my GPS" button if it fails.
   useEffect(() => {
     if (gpsAutoTriedRef.current) return;
-    gpsAutoTriedRef.current = true;
-    if (gpsAnchor) return;                                            // already have one
-    if (user?.location?.lat || user?.default_delivery_address?.lat) return; // saved address wins
+    // Wait until the auth state has resolved (undefined → user-or-false)
+    if (user === undefined) return;
+    if (gpsAnchor) {
+      gpsAutoTriedRef.current = true;
+      return;
+    }
+    if (user && (user.location?.lat || user.default_delivery_address?.lat)) {
+      gpsAutoTriedRef.current = true;
+      return;
+    }
     try {
-      if (sessionStorage.getItem("lumo_gps_denied") === "1") return;
+      if (sessionStorage.getItem("lumo_gps_denied") === "1") {
+        gpsAutoTriedRef.current = true;
+        return;
+      }
     } catch (_) { /* ignore */ }
+    gpsAutoTriedRef.current = true;
     requestGps({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -231,6 +242,8 @@ export default function MapPage() {
           groupFilter={groupFilter}
           setGroupFilter={setGroupFilter}
           height={520}
+          center={anchor}
+          zoom={radius && radius > 0 ? (radius >= 100 ? 8 : radius >= 50 ? 9 : 11) : 11}
         />
       </div>
 
@@ -265,24 +278,6 @@ export default function MapPage() {
               </button>
             );
           })}
-          {/* GPS opt-in — only show if we don't already have a saved anchor */}
-          {(!user?.location?.lat && !user?.default_delivery_address?.lat) && (
-            <button
-              type="button"
-              onClick={requestGps}
-              disabled={gpsBusy}
-              className={`text-xs font-mono px-2.5 py-1 border inline-flex items-center gap-1 transition-colors ml-1 ${
-                gpsAnchor
-                  ? "bg-teal-700 text-white border-teal-700"
-                  : "bg-white text-teal-700 border-teal-700 hover:bg-teal-50"
-              } disabled:opacity-60`}
-              data-testid="map-gps-button"
-              data-no-i18n="true"
-            >
-              <MapPin className="w-3 h-3" />
-              {gpsBusy ? "Locating…" : gpsAnchor ? "Using GPS" : "Use my GPS"}
-            </button>
-          )}
         </div>
 
         <p className="text-xs text-slate-500 mb-6" data-testid="map-feed-radius-note">{showingMessage}</p>
@@ -294,18 +289,8 @@ export default function MapPage() {
             <div className="flex-1">
               <div className="font-display font-bold text-amber-900">W-2 jobs are commute-only</div>
               <p className="text-sm text-amber-800 mt-1 leading-snug">
-                We only show W-2 listings inside your commute radius. Share your location and we&apos;ll filter the feed instantly. You can also save a permanent service address in <Link to="/settings" className="underline">Settings</Link>.
+                We only show W-2 listings inside your commute radius. Allow location access (we&apos;ll ask once) so we can filter the feed, or save a permanent service address in <Link to="/settings" className="underline">Settings</Link>.
               </p>
-              <button
-                type="button"
-                onClick={requestGps}
-                disabled={gpsBusy}
-                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white font-mono uppercase tracking-wider text-[11px] hover:bg-teal-800 disabled:opacity-60"
-                data-testid="map-w2-gps-button"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                {gpsBusy ? "Locating…" : "Use my current location"}
-              </button>
             </div>
           </div>
         )}

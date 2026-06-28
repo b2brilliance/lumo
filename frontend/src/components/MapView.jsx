@@ -42,6 +42,8 @@ export default function MapView({
   setRemoteOnly,
   groupFilter,
   setGroupFilter,
+  center = null,
+  zoom = null,
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: "lumo-google-maps",
@@ -54,6 +56,19 @@ export default function MapView({
 
   const onLoad = useCallback((m) => setMap(m), []);
   const onUnmount = useCallback(() => setMap(null), []);
+
+  // Re-center on the provided anchor whenever it changes (auto-GPS, saved
+  // address, etc.). Only adjusts zoom on the very first center to avoid
+  // fighting the user's manual pan/zoom.
+  const centeredRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!map || !center || center.lat == null) return;
+    map.panTo({ lat: center.lat, lng: center.lng });
+    if (!centeredRef.current) {
+      map.setZoom(zoom || 11);
+      centeredRef.current = true;
+    }
+  }, [map, center, zoom]);
 
   const validPins = useMemo(
     () => pins.filter((p) => typeof p.lat === "number" && typeof p.lng === "number"),
@@ -112,8 +127,8 @@ export default function MapView({
         {isLoaded && GOOGLE_KEY && (
           <GoogleMap
             mapContainerStyle={{ ...containerStyle, height }}
-            center={DEFAULT_CENTER}
-            zoom={4}
+            center={center && center.lat != null ? { lat: center.lat, lng: center.lng } : DEFAULT_CENTER}
+            zoom={center && center.lat != null ? (zoom || 11) : 4}
             onLoad={onLoad}
             onUnmount={onUnmount}
             options={{
