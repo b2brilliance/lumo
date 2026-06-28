@@ -60,6 +60,27 @@ const TIRE_SIZES = [
   "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"
 ].map((s) => ({ value: s, label: `${s}\" wheel` }));
 
+const CAR_SECTIONS = [
+  { value: "engine", label: "Engine" },
+  { value: "transmission", label: "Transmission" },
+  { value: "brakes", label: "Brakes" },
+  { value: "suspension", label: "Suspension / steering" },
+  { value: "exhaust", label: "Exhaust" },
+  { value: "electrical", label: "Electrical / battery / alternator" },
+  { value: "hvac", label: "HVAC / A/C / heater" },
+  { value: "fuel_system", label: "Fuel system" },
+  { value: "cooling", label: "Cooling system / radiator" },
+  { value: "drivetrain", label: "Drivetrain / axles / differential" },
+  { value: "tires_wheels", label: "Tires / wheels" },
+  { value: "fluids", label: "Fluids (oil / coolant / brake / power steering)" },
+  { value: "exterior", label: "Body / exterior" },
+  { value: "glass", label: "Glass / windshield" },
+  { value: "interior", label: "Interior / seats / dash" },
+  { value: "lights", label: "Lights / signals" },
+  { value: "diagnostic", label: "Diagnostic / check-engine light" },
+  { value: "other", label: "Other / not sure" },
+];
+
 export const SERVICE_SCHEMAS = {
   delivery: {
     subcategoryLabel: "Item type",
@@ -84,6 +105,7 @@ export const SERVICE_SCHEMAS = {
       same_day: { label: "Same-day" },
       next_day: { label: "Next-day" },
       scheduled: { label: "Scheduled" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "item_size", label: "Item size", type: "select", options: COMMON_ITEM_SIZES, required: true },
@@ -99,6 +121,7 @@ export const SERVICE_SCHEMAS = {
       accessibility: { label: "Wheelchair-accessible vehicle (WAV)" },
       airport: { label: "Airport transfer" },
       long_distance: { label: "Long-distance (50+ mi)" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "passengers", label: "How many passengers", type: "number", min: 1, max: 12, default: 1, required: true },
@@ -151,6 +174,7 @@ export const SERVICE_SCHEMAS = {
       heavy_duty_tow: { label: "Heavy-duty (RV, truck, bus)" },
       motorcycle_tow: { label: "Motorcycle tow" },
       long_distance_tow: { label: "Long-distance tow (50+ mi)" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "vehicle_type", label: "Vehicle type", type: "select", required: true, options: [
@@ -234,6 +258,7 @@ export const SERVICE_SCHEMAS = {
       long_distance: { label: "Long distance (50+ mi)" },
       single_item: { label: "Single bulky item" },
       labor_only: { label: "Labor only (loading / unloading)" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "property_size", label: "Property size", type: "select", options: HOUSE_SIZES, required: true },
@@ -267,6 +292,7 @@ export const SERVICE_SCHEMAS = {
       move_in_out: { label: "Move-in / move-out" },
       post_construction: { label: "Post-construction" },
       recurring: { label: "Recurring (weekly / bi-weekly)" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "property_type", label: "Property type", type: "select", options: PROPERTY_TYPES, required: true },
@@ -289,6 +315,7 @@ export const SERVICE_SCHEMAS = {
       install: { label: "Landscape installation" },
       hardscape: { label: "Hardscape (patio, walkway, walls)" },
       tree: { label: "Tree care / removal" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "services", label: "Tasks needed", type: "multiselect", required: true, options: [
@@ -349,6 +376,7 @@ export const SERVICE_SCHEMAS = {
           { name: "tire_size", label: "Tire / wheel size", type: "select", showIf: { roadside_type: "tire", tire_service: "bring_new" }, options: TIRE_SIZES },
         ],
       },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "vehicle_year", label: "Vehicle year", type: "select", required: true, options: (() => {
@@ -360,6 +388,18 @@ export const SERVICE_SCHEMAS = {
         "Acura","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler","Dodge","Ford","GMC","Honda","Hyundai","Infiniti","Jaguar","Jeep","Kia","Land Rover","Lexus","Lincoln","Mazda","Mercedes-Benz","Mini","Mitsubishi","Nissan","Porsche","Ram","Subaru","Tesla","Toyota","Volkswagen","Volvo","Other"
       ].map((m) => ({ value: m, label: m })) },
       { name: "vehicle_model", label: "Model", type: "text", required: true, placeholder: "e.g. Civic, F-150, Model 3" },
+      // Mechanic-style section → part → issue workflow. Shown only when the
+      // job is a repair / maintenance request (not detailing, not roadside —
+      // those have their own flows).
+      { name: "car_section", label: "Section of the car", type: "select", showIf: { subcategory: "minor_repair" }, options: CAR_SECTIONS },
+      { name: "car_section", label: "Section of the car", type: "select", showIf: { subcategory: "major_repair" }, options: CAR_SECTIONS },
+      { name: "car_section", label: "Section of the car", type: "select", showIf: { subcategory: "maintenance" }, options: CAR_SECTIONS },
+      { name: "car_part", label: "Specific part (if known)", type: "text", showIf: { subcategory: "minor_repair" }, placeholder: "e.g. alternator, front-left brake pad" },
+      { name: "car_part", label: "Specific part (if known)", type: "text", showIf: { subcategory: "major_repair" }, placeholder: "e.g. transmission, head gasket" },
+      { name: "car_part", label: "Specific part (if known)", type: "text", showIf: { subcategory: "maintenance" }, placeholder: "e.g. oil filter, spark plugs" },
+      { name: "issue_description", label: "Describe the issue / symptoms", type: "textarea", showIf: { subcategory: "minor_repair" }, placeholder: "What's happening? Noises, warning lights, when it started…" },
+      { name: "issue_description", label: "Describe the issue / symptoms", type: "textarea", showIf: { subcategory: "major_repair" }, placeholder: "What's happening? Noises, warning lights, when it started…" },
+      { name: "issue_description", label: "Service requested", type: "textarea", showIf: { subcategory: "maintenance" }, placeholder: "e.g. 60k-mile service, oil change, brake pad replacement" },
     ],
   },
   pet_care: {
@@ -371,6 +411,7 @@ export const SERVICE_SCHEMAS = {
       training: { label: "Training" },
       grooming: { label: "Grooming" },
       boarding: { label: "Boarding" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "animal_type", label: "Animal", type: "select", required: true, options: [
@@ -438,6 +479,7 @@ export const SERVICE_SCHEMAS = {
       barber: { label: "Barber" },
       fitness: { label: "Personal training / fitness" },
       lashes: { label: "Lashes / brows" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "num_people", label: "Number of people", type: "number", min: 1, default: 1 },
@@ -484,6 +526,7 @@ export const SERVICE_SCHEMAS = {
       companion_care: { label: "Companion care" },
       respite: { label: "Respite care (relief for family caregiver)" },
       dementia_care: { label: "Dementia / Alzheimer's care" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "license_required", label: "License required (we will verify)", type: "select", required: true, options: [
@@ -589,6 +632,7 @@ export const SERVICE_SCHEMAS = {
       operations: { label: "Operations support" },
       research: { label: "Research / data gathering" },
       transcription: { label: "Transcription" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "tools", label: "Tools / software", type: "text", placeholder: "QuickBooks, Notion, HubSpot…" },
@@ -605,6 +649,7 @@ export const SERVICE_SCHEMAS = {
       language: { label: "Language" },
       music: { label: "Music" },
       coding: { label: "Coding / CS" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "topic", label: "Specific topic", type: "text", placeholder: "Algebra II, AP Physics, Spanish…" },
@@ -632,6 +677,7 @@ export const SERVICE_SCHEMAS = {
       small_claims: { label: "Small claims" },
       estate: { label: "Estate / wills" },
       business: { label: "Business / LLC" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "jurisdiction", label: "State / jurisdiction", type: "text", placeholder: "e.g. NY, CA, US Federal" },
@@ -652,6 +698,7 @@ export const SERVICE_SCHEMAS = {
       audit: { label: "Audit / review" },
       insurance: { label: "Insurance" },
       payroll: { label: "Payroll" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "entity_type", label: "Entity type", type: "select", options: [
@@ -674,6 +721,7 @@ export const SERVICE_SCHEMAS = {
       voice: { label: "Voice work / narration" },
       transcription: { label: "Transcription" },
       moderation: { label: "Community / moderation" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "engagement", label: "Engagement", type: "select", options: [
@@ -692,6 +740,7 @@ export const SERVICE_SCHEMAS = {
       investigative: { label: "Investigative" },
       survey: { label: "Survey / data collection" },
       competitive: { label: "Competitive analysis" },
+      other: { label: "Other" },
     },
     baseFields: [
       { name: "depth", label: "Depth", type: "select", options: [
@@ -705,6 +754,210 @@ export const SERVICE_SCHEMAS = {
         { value: "spreadsheet", label: "Spreadsheet / data" },
         { value: "either", label: "Either" },
       ]},
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // NEW on-demand categories (Uber-style: each one drops the customer into
+  // a tight, structured form so the provider can quote/accept instantly).
+  // ────────────────────────────────────────────────────────────────────────
+  notary: {
+    subcategoryLabel: "Document type",
+    subcategories: {
+      acknowledgment: { label: "Acknowledgment (general)" },
+      jurat: { label: "Jurat / sworn statement" },
+      real_estate: { label: "Real estate / mortgage closing" },
+      power_of_attorney: { label: "Power of attorney" },
+      vehicle_title: { label: "Vehicle title / DMV" },
+      will_trust: { label: "Will / trust" },
+      affidavit: { label: "Affidavit" },
+      apostille: { label: "Apostille / authentication" },
+      i9_employment: { label: "I-9 / employment verification" },
+      copy_certification: { label: "Copy certification" },
+      loan_signing: { label: "Loan signing (mortgage / refi)" },
+      medical_consent: { label: "Medical consent / HIPAA" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "num_signers", label: "How many signers", type: "number", min: 1, max: 10, default: 1, required: true },
+      { name: "num_documents", label: "Number of documents", type: "number", min: 1, default: 1, required: true },
+      { name: "ids_ready", label: "Government-issued ID(s) ready", type: "select", required: true, options: [
+        { value: "yes", label: "Yes — all signers have ID" },
+        { value: "no", label: "No — need help" },
+      ]},
+      { name: "language", label: "Document language", type: "text", placeholder: "English, Spanish, etc.", default: "English" },
+      { name: "mobile_or_office", label: "Where", type: "select", required: true, options: [
+        { value: "mobile", label: "Notary comes to me" },
+        { value: "office", label: "I'll come to the notary" },
+        { value: "remote", label: "Remote online notarization (RON)" },
+      ]},
+      { name: "urgency", label: "Urgency", type: "select", required: true, options: [
+        { value: "now", label: "ASAP (within 2 hours)" },
+        { value: "today", label: "Today" },
+        { value: "this_week", label: "This week" },
+        { value: "scheduled", label: "Schedule" },
+      ]},
+      { name: "scheduled_for", label: "If scheduled, when?", type: "datetime-local" },
+    ],
+  },
+
+  it_support: {
+    subcategoryLabel: "Help needed",
+    subcategories: {
+      computer_setup: { label: "Computer / laptop setup" },
+      wifi_network: { label: "Wi-Fi / home network" },
+      printer: { label: "Printer setup / fix" },
+      smart_home: { label: "Smart home (Nest, Ring, Alexa…)" },
+      tv_streaming: { label: "TV / streaming / cable cutting" },
+      data_recovery: { label: "Data recovery / backup" },
+      virus_malware: { label: "Virus / malware removal" },
+      slow_computer: { label: "Slow computer / cleanup" },
+      software_install: { label: "Software install / training" },
+      phone_tablet: { label: "Phone / tablet help" },
+      cloud_email: { label: "Cloud / email setup (Gmail, iCloud, Drive)" },
+      passwords_accounts: { label: "Account / password recovery" },
+      remote_only: { label: "Remote screen-share help" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "device_type", label: "Device(s)", type: "multiselect", options: [
+        { value: "windows_pc", label: "Windows PC" },
+        { value: "mac", label: "Mac" },
+        { value: "iphone", label: "iPhone" },
+        { value: "android", label: "Android phone" },
+        { value: "ipad_tablet", label: "iPad / tablet" },
+        { value: "printer", label: "Printer" },
+        { value: "router", label: "Router / modem" },
+        { value: "smart_device", label: "Smart-home device" },
+        { value: "other", label: "Other" },
+      ]},
+      { name: "remote_or_onsite", label: "Remote or on-site", type: "select", required: true, options: [
+        { value: "remote", label: "Remote (screen share)" },
+        { value: "onsite", label: "On-site at my home/office" },
+        { value: "either", label: "Either" },
+      ]},
+      { name: "urgency", label: "Urgency", type: "select", options: [
+        { value: "now", label: "Now (within 2 hours)" },
+        { value: "today", label: "Today" },
+        { value: "this_week", label: "This week" },
+      ]},
+      { name: "error_message", label: "Any error message / what's happening", type: "textarea" },
+    ],
+  },
+
+  errand: {
+    subcategoryLabel: "Errand type",
+    subcategories: {
+      grocery_shop: { label: "Grocery shopping" },
+      pharmacy: { label: "Pharmacy / prescription pickup" },
+      package_dropoff: { label: "Package drop-off (USPS / UPS / FedEx)" },
+      package_pickup: { label: "Package / mail pickup" },
+      dry_cleaning: { label: "Dry cleaning drop / pickup" },
+      dmv_govt: { label: "DMV / government office wait" },
+      gift_buy: { label: "Buy & deliver a gift" },
+      return_item: { label: "Return an item to a store" },
+      grocery_delivery: { label: "Cooked-meal pickup from restaurant" },
+      misc_pickup: { label: "Misc. pickup / drop-off" },
+      wait_in_line: { label: "Wait in line for me" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "stores", label: "Where (store / address)", type: "text", placeholder: "e.g. Trader Joe's on Main St" },
+      { name: "item_list", label: "Shopping list / what to pick up", type: "textarea", placeholder: "List items, brands, sizes…" },
+      { name: "max_budget", label: "Max budget for purchases ($)", type: "number", min: 0, step: 1, helpText: "Customer pre-funds this. Provider keeps receipts." },
+      { name: "urgency", label: "When", type: "select", required: true, options: [
+        { value: "now", label: "Now / next hour" },
+        { value: "today", label: "Today" },
+        { value: "scheduled", label: "Schedule" },
+      ]},
+    ],
+  },
+
+  appliance_repair: {
+    subcategoryLabel: "Appliance",
+    subcategories: {
+      refrigerator: { label: "Refrigerator / freezer" },
+      washer: { label: "Washing machine" },
+      dryer: { label: "Dryer" },
+      dishwasher: { label: "Dishwasher" },
+      oven_range: { label: "Oven / range / cooktop" },
+      microwave: { label: "Microwave" },
+      ac_unit: { label: "Air conditioner / HVAC" },
+      water_heater: { label: "Water heater" },
+      garbage_disposal: { label: "Garbage disposal" },
+      ice_maker: { label: "Ice maker" },
+      small_appliance: { label: "Small appliance (toaster, blender…)" },
+      vacuum: { label: "Vacuum cleaner" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "brand", label: "Brand", type: "text", placeholder: "e.g. Whirlpool, GE, Samsung" },
+      { name: "model_number", label: "Model number (if known)", type: "text" },
+      { name: "age_years", label: "Approx. age (years)", type: "number", min: 0, default: 5 },
+      { name: "symptoms", label: "What's wrong", type: "textarea", placeholder: "Won't turn on, leaking, strange noise…" },
+      { name: "under_warranty", label: "Still under warranty?", type: "select", options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+        { value: "unsure", label: "Not sure" },
+      ]},
+      { name: "parts_needed", label: "Bring parts?", type: "select", options: [
+        { value: "provider", label: "Provider brings if needed" },
+        { value: "customer", label: "I'll buy the part" },
+        { value: "diagnose_first", label: "Diagnose first" },
+      ], default: "diagnose_first" },
+    ],
+  },
+
+  locksmith: {
+    subcategoryLabel: "Lock situation",
+    subcategories: {
+      home_lockout: { label: "Home lockout" },
+      car_lockout: { label: "Car lockout" },
+      business_lockout: { label: "Business lockout" },
+      lost_keys: { label: "Lost all keys — need new ones cut" },
+      rekey: { label: "Re-key existing locks" },
+      install_lock: { label: "Install new lock(s)" },
+      smart_lock: { label: "Smart-lock install / setup" },
+      safe: { label: "Safe — unlock / install" },
+      key_duplicate: { label: "Key duplicate" },
+      car_key_fob: { label: "Car key fob programming" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "urgency", label: "Urgency", type: "select", required: true, options: [
+        { value: "emergency", label: "Emergency (stranded / unsafe)" },
+        { value: "today", label: "Today" },
+        { value: "scheduled", label: "Schedule" },
+      ]},
+      { name: "lock_brand", label: "Lock brand (if known)", type: "text", placeholder: "Kwikset, Schlage, Yale…" },
+      { name: "doors_count", label: "How many doors / locks", type: "number", min: 1, default: 1 },
+      { name: "vehicle_info", label: "If car — year / make / model", type: "text", placeholder: "e.g. 2018 Toyota Camry" },
+    ],
+  },
+
+  security: {
+    subcategoryLabel: "Security need",
+    subcategories: {
+      event_security: { label: "Event security (party / venue)" },
+      private_bodyguard: { label: "Private bodyguard / VIP" },
+      home_watch: { label: "Home watch (while away)" },
+      patrol: { label: "Patrol / walk-through" },
+      cctv_install: { label: "CCTV / camera install" },
+      alarm_install: { label: "Alarm system install" },
+      asset_escort: { label: "Asset / cash escort" },
+      crowd_control: { label: "Crowd control" },
+      access_control: { label: "Access control / bouncer" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      { name: "hours_needed", label: "Hours needed", type: "number", min: 1, default: 4, required: true },
+      { name: "guards_count", label: "Number of guards", type: "number", min: 1, default: 1 },
+      { name: "armed_preference", label: "Armed?", type: "select", options: [
+        { value: "unarmed", label: "Unarmed" },
+        { value: "armed", label: "Armed (licensed)" },
+        { value: "either", label: "Either" },
+      ], default: "unarmed" },
+      { name: "venue_capacity", label: "Approx. guest / attendance count", type: "number", min: 1 },
     ],
   },
 };

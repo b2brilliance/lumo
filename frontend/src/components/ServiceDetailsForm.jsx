@@ -122,6 +122,24 @@ export default function ServiceDetailsForm({ category, details, onChange }) {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Universal "Other → describe what you need" — kicks in whenever the
+          picked subcategory is the literal value "other". Every schema that
+          exposes an Other subcategory gets a free-text textarea automatically
+          (mechanic / notary / handyman / events / etc.). */}
+      {details.subcategory === "other" && (
+        <div data-testid="detail-other-wrap">
+          <Label className="overline">Describe what you need <span className="text-red-600 ml-0.5">*</span></Label>
+          <textarea
+            value={details.other_description || ""}
+            onChange={(e) => set("other_description", e.target.value)}
+            placeholder="Tell the provider exactly what you need help with…"
+            rows={3}
+            className="mt-1 w-full border border-slate-300 px-3 py-2 text-sm"
+            data-testid="detail-other-description"
+          />
+        </div>
+      )}
       {fields.filter((f) => fieldVisible(f, details)).map((f) => (
         <div key={f.name}>
           <Label className="overline">{f.label}{f.required && <span className="text-red-600 ml-0.5">*</span>}</Label>
@@ -151,6 +169,12 @@ export function ServiceDetailsView({ category, details }) {
         <div className="flex gap-3">
           <span className="overline text-slate-500 min-w-[140px]">{schema.subcategoryLabel}</span>
           <span className="font-mono">{sub.label}</span>
+        </div>
+      )}
+      {details.subcategory === "other" && details.other_description && (
+        <div className="flex gap-3">
+          <span className="overline text-slate-500 min-w-[140px]">What&apos;s needed</span>
+          <span className="font-mono whitespace-pre-wrap">{details.other_description}</span>
         </div>
       )}
       {allFields.map((f) => {

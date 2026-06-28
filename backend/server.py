@@ -60,6 +60,7 @@ ALL_CATEGORIES = [
     "delivery", "courier", "moving", "ride_share", "towing",
     # local services
     "handyman", "cleaning", "landscaping", "auto", "pet_care", "personal_care", "events", "medical",
+    "notary", "it_support", "errand", "appliance_repair", "locksmith", "security",
     # tech/digital + remote
     "digital_tech", "marketing", "business_admin", "education",
     "legal", "financial", "remote_work", "research",
