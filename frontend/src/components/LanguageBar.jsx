@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLocale } from "@/lib/locale";
-import { Languages, Check } from "lucide-react";
+import { Languages } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 // Flag + short uppercase code per language. Flag picks the most-recognized
 // country for that language; code is the iso-639 root upper-cased so the
@@ -44,18 +47,14 @@ const LANG_META = {
 };
 
 /**
- * Centered horizontal "Read Lumo in your language" pill bar.
- * Renders at the top of the homepage. Lets a visitor switch the entire
- * site into one of the supported languages independently of their country
- * (so an Italian customer in the US can keep USD pricing).
- *
- * Languages are fetched live from /api/i18n/languages so the bar always
- * matches the backend's SUPPORTED_LANGS.
+ * Centered language picker at the top of the homepage. Single dropdown
+ * select (not side-by-side pills) — opens to reveal every supported
+ * language. The user's auto-detected language is shown as the active
+ * value and pinned at the top of the list; the rest follow alphabetically.
  */
 export default function LanguageBar() {
-  const { lang, setLangOverride, isLangOverridden, profile } = useLocale();
+  const { lang, setLangOverride, profile } = useLocale();
   const [langs, setLangs] = useState([]);
-  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,10 +69,8 @@ export default function LanguageBar() {
 
   if (langs.length === 0) return null;
 
-  // The "assumed" language is the user's currently-applied lang (which
-  // already resolves to either an explicit override OR the country-detected
-  // language). Pin it to the front; everything else sorts alphabetically
-  // by their LANG_META code so the bar reads A-Z after the active pill.
+  // Sort alphabetically by short code, then pin the user's currently-applied
+  // language to the very top so the dropdown opens with their default first.
   const sortedLangs = (() => {
     const out = [...langs];
     out.sort((a, b) => {
@@ -90,8 +87,7 @@ export default function LanguageBar() {
     return out;
   })();
 
-  const PREVIEW_COUNT = 8;
-  const visible = expanded ? sortedLangs : sortedLangs.slice(0, PREVIEW_COUNT);
+  const current = LANG_META[lang] || { flag: "🌐", code: (lang || "en").toUpperCase() };
 
   return (
     <div
@@ -100,59 +96,50 @@ export default function LanguageBar() {
       data-no-i18n="true"
     >
       <div className="max-w-screen-2xl mx-auto px-4 py-2.5">
-        <div className="flex items-center justify-center gap-1.5 flex-wrap text-[12px]">
-          <div className="flex items-center gap-1.5 text-slate-500 font-mono uppercase tracking-widest text-[10px] pr-2 mr-1 border-r border-slate-300">
+        <div className="flex items-center justify-center gap-3 text-[12px]">
+          <div className="flex items-center gap-1.5 text-slate-500 font-mono uppercase tracking-widest text-[10px]">
             <Languages className="w-3.5 h-3.5" />
             <span>Read Lumo in</span>
           </div>
-
-          {visible.map((l) => {
-            const meta = LANG_META[l.code] || { flag: "🌐", code: l.code.toUpperCase() };
-            const active = lang === l.code;
-            return (
-              <button
-                key={l.code}
-                type="button"
-                onClick={() => setLangOverride(active ? null : l.code)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full font-mono transition-colors ${
-                  active
-                    ? "border-teal-700 bg-teal-700 text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:text-slate-900"
-                }`}
-                data-testid={`lang-pill-${l.code}`}
-                data-no-i18n="true"
-                title={l.label}
-              >
-                <span className="text-sm leading-none" data-no-i18n="true">{meta.flag}</span>
-                <span className="text-[10px] uppercase tracking-widest font-bold">{meta.code}</span>
-                {active && <Check className="w-3 h-3" />}
-              </button>
-            );
-          })}
-
-          {langs.length > PREVIEW_COUNT && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="inline-flex items-center px-2.5 py-1 border border-dashed border-slate-300 rounded-full text-slate-500 hover:text-slate-900 hover:border-slate-500 font-mono text-[10px] uppercase tracking-widest"
-              data-testid="lang-pill-more"
+          <Select
+            value={lang}
+            onValueChange={(v) => setLangOverride(v === (profile?.lang || "en") ? null : v)}
+          >
+            <SelectTrigger
+              className="h-8 min-w-[180px] w-auto bg-white border-slate-300 font-mono uppercase tracking-widest text-[11px] focus:ring-teal-700"
+              data-testid="lang-dropdown-trigger"
               data-no-i18n="true"
             >
-              {expanded ? "− Less" : `+ ${sortedLangs.length - PREVIEW_COUNT} more`}
-            </button>
-          )}
-
-          {isLangOverridden && (
-            <button
-              type="button"
-              onClick={() => setLangOverride(null)}
-              className="ml-2 text-[10px] font-mono uppercase tracking-widest text-slate-400 hover:text-slate-900"
-              data-testid="lang-reset"
+              <span className="flex items-center gap-2">
+                <span className="text-base leading-none" data-no-i18n="true">{current.flag}</span>
+                <SelectValue placeholder="Choose language" />
+              </span>
+            </SelectTrigger>
+            <SelectContent
+              className="max-h-[60vh]"
+              data-testid="lang-dropdown-menu"
               data-no-i18n="true"
             >
-              ↺ Auto
-            </button>
-          )}
+              {sortedLangs.map((l) => {
+                const meta = LANG_META[l.code] || { flag: "🌐", code: l.code.toUpperCase() };
+                return (
+                  <SelectItem
+                    key={l.code}
+                    value={l.code}
+                    className="font-mono"
+                    data-testid={`lang-option-${l.code}`}
+                    data-no-i18n="true"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base leading-none" data-no-i18n="true">{meta.flag}</span>
+                      <span className="font-bold uppercase tracking-widest text-[10px]">{meta.code}</span>
+                      <span className="text-slate-500 text-[11px]">{l.label}</span>
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>
