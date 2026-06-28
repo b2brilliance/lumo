@@ -58,6 +58,10 @@ export default function MapPage() {
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [groupFilter, setGroupFilter] = useState(null);
   const [highlight, setHighlight] = useState(null);
+  // GPS anchor (browser geolocation). Lets visitors without a saved
+  // service address still get a radius-filtered W-2 / on-demand feed.
+  const [gpsAnchor, setGpsAnchor] = useState(null);
+  const [gpsBusy, setGpsBusy] = useState(false);
   // User-selectable radius (persists across visits via localStorage). 0 = Any.
   const [radius, setRadius] = useState(() => {
     if (typeof window === "undefined") return 50;
@@ -68,9 +72,8 @@ export default function MapPage() {
     try { window.localStorage.setItem(RADIUS_STORAGE_KEY, String(radius)); } catch (_) { /* localStorage unavailable */ }
   }, [radius]);
 
-  // Anchor for the 50-mile radius filter. Prefer the provider's saved service
-  // location, then the customer's saved default delivery address, then null
-  // (which falls back to "show everything").
+  // Anchor for the radius filter. Priority: saved provider location → saved
+  // delivery address → live browser GPS → none.
   const anchor = useMemo(() => {
     const provLoc = user?.location;
     if (provLoc && provLoc.lat != null && provLoc.lng != null) {
@@ -80,8 +83,33 @@ export default function MapPage() {
     if (cust && cust.lat != null && cust.lng != null) {
       return { lat: cust.lat, lng: cust.lng, source: "address" };
     }
+    if (gpsAnchor) return { ...gpsAnchor, source: "gps" };
     return null;
-  }, [user]);
+  }, [user, gpsAnchor]);
+
+  const requestGps = () => {
+    if (!("geolocation" in navigator)) {
+      toast.error("This browser doesn't support GPS.");
+      return;
+    }
+    setGpsBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsAnchor({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsBusy(false);
+        toast.success("Using your current GPS location");
+      },
+      (err) => {
+        setGpsBusy(false);
+        toast.error(
+          err?.code === 1
+            ? "Location permission denied. Enable it in your browser settings or set a service address in Settings."
+            : "Couldn't read your location. Try again or set a service address in Settings."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
+  };
 
   const load = async () => {
     const params = new URLSearchParams();
@@ -113,6 +141,12 @@ export default function MapPage() {
       ? withDistance.filter((p) => p.is_remote || (p.distance_miles != null && p.distance_miles <= radius))
       : withDistance;
 
+    // W-2 jobs are strictly local — they only make sense within a commutable
+    // radius. Force-hide every W-2 pin until we have a location anchor.
+    if (employmentFilter === "w2" && !anchor) {
+      filtered = filtered.filter((p) => p.employment_type !== "w2");
+    }
+
     // Job-board filters (only used when on /map?employment=w2 or =remote)
     if (showJobBoardFilters) {
       const kw = keyword.trim().toLowerCase();
@@ -135,10 +169,12 @@ export default function MapPage() {
   }, [pins, anchor, radius, showJobBoardFilters, keyword, minPay, maxPay, scheduleFilter]);
 
   const showingMessage = !anchor
-    ? "Showing every open job — sign in or set a location in Settings to filter to your area."
+    ? (employmentFilter === "w2"
+        ? "W-2 jobs are commute-only — share your location or set a service address to see them."
+        : "Showing every open job — sign in or set a location in Settings to filter to your area.")
     : radius === 0
       ? "Showing every open job (no distance filter)."
-      : `Showing open jobs within ${radius} miles of your saved ${anchor.source === "provider" ? "service location" : "delivery address"}.`;
+      : `Showing open jobs within ${radius} miles of your ${anchor.source === "provider" ? "saved service location" : anchor.source === "address" ? "saved address" : "current GPS location"}.`;
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-8">
@@ -193,9 +229,50 @@ export default function MapPage() {
               </button>
             );
           })}
+          {/* GPS opt-in — only show if we don't already have a saved anchor */}
+          {(!user?.location?.lat && !user?.default_delivery_address?.lat) && (
+            <button
+              type="button"
+              onClick={requestGps}
+              disabled={gpsBusy}
+              className={`text-xs font-mono px-2.5 py-1 border inline-flex items-center gap-1 transition-colors ml-1 ${
+                gpsAnchor
+                  ? "bg-teal-700 text-white border-teal-700"
+                  : "bg-white text-teal-700 border-teal-700 hover:bg-teal-50"
+              } disabled:opacity-60`}
+              data-testid="map-gps-button"
+              data-no-i18n="true"
+            >
+              <MapPin className="w-3 h-3" />
+              {gpsBusy ? "Locating…" : gpsAnchor ? "Using GPS" : "Use my GPS"}
+            </button>
+          )}
         </div>
 
         <p className="text-xs text-slate-500 mb-6" data-testid="map-feed-radius-note">{showingMessage}</p>
+
+        {/* Empty-state CTA for W-2 view when no location is set */}
+        {employmentFilter === "w2" && !anchor && (
+          <div className="border border-amber-300 bg-amber-50/60 p-5 mb-6 flex items-start gap-4" data-testid="map-w2-needs-location">
+            <MapPin className="w-5 h-5 text-amber-700 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <div className="font-display font-bold text-amber-900">W-2 jobs are commute-only</div>
+              <p className="text-sm text-amber-800 mt-1 leading-snug">
+                We only show W-2 listings inside your commute radius. Share your location and we&apos;ll filter the feed instantly. You can also save a permanent service address in <Link to="/settings" className="underline">Settings</Link>.
+              </p>
+              <button
+                type="button"
+                onClick={requestGps}
+                disabled={gpsBusy}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white font-mono uppercase tracking-wider text-[11px] hover:bg-teal-800 disabled:opacity-60"
+                data-testid="map-w2-gps-button"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                {gpsBusy ? "Locating…" : "Use my current location"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Job-board filters (only for W-2 / Remote views) */}
         {showJobBoardFilters && (
