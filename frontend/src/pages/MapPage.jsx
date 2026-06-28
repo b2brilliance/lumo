@@ -448,6 +448,11 @@ function FeedRowContent({ pin, groupColor, distLabel, external, acceptCta }) {
                   <ExternalLink className="w-2.5 h-2.5" /> External apply
                 </span>
               )}
+              {pin.source && pin.source !== "lumo" && (
+                <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 border border-slate-300 bg-slate-50 text-slate-600">
+                  via {pin.source}
+                </span>
+              )}
             </div>
             <h3 className="font-display text-lg font-bold tracking-tight mt-1.5 leading-tight line-clamp-1 group-hover:text-teal-800">
               {pin.title}

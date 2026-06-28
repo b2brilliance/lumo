@@ -26,6 +26,24 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### External job aggregator + sticky map + GPS-gated W-2 (Feb 27, 2026)
+- **Why**: User asked to ingest jobs/rentals/listings from "every publicly available source." I scoped it to **legal-only** sources (no scraping of any kind — Airbnb/Vrbo/Indeed/LinkedIn/Craigslist explicitly excluded due to ToS).
+- **New `aggregators.py`** module — pulls every 6h from 4 ToS-permitted public APIs:
+  - **USAJobs.gov** — US federal jobs (public, no key)
+  - **Greenhouse Job Board API** — every open role at 30+ curated companies (Stripe, Airbnb, Coinbase, Lyft, DoorDash, Anthropic, OpenAI, etc.) — first sync pulled **3,413 jobs**
+  - **RemoteOK** — public JSON feed of remote tech jobs — first sync pulled **100 jobs**
+  - **WeWorkRemotely** — RSS feeds across 4 categories — first sync pulled **126 jobs**
+  - First manual sync ingested **3,639 jobs total**. Idempotent upsert on `(source, source_id)`.
+- **Background sync loop**: `asyncio.create_task(aggregator_loop(db))` runs on `on_startup`. Initial 30s delay, then every 6h.
+- **Admin endpoints**:
+  - `GET /api/admin/aggregators` — see last-sync metadata
+  - `POST /api/admin/aggregators/{source}/toggle` — disable any source
+  - `POST /api/admin/aggregators/sync` — manual trigger
+- **Frontend**: feed rows now show a `via greenhouse` / `via remoteok` / `via wwr` / `via usajobs` badge alongside the existing `External apply` pill. External jobs use the same `apply_url` mechanism as W-2 listings — providers click out to the original posting.
+- **Sticky map on `/map`**: map now uses `lg:sticky lg:top-4` so it stays pinned at the top of the viewport on desktop while the feed scrolls beneath it. Mobile falls back to natural scroll (sticky on small screens eats too much vertical space).
+- **GPS-gated W-2 view**: `/map?employment=w2` now hides W-2 listings entirely when no location anchor is set, with a prominent amber CTA + "Use my current location" button using `navigator.geolocation.getCurrentPosition`. A compact 📍 GPS button is also added to the radius selector row for non-W-2 views.
+
+
 ### Centered homepage language bar + 24 new languages (Feb 27, 2026)
 - **Why**: User reported the language picker that used to sit at the top-middle of the homepage was gone, and wanted more languages.
 - **Backend**: `SUPPORTED_LANGS` expanded from 10 → **34** languages. New additions: Portuguese (Portugal), Italian, Dutch, Polish, Russian, Ukrainian, Turkish, Swedish, Korean, Traditional Chinese, Bengali, Urdu, Hebrew, Persian/Farsi, Vietnamese, Thai, Indonesian, Malay, Filipino/Tagalog, Swahili, Hausa, Yoruba, Amharic, Greek. `LANG_LABELS` updated with native-script labels (한국어, ไทย, বাংলা, etc.).

@@ -3800,6 +3800,7 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             "employment_type": d.get("employment_type") or "on_demand",
             "apply_url": d.get("apply_url"),
             "schedule": d.get("schedule"),
+            "source": d.get("source"),
         })
     # Newest first so chronological feeds don't have to re-sort client-side
     # (the map itself doesn't care about order).
@@ -3809,6 +3810,30 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
 @api.get("/")
 async def root():
     return {"app": "lumo", "status": "ok"}
+
+# ────────────────────────────────────────────────────────────────────────────
+# External job aggregator admin (USAJobs, Greenhouse, RemoteOK, WWR)
+# ────────────────────────────────────────────────────────────────────────────
+@api.get("/admin/aggregators")
+async def admin_aggregators_status(user: dict = Depends(require_role("admin"))):
+    docs = await db.aggregator_config.find({}).to_list(50)
+    return [clean_doc(d) for d in docs]
+
+@api.post("/admin/aggregators/{source}/toggle")
+async def admin_aggregators_toggle(source: str, body: dict, user: dict = Depends(require_role("admin"))):
+    enabled = bool(body.get("enabled", True))
+    await db.aggregator_config.update_one(
+        {"source": source},
+        {"$set": {"source": source, "enabled": enabled}},
+        upsert=True,
+    )
+    return {"source": source, "enabled": enabled}
+
+@api.post("/admin/aggregators/sync")
+async def admin_aggregators_sync(user: dict = Depends(require_role("admin"))):
+    from aggregators import ingest_aggregated_jobs
+    counts = await ingest_aggregated_jobs(db)
+    return {"ok": True, "counts": counts, "total": sum(counts.values())}
 
 # ────────────────────────────────────────────────────────────────────────────
 # Chat messages (job-scoped, with anti-poach sanitizer)
@@ -6164,6 +6189,13 @@ async def on_startup():
     global _scheduler_task
     _scheduler_task = asyncio.create_task(_scheduler_loop())
     logger.info("Distribution scheduler loop started (polls every 60s)")
+    # External job aggregators (USAJobs / Greenhouse / RemoteOK / WWR)
+    try:
+        from aggregators import aggregator_loop
+        asyncio.create_task(aggregator_loop(db))
+        logger.info("Aggregator loop started (every 6h)")
+    except Exception as e:
+        logger.warning(f"Aggregator loop could not start: {e}")
 
 @app.on_event("shutdown")
 async def on_shutdown():
