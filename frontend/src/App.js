@@ -53,6 +53,12 @@ import { AboutPage, ContactPage, TermsPage, PrivacyPage } from "@/pages/LegalPag
 import BlogIndex from "@/pages/BlogIndex";
 import BlogPost from "@/pages/BlogPost";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { initNativeShell } from "@/lib/native";
+
+if (typeof window !== "undefined") {
+  // Boot native bridge once. No-op when running in a regular browser.
+  initNativeShell();
+}
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();

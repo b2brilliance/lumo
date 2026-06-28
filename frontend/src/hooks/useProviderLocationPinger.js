@@ -1,10 +1,15 @@
 import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
+import { watchPosition } from "@/lib/native";
 
 /**
  * Watches the provider's device GPS while an active job is in flight
  * and pings the backend every `intervalMs` so the customer's live
  * tracker shows their position in real time.
+ *
+ * On native (iOS / Android via Capacitor) this uses the OS-level watcher
+ * which keeps reporting even when the screen sleeps. On web it falls
+ * back to `navigator.geolocation.watchPosition`.
  *
  * Activates only when `enabled` is true (e.g. when provider has an
  * active accepted/on_the_way/arrived/in_progress job).
@@ -12,11 +17,11 @@ import { api } from "@/lib/api";
 export default function useProviderLocationPinger({ jobId, enabled, intervalMs = 12000 }) {
   const lastPosRef = useRef(null);
   const lastSentAtRef = useRef(0);
-  const watchIdRef = useRef(null);
+  const clearRef = useRef(null);
 
   useEffect(() => {
     if (!enabled || !jobId) return;
-    if (!("geolocation" in navigator)) return;
+    let cancelled = false;
 
     const sendIfDue = async (pos) => {
       const now = Date.now();
@@ -32,14 +37,20 @@ export default function useProviderLocationPinger({ jobId, enabled, intervalMs =
       } catch (_) { /* silent — provider may be offline briefly */ }
     };
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        lastPosRef.current = pos;
-        sendIfDue(pos);
-      },
-      () => { /* permission denied or unavailable — ignore */ },
-      { enableHighAccuracy: true, maximumAge: 8000, timeout: 15000 }
-    );
+    (async () => {
+      const stop = await watchPosition(
+        (pos) => {
+          lastPosRef.current = pos;
+          sendIfDue(pos);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
+      );
+      if (cancelled) {
+        stop?.();
+      } else {
+        clearRef.current = stop;
+      }
+    })();
 
     // Also drive a fallback interval so we still POST if the device sits still.
     const tick = setInterval(() => {
@@ -47,10 +58,8 @@ export default function useProviderLocationPinger({ jobId, enabled, intervalMs =
     }, intervalMs);
 
     return () => {
-      if (watchIdRef.current != null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
+      cancelled = true;
+      try { clearRef.current?.(); } catch (_) { /* clear silently */ }
       clearInterval(tick);
     };
   }, [jobId, enabled, intervalMs]);

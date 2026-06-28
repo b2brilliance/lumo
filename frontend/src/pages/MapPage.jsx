@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { milesBetween } from "@/lib/deliveryPricing";
 import MapView from "@/components/MapView";
 import { toast } from "sonner";
+import { getCurrentPosition } from "@/lib/native";
 
 const RADIUS_OPTIONS = [
   { value: 5,   label: "5 mi" },
@@ -87,28 +88,21 @@ export default function MapPage() {
     return null;
   }, [user, gpsAnchor]);
 
-  const requestGps = () => {
-    if (!("geolocation" in navigator)) {
-      toast.error("This browser doesn't support GPS.");
-      return;
-    }
+  const requestGps = async () => {
     setGpsBusy(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGpsAnchor({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGpsBusy(false);
-        toast.success("Using your current GPS location");
-      },
-      (err) => {
-        setGpsBusy(false);
-        toast.error(
-          err?.code === 1
-            ? "Location permission denied. Enable it in your browser settings or set a service address in Settings."
-            : "Couldn't read your location. Try again or set a service address in Settings."
-        );
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
-    );
+    try {
+      const pos = await getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
+      setGpsAnchor({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      toast.success("Using your current GPS location");
+    } catch (err) {
+      toast.error(
+        err?.code === 1 || /denied/i.test(err?.message || "")
+          ? "Location permission denied. Enable it in your browser/device settings or set a service address in Settings."
+          : "Couldn't read your location. Try again or set a service address in Settings."
+      );
+    } finally {
+      setGpsBusy(false);
+    }
   };
 
   const load = async () => {
