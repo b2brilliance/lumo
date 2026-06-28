@@ -24,6 +24,10 @@ import Marketplace from "@/pages/Marketplace";
 import MapPage from "@/pages/MapPage";
 import JobDetail from "@/pages/JobDetail";
 import LiveTrack from "@/pages/LiveTrack";
+import BecomeProvider from "@/pages/BecomeProvider";
+import ListYourStuff from "@/pages/ListYourStuff";
+import CitiesIndex from "@/pages/CitiesIndex";
+import CityHub from "@/pages/CityHub";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import CheckoutCancel from "@/pages/CheckoutCancel";
 import Wallet from "@/pages/Wallet";
@@ -107,6 +111,12 @@ function App() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/jobs/:id/track" element={<Protected><LiveTrack /></Protected>} />
+            <Route path="/become-a-provider" element={<BecomeProvider />} />
+            <Route path="/list-your-stuff" element={<ListYourStuff />} />
+            <Route path="/sell-on-lumo" element={<ListYourStuff />} />
+            <Route path="/earn" element={<BecomeProvider />} />
+            <Route path="/cities" element={<CitiesIndex />} />
+            <Route path="/cities/:slug" element={<CityHub />} />
 
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />

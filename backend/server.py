@@ -3361,6 +3361,13 @@ LANDING_PAGE_TYPES = {
             "childcare": "Babysitter / nanny", "tutoring": "Tutor",
             "personal-training": "Personal trainer", "beauty": "Beauty professional",
             "tech": "Tech freelancer", "marketing": "Marketing freelancer", "remote": "Remote work",
+            "notary": "Mobile notary", "mechanic": "Mobile mechanic", "locksmith": "Locksmith",
+            "appliance-repair": "Appliance repair tech", "it-support": "IT support specialist",
+            "errands": "Errand runner", "security": "Security guard",
+            "junk-removal": "Junk removal pro", "snow-removal": "Snow removal pro",
+            "auto-detailing": "Auto detailer", "tax-prep": "Tax preparer",
+            "translator": "Translator", "photographer": "Photographer",
+            "event-staff": "Event staff",
         },
     },
     "find-help": {
@@ -3376,6 +3383,13 @@ LANDING_PAGE_TYPES = {
             "cleaning": "cleaning", "landscaping": "landscaping", "pet-care": "pet care",
             "childcare": "childcare", "tutoring": "tutoring",
             "personal-training": "personal training", "beauty": "beauty",
+            "notary": "notary", "mechanic": "mobile mechanic", "locksmith": "locksmith",
+            "appliance-repair": "appliance repair", "it-support": "IT support",
+            "errands": "errand running", "security": "security guard",
+            "junk-removal": "junk removal", "snow-removal": "snow removal",
+            "auto-detailing": "auto detailing", "tax-prep": "tax preparer",
+            "legal-help": "legal consult", "translator": "translator",
+            "photographer": "photographer", "event-staff": "event staff",
         },
     },
     "sell": {
@@ -3556,9 +3570,19 @@ async def sitemap_xml(request: Request):
         "/", "/about", "/contact", "/terms", "/privacy", "/blog",
         "/marketplace", "/stores", "/restaurants", "/rentals",
         "/real-estate", "/autos", "/map", "/register", "/login", "/sign-in",
+        # High-value recruiting landing pages (provider + seller)
+        "/become-a-provider", "/earn",
+        "/list-your-stuff", "/sell-on-lumo",
     ]
     for p in core_paths:
-        lines.append(f"  <url><loc>{origin}{p}</loc><changefreq>daily</changefreq><priority>1.0</priority></url>")
+        # Boost priority on the recruiting pages so Google crawls them often.
+        prio = "1.0" if p in ("/", "/become-a-provider", "/list-your-stuff", "/earn", "/sell-on-lumo") else "0.9"
+        lines.append(f"  <url><loc>{origin}{p}</loc><changefreq>daily</changefreq><priority>{prio}</priority></url>")
+
+    # Cities hub + per-city hubs (huge internal-link surface for SEO)
+    lines.append(f"  <url><loc>{origin}/cities</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
+    for city in LANDING_CITIES:
+        lines.append(f"  <url><loc>{origin}/cities/{city['slug']}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>")
 
     # Programmatic SEO landing pages (work/<cat>/<city>, etc.)
     for ptype, pdata in LANDING_PAGE_TYPES.items():

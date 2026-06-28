@@ -97,6 +97,12 @@ export default function NavBar() {
           {/* Customer link — absorbed the old "Hire and order" CTA */}
           <NavLink to="/customer" className={linkClass} data-testid="nav-customer"><User className="inline w-3.5 h-3.5 mr-1" />Customer</NavLink>
           {rl && rl.to !== "/customer" && <NavLink to={rl.to} className={linkClass} data-testid="nav-hub"><rl.icon className="inline w-3.5 h-3.5 mr-1" />{rl.label}</NavLink>}
+          {/* SEO + recruiting hook — always visible, drives provider sign-ups. */}
+          {!user && (
+            <NavLink to="/become-a-provider" className={linkClass} data-testid="nav-earn">
+              <HardHat className="inline w-3.5 h-3.5 mr-1" />Earn
+            </NavLink>
+          )}
         </nav>
         <div className="ml-auto flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <div className="hidden sm:block"><LocaleSwitcher /></div>

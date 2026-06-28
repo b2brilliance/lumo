@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
 import {
   ArrowUpRight, ShoppingBag, Store, Briefcase, Wallet,
@@ -26,6 +27,55 @@ export default function Landing() {
 
   return (
     <div className="bg-white">
+      <Helmet>
+        <title>Lumo — Local services, same-day delivery, jobs & rentals worldwide</title>
+        <meta name="description" content="Hire local providers, earn money on your schedule, sell with same-day delivery, or list rentals — all on Lumo. Workers keep 90%, hosts pay just 10%. Escrow-protected, 24-hour payouts." />
+        <link rel="canonical" href="https://golumo.app/" />
+        <meta property="og:title" content="Lumo — Local services, jobs, and rentals worldwide" />
+        <meta property="og:description" content="Workers keep 90%. Same-day delivery from any retailer. Escrow on every order. Stripe-powered 24-hour payouts." />
+        <meta property="og:url" content="https://golumo.app/" />
+        <meta name="twitter:card" content="summary_large_image" />
+        {/* LocalBusiness + AggregateOffer schema unlocks rich-result eligibility
+            and surfaces our 10% pricing as a feature snippet on Google. */}
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          "name": "Lumo",
+          "url": "https://golumo.app",
+          "logo": "https://golumo.app/apple-touch-icon.png",
+          "image": "https://golumo.app/og-cover.png",
+          "description": "On-demand local services, same-day delivery, marketplace listings, vacation rentals and remote work — all on a flat 10% commission.",
+          "areaServed": { "@type": "GeoShape", "name": "Worldwide" },
+          "priceRange": "$",
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Lumo services",
+            "itemListElement": [
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Same-day delivery" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Cleaning, moving, handyman" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Mobile notary, mechanic, locksmith" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Vacation rentals & equipment hire" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Auto sales & real estate listings" } },
+            ],
+          },
+        })}</script>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://golumo.app/" },
+          ],
+        })}</script>
+        {/* Voice-search hook: Google Assistant reads the H1+first paragraph aloud. */}
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "speakable": {
+            "@type": "SpeakableSpecification",
+            "cssSelector": ["h1", ".speakable-summary"],
+          },
+        })}</script>
+      </Helmet>
       <LanguageBar />
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="border-b border-slate-200 relative overflow-hidden">
@@ -38,7 +88,7 @@ export default function Landing() {
               <span className="text-amber-600">digital</span> &amp; <span className="text-teal-700">remote</span> work —<br />
               in one place.
             </h1>
-            <p className="text-lg text-slate-600 mt-6 max-w-xl leading-relaxed">
+            <p className="text-lg text-slate-600 mt-6 max-w-xl leading-relaxed speakable-summary">
               Lumo connects customers with trusted providers for everything from package delivery and home services to retail orders and remote contracts. Post a request, review quotes, and pay safely — all in one app.
             </p>
             <div className="flex flex-wrap gap-3 mt-8">

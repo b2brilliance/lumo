@@ -109,7 +109,7 @@ export default function SiteFooter() {
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Brand + tagline */}
-          <div className="md:col-span-5">
+          <div className="md:col-span-4">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-slate-900 text-white grid place-items-center font-display font-black">
                 L
@@ -125,8 +125,33 @@ export default function SiteFooter() {
             )}
           </div>
 
+          {/* Earn / List — SEO recruiting */}
+          <div className="md:col-span-2">
+            <div className="overline text-slate-500 mb-2">Earn</div>
+            <nav className="flex flex-col gap-1.5 text-sm">
+              <Link to="/become-a-provider" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-become-provider">Become a provider</Link>
+              <Link to="/list-your-stuff"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-list-stuff">List your stuff</Link>
+              <Link to="/rentals/host"      className="text-slate-700 hover:text-teal-700" data-testid="footer-link-host-rental">Host a rental</Link>
+              <Link to="/cities"            className="text-slate-700 hover:text-teal-700" data-testid="footer-link-cities">All cities</Link>
+              <Link to="/map"               className="text-slate-700 hover:text-teal-700" data-testid="footer-link-jobs">Jobs near you</Link>
+            </nav>
+          </div>
+
+          {/* Marketplaces */}
+          <div className="md:col-span-2">
+            <div className="overline text-slate-500 mb-2">Marketplaces</div>
+            <nav className="flex flex-col gap-1.5 text-sm">
+              <Link to="/marketplace"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-marketplace">Community Market</Link>
+              <Link to="/stores"       className="text-slate-700 hover:text-teal-700" data-testid="footer-link-stores">Stores</Link>
+              <Link to="/restaurants"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-restaurants">Restaurants</Link>
+              <Link to="/rentals"      className="text-slate-700 hover:text-teal-700" data-testid="footer-link-rentals">Rentals</Link>
+              <Link to="/real-estate"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-realestate">Real Estate</Link>
+              <Link to="/autos"        className="text-slate-700 hover:text-teal-700" data-testid="footer-link-autos">Auto Sales</Link>
+            </nav>
+          </div>
+
           {/* Page links */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <div className="overline text-slate-500 mb-2">Lumo</div>
             <nav className="flex flex-col gap-1.5 text-sm">
               <Link to="/about"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-about">About</Link>
@@ -157,7 +182,7 @@ export default function SiteFooter() {
           </div>
 
           {/* Socials */}
-          <div className="md:col-span-4">
+          <div className="md:col-span-2">
             <div className="overline text-slate-500 mb-2">Follow us</div>
             {hasLinks ? (
               <div className="flex flex-wrap gap-2" data-testid="footer-social-icons">
