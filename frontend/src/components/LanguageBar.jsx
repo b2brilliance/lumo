@@ -3,6 +3,46 @@ import { api } from "@/lib/api";
 import { useLocale } from "@/lib/locale";
 import { Languages, Check } from "lucide-react";
 
+// Flag + short uppercase code per language. Flag picks the most-recognized
+// country for that language; code is the iso-639 root upper-cased so the
+// pill stays compact (3-4 chars max).
+const LANG_META = {
+  "en":    { flag: "🇺🇸", code: "EN" },
+  "es":    { flag: "🇪🇸", code: "ES" },
+  "fr":    { flag: "🇫🇷", code: "FR" },
+  "fr-CA": { flag: "🇨🇦", code: "FR-CA" },
+  "de":    { flag: "🇩🇪", code: "DE" },
+  "pt":    { flag: "🇵🇹", code: "PT" },
+  "pt-BR": { flag: "🇧🇷", code: "PT-BR" },
+  "it":    { flag: "🇮🇹", code: "IT" },
+  "nl":    { flag: "🇳🇱", code: "NL" },
+  "pl":    { flag: "🇵🇱", code: "PL" },
+  "ru":    { flag: "🇷🇺", code: "RU" },
+  "uk":    { flag: "🇺🇦", code: "UK" },
+  "tr":    { flag: "🇹🇷", code: "TR" },
+  "sv":    { flag: "🇸🇪", code: "SV" },
+  "ja":    { flag: "🇯🇵", code: "JA" },
+  "ko":    { flag: "🇰🇷", code: "KO" },
+  "zh":    { flag: "🇨🇳", code: "ZH" },
+  "zh-TW": { flag: "🇹🇼", code: "ZH-TW" },
+  "hi":    { flag: "🇮🇳", code: "HI" },
+  "bn":    { flag: "🇧🇩", code: "BN" },
+  "ur":    { flag: "🇵🇰", code: "UR" },
+  "ar":    { flag: "🇸🇦", code: "AR" },
+  "he":    { flag: "🇮🇱", code: "HE" },
+  "fa":    { flag: "🇮🇷", code: "FA" },
+  "vi":    { flag: "🇻🇳", code: "VI" },
+  "th":    { flag: "🇹🇭", code: "TH" },
+  "id":    { flag: "🇮🇩", code: "ID" },
+  "ms":    { flag: "🇲🇾", code: "MS" },
+  "tl":    { flag: "🇵🇭", code: "TL" },
+  "sw":    { flag: "🇰🇪", code: "SW" },
+  "ha":    { flag: "🇳🇬", code: "HA" },
+  "yo":    { flag: "🇳🇬", code: "YO" },
+  "am":    { flag: "🇪🇹", code: "AM" },
+  "el":    { flag: "🇬🇷", code: "EL" },
+};
+
 /**
  * Centered horizontal "Read Lumo in your language" pill bar.
  * Renders at the top of the homepage. Lets a visitor switch the entire
@@ -30,7 +70,7 @@ export default function LanguageBar() {
 
   if (langs.length === 0) return null;
 
-  const PREVIEW_COUNT = 7;
+  const PREVIEW_COUNT = 8;
   const visible = expanded ? langs : langs.slice(0, PREVIEW_COUNT);
 
   return (
@@ -40,13 +80,14 @@ export default function LanguageBar() {
       data-no-i18n="true"
     >
       <div className="max-w-screen-2xl mx-auto px-4 py-2.5">
-        <div className="flex items-center justify-center gap-2 flex-wrap text-[12px]">
+        <div className="flex items-center justify-center gap-1.5 flex-wrap text-[12px]">
           <div className="flex items-center gap-1.5 text-slate-500 font-mono uppercase tracking-widest text-[10px] pr-2 mr-1 border-r border-slate-300">
             <Languages className="w-3.5 h-3.5" />
             <span>Read Lumo in</span>
           </div>
 
           {visible.map((l) => {
+            const meta = LANG_META[l.code] || { flag: "🌐", code: l.code.toUpperCase() };
             const active = lang === l.code;
             return (
               <button
@@ -60,10 +101,11 @@ export default function LanguageBar() {
                 }`}
                 data-testid={`lang-pill-${l.code}`}
                 data-no-i18n="true"
-                title={l.code}
+                title={l.label}
               >
+                <span className="text-sm leading-none" data-no-i18n="true">{meta.flag}</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold">{meta.code}</span>
                 {active && <Check className="w-3 h-3" />}
-                <span>{l.label}</span>
               </button>
             );
           })}
@@ -72,7 +114,7 @@ export default function LanguageBar() {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="inline-flex items-center px-2.5 py-1 border border-dashed border-slate-300 rounded-full text-slate-500 hover:text-slate-900 hover:border-slate-500 font-mono"
+              className="inline-flex items-center px-2.5 py-1 border border-dashed border-slate-300 rounded-full text-slate-500 hover:text-slate-900 hover:border-slate-500 font-mono text-[10px] uppercase tracking-widest"
               data-testid="lang-pill-more"
               data-no-i18n="true"
             >
