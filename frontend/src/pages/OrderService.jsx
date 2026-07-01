@@ -129,11 +129,20 @@ export default function OrderService() {
   }, [isMoving, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.subcategory, form.details?.home_size, form.details?.helpers, form.details?.hours, form.details?.truck_included, form.details?.stairs]);
 
   useEffect(() => {
-    if (deliveryQuote?.total > 0) set("pay_rate", deliveryQuote.total.toFixed(2));
-  }, [deliveryQuote]);
+    // Only overwrite pay_rate the FIRST time we compute a positive quote,
+    // OR when the user hasn't manually edited it since. Prevents the
+    // input value from flickering while typing in adjacent fields.
+    if (deliveryQuote?.total > 0) {
+      const rounded = deliveryQuote.total.toFixed(2);
+      setForm((f) => (f.pay_rate === rounded ? f : { ...f, pay_rate: rounded }));
+    }
+  }, [deliveryQuote?.total]);
   useEffect(() => {
-    if (movingQuote?.total > 0) set("pay_rate", movingQuote.total.toFixed(2));
-  }, [movingQuote]);
+    if (movingQuote?.total > 0) {
+      const rounded = movingQuote.total.toFixed(2);
+      setForm((f) => (f.pay_rate === rounded ? f : { ...f, pay_rate: rounded }));
+    }
+  }, [movingQuote?.total]);
 
   const priceNum = parseFloat(form.pay_rate || "0");
   const breakdown = priceNum > 0 ? computeBreakdown?.(priceNum, 0) : null;
@@ -306,7 +315,7 @@ export default function OrderService() {
 
         {/* Step 4 — Price */}
         <section data-testid="order-step-price">
-          <StepHeader n={(showAddress ? 3 : 2) + 1} title="What's it worth?" />
+          <StepHeader n={(showAddress ? 3 : 2) + 1} title="Your budget" />
           {(deliveryQuote || movingQuote) && (
             <div className="mb-3 bg-teal-50 border border-teal-200 p-3 text-sm">
               <div className="font-mono uppercase tracking-wider text-teal-800 text-xs">Auto-quote</div>

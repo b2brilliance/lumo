@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import AffiliateBlock from "@/components/AffiliateBlock";
+import PageHero from "@/components/PageHero";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Home, BedDouble, Bath, Maximize, MapPin } from "lucide-react";
 
@@ -97,17 +98,15 @@ export default function RealEstate() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 py-8" data-testid="real-estate-page">
-      <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
-        <div>
-          <p className="text-[11px] font-mono tracking-[0.2em] text-slate-500 uppercase">Lumo · Marketplace</p>
-          <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight">Real Estate</h1>
-          <p className="text-slate-600 mt-1 text-sm max-w-xl">Homes for sale and for rent — direct from sellers and landlords. Message owners privately through Lumo.</p>
-        </div>
-        <Link to="/real-estate/list">
-          <Button className="bg-slate-900 hover:bg-slate-800" data-testid="re-list-btn">List a property</Button>
-        </Link>
-      </div>
+    <div className="max-w-screen-2xl mx-auto py-0" data-testid="real-estate-page">
+      <PageHero
+        image="https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        overline="Lumo · Marketplace"
+        title="Real Estate"
+        subtitle="Homes for sale and for rent — direct from sellers and landlords. Message owners privately through Lumo."
+        action={<Link to="/real-estate/list"><Button className="bg-white text-slate-900 hover:bg-slate-100" data-testid="re-list-btn">List a property</Button></Link>}
+      />
+      <div className="px-4 sm:px-6 pb-8">
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-6 text-xs">
         <Input data-testid="re-filter-q" placeholder="Search title, city…" defaultValue={f.q} onBlur={(e) => set("q", e.target.value)} />
@@ -145,6 +144,7 @@ export default function RealEstate() {
       )}
       <div className="mt-12 -mx-4 sm:-mx-6">
         <AffiliateBlock category="real-estate" title="Mortgage & home services partners" subtitle="Get pre-approved, find a top agent, lock in home insurance." />
+      </div>
       </div>
     </div>
   );

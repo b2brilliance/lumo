@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, KeyRound, Inbox, Home, Car, HardHat } from "lucide-react";
+import { LogOut, MapPin, Sparkles, Store, UtensilsCrossed, ShoppingBag, Briefcase, User, Wallet, Settings, MessageSquare, ShoppingCart, KeyRound, Inbox, Home, Car, HardHat, ShieldCheck } from "lucide-react";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 // Marketplaces dropdown — physical goods and inventory.
@@ -32,9 +32,14 @@ export default function NavBar() {
     if (user.role === "provider") return { to: "/provider", label: "Provider Hub", icon: Briefcase };
     if (user.role === "retailer") return { to: "/retailer", label: "Retailer Hub", icon: Store };
     if (user.role === "restaurant") return { to: "/restaurant", label: "Restaurant Hub", icon: UtensilsCrossed };
+    if (user.role === "admin") return { to: "/admin", label: "Admin", icon: ShieldCheck };
     return null;
   };
   const rl = roleLink();
+  // Role-based visibility: Retailer/Restaurant/Admin get *only* their own hub
+  // link (no generic "Customer" link cluttering their nav). Everyone else
+  // (guest, customer, provider) can still see the Customer link.
+  const restrictedRole = user && ["retailer", "restaurant", "admin"].includes(user.role);
 
   const linkClass = ({ isActive }) =>
     `px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -55,8 +60,11 @@ export default function NavBar() {
         <div className="hidden sm:block flex-shrink-0" data-testid="nav-locale-left"><LocaleSwitcher /></div>
         <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden">
           <NavLink to="/map" className={linkClass} data-testid="nav-map"><MapPin className="inline w-3.5 h-3.5 mr-1" />Jobs near you</NavLink>
-          {/* Customer link — absorbed the old "Hire and order" CTA */}
-          <NavLink to="/customer" className={linkClass} data-testid="nav-customer"><User className="inline w-3.5 h-3.5 mr-1" />Customer</NavLink>
+          {/* Customer link — hidden for retailer/restaurant/admin (they have
+              their own dedicated hub link and shouldn't see redundant nav). */}
+          {!restrictedRole && (
+            <NavLink to="/customer" className={linkClass} data-testid="nav-customer"><User className="inline w-3.5 h-3.5 mr-1" />Customer</NavLink>
+          )}
           {rl && rl.to !== "/customer" && <NavLink to={rl.to} className={linkClass} data-testid="nav-hub"><rl.icon className="inline w-3.5 h-3.5 mr-1" />{rl.label}</NavLink>}
           {/* SEO + recruiting hook — always visible, drives provider sign-ups. */}
           {!user && (
@@ -112,14 +120,27 @@ export default function NavBar() {
             testId="mobile-nav-work"
           />
           <MarketplacesSheet />
-          <MobileNavTile
-            to="/customer"
-            icon={User}
-            title="Customer"
-            subtitle="Hire & order"
-            tint="teal"
-            testId="mobile-nav-hire"
-          />
+          {/* Third tile is role-aware: restricted roles jump into their hub
+              instead of the generic Customer landing. */}
+          {restrictedRole && rl ? (
+            <MobileNavTile
+              to={rl.to}
+              icon={rl.icon}
+              title={rl.label}
+              subtitle="Your dashboard"
+              tint="teal"
+              testId="mobile-nav-hub"
+            />
+          ) : (
+            <MobileNavTile
+              to="/customer"
+              icon={User}
+              title="Customer"
+              subtitle="Hire & order"
+              tint="teal"
+              testId="mobile-nav-hire"
+            />
+          )}
         </div>
       </div>
       )}

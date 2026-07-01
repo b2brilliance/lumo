@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { ReviewSummaryBadge } from "@/components/ReviewsSection";
 import { Search, Store, UtensilsCrossed, KeyRound, Car, ShoppingBag, X } from "lucide-react";
 import AffiliateBlock from "@/components/AffiliateBlock";
+import PageHero from "@/components/PageHero";
 import { useLocale } from "@/lib/locale";
 
 const SECTIONS = [
@@ -51,14 +52,14 @@ export default function Directory({ role }) {
   }, [results]);
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 py-10" data-testid="marketplace-directory">
-      <div className="overline">Marketplaces</div>
-      <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-2">
-        Find anything local.
-      </h1>
-      <p className="text-slate-600 mt-3 max-w-xl">
-        One search across every marketplace on Lumo — stores, restaurants, rentals, cars for sale, and community listings from your neighbors.
-      </p>
+    <div className="max-w-screen-2xl mx-auto py-0" data-testid="marketplace-directory">
+      <PageHero
+        image="https://images.pexels.com/photos/2467287/pexels-photo-2467287.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        overline="Marketplaces"
+        title="Find anything local."
+        subtitle="One search across every marketplace on Lumo — stores, restaurants, rentals, cars for sale, and community listings from your neighbors."
+      />
+      <div className="px-4 sm:px-6 pb-10">
 
       {/* Search bar */}
       <div className="mt-8 relative max-w-2xl" data-testid="marketplace-search-wrap">
@@ -158,6 +159,7 @@ export default function Directory({ role }) {
       )}
       <div className="mt-10 -mx-4 sm:-mx-6">
         <AffiliateBlock category={active === "restaurants" ? "restaurants" : active === "rentals" ? "rentals" : active === "autos" ? "autos" : active === "marketplace" ? "marketplace" : "stores"} />
+      </div>
       </div>
     </div>
   );

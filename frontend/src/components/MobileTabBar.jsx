@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Search, Briefcase, ShoppingBag, User } from "lucide-react";
+import { Search, Briefcase, ShoppingBag, User, Store, UtensilsCrossed, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 /* Uber-style persistent bottom bar on mobile — always visible so the four
@@ -10,20 +10,23 @@ const TABS = [
   { key: "search",     label: "Search",    to: "/",           Icon: Search },
   { key: "jobs",       label: "Jobs",      to: "/map",        Icon: Briefcase },
   { key: "market",     label: "Market",    to: "/stores",     Icon: ShoppingBag },
-  { key: "me",         label: "Me",        to: "/customer",   Icon: User },
+  { key: "account",    label: "Account",   to: "/customer",   Icon: User },
 ];
+
+// Role-aware account tab: restricted roles (retailer/restaurant/admin) get a
+// direct link + label to their own hub instead of the generic Customer icon.
+const ROLE_META = {
+  provider:   { label: "Provider",   Icon: Briefcase,   to: "/provider" },
+  retailer:   { label: "Retailer",   Icon: Store,       to: "/retailer" },
+  restaurant: { label: "Restaurant", Icon: UtensilsCrossed, to: "/restaurant" },
+  admin:      { label: "Admin",      Icon: ShieldCheck, to: "/admin" },
+};
 
 export default function MobileTabBar() {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  const meTarget = user
-    ? ({
-        provider:   "/provider",
-        retailer:   "/retailer",
-        restaurant: "/restaurant",
-        admin:      "/admin",
-      }[user.role] || "/customer")
-    : "/signin";
+  const roleMeta = user && ROLE_META[user.role];
+  const meTarget = roleMeta ? roleMeta.to : (user ? "/customer" : "/signin");
 
   return (
     <nav
@@ -32,11 +35,14 @@ export default function MobileTabBar() {
     >
       <div className="grid grid-cols-4">
         {TABS.map((t) => {
-          const to = t.key === "me" ? meTarget : t.to;
+          const isAccount = t.key === "account";
+          const to = isAccount ? meTarget : t.to;
+          const Icon = isAccount && roleMeta ? roleMeta.Icon : t.Icon;
+          const label = isAccount && roleMeta ? roleMeta.label : t.label;
           const isActive =
             (t.to === "/" && pathname === "/") ||
             (t.to !== "/" && pathname.startsWith(t.to)) ||
-            (t.key === "me" && pathname.startsWith(meTarget));
+            (isAccount && pathname.startsWith(meTarget));
           return (
             <Link
               key={t.key}
@@ -46,8 +52,8 @@ export default function MobileTabBar() {
               } active:bg-slate-100`}
               data-testid={`tabbar-${t.key}`}
             >
-              <t.Icon className={`w-5 h-5 ${isActive ? "text-teal-700" : "text-slate-500"}`} />
-              <span className="mt-0.5">{t.label}</span>
+              <Icon className={`w-5 h-5 ${isActive ? "text-teal-700" : "text-slate-500"}`} />
+              <span className="mt-0.5">{label}</span>
             </Link>
           );
         })}

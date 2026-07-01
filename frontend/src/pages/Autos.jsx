@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import AffiliateBlock from "@/components/AffiliateBlock";
+import PageHero from "@/components/PageHero";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Car, Gauge, Fuel, MapPin } from "lucide-react";
 
@@ -88,17 +89,15 @@ export default function Autos() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 py-8" data-testid="autos-page">
-      <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
-        <div>
-          <p className="text-[11px] font-mono tracking-[0.2em] text-slate-500 uppercase">Lumo · Marketplace</p>
-          <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight">Auto Sales</h1>
-          <p className="text-slate-600 mt-1 text-sm max-w-xl">Cars, trucks, SUVs and EVs — buy direct from sellers. Message owners privately through Lumo.</p>
-        </div>
-        <Link to="/autos/list">
-          <Button className="bg-slate-900 hover:bg-slate-800" data-testid="auto-list-btn">Sell my car</Button>
-        </Link>
-      </div>
+    <div className="max-w-screen-2xl mx-auto px-0 sm:px-0 py-0" data-testid="autos-page">
+      <PageHero
+        image="https://images.pexels.com/photos/3849554/pexels-photo-3849554.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        overline="Lumo · Marketplace"
+        title="Auto Sales"
+        subtitle="Cars, trucks, SUVs and EVs — buy direct from sellers. Message owners privately through Lumo."
+        action={<Link to="/autos/list"><Button className="bg-white text-slate-900 hover:bg-slate-100" data-testid="auto-list-btn">Sell my car</Button></Link>}
+      />
+      <div className="px-4 sm:px-6 pb-8">
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-3 text-xs">
         <Input data-testid="auto-filter-q" placeholder="Search…" defaultValue={f.q} onBlur={(e) => set("q", e.target.value)} />
@@ -144,6 +143,7 @@ export default function Autos() {
       )}
       <div className="mt-12 -mx-4 sm:-mx-6">
         <AffiliateBlock category="autos" title="Auto loans, warranties & cash offers" subtitle="Pre-qualify for financing, get a real cash offer, or protect your purchase." />
+      </div>
       </div>
     </div>
   );

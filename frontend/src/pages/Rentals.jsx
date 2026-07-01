@@ -5,6 +5,7 @@ import { RENTAL_CATEGORIES, RENTAL_PRICING_LABEL } from "@/lib/rentalCategories"
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star, Sparkles } from "lucide-react";
+import PageHero from "@/components/PageHero";
 
 function PriceTag({ pricing }) {
   if (!pricing) return null;
@@ -109,13 +110,16 @@ export default function Rentals() {
   const activeCat = category && RENTAL_CATEGORIES[category];
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 py-10">
-      <div className="overline">Rentals</div>
-      <div className="flex items-end justify-between gap-4 flex-wrap mt-2">
-        <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter">
-          {activeCat ? activeCat.label.toLowerCase() : "Rent anything, anywhere."}
-        </h1>
-        <div className="flex items-center gap-3 flex-1 max-w-xl">
+    <div className="max-w-screen-2xl mx-auto py-0">
+      <PageHero
+        image="https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        overline="Rentals"
+        title={activeCat ? activeCat.label : "Rent anything, anywhere."}
+        subtitle={activeCat ? activeCat.blurb : "Homes, cars, tools, gear, venues — hourly / daily / weekly. Book in a tap."}
+        action={<Link to="/rentals/host"><Button className="bg-white text-slate-900 hover:bg-slate-100 whitespace-nowrap" data-testid="rentals-host-cta"><Sparkles className="w-4 h-4 mr-1.5" />List a rental</Button></Link>}
+      />
+      <div className="px-4 sm:px-6 pb-10">
+      <div className="flex items-center gap-3 max-w-xl mb-4">
           <form
             onSubmit={(e) => { e.preventDefault(); const p = new URLSearchParams(params); if (search) p.set("q", search); else p.delete("q"); setParams(p); }}
             className="flex-1"
@@ -128,16 +132,7 @@ export default function Rentals() {
               data-testid="rentals-search-input"
             />
           </form>
-          <Link to="/rentals/host">
-            <Button className="bg-slate-900 hover:bg-slate-800 text-white whitespace-nowrap" data-testid="rentals-host-cta">
-              <Sparkles className="w-4 h-4 mr-1.5" /> List a rental
-            </Button>
-          </Link>
         </div>
-      </div>
-      {activeCat && (
-        <p className="text-slate-600 mt-3 max-w-2xl">{activeCat.blurb}</p>
-      )}
 
       {/* Category pills */}
       <div className="flex flex-wrap gap-2 mt-6">
@@ -202,6 +197,7 @@ export default function Rentals() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

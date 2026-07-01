@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import AffiliateBlock from "@/components/AffiliateBlock";
+import PageHero from "@/components/PageHero";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
@@ -141,19 +142,19 @@ export default function Marketplace() {
   const breakdown = item ? computeBreakdown(item.price, deliveryFeeNum) : null;
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 py-10">
-      <div className="flex items-end justify-between flex-wrap gap-4">
-        <div>
-          <div className="overline">Community Market</div>
-          <h1 className="font-display text-4xl md:text-5xl font-black tracking-tighter mt-2">From your neighbors.</h1>
-          <p className="text-slate-600 mt-2 max-w-xl">List anything. Bundled 10% deposit. Delivery wired in.</p>
-        </div>
-        {user && user !== false && (
-          <Button onClick={() => setOpenCreate(true)} className="bg-slate-900 hover:bg-slate-800" data-testid="marketplace-create">+ Create listing</Button>
-        )}
-      </div>
+    <div className="max-w-screen-2xl mx-auto py-0">
+      <PageHero
+        image="https://images.pexels.com/photos/994523/pexels-photo-994523.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        overline="Community Market"
+        title="From your neighbors."
+        subtitle="List anything. Bundled 10% deposit. Delivery wired in."
+        action={user && user !== false ? (
+          <Button onClick={() => setOpenCreate(true)} className="bg-white text-slate-900 hover:bg-slate-100" data-testid="marketplace-create">+ Create listing</Button>
+        ) : null}
+      />
+      <div className="px-4 sm:px-6 pb-10">
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-px bg-slate-200 mt-8 border border-slate-200" data-testid="marketplace-grid">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-px bg-slate-200 mt-2 border border-slate-200" data-testid="marketplace-grid">
         {items.length === 0 && <div className="bg-white p-8 text-sm text-slate-500 col-span-full">No listings yet.</div>}
         {items.map((it) => {
           const img = it.media_url ? (it.media_url.startsWith("http") ? it.media_url : `${BACKEND_URL}${it.media_url}`) : null;
@@ -341,6 +342,7 @@ export default function Marketplace() {
       </Dialog>
       <div className="mt-10 -mx-4 sm:-mx-6">
         <AffiliateBlock category="marketplace" title="Earn cashback while you shop" subtitle="Cashback portals, gift cards, and exclusive deals from our partners." />
+      </div>
       </div>
     </div>
   );
