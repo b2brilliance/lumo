@@ -26,6 +26,21 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Major-city expansion — US, India, UAE, UK, China, Australia (Jul 1, 2026)
+- **LANDING_CITIES expanded** from 40 → **166 cities**. Each auto-generates:
+  - `/cities/:slug` hub with services, city name in title/meta/H1, JSON-LD Place schema
+  - Four programmatic SEO pages per city: `/work/:cat/:city`, `/find-help/:cat/:city`, `/sell/:cat/:city`, `/rent-out/:cat/:city`
+  - Sitemap entry (weekly changefreq, priority 0.7)
+- Breakdown of the 6 targeted countries after expansion:
+  - **US**: 47 cities (added DC, Vegas, Nashville, Charlotte, Detroit, Indianapolis, Columbus, Memphis, Louisville, Baltimore, Milwaukee, Kansas City, OKC, Cincinnati, SLC, Raleigh, New Orleans, Minneapolis, Tampa, Orlando, Jacksonville, Pittsburgh, St. Louis, Cleveland, Sacramento, Fort Worth, El Paso, San Jose, Long Beach, Oakland)
+  - **India**: 26 (added Pune, Ahmedabad, Surat, Jaipur, Lucknow, Kanpur, Nagpur, Indore, Bhopal, Chandigarh, Kochi, Coimbatore, Vadodara, Visakhapatnam, Patna, Bhubaneswar, Gurgaon, Noida, Thane)
+  - **UAE**: 8 (all seven emirates + Al Ain)
+  - **UK**: 18 (added Birmingham, Glasgow, Liverpool, Leeds, Bristol, Cardiff, Belfast, Newcastle, Sheffield, Nottingham, Leicester, Coventry, Southampton, Oxford, Cambridge)
+  - **China**: 14 (added Guangzhou, Shenzhen, Chengdu, Chongqing, Tianjin, Wuhan, Xi'an, Nanjing, Hangzhou, Suzhou, Qingdao, Dalian)
+  - **Australia**: 13 (added Adelaide, Gold Coast, Canberra, Newcastle-AU, Wollongong, Hobart, Darwin, Geelong, Sunshine Coast)
+- **Sitemap grew from 6,182 → 13,553 URLs** — a 2.2× expansion of Lumo's indexable surface.
+
+
 ### Jobs cleanup + W-2 rename + Region SEO hubs + Marketplaces removal (Jul 1, 2026)
 - **Aggregator ingest hardening** (`/app/backend/aggregators.py`):
   - Reject any external listing where `pay_rate <= 0` — no more "$0" filler
