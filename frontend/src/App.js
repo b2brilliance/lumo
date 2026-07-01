@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/locale";
 import { CartProvider } from "@/lib/cart";
 import NavBar from "@/components/NavBar";
+import MobileTabBar from "@/components/MobileTabBar";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
 import AutoTranslator from "@/components/AutoTranslator";
@@ -163,6 +164,9 @@ function App() {
           </Routes>
               </ErrorBoundary>
           <SiteFooter />
+          {/* Bottom padding for mobile so the fixed tab bar doesn't hide the footer */}
+          <div className="md:hidden h-14" aria-hidden />
+          <MobileTabBar />
           <Toaster position="top-right" richColors />
             <AssistantWidget />
             <InstallPrompt />

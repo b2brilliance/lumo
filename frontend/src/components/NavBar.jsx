@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,10 @@ export default function NavBar() {
   const { user, logout } = useAuth();
   const { cart } = useCart() || { cart: { total_items: 0 } };
   const nav = useNavigate();
+  const { pathname } = useLocation();
+  // Homepage already surfaces every role/category in its category grid, so
+  // the sticky mobile sub-nav is redundant clutter there.
+  const showMobileSubnav = pathname !== "/";
   const [mpOpen, setMpOpen] = useState(false);
   const mpRef = useRef(null);
 
@@ -141,7 +145,8 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* ── Mobile sub-nav — three big sections explaining what each offers ── */}
+      {/* ── Mobile sub-nav — hidden on homepage (redundant with grid). ── */}
+      {showMobileSubnav && (
       <div className="md:hidden border-t border-slate-200 bg-slate-50" data-testid="mobile-subnav">
         <div className="grid grid-cols-3 divide-x divide-slate-200">
           <MobileNavTile
@@ -163,6 +168,7 @@ export default function NavBar() {
           />
         </div>
       </div>
+      )}
     </header>
   );
 }

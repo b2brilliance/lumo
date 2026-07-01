@@ -26,6 +26,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Uber × Craigslist homepage redesign + mobile UX (Jul 1, 2026)
+- **Landing.jsx rewritten** — cut from 345 lines of marketing copy to 210 lines of function:
+  - "What do you need?" giant search input on top (routes to `/stores?q=…` for unified search)
+  - Auto-detected location bar (`Showing near <Country>`) with click-to-change picker (15 top countries)
+  - 18-tile mobile-first category grid (Delivery, Food, Stores, For sale, Cars, Rentals, Housing, Cleaning, Handyman, Moving, Pet care, Childcare, Beauty, Tech & IT, Tutoring, Photo & video, Jobs, More)
+  - 4-tile quick-action strip (Post a job, Jobs near me, Sell an item, Earn on Lumo)
+  - Compact "90% / 1 tap / 24 hr" value tiles
+  - REMOVED: marketing hero, philosophy sections, `HomeReviewsSection`, `EmailSubscribeForm`, commission comparison chart, on-demand banner. All that clutter is gone.
+- **`MobileTabBar` component** (`/app/frontend/src/components/MobileTabBar.jsx`) — Uber-style sticky bottom nav on mobile with 4 tabs: `Search / Jobs / Market / Me`. Active tab highlighted teal. Auto-routes `Me` to the user's role-appropriate hub (customer / provider / retailer / admin) or `/signin` when logged out.
+- **Mobile sub-nav hidden on homepage** — the sticky "Find work / Marketplaces / Customer" tile row (previously below the top nav on mobile) is now hidden on `/` since the homepage IS a category picker. Retained on all other routes for role switching.
+- **Language selector moved back next to the logo** in NavBar per user preference (`nav-locale-left` position).
+- **Homepage now sub-3s to first meaningful action** — visitor lands, sees search bar and category grid immediately, no marketing copy blocking the fold.
+
+
 ### Affiliate / referral engine + Insurance + Cities SEO hubs (Jun 28, 2026)
 - **Affiliate engine** (`/app/backend/affiliates.py`):
   - Mongo collections: `affiliate_offers`, `affiliate_clicks`, `affiliate_settings`.
