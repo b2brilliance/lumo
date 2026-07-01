@@ -8,7 +8,7 @@ const PROVIDER_FAQ = [
   { q: "When do I get paid?", a: "Payouts release 24 hours after the customer marks the job complete, sent directly to your bank via Stripe Connect." },
   { q: "Do I need a license?", a: "Most categories — no. Regulated work like medical, legal, and notary require a verified credential before you can accept those jobs. The rest (cleaning, moving, delivery, IT support, errands, etc.) — no license needed." },
   { q: "Can I do this part-time?", a: "Yes. Most providers on Lumo are part-time. Turn it on when you want work, turn it off when you don't." },
-  { q: "What kinds of work can I do?", a: "27 categories — same-day delivery, cleaning, handyman, moving, notary, mechanic, IT support, errands, locksmith, security, tutoring, plus any of 3,000+ external W-2 listings." },
+  { q: "What kinds of work can I do?", a: "27 categories — same-day delivery, cleaning, handyman, moving, notary, mechanic, IT support, errands, locksmith, security, tutoring, plus any of 3,000+ external salaried listings." },
 ];
 
 export default function BecomeProvider() {

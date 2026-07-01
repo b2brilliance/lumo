@@ -3965,7 +3965,11 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
 # Map data
 # ────────────────────────────────────────────────────────────────────────────
 @api.get("/map/jobs")
-async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None, employment_type: Optional[str] = None):
+async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None, employment_type: Optional[str] = None, include_external: bool = False):
+    """Live job feed for /map. By default we hide external aggregator rows
+    (source is set) so on-demand + staffing agencies + local salaried
+    stay together and uncluttered. The dedicated /remote-jobs page passes
+    `include_external=true` to get the aggregator firehose."""
     q = {"status": "open"}
     if remote_only:
         q["is_remote"] = True
@@ -3982,6 +3986,8 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             ]
         else:
             q["employment_type"] = employment_type
+    if not include_external:
+        q["$and"] = q.get("$and", []) + [{"$or": [{"source": None}, {"source": {"$exists": False}}]}]
     docs = await db.jobs.find(q).to_list(2000)
     pins = []
     for d in docs:
@@ -4012,10 +4018,68 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             "schedule": d.get("schedule"),
             "source": d.get("source"),
         })
-    # Newest first so chronological feeds don't have to re-sort client-side
-    # (the map itself doesn't care about order).
-    pins.sort(key=lambda p: p.get("created_at") or "", reverse=True)
-    return pins
+@api.get("/jobs/external")
+async def external_jobs_feed(
+    q: Optional[str] = None,
+    country: Optional[str] = None,
+    is_remote: Optional[bool] = None,
+    min_pay: Optional[float] = None,
+    limit: int = 200,
+):
+    """Feed for the /remote-jobs page — only aggregator-sourced listings
+    (Greenhouse, RemoteOK, WWR, USAJobs) with real pay figures. Kept
+    separate from /api/map/jobs so external listings don't clutter the
+    local on-demand map."""
+    from typing import Any as _Any, Dict as _Dict
+    mongo_q: _Dict[str, _Any] = {
+        "status": "open",
+        "source": {"$exists": True, "$ne": None},
+        "pay_rate": {"$gt": 0},
+    }
+    if is_remote is not None:
+        mongo_q["is_remote"] = is_remote
+    if country:
+        # Naive country match via title/address text since aggregators
+        # rarely expose a structured country field.
+        rx = re.compile(re.escape(country), re.I)
+        mongo_q["$or"] = [
+            {"title":   {"$regex": rx}},
+            {"description": {"$regex": rx}},
+            {"pickup_location.address": {"$regex": rx}},
+        ]
+    if q:
+        rx = re.compile(re.escape(q), re.I)
+        mongo_q["$and"] = mongo_q.get("$and", []) + [{
+            "$or": [
+                {"title":   {"$regex": rx}},
+                {"description": {"$regex": rx}},
+                {"customer_name": {"$regex": rx}},
+            ],
+        }]
+    if min_pay is not None:
+        mongo_q["pay_rate"] = {"$gte": float(min_pay)}
+    cursor = db.jobs.find(mongo_q).sort("created_at", -1).limit(int(limit))
+    out = []
+    async for d in cursor:
+        d = clean_doc(d)
+        out.append({
+            "id": d["id"], "title": d["title"], "category": d.get("category"),
+            "description": d.get("description"),
+            "pay_rate": d.get("pay_rate"), "pay_unit": d.get("pay_unit"),
+            "salary_min": d.get("salary_min"), "salary_max": d.get("salary_max"),
+            "schedule": d.get("schedule"),
+            "customer_name": d.get("customer_name") or d.get("external_employer"),
+            "is_remote": bool(d.get("is_remote")),
+            "employment_type": d.get("employment_type"),
+            "apply_url": d.get("apply_url"),
+            "source": d.get("source"),
+            "created_at": d.get("created_at"),
+            "location_text": (d.get("pickup_location") or {}).get("address") or (
+                "Remote" if d.get("is_remote") else None
+            ),
+        })
+    return {"jobs": out, "count": len(out)}
+
 
 @api.get("/")
 async def root():
@@ -6440,7 +6504,11 @@ async def on_startup():
     logger.info("Distribution scheduler loop started (polls every 60s)")
     # External job aggregators (USAJobs / Greenhouse / RemoteOK / WWR)
     try:
-        from aggregators import aggregator_loop
+        from aggregators import aggregator_loop, cleanup_junk_jobs
+        # Fire the one-shot cleanup pass immediately so leftover $0
+        # aggregator rows + "test …" QA jobs are gone before the feed
+        # is served.
+        await cleanup_junk_jobs(db)
         asyncio.create_task(aggregator_loop(db))
         logger.info("Aggregator loop started (every 6h)")
     except Exception as e:

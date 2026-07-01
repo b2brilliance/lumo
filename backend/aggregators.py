@@ -288,6 +288,10 @@ async def ingest_aggregated_jobs(db) -> Dict[str, int]:
     for source, items in sources.items():
         inserted = 0
         for it in items:
+            # Skip jobs without compensation info — displaying "$0" or
+            # blank pay looks scammy and clutters the feed.
+            if not float(it.get("pay_rate") or 0) > 0:
+                continue
             try:
                 source_id = it["source_id"]
                 doc = {
@@ -329,6 +333,26 @@ async def ingest_aggregated_jobs(db) -> Dict[str, int]:
     total = sum(counts.values())
     logger.info(f"Aggregator ingest complete: {counts} (total={total})")
     return counts
+
+
+async def cleanup_junk_jobs(db) -> Dict[str, int]:
+    """One-shot startup cleanup:
+    - Delete aggregator rows (source is set) with pay_rate <= 0 — these
+      slip in before the ingest filter was added and look like $0 jobs.
+    - Delete any job whose title starts with 'test' (case-insensitive) so
+      the feed doesn't look trashy from leftover QA data.
+    """
+    zero_pay = await db.jobs.delete_many({
+        "source": {"$exists": True, "$ne": None},
+        "$or": [{"pay_rate": {"$lte": 0}}, {"pay_rate": None}],
+    })
+    test_titles = await db.jobs.delete_many({
+        "title": {"$regex": r"^\s*test\b", "$options": "i"},
+    })
+    stats = {"zero_pay_removed": zero_pay.deleted_count, "test_titles_removed": test_titles.deleted_count}
+    if any(stats.values()):
+        logger.info(f"Cleanup complete: {stats}")
+    return stats
 
 
 async def _get_enabled_sources(db) -> Dict[str, bool]:

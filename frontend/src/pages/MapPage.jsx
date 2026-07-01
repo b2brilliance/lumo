@@ -183,7 +183,7 @@ export default function MapPage() {
         )
       : withDistance;
 
-    // W-2 jobs are strictly local — they only make sense within a commutable
+    // Salaried jobs are strictly local — they only make sense within a commutable
     // radius. Force-hide every W-2 pin until we have a location anchor.
     if (employmentFilter === "w2" && !anchor) {
       filtered = filtered.filter((p) => p.employment_type !== "w2");
@@ -212,7 +212,7 @@ export default function MapPage() {
 
   const showingMessage = !anchor
     ? (employmentFilter === "w2"
-        ? "W-2 jobs are commute-only — share your location or set a service address to see them."
+        ? "Salaried jobs are commute-only — share your location or set a service address to see them."
         : "Showing every open job — sign in or set a location in Settings to filter to your area.")
     : radius === 0
       ? "Showing every open job (no distance filter)."
@@ -227,7 +227,7 @@ export default function MapPage() {
       </p>
 
       {/* Employment-type pills — absorbed from the old "Work" nav dropdown so
-          every kind of job (on-demand · staffing · remote · W-2) is one tap
+          every kind of job (on-demand · staffing · remote · salaried) is one tap
           away from the same page. */}
       <WorkTypePills active={employmentFilter} />
 
@@ -282,14 +282,14 @@ export default function MapPage() {
 
         <p className="text-xs text-slate-500 mb-6" data-testid="map-feed-radius-note">{showingMessage}</p>
 
-        {/* Empty-state CTA for W-2 view when no location is set */}
+        {/* Empty-state CTA for salaried view when no location is set */}
         {employmentFilter === "w2" && !anchor && (
           <div className="border border-amber-300 bg-amber-50/60 p-5 mb-6 flex items-start gap-4" data-testid="map-w2-needs-location">
             <MapPin className="w-5 h-5 text-amber-700 mt-0.5 shrink-0" />
             <div className="flex-1">
-              <div className="font-display font-bold text-amber-900">W-2 jobs are commute-only</div>
+              <div className="font-display font-bold text-amber-900">Salaried jobs are commute-only</div>
               <p className="text-sm text-amber-800 mt-1 leading-snug">
-                We only show W-2 listings inside your commute radius. Allow location access (we&apos;ll ask once) so we can filter the feed, or save a permanent service address in <Link to="/settings" className="underline">Settings</Link>.
+                We only show salaried listings inside your commute radius. Allow location access (we&apos;ll ask once) so we can filter the feed, or save a permanent service address in <Link to="/settings" className="underline">Settings</Link>.
               </p>
             </div>
           </div>
@@ -403,34 +403,37 @@ export default function MapPage() {
 function WorkTypePills({ active }) {
   const navigate = useNavigate();
   const options = [
-    { value: null,         label: "All work",  icon: MapPin,    blurb: "Everything" },
-    { value: "on_demand",  label: "On-demand", icon: Sparkles,  blurb: "Same-day gigs" },
-    { value: "staffing",   label: "Staffing & temp", icon: Calendar, blurb: "Shifts & fill-ins" },
-    { value: "remote",     label: "Remote",    icon: Globe,     blurb: "Work from anywhere" },
-    { value: "w2",         label: "W-2 jobs",  icon: Briefcase, blurb: "Salaried with benefits" },
+    { value: null,         label: "All local work", icon: MapPin,    blurb: "Everything nearby" },
+    { value: "on_demand",  label: "On-demand",      icon: Sparkles,  blurb: "Same-day gigs" },
+    { value: "staffing",   label: "Staffing & temp",icon: Calendar,  blurb: "Shifts & fill-ins" },
+    { value: "w2",         label: "Salaried",       icon: Briefcase, blurb: "Local salaried roles" },
+    // Remote / external listings live on their own dedicated page so
+    // they don't clutter the local on-demand map.
+    { external: "/remote-jobs", label: "Remote & external", icon: Globe, blurb: "Work-from-anywhere feed" },
   ];
-  const setFilter = (v) => {
+  const setFilter = (o) => {
+    if (o.external) { navigate(o.external); return; }
     const url = new URL(window.location.href);
-    if (v) url.searchParams.set("employment", v);
+    if (o.value) url.searchParams.set("employment", o.value);
     else url.searchParams.delete("employment");
     navigate(`${url.pathname}${url.search}`);
   };
   return (
     <div className="mt-4 flex items-center gap-2 flex-wrap" data-testid="map-worktype-pills">
       {options.map((o) => {
-        const isActive = active === o.value || (!active && o.value === null);
+        const isActive = !o.external && (active === o.value || (!active && o.value === null));
         const Icon = o.icon;
         return (
           <button
-            key={o.value || "all"}
+            key={o.value || o.external || "all"}
             type="button"
-            onClick={() => setFilter(o.value)}
+            onClick={() => setFilter(o)}
             className={`group inline-flex items-center gap-2 px-3.5 py-2 border transition-colors text-sm font-mono ${
               isActive
                 ? "bg-slate-900 text-white border-slate-900"
                 : "bg-white text-slate-700 border-slate-300 hover:border-slate-900 hover:text-slate-900"
             }`}
-            data-testid={`worktype-pill-${o.value || "all"}`}
+            data-testid={`worktype-pill-${o.value || o.external?.replace('/', '') || "all"}`}
             aria-pressed={isActive}
           >
             <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-teal-700"}`} />

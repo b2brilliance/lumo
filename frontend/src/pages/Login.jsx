@@ -12,7 +12,7 @@ import {
 
 const ROLES = [
   { value: "customer",   label: "Customer",   icon: UserIcon,        desc: "Hire, order, and shop" },
-  { value: "provider",   label: "Service provider", icon: Briefcase, desc: "On-demand · staffing · remote · W-2" },
+  { value: "provider",   label: "Service provider", icon: Briefcase, desc: "On-demand · staffing · remote · salaried" },
   { value: "retailer",   label: "Retailer",   icon: Store,           desc: "Run a storefront" },
   { value: "restaurant", label: "Restaurant", icon: UtensilsCrossed, desc: "Take delivery orders" },
 ];

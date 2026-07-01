@@ -17,7 +17,7 @@ import {
 // ── Role catalog ──────────────────────────────────────────────────────────
 const ROLES = [
   { value: "customer",   label: "Customer",   icon: UserIcon,        desc: "Post requests, book services, shop & order. Also for recruiters and staffing-agency contacts." },
-  { value: "provider",   label: "Service provider", icon: Briefcase, desc: "On-demand gigs · staffing & temp shifts · remote contracts · W-2 openings." },
+  { value: "provider",   label: "Service provider", icon: Briefcase, desc: "On-demand gigs · staffing & temp shifts · remote contracts · salaried openings." },
   { value: "retailer",   label: "Retailer",   icon: Store,           desc: "Open a storefront with inventory and delivery." },
   { value: "restaurant", label: "Restaurant", icon: UtensilsCrossed, desc: "List your menu and accept delivery orders." },
 ];
@@ -27,7 +27,7 @@ const EMP_TYPES = [
   { value: "on_demand", label: "On-demand",       icon: Sparkles,  desc: "Same-day, ad-hoc gigs near you." },
   { value: "staffing",  label: "Staffing & temp", icon: Calendar,  desc: "Short shifts, fill-in roles, weekly schedules." },
   { value: "remote",    label: "Remote / contract", icon: Globe,   desc: "1099 / contract work done from anywhere." },
-  { value: "w2",        label: "W-2 / salaried",  icon: Briefcase, desc: "Full-time benefit-eligible positions." },
+  { value: "w2",        label: "Salaried",  icon: Briefcase, desc: "Full-time benefit-eligible positions." },
 ];
 
 // Top-level provider category catalogue. Each maps to SERVICE_SCHEMAS for sub.

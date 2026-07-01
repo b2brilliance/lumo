@@ -13,7 +13,7 @@ const EMP_TYPES = [
   { value: "on_demand", label: "On-demand",       icon: Sparkles },
   { value: "staffing",  label: "Staffing & temp", icon: Calendar },
   { value: "remote",    label: "Remote / contract", icon: GlobeIcon },
-  { value: "w2",        label: "W-2 / salaried",  icon: Briefcase },
+  { value: "w2",        label: "Salaried",  icon: Briefcase },
 ];
 
 const PROVIDER_CATEGORIES = [
