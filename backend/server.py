@@ -3317,6 +3317,7 @@ LANDING_CITIES = [
     {"slug": "mumbai", "name": "Mumbai", "country": "IN", "lat": 19.0760, "lng": 72.8777},
     {"slug": "delhi", "name": "Delhi", "country": "IN", "lat": 28.7041, "lng": 77.1025},
     {"slug": "bengaluru", "name": "Bengaluru", "country": "IN", "lat": 12.9716, "lng": 77.5946},
+    {"slug": "bangalore", "name": "Bangalore", "country": "IN", "lat": 12.9716, "lng": 77.5946},
     {"slug": "chennai", "name": "Chennai", "country": "IN", "lat": 13.0827, "lng": 80.2707},
     {"slug": "kolkata", "name": "Kolkata", "country": "IN", "lat": 22.5726, "lng": 88.3639},
     {"slug": "hyderabad", "name": "Hyderabad", "country": "IN", "lat": 17.3850, "lng": 78.4867},
@@ -3583,6 +3584,10 @@ async def sitemap_xml(request: Request):
     lines.append(f"  <url><loc>{origin}/cities</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
     for city in LANDING_CITIES:
         lines.append(f"  <url><loc>{origin}/cities/{city['slug']}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>")
+
+    # State / country region hubs — targeted SEO for CA, TX, NY, NV, India.
+    for rslug in ("california", "texas", "new-york-state", "nevada", "india"):
+        lines.append(f"  <url><loc>{origin}/regions/{rslug}</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>")
 
     # Programmatic SEO landing pages (work/<cat>/<city>, etc.)
     for ptype, pdata in LANDING_PAGE_TYPES.items():

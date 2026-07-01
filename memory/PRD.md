@@ -26,6 +26,27 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Jobs cleanup + W-2 rename + Region SEO hubs + Marketplaces removal (Jul 1, 2026)
+- **Aggregator ingest hardening** (`/app/backend/aggregators.py`):
+  - Reject any external listing where `pay_rate <= 0` — no more "$0" filler
+  - One-shot `cleanup_junk_jobs(db)` startup migration deleted **3,840 legacy zero-pay aggregator rows** + any job whose title starts with "test"
+- **`/remote-jobs` page** — brand-new dedicated feed for external listings (Greenhouse, RemoteOK, WWR, USAJobs) with keyword/country/min-pay filters. Kept OFF the local `/map` feed so on-demand + staffing agency remain uncluttered.
+- **`/api/map/jobs?include_external=false` (default)** — local map excludes aggregator rows unless explicitly requested.
+- **`/api/jobs/external`** — filterable feed for the new page (q, country, min_pay, is_remote, limit).
+- **"W-2" renamed to "Salaried"** across NavBar, MapPage, Register, Login, BecomeProvider, ProviderProfileSection — global term instead of US-only tax jargon.
+- **New `/regions/:slug` route** (`/app/frontend/src/pages/RegionHub.jsx`) — state + country-level SEO hubs with:
+  - Geo meta tags (`geo.region`, `geo.placename`, `geo.position`, `ICBM`)
+  - JSON-LD (BreadcrumbList + State/Country schema)
+  - Service tiles funneling to `/order/:service`
+  - Cities-within-region internal links
+  - "Also serving" neighbourhood strip for long-tail SEO
+  - Live external jobs pulled by region name
+  - Priority 0.9 in sitemap
+- **7 regions seeded**: California, Texas, New York State, Nevada (US), India (country), plus aliases (bangalore → cities/bengaluru, ny/ca/tx/nv shortcuts).
+- **Top-nav "Marketplaces" dropdown removed** — was broken, unused imports cleaned up. All marketplaces still reachable from homepage "Browse & buy" grid + footer.
+- **Sitemap** grew to **6,182 URLs** with 5 high-priority region pages.
+
+
 ### Uber-style per-service ordering pages + condensed homepage (Jul 1, 2026)
 - **`/order/:service` route** (`/app/frontend/src/pages/OrderService.jsx`) — one dedicated ordering page per service (30 services mapped: delivery, courier, moving, cleaning, handyman, pet_care, personal_care, it_support, tutoring, notary, locksmith, appliance_repair, security, tax, translator, photography, junk_removal, snow_removal, auto_detailing, etc.). Step-by-step layout:
   1. **Where?** — single or pickup+dropoff address (auto-picked from `locationModeFor(category)`) with Google Places autocomplete

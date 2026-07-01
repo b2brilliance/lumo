@@ -31,6 +31,7 @@ import CitiesIndex from "@/pages/CitiesIndex";
 import CityHub from "@/pages/CityHub";
 import OrderService from "@/pages/OrderService";
 import RemoteJobs from "@/pages/RemoteJobs";
+import RegionHub from "@/pages/RegionHub";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import CheckoutCancel from "@/pages/CheckoutCancel";
 import Wallet from "@/pages/Wallet";
@@ -123,6 +124,8 @@ function App() {
             <Route path="/order/:service" element={<OrderService />} />
             <Route path="/order" element={<OrderService />} />
             <Route path="/remote-jobs" element={<RemoteJobs />} />
+            <Route path="/regions/:slug" element={<RegionHub />} />
+            <Route path="/regions" element={<RegionHub />} />
 
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />
