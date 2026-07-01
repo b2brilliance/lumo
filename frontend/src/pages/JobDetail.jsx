@@ -185,11 +185,40 @@ export default function JobDetail() {
         )}
 
         {isProvider && job.status === "open" && (
-          <div className="flex gap-3 mt-8" data-testid="provider-actions">
-            <Button onClick={accept} className="bg-teal-700 hover:bg-teal-800" data-testid="job-detail-accept">Accept at asking rate</Button>
-            <Button onClick={() => setQuoteOpen(true)} variant="outline" data-testid="job-detail-quote">
-              {myProviderQuote ? "Update your quote" : "Send a counter-quote"}
-            </Button>
+          <div className="flex gap-3 mt-8 flex-wrap" data-testid="provider-actions">
+            {(() => {
+              // Only on-demand jobs are accept-and-track. W-2 / staffing /
+              // remote → surface external apply URL (or note if none).
+              const emp = job.employment_type || "on_demand";
+              if (emp !== "on_demand") {
+                if (job.apply_url) {
+                  return (
+                    <a
+                      href={job.apply_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white text-sm font-mono uppercase tracking-wider hover:bg-teal-800"
+                      data-testid="job-detail-apply-external"
+                    >
+                      Apply externally →
+                    </a>
+                  );
+                }
+                return (
+                  <div className="text-sm text-slate-500" data-testid="job-detail-no-accept">
+                    This posting has no in-app tracking. Contact the poster directly.
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <Button onClick={accept} className="bg-teal-700 hover:bg-teal-800" data-testid="job-detail-accept">Accept at asking rate</Button>
+                  <Button onClick={() => setQuoteOpen(true)} variant="outline" data-testid="job-detail-quote">
+                    {myProviderQuote ? "Update your quote" : "Send a counter-quote"}
+                  </Button>
+                </>
+              );
+            })()}
           </div>
         )}
 

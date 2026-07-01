@@ -320,12 +320,46 @@ export default function ProviderHub() {
                   })()}
                 </div>
                 <div className="col-span-1 text-right flex flex-col gap-1.5">
-                  <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800 h-8 px-3 text-xs font-semibold" data-testid={`accept-job-${j.id}`}>
-                    Accept job
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuoteTarget(j); }} className="h-8 px-3 text-xs" data-testid={`quote-job-${j.id}`}>
-                    Send quote
-                  </Button>
+                  {(() => {
+                    // Only on-demand jobs are "accept & track" — W-2 / staffing /
+                    // remote have no delivery to track, so we surface the
+                    // external apply link (or hide the CTA entirely if none).
+                    const emp = j.employment_type || "on_demand";
+                    if (emp !== "on_demand") {
+                      if (j.apply_url) {
+                        return (
+                          <a
+                            href={j.apply_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center gap-1 h-8 px-3 text-xs font-semibold bg-teal-700 text-white hover:bg-teal-800 uppercase tracking-wider font-mono"
+                            data-testid={`apply-external-${j.id}`}
+                          >
+                            Apply →
+                          </a>
+                        );
+                      }
+                      return (
+                        <span
+                          className="text-[10px] font-mono uppercase tracking-wider text-slate-400"
+                          data-testid={`no-accept-${j.id}`}
+                        >
+                          Contact poster
+                        </span>
+                      );
+                    }
+                    return (
+                      <>
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); accept(j.id); }} className="bg-teal-700 hover:bg-teal-800 h-8 px-3 text-xs font-semibold" data-testid={`accept-job-${j.id}`}>
+                          Accept job
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setQuoteTarget(j); }} className="h-8 px-3 text-xs" data-testid={`quote-job-${j.id}`}>
+                          Send quote
+                        </Button>
+                      </>
+                    );
+                  })()}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); dismiss(j.id); }}
