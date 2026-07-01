@@ -121,7 +121,7 @@ export default function LandingPage({ pageType }) {
     "Reach customers across your city the day you list.",
     "Lumo handles payments, refunds, and customer support.",
   ] : isHost ? [
-    "Lumo handles deposits, payouts, calendar, and insurance.",
+    "Lumo handles deposits, payouts, and calendar.",
     "Reach renters across your city and globally.",
     "Keep 90% of every booking. Zero monthly listing fee.",
     "Approve every booking — you stay in control.",

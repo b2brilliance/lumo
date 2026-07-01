@@ -2257,7 +2257,7 @@ AD_AUDIENCES = {
     "small_biz_recruiter": {"label": "Small Business Recruiter", "tone": "direct, practical", "hook": "Hire vetted local talent in days, not months. No agency fees.", "persona": "a small business owner trying to hire reliable workers"},
     "retailer_seller": {"label": "Retailer / Seller", "tone": "growth-minded", "hook": "Sell on Lumo. Same-day delivery built-in. 10% fee, no monthly cost.", "persona": "an independent retailer or boutique owner ready to grow online"},
     "restaurant_owner": {"label": "Restaurant Owner", "tone": "appetizing, urgent", "hook": "Same-day delivery, zero monthly fee. Keep 90% of every order.", "persona": "a restaurant or cafe owner wanting more delivery orders"},
-    "rental_host": {"label": "Rental Host", "tone": "confident, aspirational", "hook": "Rent your space, car or gear. We handle deposits, payouts, insurance.", "persona": "someone with a property, vehicle, venue or equipment to rent out"},
+    "rental_host": {"label": "Rental Host", "tone": "confident, aspirational", "hook": "Rent your space, car or gear. We handle deposits, payouts, and the calendar.", "persona": "someone with a property, vehicle, venue or equipment to rent out"},
     "student_senior": {"label": "Students & Seniors", "tone": "affordable, inclusive", "hook": "Rides, errands, help — without the surge pricing.", "persona": "a student or senior wanting affordable help and rides"},
 }
 
@@ -3510,7 +3510,7 @@ LANDING_PAGE_TYPES = {
         "label": "Rent out on Lumo",
         "h1_template": "Rent out your {category} in {city}.",
         "h1_global": "Rent out your {category} on Lumo.",
-        "subtitle": "Reach renters worldwide. We handle deposits, payouts, insurance, and the calendar. You keep 90%.",
+        "subtitle": "Reach renters worldwide. We handle deposits, payouts, and the calendar. You keep 90%.",
         "cta_label": "List your rental",
         "cta_path": "/rentals/host",
         "categories": {
@@ -6137,7 +6137,7 @@ async def seed():
              "description": "Build storefronts, dashboards and landing pages for Lumo small-business clients. Remote, async, 10–30 hrs/wk. You set your rate; we connect you to clients.",
              "category": "digital_tech", "pay_rate": 85.0, "pay_unit": "hour", "estimated_units": 20.0},
             {"title": "Weekend Dog Walker — premium $25/walk, you set your route",
-             "description": "Saturdays and Sundays. Take 4–6 dogs/day in your neighborhood. Lumo handles payments, schedules, insurance. You keep 90%.",
+             "description": "Saturdays and Sundays. Take 4–6 dogs/day in your neighborhood. Lumo handles payments and schedules. You keep 90%.",
              "category": "pet_care", "pay_rate": 25.0, "pay_unit": "day", "estimated_units": 8.0,
              "pickup_address": "Williamsburg, Brooklyn, NY", "lat": 40.7081, "lng": -73.9571},
             {"title": "Part-time Cleaner — choose your blocks, 2-hr minimum",
@@ -6152,7 +6152,7 @@ async def seed():
              "description": "Tutor 3–10 hrs/week. Online or in-person. Lumo matches you with students near you. Choose your schedule.",
              "category": "education", "pay_rate": 40.0, "pay_unit": "hour", "estimated_units": 10.0},
             {"title": "Personal Trainer — build your private client base on Lumo",
-             "description": "Use Lumo to fill your week with $60–$95/hr personal training sessions. Bring clients with you or get matched to new ones. Insurance + scheduling included.",
+             "description": "Use Lumo to fill your week with $60–$95/hr personal training sessions. Bring clients with you or get matched to new ones. Scheduling and payments included.",
              "category": "personal_care", "pay_rate": 75.0, "pay_unit": "hour", "estimated_units": 15.0,
              "pickup_address": "Los Angeles, CA", "lat": 34.0522, "lng": -118.2437},
             {"title": "Same-day Courier — bike or car, urgent runs",
