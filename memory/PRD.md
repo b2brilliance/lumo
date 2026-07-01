@@ -26,6 +26,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Uber-style per-service ordering pages + condensed homepage (Jul 1, 2026)
+- **`/order/:service` route** (`/app/frontend/src/pages/OrderService.jsx`) — one dedicated ordering page per service (30 services mapped: delivery, courier, moving, cleaning, handyman, pet_care, personal_care, it_support, tutoring, notary, locksmith, appliance_repair, security, tax, translator, photography, junk_removal, snow_removal, auto_detailing, etc.). Step-by-step layout:
+  1. **Where?** — single or pickup+dropoff address (auto-picked from `locationModeFor(category)`) with Google Places autocomplete
+  2. **When?** — Now vs Schedule (datetime-local) toggle
+  3. **Tell us more** — title, description, ServiceDetailsForm (preserves every existing field — subcategory, sub-fields, "Other" free-text)
+  4. **What's it worth?** — auto-quote for delivery/courier/moving via `computeDeliveryQuote`/`computeMovingQuote`, tax breakdown from `computeBreakdown`
+  5. Big single-button "Confirm request" — success state redirects to `/customer` to see the request
+- Preserves the exact same POST `/api/jobs` payload as the old CustomerHub form so no backend changes needed.
+- **Homepage condensed** from 18 tiles to **two grouped rows**:
+  - "Get help — order now" (8 tiles): Delivery, Cleaning, Moving, Handyman, Pet care, Beauty, Tech help, More services → each routes to `/order/:service`
+  - "Browse & buy" (6 tiles): Food, For sale, Cars, Rentals, Housing, Stores → each routes to the existing marketplace pages
+- ServiceDetailsForm bug fix — corrected prop name (`details` not `value`) so the details form renders across every category.
+
+
 ### Uber × Craigslist homepage redesign + mobile UX (Jul 1, 2026)
 - **Landing.jsx rewritten** — cut from 345 lines of marketing copy to 210 lines of function:
   - "What do you need?" giant search input on top (routes to `/stores?q=…` for unified search)

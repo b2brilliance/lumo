@@ -3,8 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet";
 import {
   Search, MapPin, ShoppingBag, UtensilsCrossed, Car, Home,
-  KeyRound, Store, Wrench, Sparkles, Truck, PawPrint, Baby,
-  Laptop, Briefcase, Camera, HardHat, GraduationCap, Scissors,
+  KeyRound, Store, Wrench, Sparkles, Truck, PawPrint,
+  Laptop, Briefcase, HardHat, Scissors,
   ArrowRight, Zap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -17,25 +17,24 @@ import { useLocale } from "@/lib/locale";
  * Bottom: how it works (3 tiles) + 90% commission tile. Nothing else.
  * Removed marketing bloat, subscribe form, philosophy sections. */
 
-const CATEGORIES = [
-  { key: "delivery",     label: "Delivery",     Icon: Truck,           to: "/customer?category=delivery" },
+const SERVICES = [
+  { key: "delivery",     label: "Delivery",     Icon: Truck,           to: "/order/delivery" },
+  { key: "cleaning",     label: "Cleaning",     Icon: Sparkles,        to: "/order/cleaning" },
+  { key: "moving",       label: "Moving",       Icon: HardHat,         to: "/order/moving" },
+  { key: "handyman",     label: "Handyman",     Icon: Wrench,          to: "/order/handyman" },
+  { key: "pet_care",     label: "Pet care",     Icon: PawPrint,        to: "/order/pet_care" },
+  { key: "personal_care",label: "Beauty",       Icon: Scissors,        to: "/order/personal_care" },
+  { key: "it_support",   label: "Tech help",    Icon: Laptop,          to: "/order/it_support" },
+  { key: "more",         label: "More services",Icon: ArrowRight,      to: "/customer" },
+];
+
+const BROWSE = [
   { key: "food",         label: "Food",         Icon: UtensilsCrossed, to: "/restaurants" },
-  { key: "stores",       label: "Stores",       Icon: Store,           to: "/stores" },
   { key: "marketplace",  label: "For sale",     Icon: ShoppingBag,     to: "/marketplace" },
   { key: "autos",        label: "Cars",         Icon: Car,             to: "/autos" },
   { key: "rentals",      label: "Rentals",      Icon: KeyRound,        to: "/rentals" },
   { key: "housing",      label: "Housing",      Icon: Home,            to: "/real-estate" },
-  { key: "cleaning",     label: "Cleaning",     Icon: Sparkles,        to: "/customer?category=cleaning" },
-  { key: "handyman",     label: "Handyman",     Icon: Wrench,          to: "/customer?category=handyman" },
-  { key: "moving",       label: "Moving",       Icon: HardHat,         to: "/customer?category=moving" },
-  { key: "pet_care",     label: "Pet care",     Icon: PawPrint,        to: "/customer?category=pet_care" },
-  { key: "childcare",    label: "Childcare",    Icon: Baby,            to: "/customer?category=childcare" },
-  { key: "beauty",       label: "Beauty",       Icon: Scissors,        to: "/customer?category=personal_care" },
-  { key: "digital_tech", label: "Tech & IT",    Icon: Laptop,          to: "/customer?category=digital_tech" },
-  { key: "tutoring",     label: "Tutoring",     Icon: GraduationCap,   to: "/customer?category=education" },
-  { key: "photo",        label: "Photo & video", Icon: Camera,         to: "/customer?category=events" },
-  { key: "jobs",         label: "Jobs",         Icon: Briefcase,       to: "/map" },
-  { key: "more",         label: "More",         Icon: ArrowRight,      to: "/customer" },
+  { key: "stores",       label: "Stores",       Icon: Store,           to: "/stores" },
 ];
 
 const COUNTRY_LABELS = {
@@ -132,19 +131,43 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ─── Category grid — Craigslist-style, mobile-first ───────── */}
+      {/* ─── "Get help" — services (Uber-style order flow) ─────── */}
       <section className="border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-px bg-slate-200 border border-slate-200">
-            {CATEGORIES.map((c) => (
+          <div className="flex items-center justify-between mb-3">
+            <div className="overline">Get help — order now</div>
+            <Link to="/customer" className="text-xs font-mono uppercase tracking-wider text-teal-700 hover:underline" data-testid="home-more-services">All services →</Link>
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-px bg-slate-200 border border-slate-200">
+            {SERVICES.map((c) => (
               <Link
                 key={c.key}
                 to={c.to}
-                className="bg-white flex flex-col items-center justify-center text-center p-4 sm:p-5 hover:bg-teal-50 active:bg-teal-100 transition-colors min-h-[92px] sm:min-h-[110px]"
-                data-testid={`home-cat-${c.key}`}
+                className="bg-white flex flex-col items-center justify-center text-center p-3 sm:p-5 hover:bg-teal-50 active:bg-teal-100 transition-colors min-h-[90px] sm:min-h-[110px]"
+                data-testid={`home-service-${c.key}`}
               >
                 <c.Icon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-700" />
-                <div className="text-xs sm:text-sm font-display font-bold mt-2 leading-tight">{c.label}</div>
+                <div className="text-[11px] sm:text-sm font-display font-bold mt-2 leading-tight">{c.label}</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── "Browse & buy" — marketplaces ─────────────────────── */}
+      <section className="border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-6 sm:pb-10">
+          <div className="overline mb-3">Browse & buy</div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-slate-200 border border-slate-200">
+            {BROWSE.map((c) => (
+              <Link
+                key={c.key}
+                to={c.to}
+                className="bg-white flex flex-col items-center justify-center text-center p-3 sm:p-5 hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[90px] sm:min-h-[110px]"
+                data-testid={`home-browse-${c.key}`}
+              >
+                <c.Icon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-700" />
+                <div className="text-[11px] sm:text-sm font-display font-bold mt-2 leading-tight">{c.label}</div>
               </Link>
             ))}
           </div>

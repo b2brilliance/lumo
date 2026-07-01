@@ -29,6 +29,7 @@ import BecomeProvider from "@/pages/BecomeProvider";
 import ListYourStuff from "@/pages/ListYourStuff";
 import CitiesIndex from "@/pages/CitiesIndex";
 import CityHub from "@/pages/CityHub";
+import OrderService from "@/pages/OrderService";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import CheckoutCancel from "@/pages/CheckoutCancel";
 import Wallet from "@/pages/Wallet";
@@ -118,6 +119,8 @@ function App() {
             <Route path="/earn" element={<BecomeProvider />} />
             <Route path="/cities" element={<CitiesIndex />} />
             <Route path="/cities/:slug" element={<CityHub />} />
+            <Route path="/order/:service" element={<OrderService />} />
+            <Route path="/order" element={<OrderService />} />
 
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />
