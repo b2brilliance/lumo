@@ -4121,6 +4121,7 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             "schedule": d.get("schedule"),
             "source": d.get("source"),
         })
+    return pins
 @api.get("/jobs/external")
 async def external_jobs_feed(
     q: Optional[str] = None,

@@ -509,3 +509,22 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
    - Hard: Meta (FB+IG with business verification), TikTok
 - **Search engine submissions** (user action): Submit `golumo.app/api/sitemap.xml` to Google Search Console, Bing Webmaster, Yandex, Baidu, Naver — instructions in `/app/DISTRIBUTION_PLAYBOOK.md`
 - Split `server.py` (now 4400+ lines) into `APIRouter` modules
+
+## 2026-02-01 — Role-based visibility + Critical crash fixes
+- **Role-based visibility** implemented:
+  - `NavBar.jsx`: added `admin` case to `roleLink()` (nav-hub → /admin with ShieldCheck icon); `restrictedRole` gate hides the redundant "Customer" desktop link for retailer/restaurant/admin. Mobile sub-nav 3rd tile switches to the role hub for restricted roles.
+  - `MobileTabBar.jsx`: role-aware Account tab — provider/retailer/restaurant/admin see their own icon + label, tap routes directly to their hub (`/provider`, `/retailer`, `/restaurant`, `/admin`).
+  - Route-level guards in `App.js` (`Protected roles={[...]}`) already gate /retailer, /restaurant, /admin for their sole role — verified.
+- **Bug fix: `/order/moving` crash** (`Cannot read properties of undefined (reading 'toFixed')`)
+  - Root cause: `computeBreakdown()` in `locale.jsx` never returned a `total` field, but `OrderService.jsx` line 353 referenced `breakdown.total.toFixed(2)`.
+  - Fix 1: added `total = subtotal + tax` to the `computeBreakdown` return object.
+  - Fix 2: corrected parameter names passed to `computeMovingQuote` (was passing `subcategory/home_size/helpers/hours/truck_included/stairs`; function expects `move_type/property_size/num_movers/has_stairs/packing_needed/duration_hours`) so quotes now respond to user input instead of always using defaults.
+- **Bug fix: `/map` (Jobs near you) crash** (`Cannot read properties of null (reading 'map')`)
+  - Root cause: `@api.get("/map/jobs")` in `server.py` (line 4070) built the `pins` list but was missing a `return pins` statement, so FastAPI serialized `None` → frontend `pins.map()` crashed.
+  - Fix: added `return pins`. Endpoint now returns 67+ pins as expected.
+  - Defensive: `MapPage.jsx` now guards `setPins(Array.isArray(data) ? data : [])`.
+- Verified live: /map renders full US map with pins; /order/moving loads clean.
+
+## Backlog additions
+- Follow-up on `UNSAFE_componentWillMount` console warning (likely from react-helmet — non-blocking).
+

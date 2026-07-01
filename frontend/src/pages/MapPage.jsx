@@ -155,7 +155,7 @@ export default function MapPage() {
     if (groupFilter) params.set("category_group_filter", groupFilter);
     if (employmentFilter) params.set("employment_type", employmentFilter);
     const { data } = await api.get(`/map/jobs?${params}`);
-    setPins(data);
+    setPins(Array.isArray(data) ? data : []);
   };
   useEffect(() => { load(); }, [remoteOnly, groupFilter, employmentFilter]);
 

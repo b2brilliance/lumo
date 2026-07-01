@@ -165,11 +165,12 @@ export function LocaleProvider({ children }) {
     computeBreakdown: (itemUsd, deliveryUsd = 0) => {
       const subtotal = +(itemUsd + deliveryUsd).toFixed(2);
       const tax = +(subtotal * profile.taxRate).toFixed(2);
+      const total = +(subtotal + tax).toFixed(2);
       const itemDeposit = +(itemUsd * 0.10).toFixed(2);
       const deliveryDeposit = +(deliveryUsd * 0.10).toFixed(2);
       const depositTotal = +(itemDeposit + deliveryDeposit + tax).toFixed(2);
       const remaining = +(subtotal - itemDeposit - deliveryDeposit).toFixed(2);
-      return { subtotal, tax, itemDeposit, deliveryDeposit, depositTotal, remaining };
+      return { subtotal, tax, total, itemDeposit, deliveryDeposit, depositTotal, remaining };
     },
     rates,
     ratesLoaded,

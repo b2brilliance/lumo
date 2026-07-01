@@ -117,16 +117,19 @@ export default function OrderService() {
     const miles = form.pickup_lat != null && form.dropoff_lat != null
       ? milesBetween({ lat: form.pickup_lat, lng: form.pickup_lng }, { lat: form.dropoff_lat, lng: form.dropoff_lng })
       : 0;
+    // Map OrderService form field names → computeMovingQuote parameter names.
+    // labor sub → labor_only mode; otherwise defaults to local.
+    const moveType = sub === "labor" ? "labor_only" : (sub || "local");
     return computeMovingQuote({
       miles,
-      subcategory: sub || "local",
-      home_size: form.details?.home_size || "1br",
-      helpers: form.details?.helpers || 2,
-      hours: form.details?.hours || 2,
-      truck_included: form.details?.truck_included === "yes",
-      stairs: form.details?.stairs === "yes",
+      move_type: moveType,
+      property_size: form.details?.home_size || "1br",
+      num_movers: form.details?.helpers || 2,
+      has_stairs: form.details?.stairs === "yes" ? "yes" : "no",
+      packing_needed: form.details?.packing_needed === "yes" ? "yes" : "no",
+      duration_hours: form.details?.hours || null,
     });
-  }, [isMoving, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.subcategory, form.details?.home_size, form.details?.helpers, form.details?.hours, form.details?.truck_included, form.details?.stairs]);
+  }, [isMoving, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.subcategory, form.details?.home_size, form.details?.helpers, form.details?.hours, form.details?.packing_needed, form.details?.stairs]);
 
   useEffect(() => {
     // Only overwrite pay_rate the FIRST time we compute a positive quote,
