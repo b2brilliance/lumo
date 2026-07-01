@@ -2910,10 +2910,13 @@ async def _post_to_slack(cfg: dict, ad: dict, image_full_url: Optional[str]) -> 
             {"type": "section", "text": {"type": "mrkdwn", "text": text}},
             {"type": "image", "image_url": image_full_url, "alt_text": ad.get("headline", "Lumo ad")},
         ]
-    async with httpx.AsyncClient(timeout=12.0) as c:
+    async with httpx.AsyncClient(timeout=12.0, follow_redirects=False) as c:
         r = await c.post(cfg["webhook_url"], json=payload)
-        if r.status_code >= 400:
-            raise RuntimeError(f"Slack {r.status_code}: {r.text[:200]}")
+        # Slack quirk: an invalid webhook URL returns HTTP 302 to their generic
+        # error page (NOT a 4xx). Only 200 with body "ok" means the message was
+        # actually delivered. Everything else is a failure.
+        if r.status_code != 200 or (r.text or "").strip() != "ok":
+            raise RuntimeError(f"Slack {r.status_code}: {(r.text or '')[:200] or 'no body'}")
         return {"status": "ok"}
 
 
@@ -3029,7 +3032,13 @@ async def test_connector(cid: str, user: dict = Depends(_require_admin)):
         await poster(c["config"], test_ad, None)
         return {"status": "ok"}
     except Exception as e:
-        raise HTTPException(502, f"Test failed: {str(e)[:300]}")
+        # Important: never raise 5xx here. Cloudflare intercepts our 502 and
+        # swallows the JSON error body, replacing it with its own generic
+        # "invalid or incomplete response" HTML page. We want the admin UI
+        # to see the actual reason from the upstream service (Slack, Discord,
+        # etc.) so it can be displayed inline.
+        reason = str(e) or f"{type(e).__name__} (no message)"
+        return {"status": "failed", "reason": reason[:500]}
 
 
 # ────────────────────────────────────────────────────────────────────────────

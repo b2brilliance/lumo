@@ -72,8 +72,17 @@ export default function Distribution() {
     setBusyId(id);
     try {
       const { data } = await api.post(`/admin/distribution/connectors/${id}/test`);
-      if (data.status === "ok") toast.success("✓ Test post sent");
-      else toast.message(data.reason || "Skipped (token UI ready, integration pending)");
+      if (data.status === "ok") {
+        toast.success("✓ Test post sent");
+      } else if (data.status === "failed") {
+        // Real upstream error — Slack rejected, Discord token invalid, etc.
+        // The backend now returns 200 with {status:"failed",reason} so we
+        // can surface the actual message instead of a Cloudflare 502 page.
+        toast.error(`Test failed: ${data.reason || "unknown error"}`);
+      } else {
+        // "skipped" — connector platform is UI-only, poster not shipped yet.
+        toast.message(data.reason || "Skipped (token UI ready, integration pending)");
+      }
     } catch (e) { toast.error(formatApiError(e)); }
     finally { setBusyId(null); }
   };

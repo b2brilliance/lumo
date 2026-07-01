@@ -274,19 +274,21 @@ def create_router(
         sig_header = request.headers.get("stripe-signature", "")
 
         ws = _active_webhook_secret()
-        if ws:
-            try:
-                event = stripe.Webhook.construct_event(payload, sig_header, ws)
-            except (ValueError, stripe.error.SignatureVerificationError) as e:
-                logger.warning(f"Stripe webhook signature failed: {e}")
-                raise HTTPException(400, "Invalid signature")
-        else:
-            # No webhook secret yet — accept events anyway (test mode convenience).
-            try:
-                import json as _json
-                event = _json.loads(payload.decode("utf-8"))
-            except Exception:
-                raise HTTPException(400, "Invalid payload")
+        # Security: never accept unsigned webhook events. If the webhook
+        # secret isn't configured, refuse — otherwise anyone who can POST to
+        # this URL can flip stripe_payouts_enabled on any account whose
+        # stripe_account_id they can guess. Configure STRIPE_WEBHOOK_SECRET
+        # (or set it live via the admin Stripe settings panel) before
+        # pointing Stripe at this endpoint.
+        if not ws:
+            logger.error("Stripe webhook called but no signing secret configured — rejecting.")
+            raise HTTPException(503, "Webhook signing secret not configured")
+
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, ws)
+        except (ValueError, stripe.error.SignatureVerificationError) as e:
+            logger.warning(f"Stripe webhook signature failed: {e}")
+            raise HTTPException(400, "Invalid signature")
 
         evt_type = event.get("type") if isinstance(event, dict) else event["type"]
         data = (event.get("data", {}) or {}).get("object", {}) if isinstance(event, dict) else event["data"]["object"]
