@@ -6,6 +6,7 @@ import { LocaleProvider } from "@/lib/locale";
 import { CartProvider } from "@/lib/cart";
 import NavBar from "@/components/NavBar";
 import MobileTabBar from "@/components/MobileTabBar";
+import CacheBuster from "@/components/CacheBuster";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
 import AutoTranslator from "@/components/AutoTranslator";
@@ -80,6 +81,7 @@ function Protected({ children, roles }) {
 function App() {
   return (
     <div className="App grain">
+      <CacheBuster />
       <BrowserRouter>
         <LocaleProvider>
           <AuthProvider>
