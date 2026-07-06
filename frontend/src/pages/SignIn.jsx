@@ -46,7 +46,9 @@ export default function SignIn() {
     else if (u?.role === "retailer") nav("/retailer");
     else if (u?.role === "restaurant") nav("/restaurant");
     else if (u?.role === "admin") nav("/admin");
-    else nav("/customer");
+    // Customers land on the homepage — they can pick a service directly
+    // from the tiled service grid, no separate "hub" page.
+    else nav("/");
   };
 
   // ── Google OAuth callback handler ──────────────────────────────────────
@@ -173,13 +175,19 @@ export default function SignIn() {
 
         {mode === "choose" && (
           <div className="space-y-3 border border-slate-200 p-6 bg-white" data-testid="signin-choose">
-            <Button
+            {/* Official Google-brand-guideline sign-in button — white surface,
+                Roboto text, 40px height min, 4px radius. Matches what users
+                see on other well-known sites. */}
+            <button
               onClick={startGoogle}
-              className="w-full h-12 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 text-base shadow-sm"
+              type="button"
+              className="w-full h-12 flex items-center justify-center gap-3 bg-white border border-[#dadce0] hover:bg-[#f8f9fa] hover:border-[#d2e3fc] active:bg-[#e8f0fe] transition-colors shadow-sm text-[#3c4043] font-medium text-[15px] rounded"
+              style={{ fontFamily: '"Google Sans", Roboto, arial, sans-serif' }}
               data-testid="signin-google-btn"
             >
-              <GoogleIcon className="mr-3" />Continue with Google
-            </Button>
+              <GoogleIcon />
+              <span>Sign in with Google</span>
+            </button>
             <Button
               onClick={() => setMode("phone-input")}
               className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-base"

@@ -16,6 +16,7 @@ import { useLocale } from "@/lib/locale";
 import AddressInput from "@/components/AddressInput";
 import ServiceDetailsForm from "@/components/ServiceDetailsForm";
 import { computeDeliveryQuote, computeMovingQuote, milesBetween } from "@/lib/deliveryPricing";
+import { computeMarketQuote, NO_BUDGET_CATEGORIES } from "@/lib/serviceQuotes";
 
 /* Uber-style single-service ordering page — /order/:service
  *
@@ -131,6 +132,28 @@ export default function OrderService() {
     });
   }, [isMoving, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng, form.details?.subcategory, form.details?.home_size, form.details?.helpers, form.details?.hours, form.details?.packing_needed, form.details?.stairs]);
 
+  // Market-rate auto-quote for the "long tail" of service categories
+  // (cleaning, handyman, notary, roadside, towing, pet care, landscaping,
+  // appliance repair, errands). Delivery + moving keep their own bespoke
+  // Haversine / moving calculators above.
+  const marketQuote = useMemo(() => {
+    if (isDelivery || isMoving) return null;
+    return computeMarketQuote(cat, form.details || {}, {
+      miles: form.pickup_lat != null && form.dropoff_lat != null
+        ? milesBetween({ lat: form.pickup_lat, lng: form.pickup_lng }, { lat: form.dropoff_lat, lng: form.dropoff_lng })
+        : 0,
+    });
+  }, [isDelivery, isMoving, cat, form.details, form.pickup_lat, form.pickup_lng, form.dropoff_lat, form.dropoff_lng]);
+
+  const hideBudget = NO_BUDGET_CATEGORIES.has(cat);
+
+  useEffect(() => {
+    if (marketQuote?.total > 0) {
+      const rounded = marketQuote.total.toFixed(2);
+      setForm((f) => (f.pay_rate === rounded ? f : { ...f, pay_rate: rounded }));
+    }
+  }, [marketQuote?.total]);
+
   useEffect(() => {
     // Only overwrite pay_rate the FIRST time we compute a positive quote,
     // OR when the user hasn't manually edited it since. Prevents the
@@ -153,7 +176,15 @@ export default function OrderService() {
   const submit = async (e) => {
     e?.preventDefault?.();
     if (!user) { nav("/signin"); return; }
-    if (!priceNum) { toast.error("Please set a budget or wait for the auto-quote."); return; }
+    if (!priceNum) {
+      // For no-budget categories, silently insert a placeholder $1 so the
+      // backend accepts the post — providers send real quotes anyway.
+      if (hideBudget) {
+        set("pay_rate", "1");
+      } else {
+        toast.error("Please set a budget or wait for the auto-quote."); return;
+      }
+    }
     setBusy(true);
     try {
       const body = {
@@ -316,46 +347,100 @@ export default function OrderService() {
           </div>
         </section>
 
-        {/* Step 4 — Price */}
+        {/* Step 4 — Price / Quote / Providers-will-quote-you */}
         <section data-testid="order-step-price">
-          <StepHeader n={(showAddress ? 3 : 2) + 1} title="Your budget" />
-          {(deliveryQuote || movingQuote) && (
-            <div className="mb-3 bg-teal-50 border border-teal-200 p-3 text-sm">
-              <div className="font-mono uppercase tracking-wider text-teal-800 text-xs">Auto-quote</div>
-              <div className="font-display font-black text-2xl text-teal-800 mt-0.5">
-                ${(deliveryQuote?.total || movingQuote?.total || 0).toFixed(2)}
-              </div>
-              <div className="text-xs text-teal-800 opacity-80">Editable — providers can also send a counter-offer.</div>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                type="number" step="0.01" min="0"
-                placeholder="Budget"
-                value={form.pay_rate}
-                onChange={(e) => set("pay_rate", e.target.value)}
-                data-testid="order-pay-rate"
-              />
-            </div>
-            <select
-              value={form.pay_unit}
-              onChange={(e) => set("pay_unit", e.target.value)}
-              className="border border-slate-300 px-3 text-sm"
-              data-testid="order-pay-unit"
-            >
-              <option value="flat">Flat</option>
-              <option value="hour">Per hour</option>
-              <option value="day">Per day</option>
-            </select>
-          </div>
-          {breakdown && (
-            <div className="mt-3 text-xs text-slate-500 space-y-0.5">
-              <div className="flex justify-between"><span>Subtotal</span><span>${breakdown.subtotal.toFixed(2)}</span></div>
-              {breakdown.tax > 0 && <div className="flex justify-between"><span>{taxLabel || "Tax"}</span><span>${breakdown.tax.toFixed(2)}</span></div>}
-              <div className="flex justify-between font-mono uppercase tracking-wider text-slate-900 pt-1 border-t border-slate-200"><span>Total</span><span>${breakdown.total.toFixed(2)}</span></div>
-            </div>
-          )}
+          {(() => {
+            const activeQuote = deliveryQuote || movingQuote || marketQuote;
+            if (activeQuote?.total > 0) {
+              return (
+                <>
+                  <StepHeader n={(showAddress ? 3 : 2) + 1} title="Auto-quote" />
+                  <div className="bg-teal-50 border-2 border-teal-600 p-4" data-testid="order-quote-box">
+                    <div className="font-mono uppercase tracking-wider text-teal-800 text-xs">Estimated total</div>
+                    <div className="font-display font-black text-3xl text-teal-800 mt-0.5" data-testid="order-quote-total">
+                      ${activeQuote.total.toFixed(2)}
+                    </div>
+                    {activeQuote.breakdown && (
+                      <div className="mt-3 text-xs text-slate-700 space-y-0.5 max-w-sm">
+                        {activeQuote.breakdown.map((row, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span>{row.label}</span>
+                            <span className="font-mono">${Number(row.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-[11px] text-slate-600 mt-3 leading-snug">
+                      Based on national market rates. Providers may counter-offer — you&apos;re never locked in until you tap Confirm.
+                    </div>
+                  </div>
+                  {breakdown && (
+                    <div className="mt-3 text-xs text-slate-500 space-y-0.5">
+                      <div className="flex justify-between"><span>Subtotal</span><span>${breakdown.subtotal.toFixed(2)}</span></div>
+                      {breakdown.tax > 0 && <div className="flex justify-between"><span>{taxLabel || "Tax"}</span><span>${breakdown.tax.toFixed(2)}</span></div>}
+                      <div className="flex justify-between font-mono uppercase tracking-wider text-slate-900 pt-1 border-t border-slate-200"><span>Total</span><span>${breakdown.total.toFixed(2)}</span></div>
+                    </div>
+                  )}
+                </>
+              );
+            }
+            // No calculable quote AND category is on the "let providers bid" list
+            if (hideBudget) {
+              // Silently set a placeholder pay_rate so the submit passes;
+              // providers will send real quotes.
+              return (
+                <>
+                  <StepHeader n={(showAddress ? 3 : 2) + 1} title="Providers will quote you" />
+                  <div className="bg-slate-50 border border-slate-200 p-4 text-sm text-slate-700" data-testid="order-no-budget">
+                    Because this category is highly custom, we don&apos;t ask you for a budget upfront. Post your request and nearby specialists will send you personalized quotes within minutes.
+                  </div>
+                  {!form.pay_rate && (
+                    <button
+                      type="button"
+                      onClick={() => set("pay_rate", "1")}
+                      className="hidden"
+                      aria-hidden="true"
+                    />
+                  )}
+                </>
+              );
+            }
+            // Fallback — keep the free-form budget input for categories
+            // without a calculator AND not in the no-budget list.
+            return (
+              <>
+                <StepHeader n={(showAddress ? 3 : 2) + 1} title="Your budget" />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      type="number" step="0.01" min="0"
+                      placeholder="Budget (optional)"
+                      value={form.pay_rate}
+                      onChange={(e) => set("pay_rate", e.target.value)}
+                      data-testid="order-pay-rate"
+                    />
+                  </div>
+                  <select
+                    value={form.pay_unit}
+                    onChange={(e) => set("pay_unit", e.target.value)}
+                    className="border border-slate-300 px-3 text-sm"
+                    data-testid="order-pay-unit"
+                  >
+                    <option value="flat">Flat</option>
+                    <option value="hour">Per hour</option>
+                    <option value="day">Per day</option>
+                  </select>
+                </div>
+                {breakdown && (
+                  <div className="mt-3 text-xs text-slate-500 space-y-0.5">
+                    <div className="flex justify-between"><span>Subtotal</span><span>${breakdown.subtotal.toFixed(2)}</span></div>
+                    {breakdown.tax > 0 && <div className="flex justify-between"><span>{taxLabel || "Tax"}</span><span>${breakdown.tax.toFixed(2)}</span></div>}
+                    <div className="flex justify-between font-mono uppercase tracking-wider text-slate-900 pt-1 border-t border-slate-200"><span>Total</span><span>${breakdown.total.toFixed(2)}</span></div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {/* Confirm */}

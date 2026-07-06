@@ -18,6 +18,9 @@ import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import CustomerHub from "@/pages/CustomerHub";
+import Insurance from "@/pages/Insurance";
+import Training from "@/pages/Training";
+import Services from "@/pages/Services";
 import ProviderHub from "@/pages/ProviderHub";
 import StoreManager from "@/pages/StoreManager";
 import Directory from "@/pages/Directory";
@@ -103,7 +106,12 @@ function App() {
             <Route path="/signin" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
 
-            <Route path="/customer" element={<Protected roles={["customer", "provider", "retailer", "restaurant"]}><CustomerHub /></Protected>} />
+            {/* /customer → redirect to homepage. Customers now start on the
+                service grid (no separate hub page). */}
+            <Route path="/customer" element={<Navigate to="/" replace />} />
+            <Route path="/insurance" element={<Insurance />} />
+            <Route path="/training" element={<Training />} />
+            <Route path="/services" element={<Services />} />
             <Route path="/provider" element={<Protected roles={["provider"]}><ProviderHub /></Protected>} />
             <Route path="/retailer" element={<Protected roles={["retailer"]}><StoreManager role="retailer" /></Protected>} />
             <Route path="/restaurant" element={<Protected roles={["restaurant"]}><StoreManager role="restaurant" /></Protected>} />

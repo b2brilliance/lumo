@@ -1,8 +1,7 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SERVICE_SCHEMAS } from "@/lib/serviceSchemas";
 
 function fieldVisible(field, details) {
@@ -12,17 +11,22 @@ function fieldVisible(field, details) {
 
 function FieldRenderer({ field, value, onChange }) {
   if (field.type === "select") {
+    // Native <select> instead of Radix — Radix's scroll-lock body-fixed
+    // technique caused the whole page to jump when a dropdown closed.
+    // Native selects don't lock the viewport, so this is the only fix
+    // that fully eliminates the jump on every browser and every device.
     return (
-      <Select value={value || ""} onValueChange={onChange}>
-        <SelectTrigger className="mt-1" data-testid={`detail-${field.name}`}>
-          <SelectValue placeholder={field.placeholder || "Choose…"} />
-        </SelectTrigger>
-        <SelectContent className="max-h-72">
-          {field.options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <select
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full border border-slate-300 bg-white px-3 py-2 text-sm h-10 font-mono"
+        data-testid={`detail-${field.name}`}
+      >
+        <option value="" disabled>{field.placeholder || "Choose…"}</option>
+        {field.options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
     );
   }
   if (field.type === "number") {
@@ -91,37 +95,6 @@ function FieldRenderer({ field, value, onChange }) {
 
 export default function ServiceDetailsForm({ category, details, onChange }) {
   const schema = SERVICE_SCHEMAS[category];
-  // Ref to the subcategory dropdown — used to (a) measure viewport position
-  // and (b) forcibly scroll it back into view after Radix Select's body-
-  // lock/unlock cycle nukes our scroll position (Radix resets scrollY to 0
-  // on close, which was the root cause of the "jumpy" feeling users
-  // reported when picking a subcategory).
-  const subcategoryRef = useRef(null);
-  const scrollRestoreRef = useRef(null); // { scrollY, elementTop } snapshot
-
-  useLayoutEffect(() => {
-    if (!scrollRestoreRef.current || !subcategoryRef.current) return;
-    scrollRestoreRef.current = null;
-
-    // Radix Select uses body-scroll-lock (`position: fixed; top: -Ypx`)
-    // during open, which makes window.scrollY unreliable and makes manual
-    // scrollTo() calls a losing race against Radix's own cleanup. Instead,
-    // after Radix has settled, we scroll the SUBCATEGORY into a fixed
-    // position in the viewport (~30% from the top) so the user's eye
-    // stays with what they just picked. Delay 200ms so Radix's overlay
-    // teardown is fully done before we call scrollIntoView.
-    const t = setTimeout(() => {
-      if (!subcategoryRef.current) return;
-      const rect = subcategoryRef.current.getBoundingClientRect();
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      const desiredTop = Math.round(vh * 0.30); // 30% down from viewport top
-      const delta = rect.top - desiredTop;
-      if (Math.abs(delta) > 8) {
-        window.scrollBy({ top: delta, left: 0, behavior: "smooth" });
-      }
-    }, 220);
-    return () => clearTimeout(t);
-  });
 
   // Auto-select the single subcategory option when a schema only exposes
   // one — e.g. the "Other" catch-all category — so the universal
@@ -146,32 +119,25 @@ export default function ServiceDetailsForm({ category, details, onChange }) {
 
   if (!schema) return null;
 
-  const set = (k, v) => {
-    // Snapshot BOTH the current window scroll and the subcategory's viewport
-    // Y right before we mutate. The useLayoutEffect above uses this snapshot
-    // to restore the visual anchor after Radix's scroll-reset side-effect.
-    if (subcategoryRef.current) {
-      scrollRestoreRef.current = {
-        scrollY: window.scrollY,
-        elementTop: subcategoryRef.current.getBoundingClientRect().top,
-      };
-    }
-    onChange({ ...details, [k]: v });
-  };
+  const set = (k, v) => onChange({ ...details, [k]: v });
 
   return (
     <div className="space-y-4 border border-slate-200 p-4 bg-slate-50/40" data-testid="service-details">
       <div className="overline">Service details</div>
-      <div ref={subcategoryRef}>
+      <div>
         <Label className="overline">{schema.subcategoryLabel || "Subcategory"}</Label>
-        <Select value={details.subcategory || ""} onValueChange={(v) => set("subcategory", v)}>
-          <SelectTrigger className="mt-1" data-testid="detail-subcategory"><SelectValue placeholder="Choose…" /></SelectTrigger>
-          <SelectContent>
-            {Object.entries(schema.subcategories).map(([v, opt]) => (
-              <SelectItem key={v} value={v}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Native <select> — see FieldRenderer comment above for why. */}
+        <select
+          value={details.subcategory || ""}
+          onChange={(e) => set("subcategory", e.target.value)}
+          className="mt-1 w-full border border-slate-300 bg-white px-3 py-2 text-sm h-10 font-mono"
+          data-testid="detail-subcategory"
+        >
+          <option value="" disabled>Choose…</option>
+          {Object.entries(schema.subcategories).map(([v, opt]) => (
+            <option key={v} value={v}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Universal "Other → describe what you need" — kicks in whenever the

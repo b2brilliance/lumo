@@ -25,7 +25,7 @@ const SERVICES = [
   { key: "pet_care",     label: "Pet care",     Icon: PawPrint,        to: "/order/pet_care" },
   { key: "personal_care",label: "Beauty",       Icon: Scissors,        to: "/order/personal_care" },
   { key: "it_support",   label: "Tech help",    Icon: Laptop,          to: "/order/it_support" },
-  { key: "more",         label: "More services",Icon: ArrowRight,      to: "/customer" },
+  { key: "more",         label: "More services",Icon: ArrowRight,      to: "/services" },
 ];
 
 const BROWSE = [
@@ -136,7 +136,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Get help — order now</div>
-            <Link to="/customer" className="text-xs font-mono uppercase tracking-wider text-teal-700 hover:underline" data-testid="home-more-services">All services →</Link>
+            <Link to="/services" className="text-xs font-mono uppercase tracking-wider text-teal-700 hover:underline" data-testid="home-more-services">All services →</Link>
           </div>
           <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-px bg-slate-200 border border-slate-200">
             {SERVICES.map((c) => (
