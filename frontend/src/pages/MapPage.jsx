@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { MapPin, Clock, DollarSign, Globe, ExternalLink, Zap, Sparkles, Calendar, Briefcase } from "lucide-react";
-import { api, CATEGORY_COLORS, formatApiError } from "@/lib/api";
+import { api, CATEGORY_COLORS, formatApiError, errorCode } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { milesBetween } from "@/lib/deliveryPricing";
 import MapView from "@/components/MapView";
@@ -478,7 +478,17 @@ function FeedRow({ pin, highlight, onHover, user }) {
       toast.success("Job accepted — opening live tracker");
       navigate(`/jobs/${pin.id}/track`);
     } catch (err) {
-      toast.error(formatApiError(err));
+      if (errorCode(err) === "stripe_onboarding_required") {
+        toast.error(formatApiError(err), {
+          duration: 10000,
+          action: {
+            label: "Connect bank",
+            onClick: () => navigate("/provider-hub#payouts"),
+          },
+        });
+      } else {
+        toast.error(formatApiError(err));
+      }
       setBusy(false);
     }
   };

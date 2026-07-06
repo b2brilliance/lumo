@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, ALL_CATEGORIES, CATEGORY_COLORS, formatApiError } from "@/lib/api";
+import { api, ALL_CATEGORIES, CATEGORY_COLORS, formatApiError, errorCode } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,6 +143,20 @@ export default function ProviderHub() {
       toast.success("Job accepted — opening live tracker");
       navigate(`/jobs/${id}/track`);
     } catch (e) {
+      if (errorCode(e) === "stripe_onboarding_required") {
+        toast.error(formatApiError(e), {
+          duration: 10000,
+          action: {
+            label: "Connect bank",
+            onClick: () => {
+              // Provider Hub renders <StripeConnectCard/> already — just scroll it into view.
+              const el = document.querySelector('[data-testid="stripe-connect-card"]');
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            },
+          },
+        });
+        return;
+      }
       toast.error(formatApiError(e));
     }
   };

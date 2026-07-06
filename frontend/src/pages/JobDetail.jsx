@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { api, locationModeFor, formatApiError } from "@/lib/api";
+import { api, locationModeFor, formatApiError, errorCode } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
@@ -66,6 +66,16 @@ export default function JobDetail() {
       toast.success("Job accepted — opening live tracker");
       navigate(`/jobs/${id}/track`);
     } catch (e) {
+      if (errorCode(e) === "stripe_onboarding_required") {
+        toast.error(formatApiError(e), {
+          duration: 10000,
+          action: {
+            label: "Connect bank",
+            onClick: () => navigate("/provider-hub#payouts"),
+          },
+        });
+        return;
+      }
       toast.error(formatApiError(e));
     }
   };

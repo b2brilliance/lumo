@@ -16,7 +16,16 @@ export function formatApiError(err) {
   if (!d) return err?.message || "Something went wrong.";
   if (typeof d === "string") return d;
   if (Array.isArray(d)) return d.map((e) => e?.msg || JSON.stringify(e)).join(" ");
+  // Structured errors: { code, message, ...extras } — surface the human copy.
+  if (typeof d === "object" && d.message) return d.message;
   return String(d);
+}
+
+/** Extract a machine-readable error code from an axios error (e.g. "stripe_onboarding_required"). */
+export function errorCode(err) {
+  const d = err?.response?.data?.detail;
+  if (d && typeof d === "object" && typeof d.code === "string") return d.code;
+  return null;
 }
 
 export const CATEGORY_COLORS = {

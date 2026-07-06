@@ -26,7 +26,12 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
-### "Fix everything" batch (Feb 7, 2026) — 4/4 P0/P1 items, testing_agent_v3_fork 10/10 PASS
+### PlaceAutocompleteElement + Stripe Connect gate (Feb 7, 2026)
+- **AddressInput migrated to `google.maps.places.PlaceAutocompleteElement`** — the legacy `Autocomplete` class is deprecated for accounts created after 2025-03-01. New AddressInput dynamically imports the `places` library, instantiates the web-component, listens on `gmp-select` for selections (fetches `formattedAddress` + `location`), and re-emits `input` events for controlled forms. Styled via `.lumo-place-autocomplete` + `::part(input)` so it visually matches the Shadcn Input primitive. Falls back to a plain `<Input>` when the SDK / API key is missing.
+- **Stripe Connect onboarding is now enforced before accept**. Backend gate `_require_stripe_onboarded()` returns HTTP 402 `{code: "stripe_onboarding_required", message, onboard_hint}` when a provider tries to accept a job whose payments will route through Stripe. Skipped for cash-only jobs, admins, and dev environments where Stripe isn't configured. Also enforced on quote-accept (customer accepting a provider's quote when that provider hasn't onboarded). Frontend `errorCode()` helper + Sonner action button open `#payouts` / scroll to `StripeConnectCard`.
+- **Seed backfill**: existing `provider@lumo.test` seed users now get `stripe_details_submitted=true` on startup so regression tests continue to accept jobs without a real Connect roundtrip.
+
+
 - **Homepage `<LocaleSwitcher />` restored** — placed to the right of the location bar with `data-testid="home-locale-switcher"`. Full flag+currency+language dropdown.
 - **AutoTranslator now translates `placeholder` attributes** — new pass walks every `input[placeholder], textarea[placeholder]`, records the English source in a `placeholderState` WeakMap, batches into the same `/api/i18n/translate` call, and writes back via `setAttribute`. Handles route changes and re-translates when the language switches.
 - **Live service-quote calculators (see prior entry)** — the primary user complaint that spawned this session.

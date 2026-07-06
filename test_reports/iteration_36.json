@@ -1,0 +1,66 @@
+{
+  "summary": "Iter36 — verified the two backlog items: (1) Google Places migration to PlaceAutocompleteElement, and (2) Stripe Connect onboarding gate on accept_job / accept_quote. Backend: 5/5 pytest tests PASS (fresh provider→402, seed provider→200, cash-only bypass, quote 402 with rewritten customer message, stripe config sanity). Frontend: new <gmp-place-autocomplete> element renders, typing works, NO old google.maps.places.Autocomplete deprecation warning; 402 Sonner toast with correct message + 'Connect bank' action button appears when a fresh provider clicks Accept. Two real bugs found — one CRITICAL config (Google Places API New is blocked → no suggestions ever appear) and one HIGH code bug (Connect-bank button navigates to /provider-hub#payouts but the real route is /provider, so the CTA lands the user on the homepage instead of the payouts card).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AddressInput / gmp-place-autocomplete",
+        "issue": "Places API (New) is BLOCKED for the API key configured in REACT_APP_GOOGLE_MAPS_API_KEY. Every keystroke into the new <gmp-place-autocomplete> produces 403 from places.googleapis.com — 'Requests to this API places.googleapis.com method google.maps.places.v1.Places.AutocompletePlaces are blocked.' Users can type into the address box, but NO autocomplete suggestions ever render, so gmp-select never fires → onPlace({address, lat, lng}) never fires → lat/lng stay undefined on the job/order payload. Enable 'Places API (New)' on the Google Cloud project for this key.",
+        "selector": ".lumo-place-autocomplete-wrap gmp-place-autocomplete",
+        "priority": "HIGH"
+      },
+      {
+        "component": "JobDetail.jsx & MapPage.jsx — 'Connect bank' toast action",
+        "issue": "Both callers navigate to '/provider-hub#payouts' but there is no /provider-hub route in App.js (line 115 registers /provider). The catch-all '*' → Navigate to='/' silently redirects, so clicking 'Connect bank' from the 402 toast lands the provider on the HOMEPAGE, not the Stripe Connect card on Provider Hub. Change navigate('/provider-hub#payouts') → navigate('/provider#payouts') (or wire a scroll-into-view like ProviderHub.jsx line 151-155 does). Also the backend's onboard_hint returned in the 402 detail uses '/provider-hub?stripe=onboard' — same broken URL.",
+        "selector": "sonner toast [data-button] 'Connect bank'",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_behaviors": {
+    "B1_fresh_provider_402": "PASS — Registered TEST_fresh_*@lumo.test as provider, posted a cleaning job as customer, POST /api/jobs/{id}/accept → HTTP 402 with detail={code:'stripe_onboarding_required', message:'Connect your bank via Stripe...', onboard_hint:'/provider-hub?stripe=onboard'}. Note: onboard_hint is a broken URL (see bug above).",
+    "B2_seed_provider_regression": "PASS — provider@lumo.test can still accept jobs (200 accepted). Seed backfill applied stripe_details_submitted=true.",
+    "B3_cash_only_bypass": "PASS — Job posted with allowed_payment_methods=['cash'] can be accepted by a fresh unonboarded provider (returns 200). Confirms _job_needs_online_payout() correctly bypasses the gate.",
+    "B4_quote_accept_402_customer_facing": "PASS — Fresh provider submits QuoteCreate on cleaning job; customer POST /api/quotes/{qid}/accept returns 402 with detail.code='stripe_onboarding_required' AND the message is rewritten to be customer-facing ('Toast Provider hasn't finished bank onboarding yet — we can't route their payout. Pick another quote or ask them to connect a bank first.').",
+    "B5_stripe_configured": "PASS — GET /api/stripe/connect/status returns enabled=true, confirming _stripe_configured() is true on this server so the gate is actually enforced (not dev-mode bypassed).",
+    "B6_new_place_autocomplete_element_renders": "PASS — Navigated /order/handyman. .lumo-place-autocomplete-wrap wrapper present; <gmp-place-autocomplete class='lumo-place-autocomplete' placeholder='Start typing your address'> injected as a direct child. Element uses ::part(input) CSS to match the Shadcn Input look (confirmed visually — same border, rounded corners, search-icon padding).",
+    "B7_no_deprecated_warning": "PASS — Console shows ZERO 'google.maps.places.Autocomplete is not available to new customers' warnings across three separate page-loads. The old deprecation warning flagged in iter35 is gone.",
+    "B8_typing_syncs_to_el_value": "PASS — page.keyboard.type('1600 Amphitheatre Parkway') focused into the gmp element and typed. gmp-place-autocomplete.value getter returned exactly '1600 Amphitheatre Parkway'. Screenshot shows the visible input filled with the typed text.",
+    "B9_frontend_402_toast_and_action_button": "PASS (toast rendering) / FAIL (destination) — Signed in with a fresh provider token, clicked 'Accept at asking rate' on /jobs/{id}. Sonner toast appears with data-sonner-toast containing the full readable message AND a button labeled exactly 'Connect bank'. Clicking that button DOES navigate — but to the WRONG URL (/provider-hub#payouts → catch-all → /). See bug above."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter36_stripe_gate.py",
+    "/app/test_reports/pytest/iter36_stripe_gate.xml"
+  ],
+  "action_items": [
+    "[HIGH] Enable 'Places API (New)' on the Google Cloud project for REACT_APP_GOOGLE_MAPS_API_KEY. Currently users see 403 blocked errors on every keystroke and NEVER get suggestions — so the migration works at the render level but is functionally broken because no place can be selected → lat/lng never captured.",
+    "[HIGH] Fix Connect-bank CTA destination in /app/frontend/src/pages/JobDetail.jsx (line 74) and /app/frontend/src/pages/MapPage.jsx (line 486): change navigate('/provider-hub#payouts') → navigate('/provider#payouts') (Provider Hub is at /provider per App.js line 115). Also update backend onboard_hint in /app/backend/server.py line 869 from '/provider-hub?stripe=onboard' → '/provider?stripe=onboard' for consistency.",
+    "[LOW] Consider adding a data-testid to the .lumo-place-autocomplete-wrap element so E2E tests can select it deterministically without a class-name selector."
+  ],
+  "critical_code_review_comments": [
+    "AddressInput.jsx: The fallback <Input> stays mounted until readyForElement=true, then the effect appends gmp-place-autocomplete AS A SIBLING but does NOT unmount the fallback <Input> — so both exist in the wrapper briefly. The wrapper's fallback is conditionally rendered via {!readyForElement && <Input/>} so React does remove it — good. But if the SDK load fails after the effect starts, cleanup runs and we're left with just <Input>. Consider adding a visible loading indicator between 'wrapper mounted' and 'PAE ready' for slow networks.",
+    "AddressInput.jsx line 130: effect deps [isLoaded] intentionally excludes value/onChange/onPlace/placeholder. If a parent re-renders with a new onPlace callback (e.g., a fresh arrow function each render), the OLD onPlace closure is what fires on selection. This is a footgun. Consider using a ref for the callbacks (callbackRef pattern) so latest handlers always fire without recreating the element.",
+    "server.py _require_stripe_onboarded (line 842-871): the 402 detail is returned as a nested dict, which axios exposes as err.response.data.detail. Confirmed the frontend errorCode helper reads err.response.data.detail.code — matches. Good structured-error design.",
+    "server.py accept_quote (line 5174): calls _require_stripe_onboarded with the provider dict (not the caller user). This is intentional and correct — the gate is about the payout destination, not the customer's identity. Code comment explains it. LGTM.",
+    "server.py seed() lines 5775-5813: idempotent backfill sets stripe_details_submitted=true on seed providers ONLY when they don't already have it (guard {stripe_details_submitted: {$ne: True}}). Good — won't clobber a real onboarding record if a dev accidentally reuses the seed email.",
+    "Router: App.js registers /provider (not /provider-hub) but four separate call sites reference /provider-hub or /provider-hub#payouts. The 'Provider Hub' name is used in the NavBar label. Suggest either (a) rename the route to /provider-hub, or (b) grep-fix every /provider-hub reference to /provider. Currently the mismatch silently redirects users to /."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter36_stripe_gate.py"
+  ],
+  "success_rate": {
+    "backend": "5/5 pytest (100%)",
+    "frontend": "8/9 verified — 402 toast destination is broken (Connect bank button lands on /) and Places API New is blocked → no suggestions"
+  },
+  "test_credentials": "customer@lumo.test / password123 (seed customer), provider@lumo.test / password123 (seed onboarded provider), fresh provider registered per-test via /api/auth/register with avatar_url='https://example.com/p.jpg'. Stripe: STRIPE_CONNECT_SECRET_KEY is set (sk_test_51TmD...) so the gate is actually enforced on this server.",
+  "seed_data_creation": "TEST_ prefixed users and jobs are created per test via pytest fixtures; no explicit teardown (rely on prefix for later cleanup). One TEST job (4788826f-caa1-4150-b620-507ffcba5fcc) posted for frontend smoke test — still in DB as 'open'.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend gate is solid — /api/jobs/{id}/accept and /api/quotes/{qid}/accept both correctly emit HTTP 402 with detail={code:'stripe_onboarding_required',message,onboard_hint}. Seed provider is auto-onboarded. Cash-only bypass works. On the frontend, the PlaceAutocompleteElement migration IS live and the deprecated Autocomplete warning is gone — but the Google Cloud project's key is missing the 'Places API (New)' allowlist, so users see 403 errors on every keystroke and get zero suggestions. Also, the newly-added 'Connect bank' Sonner action button in JobDetail.jsx / MapPage.jsx points to /provider-hub#payouts which does not exist (the route is /provider) — the button silently redirects users to the homepage. When re-testing after fixes: (a) confirm Places autocomplete suggestions dropdown appears when typing '1600 Amphitheatre Parkway' on /order/handyman and that clicking a suggestion fires onPlace (address/lat/lng captured), (b) confirm 'Connect bank' toast action lands on the Provider Hub with the Stripe Connect card in view.",
+  "rca of the issue": "Bug 1 (Places API blocked) — Cloud project owner has enabled the legacy 'Places API' but not the newer 'Places API (New)' which the PlaceAutocompleteElement uses (endpoints under places.googleapis.com/v1). Legacy PlacesService.getPlacePredictions used places-backend.googleapis.com and probably worked with just the old API enabled. Fix: enable 'Places API (New)' in the Google Cloud Console for this key. No code change needed. Bug 2 (Connect bank navigates to /) — E1 assumed the Provider Hub route was /provider-hub (matches the component name and NavBar label), but App.js line 115 declares it as /provider. The catch-all Route at line 181 (path='*' → /) silently swallows the unknown /provider-hub path. Fix: replace navigate('/provider-hub#payouts') with navigate('/provider#payouts') in JobDetail.jsx:74 and MapPage.jsx:486, and update backend onboard_hint at server.py:869. Optionally add a hash-scroll handler on Provider Hub to focus the payouts section when #payouts is present."
+}

@@ -147,3 +147,62 @@ html {
         overscroll-behavior-x: none;
     }
 }
+
+/* ── Google Places Autocomplete (new PlaceAutocompleteElement) ─────────
+   The new element renders its own <input>. Style it to match the Shadcn
+   Input primitive used elsewhere in the app so address fields visually
+   blend into every form. */
+.lumo-place-autocomplete {
+    display: block;
+    width: 100%;
+}
+.lumo-place-autocomplete input {
+    display: flex;
+    width: 100%;
+    height: 40px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0;
+    border: 1px solid rgb(203 213 225); /* slate-300 */
+    background-color: white;
+    font-size: 0.875rem;
+    color: rgb(15 23 42); /* slate-900 */
+    box-shadow: none;
+    outline: none;
+    transition: border-color 120ms ease;
+}
+/* Newer element hides its input in a shadow root — target it via ::part */
+.lumo-place-autocomplete::part(input) {
+    display: flex;
+    width: 100%;
+    height: 40px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0;
+    border: 1px solid rgb(203 213 225);
+    background-color: white;
+    font-size: 0.875rem;
+    color: rgb(15 23 42);
+    box-shadow: none;
+    outline: none;
+    transition: border-color 120ms ease;
+}
+.lumo-place-autocomplete::part(input):focus {
+    border-color: rgb(15 118 110);
+    box-shadow: 0 0 0 1px rgb(15 118 110);
+}
+.lumo-place-autocomplete input:focus {
+    border-color: rgb(15 118 110); /* teal-700 */
+    box-shadow: 0 0 0 1px rgb(15 118 110);
+}
+.lumo-place-autocomplete input::placeholder {
+    color: rgb(100 116 139); /* slate-500 */
+}
+/* Dropdown items rendered by the element — keep the Google default look
+   but drop the rounded corners to match our sharp visual identity. */
+.gm-style .pac-container,
+.pac-container {
+    border-radius: 0 !important;
+    border: 1px solid rgb(15 23 42) !important;
+    box-shadow: 0 8px 24px -8px rgba(15, 23, 42, 0.35) !important;
+    font-family: "IBM Plex Sans", system-ui, sans-serif !important;
+}
+

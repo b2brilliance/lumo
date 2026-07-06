@@ -73,6 +73,12 @@ def _stripe_enabled() -> bool:
     return bool(k and (k.startswith("sk_") or k.startswith("rk_")))
 
 
+def is_configured() -> bool:
+    """Public alias for `_stripe_enabled` — call from server.py to decide
+    whether to enforce Connect onboarding requirements on providers."""
+    return _stripe_enabled()
+
+
 def _client() -> stripe:
     if not _stripe_enabled():
         raise HTTPException(503, "Stripe Connect is not configured on the server.")

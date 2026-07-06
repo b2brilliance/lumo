@@ -825,6 +825,54 @@ async def get_job(job_id: str):
         raise HTTPException(404, "Job not found")
     return clean_doc(j)
 
+def _job_needs_online_payout(job: dict) -> bool:
+    """Return True if the job's payment flow will route money through
+    Stripe (i.e., the provider will receive an online payout). Cash-only
+    jobs do not require Connect onboarding."""
+    methods = job.get("allowed_payment_methods") or []
+    if not methods:
+        # No methods specified → assume the default Option-B online deposit flow.
+        return True
+    # Only cash was specified — no online payout will be attempted.
+    if all((m or "").lower() == "cash" for m in methods):
+        return False
+    return True
+
+
+async def _require_stripe_onboarded(user: dict, job: dict) -> None:
+    """Gate: a provider must have completed Stripe Connect onboarding before
+    accepting a paid job. Skipped when Stripe isn't configured on the server
+    (dev mode) or the job is explicitly cash-only. Admins bypass this gate
+    so they can operate the platform during setup/testing.
+
+    Raises HTTPException 402 with a machine-readable code that the frontend
+    turns into a "Connect bank" call-to-action.
+    """
+    if not _stripe_configured():
+        return  # Dev mode — no payouts to gate.
+    if user.get("role") == "admin":
+        return
+    if not _job_needs_online_payout(job):
+        return
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0}) or user
+    if fresh.get("stripe_details_submitted"):
+        return
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "code": "stripe_onboarding_required",
+            "message": (
+                "Connect your bank via Stripe before accepting paid jobs. "
+                "This ensures your payout lands the moment the customer pays. "
+                "It takes about 3 minutes — open Provider Hub → Payouts."
+            ),
+            "onboard_hint": "/provider-hub?stripe=onboard",
+        },
+    )
+
+
+
+
 @api.post("/jobs/{job_id}/accept")
 async def accept_job(job_id: str, user: dict = Depends(get_current_user)):
     j = await db.jobs.find_one({"id": job_id})
@@ -838,6 +886,9 @@ async def accept_job(job_id: str, user: dict = Depends(get_current_user)):
     # External aggregated listings link out — they're not in-app acceptable
     if j.get("apply_url"):
         raise HTTPException(400, "This is an external listing — use the apply link")
+    # Provider must have finished Stripe Connect onboarding before accepting
+    # a job whose deposit / final payment will route through Stripe.
+    await _require_stripe_onboarded(user, j)
     if not await _has_verified_credential(user["id"], j["category"]):
         raise HTTPException(403, f"A verified credential is required to accept {j['category']} jobs. Add one in Provider Hub → Credentials.")
     # If the job specifies a license_required, verify the provider holds a matching credential
@@ -5114,6 +5165,28 @@ async def accept_quote(quote_id: str, user: dict = Depends(get_current_user)):
     job = await db.jobs.find_one({"id": q["job_id"]})
     if not job or job["status"] != "open":
         raise HTTPException(400, "Job is not open")
+    # Provider (the quoted worker) must have finished Stripe onboarding
+    # before we lock the job to them, so the deposit flow has a valid
+    # destination account.
+    provider = await db.users.find_one({"id": q["provider_id"]}, {"_id": 0})
+    if provider:
+        try:
+            await _require_stripe_onboarded(provider, job)
+        except HTTPException as ex:
+            # Re-shape so the customer sees a helpful message, not a raw
+            # "you need to connect your bank" (which is aimed at providers).
+            detail = ex.detail if isinstance(ex.detail, dict) else {"message": str(ex.detail)}
+            raise HTTPException(
+                status_code=ex.status_code,
+                detail={
+                    **detail,
+                    "message": (
+                        f"{provider.get('name') or 'This provider'} hasn't finished "
+                        "bank onboarding yet — we can't route their payout. "
+                        "Pick another quote or ask them to connect a bank first."
+                    ),
+                },
+            ) from ex
     # Assign job to this provider at the quoted rate
     await db.jobs.update_one({"id": job["id"]}, {"$set": {
         "status": "accepted",
@@ -5701,6 +5774,20 @@ async def seed():
     await db.jobs.create_index("status")
     for s in SEED_USERS:
         if await db.users.find_one({"email": s["email"]}):
+            # For existing provider seeds, backfill the Stripe onboarding
+            # sentinel so the accept-job gate does not block the standard
+            # dev/test flow (real production providers will still complete
+            # Stripe onboarding via /stripe/connect/onboard).
+            if s.get("role") == "provider":
+                await db.users.update_one(
+                    {"email": s["email"], "stripe_details_submitted": {"$ne": True}},
+                    {"$set": {
+                        "stripe_account_id": "acct_seed_provider",
+                        "stripe_details_submitted": True,
+                        "stripe_charges_enabled": True,
+                        "stripe_payouts_enabled": True,
+                    }},
+                )
             continue
         doc = {
             "id": str(uuid.uuid4()),
@@ -5713,6 +5800,15 @@ async def seed():
             "storefront": s.get("storefront"),
             "created_at": now_iso(),
         }
+        # Test-seed providers are treated as already-onboarded to Stripe so
+        # regression tests can accept jobs without a real Connect roundtrip.
+        if s.get("role") == "provider":
+            doc.update({
+                "stripe_account_id": "acct_seed_provider",
+                "stripe_details_submitted": True,
+                "stripe_charges_enabled": True,
+                "stripe_payouts_enabled": True,
+            })
         await db.users.insert_one(doc)
         logger.info(f"Seeded {s['role']}: {s['email']}")
     # Seed a few sample inventory + jobs once
@@ -6817,6 +6913,7 @@ from escrow import create_router as _create_escrow_router, auto_release_loop as 
 from stripe_connect import (  # noqa: E402
     create_router as _create_stripe_connect_router,
     attempt_stripe_transfer as _attempt_stripe_transfer,
+    is_configured as _stripe_configured,
 )
 
 
