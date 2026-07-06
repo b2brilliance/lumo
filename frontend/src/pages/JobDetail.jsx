@@ -84,6 +84,22 @@ export default function JobDetail() {
 
   const myProviderQuote = isProvider ? quotes.find((q) => q.provider_id === user.id) : null;
 
+  // Option B — customer pays a 10% deposit AFTER a provider has accepted.
+  // Locks in the booking. Shown ONLY to the customer on their own job in
+  // "accepted" status with no deposit paid yet.
+  const showDepositCta = isCustomer && job.status === "accepted" && !job.deposit_paid;
+  const startDeposit = async () => {
+    try {
+      const { data } = await api.post(`/jobs/${id}/deposit`, {
+        origin_url: window.location.origin,
+        country: (typeof window !== "undefined" && localStorage.getItem("lumo_country_override")) || undefined,
+      });
+      if (data.url) window.location.href = data.url;
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  };
+
   return (
     <div className="max-w-screen-xl mx-auto px-6 py-10 grid lg:grid-cols-12 gap-10">
       <div className="lg:col-span-7">
@@ -93,6 +109,40 @@ export default function JobDetail() {
           <div className="font-mono text-xs uppercase tracking-widest text-slate-500">{job.status}</div>
         </div>
         <h1 className="font-display text-4xl font-black tracking-tighter mt-3">{job.title}</h1>
+        {showDepositCta && (
+          <div
+            className="mt-5 border-2 border-amber-500 bg-amber-50 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+            data-testid="job-deposit-banner"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="font-display text-lg font-black tracking-tight text-slate-900">
+                {job.provider_name || "A provider"} accepted your request.
+              </div>
+              <div className="text-sm text-slate-700 mt-1 leading-snug">
+                Confirm the booking by paying a small deposit (10% of estimated total). The remaining balance is charged when the job is marked complete. You&apos;re covered by Lumo escrow.
+              </div>
+            </div>
+            <Button
+              onClick={startDeposit}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-mono uppercase tracking-wider text-sm px-5 py-3 whitespace-nowrap"
+              data-testid="pay-deposit-btn"
+            >
+              Pay deposit
+            </Button>
+          </div>
+        )}
+        {job.status === "confirmed" && isCustomer && (
+          <div
+            className="mt-5 border-2 border-emerald-500 bg-emerald-50 p-4 flex items-start gap-3"
+            data-testid="job-confirmed-banner"
+          >
+            <div className="text-2xl leading-none">✓</div>
+            <div className="text-sm">
+              <div className="font-display text-base font-black text-emerald-900">Booking confirmed.</div>
+              <div className="text-slate-700 mt-0.5">Deposit received. {job.provider_name || "Your provider"} is on it — you&apos;ll be notified when the work is complete.</div>
+            </div>
+          </div>
+        )}
         {job.provider_id && (
           <div className="mt-3 flex items-center gap-2 flex-wrap" data-testid="job-assigned-provider">
             <span className="overline text-slate-500">Assigned to</span>

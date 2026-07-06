@@ -319,6 +319,14 @@ class FinalPaymentCreate(BaseModel):
     order_id: str
     origin_url: str
 
+class JobDepositCreate(BaseModel):
+    """Customer pays the 10% deposit AFTER a provider has accepted their job.
+    Locks in the booking (Option B — "deposit after acceptance"), then the
+    remaining 90% is collected at completion via /checkout/final."""
+    origin_url: str
+    country: Optional[str] = None
+    us_state: Optional[str] = None
+
 class WithdrawRequest(BaseModel):
     amount: float
     method: str = "bank_transfer"
@@ -746,6 +754,70 @@ async def list_jobs(
     docs = await db.jobs.find(q).sort("created_at", -1).to_list(500)
     return [clean_doc(d) for d in docs]
 
+@api.get("/jobs/external")
+async def external_jobs_feed(
+    q: Optional[str] = None,
+    country: Optional[str] = None,
+    is_remote: Optional[bool] = None,
+    min_pay: Optional[float] = None,
+    limit: int = 200,
+):
+    """Feed for the /remote-jobs page — only aggregator-sourced listings
+    (Greenhouse, RemoteOK, WWR, USAJobs) with real pay figures. Kept
+    separate from /api/map/jobs so external listings don't clutter the
+    local on-demand map.
+
+    MUST stay declared before the parameterized /jobs/{job_id} route or
+    FastAPI will match "external" as a job_id and never reach this handler."""
+    from typing import Any as _Any, Dict as _Dict
+    mongo_q: _Dict[str, _Any] = {
+        "status": "open",
+        "source": {"$exists": True, "$ne": None},
+        "pay_rate": {"$gt": 0},
+    }
+    if is_remote is not None:
+        mongo_q["is_remote"] = is_remote
+    if country:
+        rx = re.compile(re.escape(country), re.I)
+        mongo_q["$or"] = [
+            {"title":   {"$regex": rx}},
+            {"description": {"$regex": rx}},
+            {"pickup_location.address": {"$regex": rx}},
+        ]
+    if q:
+        rx = re.compile(re.escape(q), re.I)
+        mongo_q["$and"] = mongo_q.get("$and", []) + [{
+            "$or": [
+                {"title":   {"$regex": rx}},
+                {"description": {"$regex": rx}},
+                {"customer_name": {"$regex": rx}},
+            ],
+        }]
+    if min_pay is not None:
+        mongo_q["pay_rate"] = {"$gte": float(min_pay)}
+    cursor = db.jobs.find(mongo_q).sort("created_at", -1).limit(int(limit))
+    out = []
+    async for d in cursor:
+        d = clean_doc(d)
+        out.append({
+            "id": d["id"], "title": d["title"], "category": d.get("category"),
+            "description": d.get("description"),
+            "pay_rate": d.get("pay_rate"), "pay_unit": d.get("pay_unit"),
+            "salary_min": d.get("salary_min"), "salary_max": d.get("salary_max"),
+            "schedule": d.get("schedule"),
+            "customer_name": d.get("customer_name") or d.get("external_employer"),
+            "is_remote": bool(d.get("is_remote")),
+            "employment_type": d.get("employment_type"),
+            "apply_url": d.get("apply_url"),
+            "source": d.get("source"),
+            "created_at": d.get("created_at"),
+            "location_text": (d.get("pickup_location") or {}).get("address") or (
+                "Remote" if d.get("is_remote") else None
+            ),
+        })
+    return {"jobs": out, "count": len(out)}
+
+
 @api.get("/jobs/{job_id}")
 async def get_job(job_id: str):
     j = await db.jobs.find_one({"id": job_id})
@@ -781,22 +853,104 @@ async def accept_job(job_id: str, user: dict = Depends(get_current_user)):
     if match_info:
         update["credential_match"] = match_info
     await db.jobs.update_one({"id": job_id}, {"$set": update})
-    # Push the customer a "track your provider" notification so they get
-    # routed straight into the Uber-style live tracker.
+    # Push the customer a "confirm your booking" notification. We route them
+    # to /jobs/{id} (not /track) so they see the "Pay deposit" banner and
+    # can lock in the booking before any tracking begins.
     if j.get("customer_id"):
         await db.notifications.insert_one({
             "id": str(uuid.uuid4()),
             "user_id": j["customer_id"],
             "type": "provider_accepted",
             "title": f"{user['name']} accepted your request",
-            "body": f"Tap to track {user['name']} live and message them.",
-            "link": f"/jobs/{job_id}/track",
+            "body": "Tap to confirm the booking (small deposit — 10% of estimated total).",
+            "link": f"/jobs/{job_id}",
             "job_id": job_id,
             "read": False,
             "created_at": now_iso(),
         })
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
+
+@api.post("/jobs/{job_id}/deposit")
+async def create_job_deposit(job_id: str, body: JobDepositCreate, req: Request, user: dict = Depends(get_current_user)):
+    """Option B — customer pays a 10 % deposit AFTER a provider has accepted
+    their job. Locks in the booking. Remaining 90 % is charged on completion.
+
+    Preconditions:
+      • caller is the customer who posted the job
+      • job.status == "accepted" (a provider has taken the job)
+      • no deposit_session already outstanding
+    """
+    j = await db.jobs.find_one({"id": job_id})
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if j.get("customer_id") != user["id"]:
+        raise HTTPException(403, "Only the customer who posted this job can pay the deposit")
+    if j.get("status") not in ("accepted",):
+        raise HTTPException(400, f"Deposit is only payable once a provider has accepted the job (current status: {j.get('status')})")
+    if j.get("deposit_paid"):
+        raise HTTPException(400, "Deposit already paid for this job")
+
+    # Estimate: pay_rate × estimated_units (default 1). Applies country tax
+    # on top so we collect 100 % of tax upfront just like the retail flow.
+    pay_rate = float(j.get("pay_rate") or 0)
+    units = float(j.get("estimated_units") or 1)
+    subtotal = round(pay_rate * units, 2)
+    if subtotal <= 0:
+        raise HTTPException(400, "Job has no valid pay_rate")
+    deposit_pct = 0.10
+    deposit_base = round(subtotal * deposit_pct, 2)
+    tax_profile = tax_for(body.country or "US", us_state=body.us_state)
+    tax_rate = tax_profile["rate"]
+    tax_amount = round(subtotal * tax_rate, 2)
+    deposit_total = round(deposit_base + tax_amount, 2)
+    remaining = round(subtotal - deposit_base, 2)
+    if deposit_total <= 0:
+        raise HTTPException(400, "Deposit amount too small to charge")
+
+    stripe = await _get_stripe(req)
+    success_url = f"{body.origin_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}&job_id={job_id}"
+    cancel_url = f"{body.origin_url}/jobs/{job_id}?deposit=cancelled"
+    metadata = {
+        "type": "job_deposit",
+        "job_id": job_id,
+        "customer_id": user["id"],
+        "provider_id": j.get("provider_id") or "",
+        "deposit_base": str(deposit_base),
+        "tax_amount": str(tax_amount),
+        "remaining": str(remaining),
+        "subtotal": str(subtotal),
+    }
+    session = await stripe.create_checkout_session(CheckoutSessionRequest(
+        amount=float(deposit_total), currency="usd",
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata,
+    ))
+    # Persist a payment_transaction that the /checkout/status handler can
+    # find by session_id to finalize the job on payment success.
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "job_id": job_id,
+        "user_id": user["id"],
+        "amount": float(deposit_total),
+        "currency": "usd",
+        "type": "job_deposit",
+        "status": "initiated",
+        "payment_status": "unpaid",
+        "metadata": metadata,
+        "created_at": now_iso(),
+    })
+    # Mark the job as awaiting deposit so the UI can surface the pending state
+    # even before Stripe confirms — prevents double-checkout.
+    await db.jobs.update_one({"id": job_id}, {"$set": {
+        "deposit_session_id": session.session_id,
+        "deposit_amount": deposit_total,
+        "deposit_subtotal": subtotal,
+        "deposit_tax": tax_amount,
+        "deposit_remaining": remaining,
+    }})
+    return {"url": session.url, "session_id": session.session_id, "job_id": job_id, "deposit_total": deposit_total, "remaining": remaining}
+
 
 @api.post("/jobs/{job_id}/complete")
 async def complete_job(job_id: str, user: dict = Depends(get_current_user)):
@@ -3941,7 +4095,7 @@ async def checkout_status(session_id: str, req: Request):
             {"session_id": session_id},
             {"$set": {"status": status.status, "payment_status": status.payment_status, "paid_at": now_iso()}}
         )
-        order = await db.orders.find_one({"id": tx["order_id"]})
+        order = await db.orders.find_one({"id": tx["order_id"]}) if tx.get("order_id") else None
         if order:
             if tx["type"] == "deposit":
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "deposit_paid", "deposit_paid_at": now_iso()}})
@@ -3956,6 +4110,28 @@ async def checkout_status(session_id: str, req: Request):
                         "id": str(uuid.uuid4()), "user_id": provider_id, "amount": credit,
                         "type": "credit", "reason": f"Order {order['id']} final payment",
                         "order_id": order["id"], "created_at": now_iso(),
+                    })
+        # Option B — job deposit paid → flip job to "confirmed" and notify the
+        # provider that the booking is locked in.
+        if tx["type"] == "job_deposit" and tx.get("job_id"):
+            job = await db.jobs.find_one({"id": tx["job_id"]})
+            if job and not job.get("deposit_paid"):
+                await db.jobs.update_one({"id": tx["job_id"]}, {"$set": {
+                    "status": "confirmed",
+                    "deposit_paid": True,
+                    "deposit_paid_at": now_iso(),
+                }})
+                if job.get("provider_id"):
+                    await db.notifications.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "user_id": job["provider_id"],
+                        "type": "job_confirmed",
+                        "title": "Booking confirmed — deposit paid",
+                        "body": f"{job.get('customer_name','The customer')} paid the deposit for “{job.get('title','your job')}”. Get to work — the remaining 90% lands in your wallet on completion.",
+                        "link": f"/jobs/{tx['job_id']}",
+                        "job_id": tx["job_id"],
+                        "read": False,
+                        "created_at": now_iso(),
                     })
     elif status.status == "expired" and tx["status"] != "expired":
         await db.payment_transactions.update_one(
@@ -4131,67 +4307,6 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             "source": d.get("source"),
         })
     return pins
-@api.get("/jobs/external")
-async def external_jobs_feed(
-    q: Optional[str] = None,
-    country: Optional[str] = None,
-    is_remote: Optional[bool] = None,
-    min_pay: Optional[float] = None,
-    limit: int = 200,
-):
-    """Feed for the /remote-jobs page — only aggregator-sourced listings
-    (Greenhouse, RemoteOK, WWR, USAJobs) with real pay figures. Kept
-    separate from /api/map/jobs so external listings don't clutter the
-    local on-demand map."""
-    from typing import Any as _Any, Dict as _Dict
-    mongo_q: _Dict[str, _Any] = {
-        "status": "open",
-        "source": {"$exists": True, "$ne": None},
-        "pay_rate": {"$gt": 0},
-    }
-    if is_remote is not None:
-        mongo_q["is_remote"] = is_remote
-    if country:
-        # Naive country match via title/address text since aggregators
-        # rarely expose a structured country field.
-        rx = re.compile(re.escape(country), re.I)
-        mongo_q["$or"] = [
-            {"title":   {"$regex": rx}},
-            {"description": {"$regex": rx}},
-            {"pickup_location.address": {"$regex": rx}},
-        ]
-    if q:
-        rx = re.compile(re.escape(q), re.I)
-        mongo_q["$and"] = mongo_q.get("$and", []) + [{
-            "$or": [
-                {"title":   {"$regex": rx}},
-                {"description": {"$regex": rx}},
-                {"customer_name": {"$regex": rx}},
-            ],
-        }]
-    if min_pay is not None:
-        mongo_q["pay_rate"] = {"$gte": float(min_pay)}
-    cursor = db.jobs.find(mongo_q).sort("created_at", -1).limit(int(limit))
-    out = []
-    async for d in cursor:
-        d = clean_doc(d)
-        out.append({
-            "id": d["id"], "title": d["title"], "category": d.get("category"),
-            "description": d.get("description"),
-            "pay_rate": d.get("pay_rate"), "pay_unit": d.get("pay_unit"),
-            "salary_min": d.get("salary_min"), "salary_max": d.get("salary_max"),
-            "schedule": d.get("schedule"),
-            "customer_name": d.get("customer_name") or d.get("external_employer"),
-            "is_remote": bool(d.get("is_remote")),
-            "employment_type": d.get("employment_type"),
-            "apply_url": d.get("apply_url"),
-            "source": d.get("source"),
-            "created_at": d.get("created_at"),
-            "location_text": (d.get("pickup_location") or {}).get("address") or (
-                "Remote" if d.get("is_remote") else None
-            ),
-        })
-    return {"jobs": out, "count": len(out)}
 
 
 @api.get("/")
