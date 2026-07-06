@@ -26,6 +26,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
+### Live service-quote calculators (Feb 7, 2026)
+- **Rewrote `/app/frontend/src/lib/serviceQuotes.js`** — calculators now use the actual `serviceSchemas.js` field names. Cleaning quote reacts live to: subcategory (standard/deep/move_in_out/post_construction/recurring), property_type, property_size, num_bathrooms, rooms multiselect, tasks multiselect, laundry_loads, supplies, pets_in_home.
+- Fixed notary (num_signers × num_documents, mobile_or_office, urgency surcharge), pet_care (dogwalking/petsitting/boarding/training/veterinary/grooming, reactive temperament bump), handyman (est_hours per subcategory), appliance_repair (est_hours + diagnostic), landscaping (per-task, frequency multiplier), errand (per-subcategory typical hours + urgency).
+- Added `est_hours` input to handyman, appliance_repair, and errand schemas so customers can dial the estimate.
+- Verified live: cleaning quote moves $165 → $255 → $285 → $255 as options are toggled.
+
+
+## Implemented — most recent first
 ### Major-city expansion — US, India, UAE, UK, China, Australia (Jul 1, 2026)
 - **LANDING_CITIES expanded** from 40 → **166 cities**. Each auto-generates:
   - `/cities/:slug` hub with services, city name in title/meta/H1, JSON-LD Place schema

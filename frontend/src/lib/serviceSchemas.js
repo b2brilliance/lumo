@@ -280,6 +280,7 @@ export const SERVICE_SCHEMAS = {
       other: { label: "Other" },
     },
     baseFields: [
+      { name: "est_hours", label: "Estimated hours", type: "number", min: 0.5, step: 0.5, default: 1.5, helpText: "How long you think the job will take. Provider can counter." },
       { name: "tools_provided", label: "Tools provided by", type: "select", options: [{ value: "provider", label: "Provider" }, { value: "customer", label: "Customer" }, { value: "either", label: "Either is fine" }], default: "either" },
       { name: "materials_provided", label: "Materials provided by", type: "select", options: [{ value: "provider", label: "Provider" }, { value: "customer", label: "Customer" }, { value: "either", label: "Either is fine" }], default: "customer" },
     ],
@@ -864,6 +865,7 @@ export const SERVICE_SCHEMAS = {
     baseFields: [
       { name: "stores", label: "Where (store / address)", type: "text", placeholder: "e.g. Trader Joe's on Main St" },
       { name: "item_list", label: "Shopping list / what to pick up", type: "textarea", placeholder: "List items, brands, sizes…" },
+      { name: "est_hours", label: "Estimated hours", type: "number", min: 0.5, step: 0.5, helpText: "Leave blank to use category default." },
       { name: "max_budget", label: "Max budget for purchases ($)", type: "number", min: 0, step: 1, helpText: "Customer pre-funds this. Provider keeps receipts." },
       { name: "urgency", label: "When", type: "select", required: true, options: [
         { value: "now", label: "Now / next hour" },
@@ -894,6 +896,7 @@ export const SERVICE_SCHEMAS = {
       { name: "brand", label: "Brand", type: "text", placeholder: "e.g. Whirlpool, GE, Samsung" },
       { name: "model_number", label: "Model number (if known)", type: "text" },
       { name: "age_years", label: "Approx. age (years)", type: "number", min: 0, default: 5 },
+      { name: "est_hours", label: "Estimated labor hours", type: "number", min: 0.5, step: 0.5, helpText: "Diagnostic + repair time. Leave blank to use category default." },
       { name: "symptoms", label: "What's wrong", type: "textarea", placeholder: "Won't turn on, leaking, strange noise…" },
       { name: "under_warranty", label: "Still under warranty?", type: "select", options: [
         { value: "yes", label: "Yes" },
