@@ -3,7 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Send, Trash2, Power, TestTube, Eye, EyeOff, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, Plus, Send, Trash2, Power, TestTube, Eye, EyeOff, Clock, Calendar as CalendarIcon, Facebook, Instagram, Music2, Copy, ExternalLink, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 const CADENCE_OPTIONS = [
@@ -13,6 +13,21 @@ const CADENCE_OPTIONS = [
   { hours: 24, label: "Daily" },
   { hours: 72, label: "Every 3 days" },
   { hours: 168, label: "Weekly" },
+];
+
+// Social platforms that gate direct API access behind app review (Meta) or
+// closed beta (TikTok). We bridge to them through Zapier catch-hooks, which
+// don't require any developer approval and work in ~5 minutes per platform.
+const ZAPIER_BRIDGE_SOCIALS = [
+  { platform: "facebook",  Icon: Facebook,  color: "#1877F2",
+    zapAction: "Facebook Pages → Create Page Post",
+    docs: "https://zapier.com/apps/facebook-pages/integrations/webhook" },
+  { platform: "instagram", Icon: Instagram, color: "#E4405F",
+    zapAction: "Instagram for Business → Publish Photo/Video",
+    docs: "https://zapier.com/apps/instagram-for-business/integrations/webhook" },
+  { platform: "tiktok",    Icon: Music2,    color: "#000000",
+    zapAction: "TikTok for Business → Post Video",
+    docs: "https://zapier.com/apps/tiktok-for-business/integrations/webhook" },
 ];
 
 export default function Distribution() {
@@ -110,6 +125,12 @@ export default function Distribution() {
       ad_ids: schedForm.ad_ids,
       cadence_hours: schedForm.cadence_hours,
     };
+    // Route to a specific subset of connectors when the preset asks for it
+    // (e.g. Zapier-only for the FB/IG/TikTok social bridge). Otherwise the
+    // backend broadcasts to every enabled connector.
+    if (schedForm.connector_ids && schedForm.connector_ids.length > 0) {
+      payload.connector_ids = schedForm.connector_ids;
+    }
     if (schedForm.mode === "times" && schedForm.daily_times.length > 0) {
       payload.daily_times = [...schedForm.daily_times].sort();
       payload.timezone = schedForm.timezone;
@@ -168,6 +189,79 @@ export default function Distribution() {
           <p className="text-sm text-slate-600 mt-2 max-w-2xl">
             Add a channel (Discord webhook + Telegram bot work instantly with no developer signup), then 1-click broadcast any Ad Studio creative to all enabled channels at once.
           </p>
+        </div>
+      </div>
+
+      {/* SOCIAL BRIDGE — FB / IG / TikTok via Zapier catch-hooks. Meta and
+          TikTok both gate direct API access, so this Zapier route is the
+          only path that works today without weeks of app-review lead time. */}
+      <div className="mt-6 border border-slate-900 bg-gradient-to-br from-slate-50 to-white p-5" data-testid="social-bridge-panel">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <div className="overline text-slate-900">Facebook · Instagram · TikTok</div>
+            <h3 className="font-display text-xl font-black tracking-tight mt-1">
+              Auto-post to socials — 2 times a day.
+            </h3>
+            <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+              Meta and TikTok require multi-week API review for direct posting. Zapier bridges around this in ~5 minutes per platform, no developer approval needed. Free tier covers 100 posts/month (60 posts at 2×/day fits comfortably).
+            </p>
+          </div>
+          {(() => {
+            const hasZapier = connectors.some((c) => c.platform === "zapier" && c.enabled);
+            const hasAds = ads.length > 0;
+            const canEnable = hasZapier && hasAds;
+            return (
+              <Button
+                onClick={() => {
+                  if (!hasZapier) { toast.error("Add at least one Zapier connector below first"); return; }
+                  if (!hasAds) { toast.error("Generate at least one Ad in Ad Studio first"); return; }
+                  const zapierIds = connectors.filter((c) => c.platform === "zapier" && c.enabled).map((c) => c.id);
+                  setSchedForm({
+                    name: "Socials 2×/day (Zapier bridge)",
+                    ad_ids: ads.slice(0, 5).map((a) => a.id),
+                    connector_ids: zapierIds,
+                    cadence_hours: 12,
+                    mode: "times",
+                    daily_times: ["09:00", "18:00"],
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+                  });
+                  setSchedModal(true);
+                }}
+                disabled={!canEnable}
+                className="bg-slate-900 hover:bg-slate-800 text-white whitespace-nowrap"
+                data-testid="socials-twice-daily-btn"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                {canEnable ? "Enable 2×/day" : "Setup below first"}
+              </Button>
+            );
+          })()}
+        </div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {ZAPIER_BRIDGE_SOCIALS.map(({ platform, Icon, color, zapAction, docs }) => (
+            <div key={platform} className="border border-slate-200 bg-white p-3 text-xs" data-testid={`social-bridge-${platform}`}>
+              <div className="flex items-center gap-2">
+                <Icon className="w-4 h-4" style={{ color }} />
+                <span className="font-display font-bold capitalize text-slate-900">{platform}</span>
+              </div>
+              <ol className="mt-2 space-y-1 text-slate-600 list-decimal list-inside">
+                <li>Create a Zap on Zapier</li>
+                <li>Trigger: <em>Webhooks by Zapier → Catch Hook</em></li>
+                <li>Action: <em>{zapAction}</em></li>
+                <li>Copy the catch-hook URL</li>
+                <li>Paste it as a <strong>Zapier</strong> connector below</li>
+              </ol>
+              <a
+                href={docs}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-teal-700 hover:underline inline-flex items-center gap-1 mt-2 font-mono text-[10px] uppercase tracking-widest"
+                data-testid={`social-bridge-docs-${platform}`}
+              >
+                Zapier guide <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          ))}
         </div>
       </div>
 
