@@ -28,10 +28,10 @@ export default function LocaleSwitcher() {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-2 py-1.5 border border-transparent hover:border-slate-200 text-sm font-mono text-slate-600 hover:text-slate-900 transition-colors"
         data-testid="locale-switcher-trigger"
-        title={`Language & currency · ${profile.name}`}
+        title={`${profile.name} · ${profile.currency}`}
       >
         <span className="text-base leading-none" data-no-i18n="true">{profile.flag}</span>
-        <span className="hidden md:inline uppercase tracking-widest text-[11px]" data-no-i18n="true">{profile.currency}</span>
+        <span className="hidden md:inline uppercase tracking-widest text-[11px]" data-no-i18n="true">{country}</span>
         <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
