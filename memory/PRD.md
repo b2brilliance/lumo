@@ -26,11 +26,12 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
-### Live service-quote calculators (Feb 7, 2026)
-- **Rewrote `/app/frontend/src/lib/serviceQuotes.js`** — calculators now use the actual `serviceSchemas.js` field names. Cleaning quote reacts live to: subcategory (standard/deep/move_in_out/post_construction/recurring), property_type, property_size, num_bathrooms, rooms multiselect, tasks multiselect, laundry_loads, supplies, pets_in_home.
-- Fixed notary (num_signers × num_documents, mobile_or_office, urgency surcharge), pet_care (dogwalking/petsitting/boarding/training/veterinary/grooming, reactive temperament bump), handyman (est_hours per subcategory), appliance_repair (est_hours + diagnostic), landscaping (per-task, frequency multiplier), errand (per-subcategory typical hours + urgency).
-- Added `est_hours` input to handyman, appliance_repair, and errand schemas so customers can dial the estimate.
-- Verified live: cleaning quote moves $165 → $255 → $285 → $255 as options are toggled.
+### "Fix everything" batch (Feb 7, 2026) — 4/4 P0/P1 items, testing_agent_v3_fork 10/10 PASS
+- **Homepage `<LocaleSwitcher />` restored** — placed to the right of the location bar with `data-testid="home-locale-switcher"`. Full flag+currency+language dropdown.
+- **AutoTranslator now translates `placeholder` attributes** — new pass walks every `input[placeholder], textarea[placeholder]`, records the English source in a `placeholderState` WeakMap, batches into the same `/api/i18n/translate` call, and writes back via `setAttribute`. Handles route changes and re-translates when the language switches.
+- **Live service-quote calculators (see prior entry)** — the primary user complaint that spawned this session.
+- **Cache-busting `/api/meta` endpoint verified** — headers `cache-control: no-store, no-cache, must-revalidate` + `expires: 0` + `pragma: no-cache`. CacheBuster polls it every 5 min and forces a hard reload on new `buildTime`.
+- Non-blocking notes from testing agent (not fixed this pass): react-helmet `UNSAFE_componentWillMount` warning (upgrade to `react-helmet-async`), Google Maps `places.Autocomplete` deprecation (migrate to `PlaceAutocompleteElement` before Q2 2026).
 
 
 ## Implemented — most recent first
