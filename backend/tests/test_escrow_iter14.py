@@ -204,7 +204,7 @@ class TestConfirmReceipt:
     def test_confirm_idempotent_no_double_credit(self, customer, provider):
         jid = _insert_job("delivery", customer["user"]["id"], provider["user"]["id"], pay_rate=60.0, flat=True)
         requests.post(f"{API}/jobs/{jid}/mark-delivered", json={"photos": [PNG_1X1]}, headers=provider["headers"])
-        b0 = _get_wallet_balance(provider["headers"])
+        _get_wallet_balance(provider["headers"])
         r1 = requests.post(f"{API}/jobs/{jid}/confirm-receipt", headers=customer["headers"])
         assert r1.status_code == 200
         b1 = _get_wallet_balance(provider["headers"])

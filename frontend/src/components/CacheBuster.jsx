@@ -22,7 +22,14 @@
 import { useEffect } from "react";
 
 const STORAGE_KEY = "lumo_build_time";
-const META_URL = "/meta.json";
+// Primary source: backend endpoint served with strict no-store headers.
+// The static /meta.json is inside the frontend bucket and Cloudflare
+// caches it for 5 min (even with cache-busting query strings), which was
+// making users stay stuck on stale HTML after a deploy.
+const META_URLS = ["/api/meta", "/meta.json"];
+// How often to re-check for new deploys while the tab is open. Keeps
+// existing sessions in sync without requiring a refresh.
+const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 
 async function nukeSwAndCaches() {
   try {
@@ -42,46 +49,58 @@ async function nukeSwAndCaches() {
 export default function CacheBuster() {
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        // Cache-buster on the URL — browsers cannot return a stale copy
-        // of meta.json when the query string differs every time.
-        const res = await fetch(`${META_URL}?t=${Date.now()}`, {
-          cache: "no-store",
-          credentials: "omit",
-        });
-        if (!res.ok || cancelled) return;
-        const { buildTime } = await res.json();
-        if (!buildTime) return;
+    const backendBase = (typeof process !== "undefined" && process.env.REACT_APP_BACKEND_URL) || "";
 
-        const stored = localStorage.getItem(STORAGE_KEY);
-
-        // First visit — record but do not reload.
-        if (!stored) {
-          localStorage.setItem(STORAGE_KEY, buildTime);
-          return;
-        }
-        // Same deploy — nothing to do.
-        if (stored === buildTime) return;
-
-        // Newer deploy detected → refresh everything.
-        localStorage.setItem(STORAGE_KEY, buildTime);
-        await nukeSwAndCaches();
-        // Guard against reload loops if something goes sideways.
-        const loopKey = "lumo_cachebuster_last_reload";
-        const now = Date.now();
-        const last = parseInt(sessionStorage.getItem(loopKey) || "0", 10);
-        if (now - last < 10_000) return; // don't loop within 10s
-        sessionStorage.setItem(loopKey, String(now));
-
-        const url = new URL(window.location.href);
-        url.searchParams.set("v", buildTime);
-        window.location.replace(url.toString());
-      } catch (_) {
-        /* Network fail / dev server / meta.json missing — silently ignore. */
+    async function fetchMeta() {
+      // Try the backend (no-store) first, then fall back to the static file.
+      for (const path of META_URLS) {
+        const url = path.startsWith("/api")
+          ? `${backendBase}${path}?t=${Date.now()}`
+          : `${path}?t=${Date.now()}`;
+        try {
+          const res = await fetch(url, { cache: "no-store", credentials: "omit" });
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data && data.buildTime) return data.buildTime;
+        } catch { /* try next */ }
       }
-    })();
-    return () => { cancelled = true; };
+      return null;
+    }
+
+    async function check(isInitial) {
+      if (cancelled) return;
+      const buildTime = await fetchMeta();
+      if (!buildTime || cancelled) return;
+
+      const stored = localStorage.getItem(STORAGE_KEY);
+
+      if (!stored) {
+        // First visit — record but do not reload.
+        localStorage.setItem(STORAGE_KEY, buildTime);
+        return;
+      }
+      if (stored === buildTime) return; // Same deploy — nothing to do.
+
+      // Newer deploy detected → refresh everything.
+      localStorage.setItem(STORAGE_KEY, buildTime);
+      await nukeSwAndCaches();
+
+      // Guard against reload loops if something goes sideways.
+      const loopKey = "lumo_cachebuster_last_reload";
+      const now = Date.now();
+      const last = parseInt(sessionStorage.getItem(loopKey) || "0", 10);
+      if (now - last < 10_000) return; // don't loop within 10s
+      sessionStorage.setItem(loopKey, String(now));
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("v", buildTime);
+      window.location.replace(url.toString());
+    }
+
+    // Initial check on mount + poll every 5 min for open tabs
+    check(true);
+    const interval = setInterval(() => check(false), POLL_INTERVAL_MS);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
   return null;
 }

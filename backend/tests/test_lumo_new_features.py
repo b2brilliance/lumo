@@ -83,7 +83,7 @@ class TestI18n:
         langs = r.json()
         assert isinstance(langs, list)
         assert len(langs) >= 9
-        codes = {l["code"] for l in langs}
+        codes = {lang["code"] for lang in langs}
         # must include core set
         for c in ("en", "es", "fr", "de", "ja", "hi", "ar", "zh"):
             assert c in codes, f"missing language {c}"

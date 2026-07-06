@@ -5394,6 +5394,35 @@ async def fx_rates():
         "rates": rates,
     }
 
+
+@api.get("/meta")
+async def build_meta(response: Response):
+    """Build metadata for the frontend CacheBuster.
+
+    Served WITH `Cache-Control: no-store` headers so that neither the browser
+    nor Cloudflare/CDN can cache it. The frontend's static /meta.json is
+    subject to a 5-min shared cache which was causing users to stay stuck
+    on stale HTML after a deploy — this endpoint sidesteps that entirely
+    because backend origins have their own cache policy that we control.
+
+    We read /app/frontend/build/meta.json (regenerated on each `yarn build`)
+    and fall back to /app/frontend/public/meta.json in dev/preview.
+    """
+    import json
+    from pathlib import Path
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    for path in ("/app/frontend/build/meta.json", "/app/frontend/public/meta.json"):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+                data["served_at"] = now_iso()
+                return data
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+    return {"version": "unknown", "buildTime": now_iso(), "served_at": now_iso()}
+
 # Languages supported for translation
 SUPPORTED_LANGS = {
     "en": "English",

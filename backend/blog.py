@@ -233,12 +233,15 @@ def create_router(*, db, require_admin) -> APIRouter:
     @router.put("/api/admin/blog/config")
     async def update_config(body: BlogConfigBody, _admin: dict = Depends(require_admin)):
         upd = {"updated_at": _now_iso()}
-        if body.paused is not None: upd["paused"] = body.paused
+        if body.paused is not None:
+            upd["paused"] = body.paused
         if body.schedule_hours_utc is not None:
             hours = [h for h in body.schedule_hours_utc if 0 <= h < 24]
-            if not hours: raise HTTPException(400, "Need at least one valid hour 0-23")
+            if not hours:
+                raise HTTPException(400, "Need at least one valid hour 0-23")
             upd["schedule_hours_utc"] = sorted(set(hours))[:6]  # cap at 6/day
-        if body.auto_share is not None: upd["auto_share"] = body.auto_share
+        if body.auto_share is not None:
+            upd["auto_share"] = body.auto_share
         await db.blog_config.update_one({"_id": "singleton"}, {"$set": upd}, upsert=True)
         return await get_config(_admin)
 
@@ -265,9 +268,12 @@ def create_router(*, db, require_admin) -> APIRouter:
         if body.title is not None:
             upd["title"] = body.title[:160]
             upd["slug"] = _slugify(body.title)
-        if body.excerpt is not None: upd["excerpt"] = body.excerpt[:300]
-        if body.body_md is not None: upd["body_md"] = body.body_md
-        if body.tags is not None:    upd["tags"] = [t for t in body.tags if isinstance(t, str)][:8]
+        if body.excerpt is not None:
+            upd["excerpt"] = body.excerpt[:300]
+        if body.body_md is not None:
+            upd["body_md"] = body.body_md
+        if body.tags is not None:
+            upd["tags"] = [t for t in body.tags if isinstance(t, str)][:8]
         if body.status is not None:
             if body.status not in ("published", "draft"):
                 raise HTTPException(400, "status must be 'published' or 'draft'")
@@ -317,7 +323,8 @@ async def _publish_one(db, force: bool = False) -> dict:
     # Pick a topic that hasn't been used recently if possible
     recent = []
     async for d in db.blog_posts.find({}, {"topic": 1, "_id": 0}).sort("created_at", -1).limit(6):
-        if d.get("topic"): recent.append(d["topic"])
+        if d.get("topic"):
+            recent.append(d["topic"])
     candidates = [t for t in TOPIC_CATALOG if t["key"] not in recent] or TOPIC_CATALOG
     topic = random.choice(candidates)
 

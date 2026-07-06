@@ -175,7 +175,7 @@ class TestDeclineQuoteNotifications:
         p2_token, p2 = _register(role="provider")
 
         job = _create_job(ctoken, title_suffix="dec")
-        q1 = _create_quote(p1_token, job["id"], rate=44.0)
+        _create_quote(p1_token, job["id"], rate=44.0)
         q2 = _create_quote(p2_token, job["id"], rate=66.0)
 
         # Customer declines q2 only

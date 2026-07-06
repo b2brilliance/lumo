@@ -54,8 +54,10 @@ def _clean(d: dict) -> dict:
 
 def _range_filter(field: str, from_iso: Optional[str], to_iso: Optional[str]) -> dict:
     f: dict = {}
-    if from_iso: f["$gte"] = from_iso
-    if to_iso:   f["$lte"] = to_iso
+    if from_iso:
+        f["$gte"] = from_iso
+    if to_iso:
+        f["$lte"] = to_iso
     return {field: f} if f else {}
 
 
@@ -291,7 +293,8 @@ def create_router(*, db, require_admin) -> APIRouter:
         _admin: dict = Depends(require_admin),
     ):
         f: dict = {}
-        if role: f["role"] = role
+        if role:
+            f["role"] = role
         f.update(_range_filter("created_at", from_iso, to_iso))
         if q:
             rx = {"$regex": re.escape(q), "$options": "i"}
@@ -320,7 +323,8 @@ def create_router(*, db, require_admin) -> APIRouter:
         # Jobs
         if kind in (None, "all", "job"):
             f: dict = {}
-            if status: f["status"] = status
+            if status:
+                f["status"] = status
             f.update(_range_filter("created_at", from_iso, to_iso))
             f = _merge_cutoff(f, "created_at", cutoff)
             cursor = db.jobs.find(f).sort("created_at", -1)
@@ -345,7 +349,8 @@ def create_router(*, db, require_admin) -> APIRouter:
         # Cart orders
         if kind in (None, "all", "order"):
             f = {}
-            if status: f["status"] = status
+            if status:
+                f["status"] = status
             f.update(_range_filter("created_at", from_iso, to_iso))
             f = _merge_cutoff(f, "created_at", cutoff)
             cursor = db.orders.find(f).sort("created_at", -1)
@@ -407,15 +412,21 @@ def create_router(*, db, require_admin) -> APIRouter:
                 {"$group": {"_id": None, "s": {"$sum": "$payment_released_amount"},
                             "n": {"$sum": 1}}},
             ])
-            payouts = 0.0; jobs_done = 0
-            async for d in paid_jobs:   payouts += float(d.get("s") or 0); jobs_done += int(d.get("n") or 0)
-            async for d in paid_orders: payouts += float(d.get("s") or 0); jobs_done += int(d.get("n") or 0)
+            payouts = 0.0
+            jobs_done = 0
+            async for d in paid_jobs:
+                payouts += float(d.get("s") or 0)
+                jobs_done += int(d.get("n") or 0)
+            async for d in paid_orders:
+                payouts += float(d.get("s") or 0)
+                jobs_done += int(d.get("n") or 0)
             # Ratings — pull from db.reviews where target_user_id == uid
             rcur = db.reviews.aggregate([
                 {"$match": {"target_user_id": uid}},
                 {"$group": {"_id": None, "avg": {"$avg": "$rating"}, "n": {"$sum": 1}}},
             ])
-            avg_rating = None; reviews_count = 0
+            avg_rating = None
+            reviews_count = 0
             async for d in rcur:
                 avg_rating = round(float(d.get("avg") or 0), 2) if d.get("avg") is not None else None
                 reviews_count = int(d.get("n") or 0)

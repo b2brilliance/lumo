@@ -209,7 +209,6 @@ class TestOrdersList:
                          headers=admin_h(admin_token))
         assert r.status_code == 200
         items = r.json()["items"]
-        kinds = {i.get("kind") for i in items}
         # if both collections have rows, both kinds appear; if not, at least required fields
         for it in items[:5]:
             for k in ("id", "kind", "title", "status", "amount", "created_at"):

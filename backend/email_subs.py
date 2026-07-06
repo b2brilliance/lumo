@@ -171,7 +171,8 @@ def create_router(*, db, require_admin) -> APIRouter:
                         status: Optional[str] = None, q: Optional[str] = None,
                         _admin: dict = Depends(require_admin)):
         flt: dict = {}
-        if status: flt["status"] = status
+        if status:
+            flt["status"] = status
         if q:
             flt["email"] = {"$regex": re.escape(q), "$options": "i"}
         total = await db.email_subscribers.count_documents(flt)
@@ -208,7 +209,8 @@ async def _pick_topic(db) -> dict:
     import random
     recent = []
     async for d in db.email_sends.find({}, {"topic": 1, "_id": 0}).sort("sent_at", -1).limit(3):
-        if d.get("topic"): recent.append(d["topic"])
+        if d.get("topic"):
+            recent.append(d["topic"])
     pool = [t for t in NEWSLETTER_TOPICS if t["key"] not in recent] or NEWSLETTER_TOPICS
     return random.choice(pool)
 
@@ -235,7 +237,10 @@ async def _run_one(db, force: bool = False) -> dict:
     if opted_out:
         logger.info(f"Email batch: skipping {len(opted_out)} subscribers who opted out via Settings.")
 
-    sent_count = 0; queued_count = 0; failed_count = 0; opted_out_count = 0
+    sent_count = 0
+    queued_count = 0
+    failed_count = 0
+    opted_out_count = 0
     batch_id = str(uuid.uuid4())
     for sub in subs:
         if sub["email"] in opted_out:
@@ -258,9 +263,12 @@ async def _run_one(db, force: bool = False) -> dict:
             "sent_at": _now_iso(),
         }
         await db.email_sends.insert_one(record)
-        if ok: sent_count += 1
-        elif info == "no_api_key": queued_count += 1
-        else: failed_count += 1
+        if ok:
+            sent_count += 1
+        elif info == "no_api_key":
+            queued_count += 1
+        else:
+            failed_count += 1
 
     logger.info(
         f"Email batch {batch_id}: topic={topic['key']} sent={sent_count} "
