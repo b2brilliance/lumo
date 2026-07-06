@@ -866,7 +866,7 @@ async def _require_stripe_onboarded(user: dict, job: dict) -> None:
                 "This ensures your payout lands the moment the customer pays. "
                 "It takes about 3 minutes — open Provider Hub → Payouts."
             ),
-            "onboard_hint": "/provider-hub?stripe=onboard",
+            "onboard_hint": "/provider?stripe=onboard",
         },
     )
 
@@ -3992,7 +3992,7 @@ async def robots_txt(request: Request):
         "Allow: /\n"
         "Disallow: /admin\n"
         "Disallow: /admin/\n"
-        "Disallow: /provider-hub\n"
+        "Disallow: /provider\n"
         "Disallow: /customer-hub\n"
         "Disallow: /wallet\n"
         "Disallow: /settings\n"
@@ -6948,7 +6948,7 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
             "type": "stripe_payout",
             "title": f"${amount:.2f} sent to your bank",
             "body": "Stripe is sending this payout to your connected bank account.",
-            "link": "/provider-hub",
+            "link": "/provider",
             "read": False,
             "created_at": now_iso(),
         })

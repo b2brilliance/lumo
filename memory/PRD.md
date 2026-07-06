@@ -26,7 +26,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
-### PlaceAutocompleteElement + Stripe Connect gate (Feb 7, 2026)
+### PlaceAutocompleteElement + Stripe Connect gate — retest fixes (Feb 7, 2026)
+- Fixed URL-mismatch bugs found by testing agent iter36:
+  - `/provider-hub#payouts` → `/provider#payouts` in JobDetail.jsx & MapPage.jsx toast actions
+  - `onboard_hint` in backend now returns `/provider?stripe=onboard`
+  - Notification link + robots.txt + email CTA path + stripe_connect comment updated
+- ProviderHub now scrolls to the Stripe Connect card when arriving with `#payouts` or `?stripe=onboard`.
+- Added `data-testid="address-input-wrap"` on the new PAE wrapper for E2E targetability.
+
+⚠️ **Google Cloud Console action required (user)**: enable "Places API (New)" on the project for `REACT_APP_GOOGLE_MAPS_API_KEY`. The migration itself is complete and the deprecated Autocomplete warning is gone, but suggestions never render until the New Places API is allowlisted. Users can still type an address (it flows through as a raw string) but lat/lng auto-attach is disabled until enabled.
+
+
 - **AddressInput migrated to `google.maps.places.PlaceAutocompleteElement`** — the legacy `Autocomplete` class is deprecated for accounts created after 2025-03-01. New AddressInput dynamically imports the `places` library, instantiates the web-component, listens on `gmp-select` for selections (fetches `formattedAddress` + `location`), and re-emits `input` events for controlled forms. Styled via `.lumo-place-autocomplete` + `::part(input)` so it visually matches the Shadcn Input primitive. Falls back to a plain `<Input>` when the SDK / API key is missing.
 - **Stripe Connect onboarding is now enforced before accept**. Backend gate `_require_stripe_onboarded()` returns HTTP 402 `{code: "stripe_onboarding_required", message, onboard_hint}` when a provider tries to accept a job whose payments will route through Stripe. Skipped for cash-only jobs, admins, and dev environments where Stripe isn't configured. Also enforced on quote-accept (customer accepting a provider's quote when that provider hasn't onboarded). Frontend `errorCode()` helper + Sonner action button open `#payouts` / scroll to `StripeConnectCard`.
 - **Seed backfill**: existing `provider@lumo.test` seed users now get `stripe_details_submitted=true` on startup so regression tests continue to accept jobs without a real Connect roundtrip.

@@ -64,7 +64,7 @@ NEWSLETTER_TOPICS = [
      "cta_label": "Browse rentals", "cta_path": "/rentals"},
     {"key": "stripe_payouts", "title": "Your money, on your schedule.",
      "blurb": "Connect your bank in one tap — Stripe pays out every job directly to your account. No platform balance, no waiting.",
-     "cta_label": "Set up payouts", "cta_path": "/provider-hub"},
+     "cta_label": "Set up payouts", "cta_path": "/provider"},
     {"key": "business_hire", "title": "Need help for your business?",
      "blurb": "On-demand couriers, weekend warehouse hands, recurring crews — vet on Lumo, hire on Lumo, convert to full-time when you find your people.",
      "cta_label": "Hire for your business", "cta_path": "/customer"},

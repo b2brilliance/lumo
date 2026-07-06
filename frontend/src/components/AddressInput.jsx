@@ -153,7 +153,12 @@ export default function AddressInput({
   }
 
   return (
-    <div ref={wrapRef} className="lumo-place-autocomplete-wrap w-full" {...rest}>
+    <div
+      ref={wrapRef}
+      className="lumo-place-autocomplete-wrap w-full"
+      data-testid="address-input-wrap"
+      {...rest}
+    >
       {!readyForElement && (
         // Rendered until PlaceAutocompleteElement takes over. Uses the same
         // <Input> so users can start typing immediately even before the SDK

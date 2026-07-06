@@ -7,7 +7,7 @@ Flow:
      → Creates an Express account (if needed), returns a Stripe-hosted onboarding URL.
 
   2. Provider completes onboarding on Stripe's site.
-     → Stripe redirects back to /provider-hub?stripe=connected
+     → Stripe redirects back to /provider?stripe=connected
 
   3. UI polls GET /api/stripe/connect/status to see if payouts are enabled.
 

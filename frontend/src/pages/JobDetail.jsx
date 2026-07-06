@@ -71,7 +71,7 @@ export default function JobDetail() {
           duration: 10000,
           action: {
             label: "Connect bank",
-            onClick: () => navigate("/provider-hub#payouts"),
+            onClick: () => navigate("/provider#payouts"),
           },
         });
         return;

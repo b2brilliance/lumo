@@ -18,11 +18,12 @@ import { KIND_LABEL } from "@/lib/credentialKinds";
 import { providerEarningsBreakdown } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
 import { Wallet, MapPin, Briefcase } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 export default function ProviderHub() {
   const { user, updateMe } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [pins, setPins] = useState([]);
   const [opps, setOpps] = useState([]);
   const [highlightId, setHighlightId] = useState(null);
@@ -48,6 +49,22 @@ export default function ProviderHub() {
     const { data } = await api.get(`/map/jobs?${params.toString()}`);
     setPins(data);
   };
+
+  // If the user arrived with `#payouts` (e.g. via the "Connect bank" toast
+  // action or the backend's onboard_hint), scroll the Stripe Connect card
+  // into view once the page has painted.
+  useEffect(() => {
+    const wantsPayouts =
+      location.hash === "#payouts" ||
+      new URLSearchParams(location.search).get("stripe") === "onboard";
+    if (!wantsPayouts) return;
+    const t = setTimeout(() => {
+      const el = document.querySelector('[data-testid="stripe-connect-card"]');
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [location.hash, location.search]);
+
 
   const loadOpps = async () => {
     const { data } = await api.get(`/provider/opportunities`);
@@ -134,8 +151,8 @@ export default function ProviderHub() {
     const t = setInterval(pollNew, 15000);
     const t2 = setInterval(loadMyDeliveries, 20000);
     return () => { clearInterval(t); clearInterval(t2); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { loadPins(); }, [remoteOnly, groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
+  useEffect(() => { loadPins(); }, [remoteOnly, groupFilter]);  
 
   const accept = async (id) => {
     try {
