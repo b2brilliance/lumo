@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useLocale } from "@/lib/locale";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 /* Uber × Craigslist homepage
  * ─────────────────────────
@@ -98,17 +99,23 @@ export default function Landing() {
             </div>
           </form>
 
-          {/* Location bar */}
-          <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-            <MapPin className="w-4 h-4 text-teal-700" />
-            <span className="text-slate-500">Showing near</span>
-            <button
-              onClick={() => setLocOpen((v) => !v)}
-              className="font-display font-bold text-slate-900 underline decoration-dotted underline-offset-2 hover:text-teal-700"
-              data-testid="home-location-toggle"
-            >
-              {locLabel}
-            </button>
+          {/* Location bar + language/currency selector */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-teal-700" />
+              <span className="text-slate-500">Showing near</span>
+              <button
+                onClick={() => setLocOpen((v) => !v)}
+                className="font-display font-bold text-slate-900 underline decoration-dotted underline-offset-2 hover:text-teal-700"
+                data-testid="home-location-toggle"
+              >
+                {locLabel}
+              </button>
+            </div>
+            <span className="text-slate-300" aria-hidden="true">·</span>
+            <div className="inline-flex" data-testid="home-locale-switcher">
+              <LocaleSwitcher />
+            </div>
           </div>
 
           {locOpen && (

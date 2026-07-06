@@ -66,6 +66,9 @@ function rewriteCurrency(text, formatPrice, isUsd) {
 // Per-node state — WeakMap so React-removed nodes get GC'd.
 const nodeState = new WeakMap();
 const elemState = new WeakMap();
+// Track the original English placeholder per input/textarea so we can
+// re-translate on language switch without losing the source of truth.
+const placeholderState = new WeakMap();
 // Source-text → already-translated text (per language). Survives React node
 // swaps so identical strings get re-translated instantly from cache.
 const translationCache = new Map(); // key = `${lang}::${source}` → applied
@@ -204,6 +207,28 @@ export default function AutoTranslator() {
           sourceSet.add(trimmedSrc);
         }
       }
+
+      // Placeholder pass: collect all <input>/<textarea> placeholder sources.
+      // We record the ORIGINAL English placeholder on first visit so a later
+      // language switch can re-translate from the true source (not from an
+      // already-translated placeholder that we then re-treat as English).
+      const placeholderEls = document.querySelectorAll(
+        "input[placeholder], textarea[placeholder]"
+      );
+      const placeholderItems = [];
+      for (const el of placeholderEls) {
+        if (el.getAttribute("data-no-i18n") === "true") continue;
+        const current = el.getAttribute("placeholder") || "";
+        const prev = placeholderState.get(el);
+        const source = (prev && prev.applied === current) ? prev.source : current;
+        if (!isTranslatable(source)) continue;
+        placeholderItems.push({ el, source });
+        const trimmedSrc = source.trim();
+        if (langRef.current !== "en" && !translationCache.has(`${langRef.current}::${trimmedSrc}`)) {
+          sourceSet.add(trimmedSrc);
+        }
+      }
+
       let translated = {};
       if (langRef.current !== "en" && sourceSet.size) {
         const texts = Array.from(sourceSet);
@@ -249,6 +274,23 @@ export default function AutoTranslator() {
             node.nodeValue = display;
           }
           nodeState.set(node, { source, applied: display, lang: langRef.current });
+        }
+        // Apply translations to placeholders too
+        for (const { el, source } of placeholderItems) {
+          let display = source;
+          if (langRef.current !== "en") {
+            const trimmedSrc = source.trim();
+            const trans = translated[trimmedSrc] || translationCache.get(`${langRef.current}::${trimmedSrc}`);
+            if (trans) {
+              const leading = source.match(/^\s*/)[0];
+              const trailing = source.match(/\s*$/)[0];
+              display = leading + trans + trailing;
+            }
+          }
+          if (el.getAttribute("placeholder") !== display) {
+            el.setAttribute("placeholder", display);
+          }
+          placeholderState.set(el, { source, applied: display, lang: langRef.current });
         }
         // Pass 2: handle JSX `${expr}` split-node prices at the element level
         syncElementPrices();

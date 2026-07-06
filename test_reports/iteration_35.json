@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 35 — Frontend-only smoke test of the four P0/P1 items shipped this session (cleaning quote calculator regression fix, homepage LocaleSwitcher, placeholder i18n, /api/meta cache-buster) plus core-flow regressions. Every acceptance criterion in the review request PASSED.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_behaviors": {
+    "B1_cleaning_auto_quote_reactive": "PASS — /order/cleaning as anon user shows the Auto-quote box with ESTIMATED TOTAL. Every field mutation produces a fresh total AND updates the breakdown rows:\n  - subcategory: standard=$135 → deep=$327 → move_in_out=$371 → recurring=$185\n  - property_type: apartment $135 → house $218 (adds 'house adjustment' row)\n  - property_size: 1br $135 → 3br $200\n  - rooms multiselect: +2 rooms adds $24 ($218→$242)\n  - tasks fridge: +$25, oven: +$30 (task rows in breakdown)\n  - num_bathrooms 3: +$40 (row '3 bathrooms × $20')\n  - laundry_loads 2: +$36 (row '2 laundry loads × $18')\n  - supplies provider vs customer: +$15 / removes\n  - pets_in_home dog: +$15, both: +$5 (upgrade from dog to both)\n  Task-only 'laundry' toggle without laundry_loads correctly does not add cost (matches serviceQuotes.js logic).",
+    "B2_homepage_locale_switcher_visible": "PASS — data-testid='home-locale-switcher' present on /, wraps <LocaleSwitcher />. locale-switcher-trigger opens locale-switcher-menu; locale-option-FR click applies FR immediately.",
+    "B3_french_translation_h1_and_tiles": "PASS — after selecting FR + ~5s wait:\n  - H1: 'De quoi avez-vous besoin ?'\n  - tiles: Livraison, Nettoyage, Déménagement, Bricolage, Garde d'animaux, Beauté, Aide tech, Plus de services\n  - buttons: RECHERCHER, Se connecter, COMMENCER",
+    "B4_placeholder_i18n_home_search": "PASS — home-search-input placeholder translates from 'Try \\'cleaning\\', \\'used couch\\', \\'moving help\\'...' → 'Essaie \\'ménage\\', \\'canapé d'occasion\\', \\'aide au déménagement\\'...' (contains both 'ménage' and 'canapé').",
+    "B5_placeholder_i18n_order_page": "PASS — on /order/handyman with FR active, order-title placeholder → 'Titre court pour votre demande de bricoleur'; order-description → 'Décrivez ce dont vous avez besoin — plus c'est clair, plus vite vous serez accepté.' AutoTranslator placeholder pass is working across route changes.",
+    "B6_reset_to_auto_detect": "PASS — locale-reset button restores H1 to 'What do you need?' and everything reverts to English.",
+    "B7_api_meta_cache_headers": "PASS — GET {REACT_APP_BACKEND_URL}/api/meta → 200, JSON body {version:'0.1.0', buildTime:'2026-07-06T22:44:44.629Z', served_at:'2026-07-06T23:18:22.609321+00:00'}. Response headers: 'cache-control: no-store, no-cache, must-revalidate', 'expires: 0', 'pragma: no-cache'. CORS: 'access-control-allow-origin: *' — no CORS errors observed from frontend origin (AutoTranslator posts to /api/i18n/translate on the same origin and returns 200s).",
+    "B8_regression_service_tile_navigates": "PASS — clicking home-service-cleaning tile lands on /order/cleaning.",
+    "B9_regression_location_picker": "PASS — home-location-toggle opens home-location-picker with country buttons.",
+    "B10_regression_signin_customer": "PASS — /login → login-role-customer → login-email 'customer@lumo.test' + login-password 'password123' → login-submit redirects to '/', nav shows 'Casey Customer' + Sign out, nav-login gone."
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_35.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "React strict-mode console warning: 'Using UNSAFE_componentWillMount ...' — comes from a third-party dependency (likely react-helmet, which uses side-effect-full lifecycle methods). Non-blocking but consider migrating to react-helmet-async to silence the warning and gain Suspense/StrictMode compatibility.",
+    "Google Maps deprecation warning: 'google.maps.places.Autocomplete is not available to new customers. Please use google.maps.places.PlaceAutocompleteElement instead.' — AddressInput will stop working for accounts created after 2025-03. Plan a migration to PlaceAutocompleteElement before it becomes hard-broken.",
+    "AutoTranslator adds a placeholder-translation pass that walks every input/textarea on every 4-second interval scan. For long-form pages with many inputs this could cause extra POSTs to /api/i18n/translate. Consider limiting the walk to nodes that have appeared since the last scan by hashing the placeholder set.",
+    "serviceQuotes.js: bathrooms defaults to 1 when the field is blank (Math.max(0, parseInt(details.num_bathrooms ?? 1))). Because ?? treats '' as truthy, an empty string produces NaN → parseInt fallback. The current logic works but explicitly checking for '' would be more robust.",
+    "OrderService.jsx auto-updates form.pay_rate whenever marketQuote.total changes — this is correct for the Cleaning fix but means any user-typed pay_rate is silently overwritten by the calculator on the NEXT field change. Consider gating the effect on a 'user hasn't manually edited pay_rate' sentinel."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (skipped per request)", "frontend": "10/10 (100%)" },
+  "test_credentials": "customer@lumo.test / password123 verified. provider/admin not exercised in this run.",
+  "seed_data_creation": "None — anon browsing + one signin flow, no jobs posted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All four P0/P1 items from the user's 'fix everything' request are landed and verified end-to-end against the preview URL: (1) Cleaning quote calculator now uses the correct schema fields (property_size, property_type, rooms, tasks, num_bathrooms, laundry_loads, supplies, pets_in_home, subcategory 'standard|deep|move_in_out|post_construction|recurring'); toggling ANY of them updates the ESTIMATED TOTAL and breakdown. (2) LocaleSwitcher is rendered on the homepage right of the location bar, wrapped in data-testid='home-locale-switcher'. (3) AutoTranslator's placeholder-translation pass works — home-search-input and every order-page input translate to French within ~5s of the FR switch. (4) /api/meta returns {version, buildTime, served_at} with proper cache-busting headers and permissive CORS. No regressions on service-tile nav, location picker, or customer signin. Two pre-existing non-blocking warnings (react-helmet UNSAFE_componentWillMount, google.maps.places.Autocomplete deprecation) noted in critical_code_review_comments.",
+  "rca of the issue": "n/a — verification only, no bugs surfaced this iteration."
+}
