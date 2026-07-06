@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -91,6 +91,37 @@ function FieldRenderer({ field, value, onChange }) {
 
 export default function ServiceDetailsForm({ category, details, onChange }) {
   const schema = SERVICE_SCHEMAS[category];
+  // Ref to the subcategory dropdown — used to (a) measure viewport position
+  // and (b) forcibly scroll it back into view after Radix Select's body-
+  // lock/unlock cycle nukes our scroll position (Radix resets scrollY to 0
+  // on close, which was the root cause of the "jumpy" feeling users
+  // reported when picking a subcategory).
+  const subcategoryRef = useRef(null);
+  const scrollRestoreRef = useRef(null); // { scrollY, elementTop } snapshot
+
+  useLayoutEffect(() => {
+    if (!scrollRestoreRef.current || !subcategoryRef.current) return;
+    scrollRestoreRef.current = null;
+
+    // Radix Select uses body-scroll-lock (`position: fixed; top: -Ypx`)
+    // during open, which makes window.scrollY unreliable and makes manual
+    // scrollTo() calls a losing race against Radix's own cleanup. Instead,
+    // after Radix has settled, we scroll the SUBCATEGORY into a fixed
+    // position in the viewport (~30% from the top) so the user's eye
+    // stays with what they just picked. Delay 200ms so Radix's overlay
+    // teardown is fully done before we call scrollIntoView.
+    const t = setTimeout(() => {
+      if (!subcategoryRef.current) return;
+      const rect = subcategoryRef.current.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const desiredTop = Math.round(vh * 0.30); // 30% down from viewport top
+      const delta = rect.top - desiredTop;
+      if (Math.abs(delta) > 8) {
+        window.scrollBy({ top: delta, left: 0, behavior: "smooth" });
+      }
+    }, 220);
+    return () => clearTimeout(t);
+  });
 
   // Auto-select the single subcategory option when a schema only exposes
   // one — e.g. the "Other" catch-all category — so the universal
@@ -115,12 +146,23 @@ export default function ServiceDetailsForm({ category, details, onChange }) {
 
   if (!schema) return null;
 
-  const set = (k, v) => onChange({ ...details, [k]: v });
+  const set = (k, v) => {
+    // Snapshot BOTH the current window scroll and the subcategory's viewport
+    // Y right before we mutate. The useLayoutEffect above uses this snapshot
+    // to restore the visual anchor after Radix's scroll-reset side-effect.
+    if (subcategoryRef.current) {
+      scrollRestoreRef.current = {
+        scrollY: window.scrollY,
+        elementTop: subcategoryRef.current.getBoundingClientRect().top,
+      };
+    }
+    onChange({ ...details, [k]: v });
+  };
 
   return (
     <div className="space-y-4 border border-slate-200 p-4 bg-slate-50/40" data-testid="service-details">
       <div className="overline">Service details</div>
-      <div>
+      <div ref={subcategoryRef}>
         <Label className="overline">{schema.subcategoryLabel || "Subcategory"}</Label>
         <Select value={details.subcategory || ""} onValueChange={(v) => set("subcategory", v)}>
           <SelectTrigger className="mt-1" data-testid="detail-subcategory"><SelectValue placeholder="Choose…" /></SelectTrigger>

@@ -196,9 +196,12 @@ export default function AutoTranslator() {
           source = text;
         }
         items.push({ node: n, source });
-        // Only ask for translation on actually translatable strings (not pure "$9.50")
-        if (langRef.current !== "en" && isTranslatable(source) && !translationCache.has(`${langRef.current}::${source}`)) {
-          sourceSet.add(source);
+        // Only ask for translation on actually translatable strings (not pure "$9.50").
+        // Cache key uses the TRIMMED source so "Get started" and "Get started "
+        // (trailing space before an icon) share the same translation entry.
+        const trimmedSrc = source.trim();
+        if (langRef.current !== "en" && isTranslatable(source) && !translationCache.has(`${langRef.current}::${trimmedSrc}`)) {
+          sourceSet.add(trimmedSrc);
         }
       }
       let translated = {};
@@ -228,9 +231,18 @@ export default function AutoTranslator() {
         for (const { node, source } of items) {
           let display = source;
           if (langRef.current !== "en") {
-            const cacheKey = `${langRef.current}::${source}`;
-            if (translated[source]) display = translated[source];
-            else if (translationCache.has(cacheKey)) display = translationCache.get(cacheKey);
+            const trimmedSrc = source.trim();
+            const cacheKey = `${langRef.current}::${trimmedSrc}`;
+            // Look up translation on the trimmed key, then preserve the
+            // original leading/trailing whitespace so we don't collapse
+            // "Get started " → "Commencer" (which would eat the space
+            // between the label and the icon that follows it).
+            const trans = translated[trimmedSrc] || translationCache.get(cacheKey);
+            if (trans) {
+              const leading = source.match(/^\s*/)[0];
+              const trailing = source.match(/\s*$/)[0];
+              display = leading + trans + trailing;
+            }
           }
           display = rewriteCurrency(display, formatPrice, isUsd);
           if (node.nodeValue !== display) {
