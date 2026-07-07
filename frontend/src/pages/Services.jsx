@@ -14,7 +14,7 @@ import { Search, Home, Sparkles, Truck, Wrench, Heart, Briefcase, MonitorSmartph
 
 const GROUPS = [
   { key: "home",     label: "Home & Property",  Icon: Home,           categories: ["cleaning", "handyman", "landscaping", "appliance_repair", "locksmith", "security", "moving"] },
-  { key: "auto",     label: "Auto & Transport", Icon: Truck,          categories: ["delivery", "courier", "ride_share", "towing", "auto", "roadside"] },
+  { key: "auto",     label: "Auto & Transport", Icon: Truck,          categories: ["delivery", "courier", "ride_share", "auto", "auto_detailing", "roadside", "towing"] },
   { key: "personal", label: "Personal & Care",  Icon: Heart,          categories: ["personal_care", "medical", "pet_care", "events", "education"] },
   { key: "biz",      label: "Business & Legal", Icon: Briefcase,      categories: ["business_admin", "marketing", "legal", "financial", "notary"] },
   { key: "tech",     label: "Digital & Tech",   Icon: MonitorSmartphone, categories: ["digital_tech", "it_support", "remote_work", "research"] },
@@ -24,7 +24,8 @@ const GROUPS = [
 const PRETTY = {
   delivery: "Delivery", courier: "Courier", ride_share: "Ride-share",
   towing: "Towing", moving: "Moving", handyman: "Handyman",
-  cleaning: "Cleaning", landscaping: "Landscaping", auto: "Auto detailing",
+  cleaning: "Cleaning", landscaping: "Landscaping", auto: "Mobile mechanic",
+  auto_detailing: "Auto detailing",
   roadside: "Roadside assistance", pet_care: "Pet care", events: "Events & catering",
   personal_care: "Personal care", medical: "Medical & wellness",
   digital_tech: "Digital & tech", marketing: "Marketing",

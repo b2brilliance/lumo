@@ -40,7 +40,9 @@ export const ALL_CATEGORIES = [
   { value: "courier", label: "Courier", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "moving", label: "Moving", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "ride_share", label: "Ride / Rideshare", group: "physical_delivery", location_mode: "pickup_dropoff" },
-  { value: "towing", label: "Towing / Roadside", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "towing", label: "Towing", group: "physical_delivery", location_mode: "pickup_dropoff" },
+  { value: "roadside", label: "Roadside assistance", group: "physical_delivery", location_mode: "onsite" },
+  { value: "auto_detailing", label: "Auto detailing", group: "local_services", location_mode: "onsite" },
   { value: "handyman", label: "Handyman", group: "local_services", location_mode: "onsite" },
   { value: "cleaning", label: "Cleaning", group: "local_services", location_mode: "onsite" },
   { value: "landscaping", label: "Landscaping", group: "local_services", location_mode: "onsite" },
@@ -116,14 +118,30 @@ export function locationLabelsFor(category, subcategory) {
     return { title: "Where the work happens", pickup_label: "Where should the landscaping be done?", pickup_placeholder: "Property address" };
   }
   if (category === "auto") {
-    if (subcategory === "roadside") {
-      return {
-        title: "Where you need help",
-        pickup_label: "Where are you stuck?",
-        pickup_placeholder: "Drop a pin on the map if you do not have an exact address",
-      };
-    }
     return { title: "Where the work happens", pickup_label: "Where should the work be done?", pickup_placeholder: "Address or shop location" };
+  }
+  if (category === "roadside") {
+    return {
+      title: "Where you need help",
+      pickup_label: "Where are you stuck?",
+      pickup_placeholder: "Drop a pin on the map if you do not have an exact address",
+    };
+  }
+  if (category === "auto_detailing") {
+    return {
+      title: "Where the detailing happens",
+      pickup_label: "Where should the detailer come?",
+      pickup_placeholder: "Home, work, or provider's shop address",
+    };
+  }
+  if (category === "towing") {
+    return {
+      title: "Pickup & drop-off",
+      pickup_label: "Pickup location (where the vehicle is now)",
+      dropoff_label: "Drop-off location (shop or home)",
+      pickup_placeholder: "Address where the tow truck should meet you",
+      dropoff_placeholder: "Where to deliver the vehicle",
+    };
   }
   if (category === "pet_care") {
     const verb = {

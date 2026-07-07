@@ -81,6 +81,72 @@ const CAR_SECTIONS = [
   { value: "other", label: "Other / not sure" },
 ];
 
+// ── Shared vehicle-picker fields ──────────────────────────────────────
+// Year / Make / Model dropdowns used by any category that touches a
+// customer vehicle (auto, roadside, auto_detailing, towing). Model
+// options depend on the selected make — FieldRenderer supports
+// `options: (details) => [...]` for that. Cars we don't recognise fall
+// back to a single "Other (write in notes)" option so customers aren't
+// blocked.
+const VEHICLE_YEARS = (() => {
+  const arr = [];
+  for (let y = new Date().getFullYear() + 1; y >= 1980; y--) arr.push({ value: String(y), label: String(y) });
+  return arr;
+})();
+const VEHICLE_MAKES = [
+  "Acura","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler","Dodge",
+  "Ford","GMC","Honda","Hyundai","Infiniti","Jaguar","Jeep","Kia",
+  "Land Rover","Lexus","Lincoln","Mazda","Mercedes-Benz","Mini",
+  "Mitsubishi","Nissan","Porsche","Ram","Subaru","Tesla","Toyota",
+  "Volkswagen","Volvo","Other",
+].map((m) => ({ value: m, label: m }));
+const VEHICLE_MAKE_MODELS = {
+  Acura: ["ILX","TLX","RLX","MDX","RDX","NSX","Integra"],
+  Audi: ["A3","A4","A5","A6","A7","A8","Q3","Q5","Q7","Q8","e-tron","R8"],
+  BMW: ["2 Series","3 Series","4 Series","5 Series","7 Series","X1","X3","X5","X6","X7","i3","i4","i7","iX","M3","M4","M5"],
+  Buick: ["Encore","Envision","Enclave","Regal","LaCrosse"],
+  Cadillac: ["ATS","CT4","CT5","CT6","XT4","XT5","XT6","Escalade","Lyriq"],
+  Chevrolet: ["Spark","Sonic","Cruze","Malibu","Impala","Camaro","Corvette","Trailblazer","Trax","Equinox","Blazer","Traverse","Tahoe","Suburban","Colorado","Silverado 1500","Silverado 2500","Bolt"],
+  Chrysler: ["300","Pacifica","Voyager"],
+  Dodge: ["Charger","Challenger","Durango","Journey","Grand Caravan","Hornet"],
+  Ford: ["Fiesta","Focus","Fusion","Mustang","Mustang Mach-E","EcoSport","Escape","Edge","Explorer","Expedition","Bronco","Bronco Sport","Ranger","F-150","F-150 Lightning","F-250","F-350","Maverick","Transit"],
+  GMC: ["Terrain","Acadia","Yukon","Yukon XL","Canyon","Sierra 1500","Sierra 2500","Hummer EV"],
+  Honda: ["Fit","Civic","Insight","Accord","HR-V","CR-V","Passport","Pilot","Ridgeline","Odyssey","Prologue"],
+  Hyundai: ["Accent","Elantra","Sonata","Ioniq 5","Ioniq 6","Kona","Venue","Tucson","Santa Fe","Palisade","Santa Cruz"],
+  Infiniti: ["Q50","Q60","QX50","QX55","QX60","QX80"],
+  Jaguar: ["XE","XF","F-Type","E-Pace","F-Pace","I-Pace"],
+  Jeep: ["Renegade","Compass","Cherokee","Grand Cherokee","Wrangler","Gladiator","Wagoneer","Grand Wagoneer"],
+  Kia: ["Rio","Forte","K5","Stinger","Soul","Seltos","Sportage","Sorento","Telluride","Carnival","EV6","Niro"],
+  "Land Rover": ["Range Rover","Range Rover Sport","Range Rover Velar","Range Rover Evoque","Discovery","Discovery Sport","Defender"],
+  Lexus: ["IS","ES","GS","LS","NX","RX","GX","LX","UX","LC","RC"],
+  Lincoln: ["MKZ","Continental","Corsair","Nautilus","Aviator","Navigator"],
+  Mazda: ["Mazda3","Mazda6","MX-5 Miata","CX-3","CX-30","CX-5","CX-9","CX-50","CX-90"],
+  "Mercedes-Benz": ["A-Class","C-Class","E-Class","S-Class","CLA","CLS","GLA","GLB","GLC","GLE","GLS","G-Class","EQS","EQE","Sprinter"],
+  Mini: ["Cooper","Cooper Clubman","Cooper Countryman"],
+  Mitsubishi: ["Mirage","Outlander","Outlander Sport","Eclipse Cross"],
+  Nissan: ["Versa","Sentra","Altima","Maxima","Leaf","Ariya","Kicks","Rogue","Murano","Pathfinder","Armada","Frontier","Titan"],
+  Porsche: ["911","718 Cayman","718 Boxster","Panamera","Macan","Cayenne","Taycan"],
+  Ram: ["1500","2500","3500","ProMaster","ProMaster City"],
+  Subaru: ["Impreza","Legacy","Outback","Forester","Ascent","Crosstrek","WRX","BRZ","Solterra"],
+  Tesla: ["Model S","Model 3","Model X","Model Y","Cybertruck"],
+  Toyota: ["Corolla","Camry","Avalon","Prius","Prius Prime","Crown","GR86","Supra","C-HR","Corolla Cross","RAV4","Venza","Highlander","Grand Highlander","4Runner","Sequoia","Tacoma","Tundra","Sienna","bZ4X"],
+  Volkswagen: ["Jetta","Passat","Arteon","Golf","GTI","Golf R","Taos","Tiguan","Atlas","Atlas Cross Sport","ID.4"],
+  Volvo: ["S60","S90","V60","V90","XC40","XC60","XC90","C40 Recharge"],
+};
+const VEHICLE_MODELS_FOR_MAKE = (make) => {
+  const list = VEHICLE_MAKE_MODELS[make];
+  if (!list) return [{ value: "other", label: "Other (write in notes)" }];
+  return [...list.map((m) => ({ value: m, label: m })), { value: "other", label: "Other (write in notes)" }];
+};
+const VEHICLE_FIELDS = [
+  { name: "vehicle_year", label: "Vehicle year", type: "select", required: true, options: VEHICLE_YEARS },
+  { name: "vehicle_make", label: "Make", type: "select", required: true, options: VEHICLE_MAKES },
+  {
+    name: "vehicle_model", label: "Model", type: "select", required: true,
+    options: (details) => VEHICLE_MODELS_FOR_MAKE(details.vehicle_make),
+  },
+];
+
 export const SERVICE_SCHEMAS = {
   delivery: {
     subcategoryLabel: "Item type",
@@ -162,15 +228,10 @@ export const SERVICE_SCHEMAS = {
     ],
   },
   towing: {
-    subcategoryLabel: "Tow / roadside type",
+    subcategoryLabel: "Tow type",
     subcategories: {
       breakdown_tow: { label: "Broken-down vehicle — tow to shop/home" },
       accident_tow: { label: "Accident recovery" },
-      flat_tire: { label: "Flat tire change" },
-      jump_start: { label: "Battery jump-start" },
-      fuel_delivery: { label: "Out of fuel — delivery" },
-      lockout: { label: "Locked out — unlock / key replacement" },
-      winch_pullout: { label: "Stuck / ditch — winch pull-out" },
       heavy_duty_tow: { label: "Heavy-duty (RV, truck, bus)" },
       motorcycle_tow: { label: "Motorcycle tow" },
       long_distance_tow: { label: "Long-distance tow (50+ mi)" },
@@ -188,7 +249,7 @@ export const SERVICE_SCHEMAS = {
         { value: "heavy_duty", label: "Heavy-duty / semi" },
         { value: "ev", label: "Electric vehicle (special handling)" },
       ]},
-      { name: "make_model_year", label: "Make / model / year", type: "text", required: true, helpText: "e.g. 2018 Honda Civic" },
+      ...VEHICLE_FIELDS,
       { name: "drivetrain", label: "Drivetrain", type: "select", required: true, options: [
         { value: "fwd", label: "Front-wheel drive (FWD)" },
         { value: "rwd", label: "Rear-wheel drive (RWD)" },
@@ -351,47 +412,12 @@ export const SERVICE_SCHEMAS = {
       minor_repair: { label: "Minor repair" },
       major_repair: { label: "Major repair" },
       maintenance: { label: "Maintenance / tune-up" },
-      detailing: { label: "Detailing / wash" },
-      roadside: {
-        label: "Roadside assistance",
-        fields: [
-          { name: "roadside_type", label: "Roadside service", type: "select", required: true, options: [
-            { value: "gas", label: "Gas delivery" },
-            { value: "battery", label: "Battery jump" },
-            { value: "tire", label: "Tire service" },
-            { value: "lockout", label: "Lockout" },
-            { value: "tow", label: "Tow" },
-          ]},
-          { name: "fuel_grade", label: "Fuel grade", type: "select", showIf: { roadside_type: "gas" }, options: [
-            { value: "regular", label: "Regular (87)" },
-            { value: "midgrade", label: "Mid-grade (89)" },
-            { value: "premium", label: "Premium (91+)" },
-            { value: "diesel", label: "Diesel" },
-          ]},
-          { name: "fuel_gallons", label: "Gallons (max 5)", type: "number", showIf: { roadside_type: "gas" }, min: 1, max: 5, default: 2 },
-          { name: "tire_service", label: "Tire service needed", type: "select", showIf: { roadside_type: "tire" }, options: [
-            { value: "change_spare", label: "Change to spare" },
-            { value: "repair_flat", label: "Repair flat" },
-            { value: "bring_new", label: "Bring new tire" },
-          ]},
-          { name: "tire_size", label: "Tire / wheel size", type: "select", showIf: { roadside_type: "tire", tire_service: "bring_new" }, options: TIRE_SIZES },
-        ],
-      },
       other: { label: "Other" },
     },
     baseFields: [
-      { name: "vehicle_year", label: "Vehicle year", type: "select", required: true, options: (() => {
-        const years = [];
-        for (let y = new Date().getFullYear() + 1; y >= 1980; y--) years.push({ value: String(y), label: String(y) });
-        return years;
-      })() },
-      { name: "vehicle_make", label: "Make", type: "select", required: true, options: [
-        "Acura","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler","Dodge","Ford","GMC","Honda","Hyundai","Infiniti","Jaguar","Jeep","Kia","Land Rover","Lexus","Lincoln","Mazda","Mercedes-Benz","Mini","Mitsubishi","Nissan","Porsche","Ram","Subaru","Tesla","Toyota","Volkswagen","Volvo","Other"
-      ].map((m) => ({ value: m, label: m })) },
-      { name: "vehicle_model", label: "Model", type: "text", required: true, placeholder: "e.g. Civic, F-150, Model 3" },
+      ...VEHICLE_FIELDS,
       // Mechanic-style section → part → issue workflow. Shown only when the
-      // job is a repair / maintenance request (not detailing, not roadside —
-      // those have their own flows).
+      // job is a repair / maintenance request.
       { name: "car_section", label: "Section of the car", type: "select", showIf: { subcategory: "minor_repair" }, options: CAR_SECTIONS },
       { name: "car_section", label: "Section of the car", type: "select", showIf: { subcategory: "major_repair" }, options: CAR_SECTIONS },
       { name: "car_section", label: "Section of the car", type: "select", showIf: { subcategory: "maintenance" }, options: CAR_SECTIONS },
@@ -401,6 +427,90 @@ export const SERVICE_SCHEMAS = {
       { name: "issue_description", label: "Describe the issue / symptoms", type: "textarea", showIf: { subcategory: "minor_repair" }, placeholder: "What's happening? Noises, warning lights, when it started…" },
       { name: "issue_description", label: "Describe the issue / symptoms", type: "textarea", showIf: { subcategory: "major_repair" }, placeholder: "What's happening? Noises, warning lights, when it started…" },
       { name: "issue_description", label: "Service requested", type: "textarea", showIf: { subcategory: "maintenance" }, placeholder: "e.g. 60k-mile service, oil change, brake pad replacement" },
+    ],
+  },
+
+  // Roadside — jump-starts, tire changes, lockouts, fuel delivery. Split
+  // off from the old `auto` / `towing` categories so customers who need
+  // urgent roadside help can find it directly.
+  roadside: {
+    subcategoryLabel: "Roadside service",
+    subcategories: {
+      jump_start: { label: "Battery jump-start" },
+      flat_tire: { label: "Flat tire change / repair" },
+      fuel_delivery: { label: "Out of fuel — delivery" },
+      lockout: { label: "Locked out / lost key" },
+      winch_out: { label: "Stuck (mud / ditch / snow) — winch pull-out" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      ...VEHICLE_FIELDS,
+      { name: "fuel_grade", label: "Fuel grade", type: "select", showIf: { subcategory: "fuel_delivery" }, options: [
+        { value: "regular", label: "Regular (87)" },
+        { value: "midgrade", label: "Mid-grade (89)" },
+        { value: "premium", label: "Premium (91+)" },
+        { value: "diesel", label: "Diesel" },
+      ]},
+      { name: "fuel_gallons", label: "Gallons (max 5)", type: "number", showIf: { subcategory: "fuel_delivery" }, min: 1, max: 5, default: 2 },
+      { name: "tire_service", label: "Tire service needed", type: "select", showIf: { subcategory: "flat_tire" }, options: [
+        { value: "change_spare", label: "Change to spare" },
+        { value: "repair_flat", label: "Repair flat" },
+        { value: "bring_new", label: "Bring new tire" },
+      ]},
+      { name: "tire_size", label: "Tire / wheel size", type: "select", showIf: { subcategory: "flat_tire", tire_service: "bring_new" }, options: TIRE_SIZES },
+      { name: "urgency", label: "Urgency", type: "select", required: true, options: [
+        { value: "now", label: "ASAP — unsafe location / blocking traffic" },
+        { value: "hour", label: "Within the hour" },
+        { value: "today", label: "Sometime today" },
+      ]},
+      { name: "location_type", label: "Location type", type: "select", options: [
+        { value: "roadside", label: "Roadside / shoulder" },
+        { value: "parking_lot", label: "Parking lot / driveway" },
+        { value: "highway", label: "Highway / freeway" },
+        { value: "off_road", label: "Off-road / unpaved" },
+      ]},
+      { name: "notes", label: "Anything else the operator should know", type: "textarea" },
+    ],
+  },
+
+  // Auto detailing — mobile wash / interior detail / paint correction /
+  // ceramic coating. Split off from `auto` since it's non-mechanical work
+  // and has entirely different pricing and provider pools.
+  auto_detailing: {
+    subcategoryLabel: "Detailing type",
+    subcategories: {
+      exterior_wash: { label: "Exterior wash & wax" },
+      interior_detail: { label: "Interior deep-clean" },
+      full_detail: { label: "Full detail (interior + exterior)" },
+      paint_correction: { label: "Paint correction / polish" },
+      ceramic_coating: { label: "Ceramic coating" },
+      headlight_restore: { label: "Headlight restoration" },
+      engine_bay: { label: "Engine bay cleaning" },
+      other: { label: "Other" },
+    },
+    baseFields: [
+      ...VEHICLE_FIELDS,
+      { name: "vehicle_size", label: "Vehicle size", type: "select", required: true, options: [
+        { value: "compact", label: "Compact / sedan" },
+        { value: "midsize", label: "Mid-size SUV / crossover" },
+        { value: "large", label: "Full-size SUV / pickup" },
+        { value: "xl", label: "XL — 3-row SUV / van" },
+      ]},
+      { name: "condition", label: "Interior condition", type: "select", options: [
+        { value: "light", label: "Light — regular tidy-up" },
+        { value: "moderate", label: "Moderate — visible dirt / stains" },
+        { value: "heavy", label: "Heavy — deep stains / pet hair / smoke" },
+      ]},
+      { name: "pet_hair", label: "Pet hair to remove?", type: "select", options: [
+        { value: "no", label: "No" },
+        { value: "some", label: "Some" },
+        { value: "a_lot", label: "A lot" },
+      ]},
+      { name: "location_type", label: "Where should the work happen?", type: "select", required: true, options: [
+        { value: "customer", label: "At my location (mobile)" },
+        { value: "shop", label: "Drop-off at provider's shop" },
+      ]},
+      { name: "notes", label: "Anything else the detailer should know", type: "textarea" },
     ],
   },
   pet_care: {

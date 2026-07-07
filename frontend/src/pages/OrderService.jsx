@@ -31,7 +31,8 @@ const SERVICE_META = {
   courier:         { label: "Same-day courier", Icon: Truck,            blurb: "Sensitive or urgent — hand-carried A → B.",   cta: "Request courier" },
   moving:          { label: "Moving help",      Icon: HardHat,          blurb: "Load, drive, unload. Furniture-friendly.",    cta: "Request movers" },
   ride_share:      { label: "Rides",            Icon: Car,              blurb: "Any distance, driver picks you up.",          cta: "Request a ride" },
-  towing:          { label: "Towing & roadside",Icon: Truck,            blurb: "Flat tire, jump, or full tow — 24/7.",        cta: "Request tow" },
+  towing:          { label: "Towing",            Icon: Truck,            blurb: "Full tows, breakdowns, long-distance & heavy-duty.", cta: "Request tow" },
+  roadside:        { label: "Roadside assistance", Icon: Zap,            blurb: "Jump-starts, flat tires, lockouts, fuel delivery.",  cta: "Get help now" },
   handyman:        { label: "Handyman",         Icon: Wrench,           blurb: "Small repairs, mounting, assembly.",          cta: "Book a handyman" },
   cleaning:        { label: "Cleaning",         Icon: Sparkles,         blurb: "House, apartment, or one-time deep clean.",   cta: "Book a cleaner" },
   landscaping:     { label: "Landscaping",      Icon: Sparkles,         blurb: "Lawn, hedges, seasonal cleanups.",            cta: "Book landscaping" },
@@ -177,13 +178,11 @@ export default function OrderService() {
     e?.preventDefault?.();
     if (!user) { nav("/signin"); return; }
     if (!priceNum) {
-      // For no-budget categories, silently insert a placeholder $1 so the
-      // backend accepts the post — providers send real quotes anyway.
-      if (hideBudget) {
-        set("pay_rate", "1");
-      } else {
-        toast.error("Please set a budget or wait for the auto-quote."); return;
-      }
+      // We never show a budget input — either the auto-quote landed or the
+      // user is being told providers will quote them. Insert a placeholder
+      // $1 pay_rate silently so the backend accepts the post; the real
+      // number comes from provider quotes.
+      set("pay_rate", "1");
     }
     setBusy(true);
     try {
@@ -384,59 +383,24 @@ export default function OrderService() {
                 </>
               );
             }
-            // No calculable quote AND category is on the "let providers bid" list
-            if (hideBudget) {
-              // Silently set a placeholder pay_rate so the submit passes;
-              // providers will send real quotes.
-              return (
-                <>
-                  <StepHeader n={(showAddress ? 3 : 2) + 1} title="Providers will quote you" />
-                  <div className="bg-slate-50 border border-slate-200 p-4 text-sm text-slate-700" data-testid="order-no-budget">
-                    Because this category is highly custom, we don&apos;t ask you for a budget upfront. Post your request and nearby specialists will send you personalized quotes within minutes.
-                  </div>
-                  {!form.pay_rate && (
-                    <button
-                      type="button"
-                      onClick={() => set("pay_rate", "1")}
-                      className="hidden"
-                      aria-hidden="true"
-                    />
-                  )}
-                </>
-              );
-            }
-            // Fallback — keep the free-form budget input for categories
-            // without a calculator AND not in the no-budget list.
+            // No calculable quote → always show "Providers will quote you"
+            // (per user directive, we NEVER ask customers to type a budget
+            // upfront; they either see an auto-quote or hear "providers
+            // will quote you"). A placeholder pay_rate keeps the submit
+            // payload valid; providers send real quotes afterwards.
             return (
               <>
-                <StepHeader n={(showAddress ? 3 : 2) + 1} title="Your budget" />
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      type="number" step="0.01" min="0"
-                      placeholder="Budget (optional)"
-                      value={form.pay_rate}
-                      onChange={(e) => set("pay_rate", e.target.value)}
-                      data-testid="order-pay-rate"
-                    />
-                  </div>
-                  <select
-                    value={form.pay_unit}
-                    onChange={(e) => set("pay_unit", e.target.value)}
-                    className="border border-slate-300 px-3 text-sm"
-                    data-testid="order-pay-unit"
-                  >
-                    <option value="flat">Flat</option>
-                    <option value="hour">Per hour</option>
-                    <option value="day">Per day</option>
-                  </select>
+                <StepHeader n={(showAddress ? 3 : 2) + 1} title="Providers will quote you" />
+                <div className="bg-slate-50 border border-slate-200 p-4 text-sm text-slate-700" data-testid="order-no-budget">
+                  Because pricing depends on the specifics of your request, we don&apos;t ask you for a budget upfront. Post your request and nearby specialists will send you personalized quotes within minutes.
                 </div>
-                {breakdown && (
-                  <div className="mt-3 text-xs text-slate-500 space-y-0.5">
-                    <div className="flex justify-between"><span>Subtotal</span><span>${breakdown.subtotal.toFixed(2)}</span></div>
-                    {breakdown.tax > 0 && <div className="flex justify-between"><span>{taxLabel || "Tax"}</span><span>${breakdown.tax.toFixed(2)}</span></div>}
-                    <div className="flex justify-between font-mono uppercase tracking-wider text-slate-900 pt-1 border-t border-slate-200"><span>Total</span><span>${breakdown.total.toFixed(2)}</span></div>
-                  </div>
+                {!form.pay_rate && (
+                  <button
+                    type="button"
+                    onClick={() => set("pay_rate", "1")}
+                    className="hidden"
+                    aria-hidden="true"
+                  />
                 )}
               </>
             );

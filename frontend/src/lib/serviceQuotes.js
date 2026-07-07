@@ -76,10 +76,11 @@ const RATES = {
   },
   roadside: {
     jump_start: 75,
-    tire_change: 100,
+    flat_tire: 100,
     lockout: 85,
     fuel_delivery: 75,
     winch_out: 200,
+    other: 95,
   },
   towing: {
     hookup: 95,
@@ -456,6 +457,6 @@ export function computeMarketQuote(category, details, extraCtx = {}) {
 export const NO_BUDGET_CATEGORIES = new Set([
   "medical", "legal", "financial", "marketing", "business_admin",
   "digital_tech", "it_support", "remote_work", "research", "education",
-  "personal_care", "events", "auto", "ride_share", "security",
-  "locksmith", "other",
+  "personal_care", "events", "auto", "auto_detailing", "ride_share",
+  "security", "locksmith", "other",
 ]);

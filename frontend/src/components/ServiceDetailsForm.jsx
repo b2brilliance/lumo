@@ -9,8 +9,12 @@ function fieldVisible(field, details) {
   return Object.entries(field.showIf).every(([k, v]) => details[k] === v);
 }
 
-function FieldRenderer({ field, value, onChange }) {
+function FieldRenderer({ field, value, onChange, details }) {
   if (field.type === "select") {
+    // Support dynamic options based on other fields (e.g. vehicle_model
+    // options depend on the selected vehicle_make). If `field.options`
+    // is a function it's called with the full `details` object.
+    const opts = typeof field.options === "function" ? field.options(details || {}) : field.options;
     // Native <select> instead of Radix — Radix's scroll-lock body-fixed
     // technique caused the whole page to jump when a dropdown closed.
     // Native selects don't lock the viewport, so this is the only fix
@@ -23,7 +27,7 @@ function FieldRenderer({ field, value, onChange }) {
         data-testid={`detail-${field.name}`}
       >
         <option value="" disabled>{field.placeholder || "Choose…"}</option>
-        {field.options.map((o) => (
+        {(opts || []).map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
@@ -160,7 +164,7 @@ export default function ServiceDetailsForm({ category, details, onChange }) {
       {fields.filter((f) => fieldVisible(f, details)).map((f) => (
         <div key={f.name}>
           <Label className="overline">{f.label}{f.required && <span className="text-red-600 ml-0.5">*</span>}</Label>
-          <FieldRenderer field={f} value={details[f.name]} onChange={(v) => set(f.name, v)} />
+          <FieldRenderer field={f} value={details[f.name]} onChange={(v) => set(f.name, v)} details={details} />
         </div>
       ))}
     </div>
@@ -175,10 +179,11 @@ export function ServiceDetailsView({ category, details }) {
   const allFields = [...(schema.baseFields || []), ...(sub?.fields || [])];
   const lookup = (field, val) => {
     if (!field?.options) return Array.isArray(val) ? val.join(", ") : val;
+    const opts = typeof field.options === "function" ? field.options(details || {}) : field.options;
     if (Array.isArray(val)) {
-      return val.map((v) => field.options.find((o) => o.value === v)?.label || v).join(", ");
+      return val.map((v) => opts.find((o) => o.value === v)?.label || v).join(", ");
     }
-    return field.options.find((o) => o.value === val)?.label || val;
+    return opts.find((o) => o.value === val)?.label || val;
   };
   return (
     <div className="space-y-2 text-sm" data-testid="service-details-view">
