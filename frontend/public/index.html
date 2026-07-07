@@ -2,6 +2,13 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
+        <!-- Aggressive browser cache eviction for the HTML shell. Combined
+             with the origin's `Cache-Control: no-store` header this is the
+             belt AND suspenders that stops legacy browsers from serving a
+             stale index.html that references dead JS bundle hashes. -->
+        <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0f172a" />
         <meta name="description" content="Lumo — On-demand delivery, everyday services, digital work and remote contracts. Post a request, get matched with trusted local providers, pay safely. Workers keep 90% of every dollar earned." />
@@ -80,6 +87,99 @@
         -->
         <title>Lumo — On-demand jobs, delivery, rentals worldwide</title>
         <meta name="lumo-build" content="2026-07-07T00:47:51.791Z" />
+        <script>
+            // ── Asset-failure hard-reload guard ────────────────────────────
+            // The frontend static host falls back to serving index.html for
+            // ANY unknown /static/* URL (SPA-fallback config). That means a
+            // stale HTML referencing a dead JS bundle hash (e.g.
+            // `main.OLDHASH.chunk.js`) receives an HTML response with
+            // Content-Type: text/html — the browser refuses to execute it
+            // as JavaScript and the app never boots. THAT is the actual
+            // "only works in incognito" bug.
+            //
+            // Postbuild patches every `<script src="/static/js/…">` tag
+            // with `onerror="__lumoAssetFail(event)"`. When the browser
+            // refuses to execute the bundle, onerror fires HERE, we clear
+            // caches / SWs and force a hard-reload with a fresh URL query,
+            // which fetches CURRENT HTML from origin (Cache-Control:
+            // no-store) that references the CORRECT bundle hashes.
+            window.__lumoAssetFail = function (_ev) {
+                try {
+                    var key = "lumo_asset_fail_last";
+                    var last = 0;
+                    try { last = parseInt(sessionStorage.getItem(key) || "0", 10); } catch (e) {}
+                    // Never reload more than once per 10s so a legit
+                    // total-outage doesn't reload-storm the server.
+                    if (Date.now() - last < 10000) return;
+                    try { sessionStorage.setItem(key, String(Date.now())); } catch (e) {}
+                    var chain = Promise.resolve();
+                    if ("serviceWorker" in navigator) {
+                        chain = chain.then(function () {
+                            return navigator.serviceWorker.getRegistrations();
+                        }).then(function (regs) {
+                            return Promise.all((regs || []).map(function (rr) {
+                                try { return rr.unregister(); } catch (e) { return null; }
+                            }));
+                        }).catch(function () {});
+                    }
+                    if (window.caches && caches.keys) {
+                        chain = chain.then(function () { return caches.keys(); })
+                            .then(function (keys) {
+                                return Promise.all((keys || []).map(function (k) {
+                                    try { return caches.delete(k); } catch (e) { return null; }
+                                }));
+                            }).catch(function () {});
+                    }
+                    chain.finally(function () {
+                        var url = new URL(window.location.href);
+                        url.searchParams.set("_cb", String(Date.now()));
+                        window.location.replace(url.toString());
+                    });
+                } catch (e) {
+                    try { window.location.reload(); } catch (ee) {}
+                }
+            };
+            // Also install a global capture-phase listener so ANY
+            // dynamically-inserted <script>/<link> failure (React code-split
+            // chunks CRA lazy-loads at runtime) triggers the same self-heal.
+            // Handles TWO shapes of failure:
+            //   (a) 404 / network error → ev.target is the <script>/<link> node
+            //   (b) MIME-mismatch parse error → ev.target is `window`, but
+            //       `ev.filename` is the offending script URL and
+            //       `ev.message` reads "Unexpected token '<'" (the very
+            //       first char of the fallback index.html the CDN served).
+            //       This is THE scenario behind the "only works in
+            //       incognito" bug — stale HTML references a dead bundle
+            //       hash, CDN falls back to index.html, browser refuses to
+            //       execute HTML as JS and throws SyntaxError. Catch it here.
+            window.addEventListener("error", function (ev) {
+                if (!ev) return;
+                var t = ev.target;
+                var isAssetTag =
+                    t && (
+                        (t.tagName === "SCRIPT" && t.src) ||
+                        (t.tagName === "LINK" && t.href && (t.rel || "").indexOf("stylesheet") >= 0)
+                    );
+                if (isAssetTag) {
+                    var url1 = t.src || t.href || "";
+                    if (url1.indexOf("/static/") >= 0) {
+                        window.__lumoAssetFail(ev);
+                    }
+                    return;
+                }
+                // MIME-mismatch parse error path
+                var fn = ev.filename || "";
+                var msg = ev.message || (ev.error && ev.error.message) || "";
+                if (fn.indexOf("/static/") >= 0 && (
+                    msg.indexOf("Unexpected token") >= 0 ||
+                    msg.indexOf("Unexpected end of") >= 0 ||
+                    msg.indexOf("<") >= 0
+                )) {
+                    window.__lumoAssetFail(ev);
+                }
+            }, true);
+        </script>
+
         <script>
             // ── Inline cache-buster bootstrap ─────────────────────────────
             // This runs BEFORE any React bundle loads, so it catches the

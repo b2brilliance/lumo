@@ -26,7 +26,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
-### Rate-limiting + referral engine + Helmet upgrade + refactor start (Feb 7, 2026)
+### Single-deploy self-healing (Feb 7, 2026) — the actual incognito-bug root cause
+- **Root cause identified**: the frontend static host serves `index.html` (HTTP 200, `Content-Type: text/html`) as a fallback for ANY unknown `/static/*` URL. So a stale browser HTML that references `main.OLDHASH.chunk.js` gets HTML content back, the browser refuses to execute HTML as JS with `SyntaxError: Unexpected token '<'`, and the app never boots. This is why users needed incognito.
+- **`__lumoAssetFail` inline handler** (public/index.html) — clears ServiceWorker + Cache Storage + hard-reloads with `?_cb=<now>`. Guarded by 10s sessionStorage against reload loops.
+- **`window.addEventListener('error', ..., true)`** — capture-phase global listener that catches BOTH shapes of failure:
+  1. Network error / 404 → `ev.target` is the `<script>` / `<link>` node
+  2. **MIME-mismatch SyntaxError → `ev.target` is `window`, but `ev.filename` is the offending URL and `ev.message` starts with "Unexpected token '<'"** — the exact production bug, now detected and healed.
+- **New `scripts/postbuild-harden.js`** — runs after `craco build` (via `"build"` script). Adds `onerror="__lumoAssetFail(event)"` and `data-lumo-asset` attributes to every `<script src="/static/js/*">` and `<link rel=stylesheet href="/static/css/*">` CRA emits.
+- **`<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">`** + Pragma + Expires meta tags — belt-and-suspenders for browsers that ignore server headers.
+- **Verified in preview via Playwright reproduction**: injected `<script src="/static/js/main.DEADHASH.chunk.js">` → the CDN's MIME-mismatch triggered SyntaxError → my listener fired `__lumoAssetFail` with the correct filename + message. In production this triggers a hard reload → fresh HTML → correct current bundle hashes → app boots.
+
+### Referral engine math correction (Feb 7, 2026)
+- Updated `PROVIDER_TAKE_TO_REFERRER_RATIO` from `1/900` → `1/90`. Referrer now earns **10% of Lumo's 10% commission = 1% of gross**. Verified: $100 gross job → provider $90 → referrer $1.00 exactly. `/api/referrals/me` reward_copy updated to "roughly $1 for every $100 they earn."
+
+
 - **NEW `/app/backend/rate_limit.py`** — sliding-window in-memory throttle. `/api/auth/login` capped at 10 attempts / IP / 15 min; `/api/auth/register` capped at 20/15 min. Successful login resets the counter. Returns HTTP 429 with `Retry-After` header + structured `{code:"rate_limited", message}` detail.
 - **NEW `/app/backend/referrals.py`** — end-to-end referral engine:
   - Every user auto-gets a 6-char referral code on register (`referral_code`, uniqueness-checked; excludes `0/O/1/I` for typability)

@@ -78,7 +78,7 @@
   "scripts": {
     "prebuild": "node scripts/write-meta.js",
     "start": "craco start",
-    "build": "craco build",
+    "build": "craco build && node scripts/postbuild-harden.js",
     "test": "craco test"
   },
   "browserslist": {
