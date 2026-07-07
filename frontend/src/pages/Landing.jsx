@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import {
   Search, MapPin, ShoppingBag, UtensilsCrossed, Car, Home,
   KeyRound, Store, Wrench, Sparkles, Truck, PawPrint,

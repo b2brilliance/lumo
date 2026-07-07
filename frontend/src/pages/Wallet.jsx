@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import AffiliateBlock from "@/components/AffiliateBlock";
+import ReferralCard from "@/components/ReferralCard";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Wallet as WalletIcon, ArrowDownCircle } from "lucide-react";
@@ -70,6 +71,9 @@ export default function Wallet() {
             </div>
           ))}
         </div>
+      </div>
+      <div className="mt-10">
+        <ReferralCard />
       </div>
       <div className="mt-10 -mx-4 sm:-mx-6">
         <AffiliateBlock category="wallet" title="Make your money work harder" subtitle="Higher-yield banks, free-stock signups, and credit-score tools — vetted partners." />

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
 import {
   ArrowLeft, MapPin, Clock, Sparkles, CheckCircle2,

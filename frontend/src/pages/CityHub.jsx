@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { ArrowRight, MapPin, Briefcase, Sparkles, Store, KeyRound } from "lucide-react";
 import { api } from "@/lib/api";
 import AffiliateBlock from "@/components/AffiliateBlock";

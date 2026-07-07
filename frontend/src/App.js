@@ -1,12 +1,14 @@
 import React from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/locale";
 import { CartProvider } from "@/lib/cart";
 import NavBar from "@/components/NavBar";
 import MobileTabBar from "@/components/MobileTabBar";
 import CacheBuster from "@/components/CacheBuster";
+import RefCapture from "@/components/RefCapture";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
 import AutoTranslator from "@/components/AutoTranslator";
@@ -83,13 +85,15 @@ function Protected({ children, roles }) {
 
 function App() {
   return (
-    <div className="App grain">
-      <CacheBuster />
-      <BrowserRouter>
+    <HelmetProvider>
+      <div className="App grain">
+        <CacheBuster />
+        <BrowserRouter>
         <LocaleProvider>
           <AuthProvider>
             <CartProvider>
               <NavBar />
+              <RefCapture />
               <NotificationsBridge />
               <AutoTranslator />
               <AccessibilityApplier />
@@ -192,7 +196,8 @@ function App() {
           </AuthProvider>
         </LocaleProvider>
       </BrowserRouter>
-    </div>
+      </div>
+    </HelmetProvider>
   );
 }
 

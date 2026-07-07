@@ -177,6 +177,7 @@ class UserCreate(BaseModel):
     categories: Optional[List[str]] = None        # top-level category keys
     subcategories: Optional[List[str]] = None     # specific sub-services (hard filter)
     provider_profile: Optional[dict] = None       # {bio, certifications:[], work_history:[]}
+    ref_code: Optional[str] = None                # Referral code — captured from `?ref=XXX` in frontend
 
 class UserLogin(BaseModel):
     email: str
@@ -550,16 +551,30 @@ api = APIRouter(prefix="/api")
 # ────────────────────────────────────────────────────────────────────────────
 # Auth routes
 # ────────────────────────────────────────────────────────────────────────────
+from rate_limit import throttle as _throttle, reset as _reset_rate  # noqa: E402
+from referrals import (  # noqa: E402
+    ensure_referral_code as _ensure_referral_code,
+    resolve_ref_code as _resolve_ref_code,
+    credit_referrer as _credit_referrer,
+    create_router as _create_referrals_router,
+)
+
+
 @api.post("/auth/register")
-async def register(body: UserCreate):
+async def register(body: UserCreate, request: Request):
     email = body.email.lower()
     # Providers MUST upload a profile photo at sign-up so customers can see
     # who's coming to their door. Customers/retailers/restaurants are optional.
     if body.role == "provider" and not body.avatar_url:
         raise HTTPException(status_code=400, detail="Profile photo is required for service providers")
+    # Rate-limit signup too — same 10 / 15min ceiling, per IP.
+    _throttle(request, key="auth.register", limit=20, window_sec=900, penalty_sec=900)
     existing = await db.users.find_one({"email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
+    # Resolve the referral code (if any) BEFORE inserting so we can tag the
+    # new user document with `referred_by_user_id` in a single write.
+    referred_by = await _resolve_ref_code(db, body.ref_code)
     user_doc = {
         "id": str(uuid.uuid4()),
         "email": email,
@@ -578,18 +593,29 @@ async def register(body: UserCreate):
         "provider_profile": body.provider_profile or None,
         "created_at": now_iso(),
     }
+    if referred_by:
+        user_doc["referred_by_user_id"] = referred_by
+        user_doc["referred_by_code"] = (body.ref_code or "").strip().upper()
     await db.users.insert_one(user_doc)
+    # Auto-generate the new user's OWN referral code so they can share
+    # immediately without waiting for a first API call.
+    await _ensure_referral_code(db, user_doc["id"])
     token = create_access_token(user_doc["id"], email, body.role)
     out = clean_doc(user_doc)
     out.pop("password_hash", None)
     return {"token": token, "user": out}
 
 @api.post("/auth/login")
-async def login(body: UserLogin):
+async def login(body: UserLogin, request: Request):
+    # Brute-force protection: 10 attempts per IP per 15 min. Successful
+    # login CLEARS the counter, so a legitimate user who just fat-fingered
+    # their password twice isn't punished after they finally get in.
+    _throttle(request, key="auth.login", limit=10, window_sec=900, penalty_sec=900)
     email = body.email.lower()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    _reset_rate(request, key="auth.login")
     token = create_access_token(user["id"], email, user["role"])
     out = clean_doc(user)
     out.pop("password_hash", None)
@@ -6966,6 +6992,16 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
         "ref_kind": ref_kind,
         "created_at": now_iso(),
     })
+    # Whether the payout went through Stripe Connect or the wallet fallback,
+    # this is the moment the provider "earns" money on Lumo — so it's also
+    # the moment to reward whoever referred them (1% of Lumo's commission).
+    try:
+        await _credit_referrer(
+            db, provider_id=provider_id, provider_amount=amount,
+            source_type=(ref_kind or "payout"), source_id=ref_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"referral payout failed for provider={provider_id}: {exc}")
 
 
 app.include_router(_create_escrow_router(db=db, get_current_user=get_current_user,
@@ -6973,6 +7009,11 @@ app.include_router(_create_escrow_router(db=db, get_current_user=get_current_use
 
 # Stripe Connect — real provider bank onboarding & payouts
 app.include_router(_create_stripe_connect_router(db=db, get_current_user=get_current_user))
+
+# Referral engine — /api/referrals/me + credit_referrer() hook (also
+# wired into _credit_provider above so every payout event rewards the
+# referrer of the earning provider).
+app.include_router(_create_referrals_router(db=db, get_current_user=get_current_user), prefix="/api")
 
 
 @app.on_event("startup")

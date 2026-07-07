@@ -40,9 +40,20 @@ export function AuthProvider({ children }) {
 
   const register = async (payload) => {
     try {
-      const { data } = await api.post("/auth/register", payload);
+      // Attach the referral code (if any) captured on the very first visit.
+      // This is set by <RefCapture/> in App.js — see comments there for the
+      // capture-once + 30-day expiry rules.
+      let refCode = null;
+      try { refCode = localStorage.getItem("lumo_ref_code") || null; } catch { /* private mode */ }
+      const withRef = refCode ? { ...payload, ref_code: refCode } : payload;
+      const { data } = await api.post("/auth/register", withRef);
       localStorage.setItem("lumo_token", data.token);
       setUser(data.user);
+      // Clear the ref cookie once it's been redeemed so subsequent
+      // registrations on the same device don't inherit a stale code.
+      if (refCode) {
+        try { localStorage.removeItem("lumo_ref_code"); } catch { /* noop */ }
+      }
       return { ok: true, user: data.user };
     } catch (e) {
       return { ok: false, error: formatApiError(e) };

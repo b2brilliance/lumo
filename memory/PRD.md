@@ -26,7 +26,19 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
-### Address auto-populate + global LocaleSwitcher + cache-buster hardening (Feb 7, 2026)
+### Rate-limiting + referral engine + Helmet upgrade + refactor start (Feb 7, 2026)
+- **NEW `/app/backend/rate_limit.py`** — sliding-window in-memory throttle. `/api/auth/login` capped at 10 attempts / IP / 15 min; `/api/auth/register` capped at 20/15 min. Successful login resets the counter. Returns HTTP 429 with `Retry-After` header + structured `{code:"rate_limited", message}` detail.
+- **NEW `/app/backend/referrals.py`** — end-to-end referral engine:
+  - Every user auto-gets a 6-char referral code on register (`referral_code`, uniqueness-checked; excludes `0/O/1/I` for typability)
+  - `/auth/register` accepts `ref_code`; new user gets `referred_by_user_id` + `referred_by_code`
+  - `credit_referrer()` wired into `_credit_provider()` — fires on EVERY payout path (Stripe Connect transfer, escrow release, wallet fallback). Referrer earns **1% of Lumo's 10% commission** = `provider_take / 900` (e.g. $100 provider take → $0.1111 referrer bonus). Logged in `referral_earnings` collection, credited to wallet, notification pushed.
+  - `GET /api/referrals/me` → code, share_url, referred_users, events, total_earned, recent[], reward_copy.
+- **Frontend referral capture** — new `<RefCapture/>` component (in App.js) reads `?ref=`/`?r=`/`?referrer=` on any URL, stores in `localStorage` for 30 days with first-touch precedence. `AuthProvider.register()` attaches it to `/auth/register` and clears on success.
+- **NEW `<ReferralCard/>`** rendered on `/wallet` (visible to everyone). Shows code + share link + total earned + recent list. Includes `navigator.share` for mobile native sheet.
+- **`react-helmet` → `react-helmet-async` upgrade** — silences the `UNSAFE_componentWillMount` warning (confirmed 0 console warnings on Landing). Swapped imports across 8 files; wrapped app in `<HelmetProvider>`.
+- **Server.py refactor** — first two modules extracted (`rate_limit.py`, `referrals.py`) to demonstrate the routes/ pattern. Full split into `routes/auth.py`, `routes/jobs.py`, `routes/payments.py` remains in backlog (too risky for one session; will be done in stages).
+
+
 - **AddressInput reverted to legacy `google.maps.places.Autocomplete`** — the newer `PlaceAutocompleteElement` needs "Places API (New)" to be enabled in Google Cloud (user hasn't). Legacy Autocomplete uses the classic Places API which already works on their key. Confirmed live: typing "1600 Amphitheatre" surfaces 5 real Google suggestions.
 - **LocaleSwitcher promoted to the global sticky header** (`NavBar.jsx`), pinned right of the Lumo logo/name, now visible on EVERY page and EVERY screen size (removed the `hidden sm:block` gate). Duplicate LocaleSwitcher on Landing hero deleted.
 - **Cache-busting hardened** to fight the "app only loads in incognito" bug:

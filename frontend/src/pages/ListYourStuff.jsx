@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Home, Car, ShoppingBag, KeyRound, ArrowRight, Sparkles, Wallet, Camera, Globe, CheckCircle2 } from "lucide-react";
 
 const SELLER_FAQ = [

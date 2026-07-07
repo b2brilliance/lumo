@@ -1,0 +1,45 @@
+{
+  "summary": "Full backend + frontend sweep of iter38 (rate-limit on /auth, referral engine, react-helmet-async migration). Backend: 6/6 pytest suites pass (login 10→429, register 20→429, successful login RESETS the counter, referral code auto-issued as 6-char code excluding 0/O/1/I, /referrals/me shape correct, ref_code capture on register propagates to /auth/me with uppercased code, credit_referrer credits exactly 0.1111 on $100 provider_amount, referral_earnings + wallet_transactions + notification rows all written, /referrals/me aggregates update correctly, ref_code strip+upper canonicalization works). Frontend: RefCapture writes ?ref to localStorage with epoch ts, first-touch precedence honored (CODEB does NOT overwrite CODEA), ref persists across nav, register form attaches ref_code in payload, lumo_ref_code cleared after successful register, ReferralCard on /wallet renders with code + share URL + copy code copies to clipboard + toast 'Code copied'. Regressions: zero react-helmet 'componentWillMount' warnings across Landing/register/cities/london/remote-jobs/cities/order/handyman. LocaleSwitcher visible on desktop AND mobile. Seed provider@lumo.test still logs in and /api/jobs?status=posted returns 200. Handyman order page still shows auto-quote ($128 for 1.5h @ $85). /api/meta returns 200 with Cache-Control: no-store,no-cache,must-revalidate.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "server.py:_credit_provider (line 6953-7004)", "issue": "credit_referrer() is ONLY called on the wallet-fallback path, NOT on the Stripe transfer path — the `if transfer: ... return` early-returns at line 6981 before reaching the _credit_referrer call at line 6999. Any provider onboarded to Stripe Connect (including seed provider@lumo.test if onboarded) will short-circuit and their referrer will earn $0, contradicting the design comment on lines 6995-6997 and the spec 'referrer earns 1% of Lumo's 10% commission on every paid job/order'. Fix: move the try/except around _credit_referrer to fire in BOTH branches (or right before the two `return`s).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "/api/referrals/me → share_url", "issue": "share_url is built from request.base_url which reflects the INTERNAL cluster hostname (http://lumo-bundle-checkout.cluster-12.preview.emergentcf.cloud/register?ref=CODE), not the public REACT_APP_BACKEND_URL. Link still works but looks unprofessional when copied/shared. Consider reading a PUBLIC_BASE_URL env var or trusting X-Forwarded-Host."},
+      {"endpoint": "server.py line 570 comment", "issue": "Comment says '10 / 15min ceiling' but the actual limit for /auth/register is 20 (correct per spec). Comment is stale — fix wording only."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "auth.jsx register()", "issue": "On successful register, only `lumo_ref_code` is removed from localStorage. `lumo_ref_code_ts` is left behind as an orphan (harmless but unclean).", "selector": "localStorage.lumo_ref_code_ts", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter38_ratelimit_referrals.py",
+    "/app/test_reports/pytest/iter38.xml"
+  ],
+  "action_items": [
+    "HIGH: Move _credit_referrer call outside the Stripe-branch early-return in _credit_provider (server.py:6953-7004) so referral bonuses fire on Stripe Connect transfers too.",
+    "LOW: Also remove `lumo_ref_code_ts` alongside `lumo_ref_code` on successful register in /app/frontend/src/lib/auth.jsx.",
+    "LOW: /referrals/me share_url leaks the internal cluster hostname — read a PUBLIC_BASE_URL env var and prefer it over request.base_url."
+  ],
+  "critical_code_review_comments": [
+    "Referral payout hook mis-wired: only the wallet fallback triggers credit_referrer, Stripe transfers silently skip it. This will break the 'passive income' promise for the majority of paying providers once Stripe Connect is fully rolled out.",
+    "rate_limit.py's in-memory store won't survive a supervisor restart or scale-out; acceptable for the single-instance preview but must be moved to Redis / Mongo TTL before horizontal scaling.",
+    "server.py is now 7203 lines — well past the 700-line healthy limit. rate_limit.py + referrals.py extraction is a good start; keep pulling more modules (escrow, stripe_connect, affiliates) out.",
+    "referrals.credit_referrer stores a 'pass' branch that literally does nothing for sub-penny amounts — either enforce a minimum-accrual buffer or delete the dead code path.",
+    "share_url domain leak (internal cluster hostname) is a UX regression for the actual referral feature — every user who copies their link today gets an unbrandable URL."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter38_ratelimit_referrals.py (new)"
+  ],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% (9/9 UI scenarios)"},
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123 (seed accounts). Test-created accounts prefixed TEST_ui_*, TEST_ref_* — safe to leave in DB.",
+  "seed_data_creation": "Created ~25 TEST_ prefixed users via the rate-limit + referral flows. All emailed with TEST_ prefix per convention.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The rate limiter uses X-Forwarded-For per-IP; always send a UNIQUE X-Forwarded-For per test class (utility `_fresh_ip()` in test_iter38_ratelimit_referrals.py). credit_referrer can be imported directly from /app/backend/referrals.py for unit-testing payout math without wiring escrow. The Stripe-vs-wallet payout path split in _credit_provider is currently the biggest referral risk — retest whichever branch main agent fixes.",
+  "rca of the issue": "Root cause of the credit_referrer bug: the function was placed AFTER the wallet-fallback block but BEFORE the function returns, HOWEVER the earlier `if transfer: ... return` at line 6981 short-circuits the Stripe path entirely. The comment on line 6995 states the design intent ('Whether the payout went through Stripe Connect or the wallet fallback...') but the code doesn't match. Mitigation: extract the _credit_referrer try/except into an inline helper called from both branches, OR call it once at the top of the function after computing amount, since it only reads provider.referred_by_user_id (independent of payout path)."
+}

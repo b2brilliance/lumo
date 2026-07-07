@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Search, Globe, ExternalLink, MapPin, DollarSign, Building2, Briefcase } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
