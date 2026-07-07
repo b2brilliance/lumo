@@ -72,13 +72,16 @@ async def resolve_ref_code(db, ref_code: Optional[str]) -> Optional[str]:
 
 # ── Referral payout ────────────────────────────────────────────────────
 # The provider's net take is 90% of gross (platform keeps 10% commission).
-# We reward the referrer with 1% of that commission → 0.001 × gross → about
-# 0.111% of the provider's take. Simple algebra:
+# We reward the referrer with 10% of that commission → 1% of gross → about
+# 1.11% of the provider's take. Simple algebra:
 #   gross      = provider_amount / 0.90
 #   commission = gross * 0.10
-#   payout     = commission * 0.01 = provider_amount * (10/9) * 0.10 * 0.01
-#              = provider_amount / 900
-PROVIDER_TAKE_TO_REFERRER_RATIO = 1.0 / 900.0
+#   payout     = commission * 0.10 = provider_amount * (10/9) * 0.10 * 0.10
+#              = provider_amount / 90
+#
+# Concrete: a $100 gross job → platform earns $10 commission → referrer
+# gets $1 (= referred provider's $90 take / 90).
+PROVIDER_TAKE_TO_REFERRER_RATIO = 1.0 / 90.0
 
 
 async def credit_referrer(
@@ -207,8 +210,9 @@ def create_router(*, db, get_current_user):
             "total_earned": round(total_earned, 2),
             "recent": recent,
             "reward_copy": (
-                "You earn 1% of Lumo's platform commission every time "
-                "someone you referred completes a paid job or order."
+                "You earn 10% of Lumo's platform commission every time "
+                "someone you referred completes a paid job or order. "
+                "That's roughly $1 for every $100 they earn."
             ),
         }
 
