@@ -1,0 +1,36 @@
+{
+  "summary": "Retest of iter38's 3 fixes: (1) HIGH — _credit_referrer now fires on BOTH Stripe transfer AND wallet fallback paths in _credit_provider. Verified end-to-end by monkey-patching _attempt_stripe_transfer to force the Stripe branch: referrer wallet incremented by 0.1111, referral_earnings row written with source_type='job', provider B got a wallet_transactions row of type='stripe_payout' (NOT 'credit'), referrer got a 'referral_earned' notification. (2) LOW — /api/referrals/me share_url is now `https://lumo-bundle-checkout.preview.emergentagent.com/register?ref=CODE` (public preview host via X-Forwarded-Host), no 'cluster' leak. (3) LOW — frontend AuthProvider.register() now removes BOTH lumo_ref_code AND lumo_ref_code_ts on success (verified via Playwright: seeded ?ref=TESTX9 → registered → both keys cleared). Regressions: full iter38 test suite still passes (6/6 pytest), react-helmet migration still clean (0 warnings across Landing/register/cities/london/remote-jobs/order/handyman), LocaleSwitcher visible desktop AND mobile, seed provider@lumo.test still logs in, handyman auto-quote still dynamic ($128 for 1.5h). New backend test file has 5/5 tests passing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter39_referral_fixes.py",
+    "/app/backend/tests/test_iter38_ratelimit_referrals.py",
+    "/app/test_reports/pytest/iter39.xml",
+    "/app/test_reports/pytest/iter38_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: _credit_provider fix is clean — _credit_referrer is called BEFORE the branch split and wrapped in try/except so a referrer-side failure never blocks the payout itself. Good defensive pattern.",
+    "referrals.py: PUBLIC_BASE_URL env-var precedence is correct, X-Forwarded-Host fallback works today via ingress. Consider adding a code comment reminding devs that request.base_url is a LAST resort and any horizontal-scale deploy MUST set PUBLIC_BASE_URL to keep share links branded.",
+    "server.py is still 7207 lines — carry-over comment from iter38, extract more modules (escrow, stripe_connect wiring, wallet_ops) into standalone files.",
+    "referrals.credit_referrer no longer has the dead sub-penny 'pass' branch (verified by grep) — good cleanup.",
+    "rate_limit.py in-memory store still won't survive supervisor restart or scale-out — acceptable for preview but must move to Redis / Mongo TTL before horizontal scaling."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter39_referral_fixes.py (new — 5 tests, all pass)"
+  ],
+  "success_rate": {"backend": "100% (5/5 new + 6/6 iter38 regression)", "frontend": "100% (all iter38 UI scenarios + 3 fix verifications)"},
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123. Seed accounts still work.",
+  "seed_data_creation": "Created ~10 TEST_iter39_* prefixed users via the payout + share_url + register-clear flows. Safe to leave in DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 3 iter38 fixes are verified in-live. New backend suite `/app/backend/tests/test_iter39_referral_fixes.py` monkey-patches server_mod._attempt_stripe_transfer to force the Stripe branch — a repeatable pattern for future payout-path tests without needing real Stripe Connect. Playwright confirmed the LS-clear path via a live register wizard (role→Customer→Continue→fill→submit). Environment REACT_APP_BACKEND_URL must be exported for pytest since backend/.env is not read by tests (see conftest).",
+  "rca of the issue": "N/A — all 3 previously reported bugs are resolved. iter38 RCA: (a) credit_referrer was placed AFTER the wallet-fallback block but the earlier `if transfer: return` short-circuited it on Stripe path; fix moves the call BEFORE the branch split. (b) request.base_url reflected the internal cluster hostname; fix reads PUBLIC_BASE_URL env then X-Forwarded-Host from ingress. (c) auth.jsx only cleared lumo_ref_code but left lumo_ref_code_ts orphaned; fix removes both."
+}

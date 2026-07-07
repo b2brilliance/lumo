@@ -109,12 +109,6 @@ async def credit_referrer(
         return None
 
     amount = round(provider_amount * PROVIDER_TAKE_TO_REFERRER_RATIO, 4)
-    if amount < 0.01:
-        # Don't spam the wallet with sub-penny drips — hold until we can
-        # accrue at least a cent. Simplest way: just record with the tiny
-        # amount so the sum eventually crosses the threshold.
-        pass
-
     now = _now_iso()
     record = {
         "id": str(uuid.uuid4()),
@@ -166,10 +160,24 @@ def create_router(*, db, get_current_user):
     async def me(request: Request, user: dict = Depends(get_current_user)):
         """Return the caller's own referral code + running stats."""
         code = await ensure_referral_code(db, user["id"])
-        origin = str(request.base_url).rstrip("/")
-        # Signup deep-link. The frontend Landing page captures ?ref=…
-        # into localStorage and forwards it to /auth/register.
-        share_url = f"{origin.replace('/api', '')}/register?ref={code}"
+        # Prefer an explicit PUBLIC_BASE_URL (e.g. https://golumo.app) set at
+        # deploy time. Otherwise trust X-Forwarded-Host/X-Forwarded-Proto
+        # from the ingress. Fall back to `request.base_url` only as a last
+        # resort — that reflects the internal cluster hostname and looks
+        # ugly in copied share links.
+        import os as _os
+        public_base = _os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+        if not public_base:
+            fwd_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+            fwd_proto = request.headers.get("x-forwarded-proto") or "https"
+            if fwd_host:
+                public_base = f"{fwd_proto}://{fwd_host}"
+            else:
+                public_base = str(request.base_url).rstrip("/")
+        # Strip trailing /api if the base points at the API subpath.
+        if public_base.endswith("/api"):
+            public_base = public_base[:-4]
+        share_url = f"{public_base}/register?ref={code}"
 
         # Aggregates
         cur = db.referral_earnings.find({"referrer_user_id": user["id"]})

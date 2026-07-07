@@ -567,7 +567,9 @@ async def register(body: UserCreate, request: Request):
     # who's coming to their door. Customers/retailers/restaurants are optional.
     if body.role == "provider" and not body.avatar_url:
         raise HTTPException(status_code=400, detail="Profile photo is required for service providers")
-    # Rate-limit signup too — same 10 / 15min ceiling, per IP.
+    # Brute-force protection: 20 attempts per IP per 15 min. Higher than
+    # login because register is more expensive to game and legitimate
+    # users may retry with tweaked emails.
     _throttle(request, key="auth.register", limit=20, window_sec=900, penalty_sec=900)
     existing = await db.users.find_one({"email": email})
     if existing:
@@ -6954,6 +6956,18 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
         db=db, provider_id=provider_id, amount_usd=amount,
         reason=reason, ref_id=ref_id, ref_kind=ref_kind,
     )
+    # Referral bonus fires on BOTH payout paths — this is the moment the
+    # provider "earns" money on Lumo, regardless of whether it lands via
+    # Stripe Connect transfer or the wallet fallback. Fire it BEFORE the
+    # branch splits so a `return` in either path can't skip it.
+    try:
+        await _credit_referrer(
+            db, provider_id=provider_id, provider_amount=amount,
+            source_type=(ref_kind or "payout"), source_id=ref_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"referral payout failed for provider={provider_id}: {exc}")
+
     if transfer:
         # Stripe paid the provider directly — record a "credit" entry
         # tagged with the transfer id so the wallet UI can show the source.
@@ -6992,16 +7006,6 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
         "ref_kind": ref_kind,
         "created_at": now_iso(),
     })
-    # Whether the payout went through Stripe Connect or the wallet fallback,
-    # this is the moment the provider "earns" money on Lumo — so it's also
-    # the moment to reward whoever referred them (1% of Lumo's commission).
-    try:
-        await _credit_referrer(
-            db, provider_id=provider_id, provider_amount=amount,
-            source_type=(ref_kind or "payout"), source_id=ref_id,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(f"referral payout failed for provider={provider_id}: {exc}")
 
 
 app.include_router(_create_escrow_router(db=db, get_current_user=get_current_user,

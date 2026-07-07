@@ -52,7 +52,10 @@ export function AuthProvider({ children }) {
       // Clear the ref cookie once it's been redeemed so subsequent
       // registrations on the same device don't inherit a stale code.
       if (refCode) {
-        try { localStorage.removeItem("lumo_ref_code"); } catch { /* noop */ }
+        try {
+          localStorage.removeItem("lumo_ref_code");
+          localStorage.removeItem("lumo_ref_code_ts");
+        } catch { /* noop */ }
       }
       return { ok: true, user: data.user };
     } catch (e) {
