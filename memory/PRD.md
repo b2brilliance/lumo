@@ -26,7 +26,16 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - **Routes**: `/`, `/login`, `/register`, `/customer`, `/provider`, `/retailer`, `/restaurant`, `/stores`, `/restaurants`, `/stores/:id`, `/restaurants/:id`, `/marketplace`, `/map`, `/jobs/:id`, `/orders/:id/pay`, `/wallet`, `/chats`, `/credentials`, `/cart`, `/rentals`, `/rentals/:id`, `/settings`, `/checkout/success`, `/checkout/cancel`.
 
 ## Implemented — most recent first
-### PlaceAutocompleteElement + Stripe Connect gate — retest fixes (Feb 7, 2026)
+### Address auto-populate + global LocaleSwitcher + cache-buster hardening (Feb 7, 2026)
+- **AddressInput reverted to legacy `google.maps.places.Autocomplete`** — the newer `PlaceAutocompleteElement` needs "Places API (New)" to be enabled in Google Cloud (user hasn't). Legacy Autocomplete uses the classic Places API which already works on their key. Confirmed live: typing "1600 Amphitheatre" surfaces 5 real Google suggestions.
+- **LocaleSwitcher promoted to the global sticky header** (`NavBar.jsx`), pinned right of the Lumo logo/name, now visible on EVERY page and EVERY screen size (removed the `hidden sm:block` gate). Duplicate LocaleSwitcher on Landing hero deleted.
+- **Cache-busting hardened** to fight the "app only loads in incognito" bug:
+  - New inline bootstrap `<script>` at the top of `public/index.html` — reads `<meta name="lumo-build" content="…">` (baked in per build), fetches `/api/meta` (no-store, always fresh through Cloudflare per `cf-cache-status: DYNAMIC`), and on mismatch nukes ServiceWorker + Cache Storage + hard-reloads with `?_cb=<buildTime>`. Guarded by 15s sessionStorage against loops.
+  - `write-meta.js` now injects the timestamp into BOTH `public/index.html` and `build/index.html` on every prebuild.
+  - React `CacheBuster` component still runs as the secondary long-tab poll every 5 min.
+  - **⚠️ First-deploy caveat**: users already stuck on a stale HTML need one cache TTL to expire before the new bootstrap kicks in. After that they're on the self-heal train forever.
+
+
 - Fixed URL-mismatch bugs found by testing agent iter36:
   - `/provider-hub#payouts` → `/provider#payouts` in JobDetail.jsx & MapPage.jsx toast actions
   - `onboard_hint` in backend now returns `/provider?stripe=onboard`

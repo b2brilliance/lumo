@@ -79,6 +79,81 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Lumo — On-demand jobs, delivery, rentals worldwide</title>
+        <meta name="lumo-build" content="2026-07-07T00:47:51.791Z" />
+        <script>
+            // ── Inline cache-buster bootstrap ─────────────────────────────
+            // This runs BEFORE any React bundle loads, so it catches the
+            // "app doesn't load unless in incognito" bug even when
+            // Cloudflare has cached a stale index.html referencing dead
+            // JS bundles. Steps:
+            //   1. Read the build timestamp baked into this HTML (see
+            //      scripts/write-meta.js — the placeholder is swapped at
+            //      build time so every fresh deploy carries a fresh value).
+            //   2. Fetch /api/meta with `no-store` — that endpoint is
+            //      served straight from FastAPI with `Cache-Control:
+            //      no-store, no-cache, must-revalidate` so it's ALWAYS
+            //      the live build timestamp, even through Cloudflare.
+            //   3. If server says a NEWER build exists → nuke Service
+            //      Worker + Cache Storage + hard-reload with a cache-
+            //      buster query string. sessionStorage guards against
+            //      infinite loops.
+            (function () {
+                var htmlBuild = "";
+                try {
+                    var m = document.querySelector('meta[name="lumo-build"]');
+                    htmlBuild = m ? (m.getAttribute("content") || "") : "";
+                } catch (e) {}
+                // If the placeholder was never substituted (dev server /
+                // very first deploy), skip the check — nothing to compare.
+                if (!htmlBuild || htmlBuild === "__LUMO_BUILD_TIME__") return;
+
+                var loopKey = "lumo_boot_cachebuster_last";
+                var last = 0;
+                try { last = parseInt(sessionStorage.getItem(loopKey) || "0", 10); } catch (e) {}
+                if (Date.now() - last < 15000) return; // never loop faster than 15s
+
+                // /api/meta is same-origin on production (ingress proxies
+                // /api/* to the backend). In preview it's also same-origin.
+                // Always use a relative URL so we never accidentally hit a
+                // stale REACT_APP_BACKEND_URL value.
+                var url = "/api/meta?t=" + Date.now();
+                fetch(url, { cache: "no-store", credentials: "omit" })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (!data || !data.buildTime) return;
+                        if (data.buildTime === htmlBuild) return;
+                        // Newer deploy exists — nuke everything and reload.
+                        try { sessionStorage.setItem(loopKey, String(Date.now())); } catch (e) {}
+                        var chain = Promise.resolve();
+                        if ("serviceWorker" in navigator) {
+                            chain = chain
+                                .then(function () { return navigator.serviceWorker.getRegistrations(); })
+                                .then(function (regs) {
+                                    return Promise.all((regs || []).map(function (rr) {
+                                        try { return rr.unregister(); } catch (e) { return null; }
+                                    }));
+                                })
+                                .catch(function () {});
+                        }
+                        if (window.caches && caches.keys) {
+                            chain = chain
+                                .then(function () { return caches.keys(); })
+                                .then(function (keys) {
+                                    return Promise.all((keys || []).map(function (k) {
+                                        try { return caches.delete(k); } catch (e) { return null; }
+                                    }));
+                                })
+                                .catch(function () {});
+                        }
+                        chain.finally(function () {
+                            var loc = new URL(window.location.href);
+                            loc.searchParams.set("_cb", data.buildTime);
+                            window.location.replace(loc.toString());
+                        });
+                    })
+                    .catch(function () { /* silent — network is optional */ });
+            })();
+        </script>
         <script>
             // ── Service Worker killswitch ────────────────────────────────────
             // Some users (mainly iOS Safari) have a Service Worker cached from

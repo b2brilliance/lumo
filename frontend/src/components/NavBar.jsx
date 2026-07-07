@@ -56,8 +56,9 @@ export default function NavBar() {
           <span className="font-display font-bold text-lg tracking-tight">Lumo</span>
         </Link>
         {/* Language / currency selector — pinned right of the logo per user
-            preference so it's the first control they see. */}
-        <div className="hidden sm:block flex-shrink-0" data-testid="nav-locale-left"><LocaleSwitcher /></div>
+            preference so it's the first control they see. Visible on every
+            screen size and every route (part of the sticky global header). */}
+        <div className="flex-shrink-0" data-testid="nav-locale-left"><LocaleSwitcher /></div>
         <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden">
           <NavLink to="/map" className={linkClass} data-testid="nav-map"><MapPin className="inline w-3.5 h-3.5 mr-1" />Jobs near you</NavLink>
           {/* Customer link — hidden for retailer/restaurant/admin (they have
