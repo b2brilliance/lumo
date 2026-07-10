@@ -29,7 +29,11 @@ const STORAGE_KEY = "lumo_build_time";
 const META_URLS = ["/api/meta", "/meta.json"];
 // How often to re-check for new deploys while the tab is open. Keeps
 // existing sessions in sync without requiring a refresh.
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+const POLL_INTERVAL_MS = 30 * 1000; // 30s — was 5 min, more aggressive
+                                     // so long-lived tabs pick up new
+                                     // deploys within seconds (users
+                                     // stuck on stale HTML report the
+                                     // "only works in incognito" bug).
 
 async function nukeSwAndCaches() {
   try {
@@ -97,10 +101,23 @@ export default function CacheBuster() {
       window.location.replace(url.toString());
     }
 
-    // Initial check on mount + poll every 5 min for open tabs
+    // Initial check on mount + poll every 30s for long-lived tabs.
     check(true);
     const interval = setInterval(() => check(false), POLL_INTERVAL_MS);
-    return () => { cancelled = true; clearInterval(interval); };
+    // ALSO re-check the moment the user returns to the tab — this is the
+    // fastest way to unstick users who Alt-Tab back after a deploy went
+    // live (the poll interval alone would still be up to 30s late).
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") check(false);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onVisibilityChange);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onVisibilityChange);
+    };
   }, []);
   return null;
 }
