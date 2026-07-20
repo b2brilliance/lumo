@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
@@ -279,13 +279,43 @@ function RentalsTab() {
 
 export default function AdminConsole() {
   const { user } = useAuth();
-  const [tab, setTab] = useState("analytics");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = TABS.some((t) => t.key === searchParams.get("tab")) ? searchParams.get("tab") : "analytics";
+  const [tab, setTab] = useState(initialTab);
   const [stats, setStats] = useState(null);
+  const [affiliateSetup, setAffiliateSetup] = useState(null); // { missing_count, total_placeholders }
   useEffect(() => {
     if (user?.role === "admin") {
       api.get("/admin/stats").then(({ data }) => setStats(data)).catch(() => {});
+      // Fetch tracking ID setup status so we can nudge the admin.
+      Promise.all([
+        api.get("/admin/affiliates/settings").catch(() => ({ data: { keys: {} } })),
+        api.get("/admin/affiliates/offers").catch(() => ({ data: { offers: [] } })),
+      ]).then(([s, o]) => {
+        const keys = s?.data?.keys || {};
+        const all = new Set();
+        (o?.data?.offers || []).forEach((off) => {
+          const matches = (off.url_template || "").match(/\{([a-zA-Z0-9_]+)\}/g) || [];
+          matches.forEach((m) => all.add(m.replace(/[{}]/g, "")));
+        });
+        all.delete("city_slug");
+        const total = all.size;
+        let missing = 0;
+        all.forEach((k) => { if (!keys[k]) missing += 1; });
+        setAffiliateSetup({ missing_count: missing, total_placeholders: total });
+      }).catch(() => setAffiliateSetup(null));
     }
   }, [user]);
+
+  // Sync tab selection to the URL so deep links from AffiliateBlock work.
+  useEffect(() => {
+    if (searchParams.get("tab") !== tab) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", tab);
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   if (user === undefined) return <div className="p-12 text-slate-500">Loading…</div>;
   if (!user || user === false) return <Navigate to="/login" replace />;
@@ -305,6 +335,25 @@ export default function AdminConsole() {
         <StatTile label="Active rentals"     value={stats?.active_rentals}           icon={Calendar}    testId="admin-stat-rentals" />
         <StatTile label="Pending bookings"   value={stats?.pending_rental_bookings}  icon={Briefcase}   testId="admin-stat-bookings" />
       </div>
+
+      {affiliateSetup && affiliateSetup.missing_count > 0 && (
+        <div className="mt-6 border-l-4 border-amber-500 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="admin-affiliate-setup-banner">
+          <div className="flex-1">
+            <div className="overline text-amber-700 mb-1">Referral tracking setup</div>
+            <div className="text-sm text-slate-800">
+              <strong>{affiliateSetup.missing_count} of {affiliateSetup.total_placeholders}</strong> partner tracking IDs still need to be added. Without them, Lumo can&apos;t collect commissions when users sign up for referred services (Uber, DoorDash, Chime, etc.).
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="bg-amber-600 hover:bg-amber-700 text-white rounded-none"
+            onClick={() => setTab("affiliates")}
+            data-testid="admin-affiliate-setup-cta"
+          >
+            <DollarSign className="w-3.5 h-3.5 mr-1" /> Add tracking IDs
+          </Button>
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-slate-200 mt-10 overflow-x-auto" data-testid="admin-tabs">
         {TABS.map((t) => {

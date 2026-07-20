@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { ExternalLink, Info, Tag } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ExternalLink, Info, Tag, Settings } from "lucide-react";
 import { api, API } from "@/lib/api";
 import { useLocale } from "@/lib/locale";
+import { useAuth } from "@/lib/auth";
 
 /* AffiliateBlock — drops a row of partner offers into any page.
  *
@@ -58,6 +60,9 @@ export default function AffiliateBlock({
   variant = "grid", // "grid" or "compact"
 }) {
   const { country } = useLocale() || {};
+  const { user } = useAuth() || {};
+  const isAdmin = user && user.role === "admin";
+  const navigate = useNavigate();
   const [offers, setOffers] = useState([]);
   const [labels, setLabels] = useState(FALLBACK_LABELS);
   const [loading, setLoading] = useState(true);
@@ -198,9 +203,20 @@ export default function AffiliateBlock({
                     Open offer <ExternalLink className="w-3 h-3" />
                   </div>
                   {o.needs_setup && (
-                    <div className="mt-1 text-[9px] font-mono uppercase tracking-wider text-amber-700">
-                      Admin: add tracking ID
-                    </div>
+                    isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate("/admin?tab=affiliates"); }}
+                        className="mt-1 inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider text-amber-800 border border-amber-300 bg-amber-50 px-1.5 py-0.5 hover:bg-amber-100 cursor-pointer"
+                        data-testid={`affiliate-setup-${o.slug}`}
+                      >
+                        <Settings className="w-2.5 h-2.5" /> Add tracking ID
+                      </button>
+                    ) : (
+                      <div className="mt-1 text-[9px] font-mono uppercase tracking-wider text-amber-700">
+                        Admin: add tracking ID
+                      </div>
+                    )
                   )}
                 </a>
               ))}

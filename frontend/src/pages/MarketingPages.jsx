@@ -14,6 +14,7 @@ import {
   PROVIDER_HOOKS,
   RECRUITING_CATEGORIES,
 } from "@/lib/marketing";
+import AffiliateBlock from "@/components/AffiliateBlock";
 
 const HOOK_ICONS = { wallet: Wallet, clock: Clock, calendar: Calendar, "map-pin": MapPin };
 
@@ -225,6 +226,52 @@ function CityList({ pathPrefix = "/providers", title = "Available in these citie
   );
 }
 
+/** FinalCTA — the informational-marketing-page closer.
+ * All marketing pages end with this so readers who've absorbed the info
+ * can tap straight through to the actual tool. */
+function FinalCTA({
+  title = "Ready to try Lumo?",
+  subtitle = "One tap to post a request, or sign up as a provider and start earning this week.",
+  primaryHref = "/services",
+  primaryLabel = "Browse services",
+  secondaryHref = "/register?role=provider",
+  secondaryLabel = "Become a provider",
+  tone = "dark",
+}) {
+  const bg = tone === "dark" ? "bg-slate-900 text-white" : "bg-teal-50 text-slate-900 border-y border-teal-100";
+  const primaryBtn =
+    tone === "dark"
+      ? "bg-white text-slate-900 hover:bg-amber-300"
+      : "bg-slate-900 text-white hover:bg-slate-800";
+  const secondaryBtn =
+    tone === "dark"
+      ? "border border-white/40 text-white hover:bg-white/10"
+      : "border border-slate-900 text-slate-900 hover:bg-white";
+  return (
+    <section className={bg} data-testid="marketing-final-cta">
+      <div className="max-w-4xl mx-auto px-4 py-16 sm:py-20 text-center">
+        <div className="overline mb-3 opacity-80">Next step</div>
+        <h2 className="font-display font-black text-3xl sm:text-5xl tracking-tighter">{title}</h2>
+        <p className={`mt-4 text-base sm:text-lg max-w-2xl mx-auto ${tone === "dark" ? "text-slate-300" : "text-slate-600"}`}>
+          {subtitle}
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3 justify-center">
+          <Link to={primaryHref} data-testid="marketing-final-cta-primary">
+            <Button className={`rounded-none h-12 px-6 text-sm font-mono uppercase tracking-wider ${primaryBtn}`}>
+              {primaryLabel} <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </Link>
+          <Link to={secondaryHref} data-testid="marketing-final-cta-secondary">
+            <Button variant="outline" className={`rounded-none h-12 px-6 text-sm font-mono uppercase tracking-wider ${secondaryBtn}`}>
+              {secondaryLabel}
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Public pages ──────────────────────────────────────────────────────
 
 export function HowItWorks() {
@@ -239,10 +286,6 @@ export function HowItWorks() {
         eyebrow="How Lumo works"
         title="Post a job. Get bids in minutes. Pay when it's done."
         subtitle="Lumo is an Uber-style, chronological, distance-based marketplace for every service you need — from moving a couch to fixing a leak to walking your dog. Customers pay a 10% deposit to lock in a provider; providers keep 90% of the total."
-        ctaHref="/services"
-        ctaLabel="Browse services"
-        secondaryHref="/for-providers"
-        secondaryLabel="Become a provider"
       />
       <section className="border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 py-16 grid gap-8 sm:grid-cols-3">
@@ -259,8 +302,29 @@ export function HowItWorks() {
           ))}
         </div>
       </section>
+      <section className="border-b border-slate-200 bg-slate-50">
+        <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="overline text-teal-700 mb-3">The details</div>
+          <h2 className="font-display font-black text-3xl">Why every step of Lumo is built to protect both sides.</h2>
+          <div className="mt-8 space-y-6 text-slate-700 leading-relaxed">
+            <p><strong className="text-slate-900">Chronological + distance-based feed.</strong> Providers see the newest requests inside their radius first. No pay-to-play, no priority bumps for advertisers — everyone sees the same feed, in the same order.</p>
+            <p><strong className="text-slate-900">Escrow-backed payments.</strong> When a provider accepts your job, your 10% deposit is held in Stripe escrow. Neither side sees the money until the work is confirmed done. Disputes get manual review by a Lumo operator.</p>
+            <p><strong className="text-slate-900">Live GPS tracker.</strong> Every accepted job opens a live map view showing the provider's ETA, current position, and one-tap chat. It's the same tech Uber uses — because when you're waiting on someone at your front door, you deserve to see them coming.</p>
+            <p><strong className="text-slate-900">Same-day payouts via Stripe Connect.</strong> Providers who complete the Stripe onboarding get funds released to their bank within 24 hours of the customer marking a job complete.</p>
+          </div>
+        </div>
+      </section>
       <HooksGrid />
       <CityList />
+      <AffiliateBlock category="global" title="While you're here — partner services you might like" subtitle="Cashback, banking, insurance and other tools our providers use. Lumo earns a small commission when you sign up — no extra cost to you." />
+      <FinalCTA
+        title="Ready to try Lumo?"
+        subtitle="Post a service request in under a minute, or sign up as a provider and start earning this week."
+        primaryHref="/services"
+        primaryLabel="Browse services"
+        secondaryHref="/register?role=provider"
+        secondaryLabel="Become a provider"
+      />
     </div>
   );
 }
@@ -285,10 +349,6 @@ export function ForProviders() {
         eyebrow="For service providers"
         title="Earn on your terms. Keep 90% of every dollar."
         subtitle="Lumo takes 10%. That's it. No lead fees, no boost fees, no monthly minimums. Payouts hit your bank in under 24 hours. Pick the jobs you want; skip the ones you don't. No 1099 quotas — do one job a month or a hundred."
-        ctaHref="/apply"
-        ctaLabel="Apply to be a provider"
-        secondaryHref="/how-it-works"
-        secondaryLabel="How Lumo works"
       />
       <HooksGrid />
       <section className="border-b border-slate-200 bg-white">
@@ -337,6 +397,15 @@ export function ForProviders() {
         </div>
       </section>
       <CityList />
+      <AffiliateBlock category="provider" title="Get paid earlier — partner banks & tools" subtitle="Earn referral bonuses while getting better banking, tax, and gig-worker perks." />
+      <FinalCTA
+        title="Earning on Lumo starts today."
+        subtitle="Create your provider account, or fill in the application above — either path gets you approved in under 24 hours."
+        primaryHref="/register?role=provider"
+        primaryLabel="Create provider account"
+        secondaryHref="/how-it-works"
+        secondaryLabel="How Lumo works"
+      />
     </div>
   );
 }
@@ -353,10 +422,6 @@ export function ForCustomers() {
         eyebrow="For customers"
         title="One app for every service you need."
         subtitle="Delivery, cleaning, moving, roadside, mechanics, notaries, pet care, tutoring — the same experience for everything. Instant auto-quotes on common services. Escrow protection built in. Live GPS tracking on every accepted booking."
-        ctaHref="/services"
-        ctaLabel="See all services"
-        secondaryHref="/how-it-works"
-        secondaryLabel="How it works"
       />
       <section className="border-b border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-4 py-16 grid gap-6 sm:grid-cols-2">
@@ -364,7 +429,7 @@ export function ForCustomers() {
             { Icon: Zap, t: "Instant auto-quotes", b: "Cleaning, moving, delivery, roadside, and 25+ other services get a real price the moment you fill in the form. No back-and-forth." },
             { Icon: ShieldCheck, t: "Escrow protection", b: "Your 10% deposit locks in the provider. The remaining 90% releases only after you confirm the work is done. Simple, fair, safe." },
             { Icon: MapPin, t: "Live GPS tracker", b: "Uber-style live tracking on every accepted job. Watch your provider en route with real-time ETA and one-tap chat." },
-            { Icon: Star, t: "Ratings that matter", b: "Every provider is rated after every job. Photos, timestamps, and receipts baked into every review so you know what you&apos;re getting." },
+            { Icon: Star, t: "Ratings that matter", b: "Every provider is rated after every job. Photos, timestamps, and receipts baked into every review so you know what you\u2019re getting." },
           ].map((f, i) => (
             <div key={i} className="border border-slate-200 p-6">
               <f.Icon className="w-6 h-6 text-teal-700" />
@@ -374,7 +439,30 @@ export function ForCustomers() {
           ))}
         </div>
       </section>
+      <section className="border-b border-slate-200 bg-slate-50">
+        <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="overline text-teal-700 mb-3">What you can book</div>
+          <h2 className="font-display font-black text-3xl">28+ services, one flow, one app.</h2>
+          <p className="mt-4 text-slate-700 leading-relaxed">
+            Lumo is not a niche marketplace. You can hire a mover, book a locksmith, order same-day delivery, get a mechanic to your driveway, book a tutor, hire a notary, list an item for sale, or rent out a room — all inside the same app, with the same escrow, the same rating system, and the same GPS-based matching.
+          </p>
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+            {["Cleaning", "Moving", "Delivery", "Roadside", "Handyman", "Auto detail", "Notary", "Pet care", "Tutoring", "IT support", "Landscaping", "Photography"].map((s) => (
+              <div key={s} className="border border-slate-200 bg-white px-3 py-2 text-slate-800 font-medium">{s}</div>
+            ))}
+          </div>
+        </div>
+      </section>
       <CityList pathPrefix="/cities" title="Now live in these cities" />
+      <AffiliateBlock category="customer" title="Stretch your dollar — partner cards & cashback" subtitle="Credit cards, cashback portals, and services our users love." />
+      <FinalCTA
+        title="Book your first service today."
+        subtitle="Instant quotes, escrow-backed payment, live tracker included."
+        primaryHref="/services"
+        primaryLabel="Browse services"
+        secondaryHref="/how-it-works"
+        secondaryLabel="How it works"
+      />
     </div>
   );
 }
@@ -449,6 +537,14 @@ export function ProviderCity() {
           </div>
         </div>
       </section>
+      <FinalCTA
+        title={`Start earning in ${displayName} this week.`}
+        subtitle="Sign up as a provider or submit the application above — approval takes under 24 hours."
+        primaryHref="/register?role=provider"
+        primaryLabel="Create provider account"
+        secondaryHref="/for-providers"
+        secondaryLabel="Why Lumo"
+      />
     </div>
   );
 }
@@ -516,6 +612,14 @@ export function CareersCategory() {
           </div>
         </div>
       </section>
+      <FinalCTA
+        title={`Ready to start doing ${cat.label.toLowerCase()} work?`}
+        subtitle={`Create a provider account and pick ${cat.label.toLowerCase()} jobs the moment they come in. Same-day payouts, 90% of every dollar.`}
+        primaryHref={`/register?role=provider&service=${cat.slug}`}
+        primaryLabel="Create provider account"
+        secondaryHref="/for-providers"
+        secondaryLabel="Why Lumo"
+      />
     </div>
   );
 }
@@ -532,10 +636,6 @@ export function About() {
         eyebrow="Our story"
         title="Every service, one app. Half the fees."
         subtitle="Lumo was built to fix the two biggest problems with gig-work marketplaces: providers keep too little, and customers wait too long. We charge 10% flat (half of TaskRabbit), match customers to providers by GPS in seconds, and settle payouts same-day via Stripe."
-        ctaHref="/for-providers"
-        ctaLabel="Become a provider"
-        secondaryHref="/press"
-        secondaryLabel="Press kit"
       />
       <section className="border-b border-slate-200 bg-white">
         <div className="max-w-3xl mx-auto px-4 py-16 space-y-6 text-slate-700 leading-relaxed">
@@ -551,6 +651,14 @@ export function About() {
           </p>
         </div>
       </section>
+      <FinalCTA
+        title="Join the marketplace built for both sides."
+        subtitle="Post a request as a customer, or earn as a provider — either way, you keep more of every dollar."
+        primaryHref="/services"
+        primaryLabel="Book a service"
+        secondaryHref="/register?role=provider"
+        secondaryLabel="Become a provider"
+      />
     </div>
   );
 }
@@ -586,6 +694,15 @@ export function Press() {
           ))}
         </div>
       </section>
+      <FinalCTA
+        title="Building a story on Lumo?"
+        subtitle="Email press@golumo.app or hit either button below to see the product live."
+        primaryHref="/services"
+        primaryLabel="See services"
+        secondaryHref="/how-it-works"
+        secondaryLabel="How it works"
+        tone="light"
+      />
     </div>
   );
 }
@@ -602,10 +719,16 @@ export function ProviderCityIndex() {
         eyebrow="Provider cities"
         title="Earn as a Lumo provider in 50+ cities."
         subtitle="Wherever you live, if Lumo is live there, you can start earning this week. Pick your city to see local demand + apply."
-        ctaHref="/apply"
-        ctaLabel="Apply anywhere"
       />
       <CityList pathPrefix="/providers" title="All provider cities" />
+      <FinalCTA
+        title="Skip the city page — apply now."
+        subtitle="One application, valid in every city Lumo operates in. Approval in under 24 hours."
+        primaryHref="/register?role=provider"
+        primaryLabel="Create provider account"
+        secondaryHref="/apply"
+        secondaryLabel="Apply via form"
+      />
     </div>
   );
 }
@@ -640,6 +763,14 @@ export function CareersIndex() {
           </div>
         </div>
       </section>
+      <FinalCTA
+        title="Ready to pick a role?"
+        subtitle="Or skip the browse and just create a provider account — you can add multiple services from the dashboard."
+        primaryHref="/register?role=provider"
+        primaryLabel="Create provider account"
+        secondaryHref="/for-providers"
+        secondaryLabel="Learn why Lumo"
+      />
     </div>
   );
 }

@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only verification of Lumo marketing informational pages, FinalCTA closers, AffiliateBlock admin setup buttons, and Admin console referral-tracking-setup banner + Affiliates > Settings sub-tab save flow. 100% of the requested UI checks passed. Login used the API + localStorage.setItem('lumo_token') pattern (per agent-to-agent note) — the /login role-card flow was intentionally bypassed for testing efficiency.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Non-blocking clarification: the review request cites '/careers/cleaning' as a smoke URL, but the actual slug in /app/frontend/src/lib/marketing.js RECRUITING_CATEGORIES is 'cleaner' — /careers/cleaning renders the 'Category not found' fallback (by design), while /careers/cleaner works correctly with FinalCTA (verified). Consider adding a 'cleaning' alias slug, or update any external references (e.g., sitemap, blog links) to use 'cleaner'.",
+    "Non-blocking: /how-it-works has AffiliateBlock category='global', but only 1 global offer is seeded and it has needs_setup=false, so the 'Add tracking ID' setup button never appears on that page in the current seed state. The setup-button feature was verified on /for-customers (7 setup buttons) and /for-providers (8 setup buttons), which is what admins will actually encounter. Consider updating the review-request wording or seeding one placeholder-templated global offer if you want /how-it-works to also exercise this admin nudge."
+  ],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped)", "frontend": "100%" },
+  "test_credentials": "admin@lumo.test / password123 (used via POST /api/auth/login + localStorage.lumo_token)",
+  "seed_data_creation": "Filled one admin affiliate tracking key (impact_publisher_id=TEST-IMPACT-12345) as part of the Settings save test; this consumed 1 of the previously-missing placeholders so the banner now reads '37 of 38' instead of the original count and one offer's needs_setup flipped to false. If the main agent wants a pristine banner, wipe admin_affiliate_settings for impact_publisher_id.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verified all requested marketing pages (/how-it-works, /for-customers, /for-providers, /about, /careers, /providers, /press, /providers/new-york, /careers/cleaner) render data-testid=marketing-final-cta at the END with correct primary/secondary hrefs and labels. Hero CTA is absent (hero_cta_count=0) on /how-it-works, /for-customers, /for-providers, /about, /careers, /providers, /press — matching the 'info-first' requirement. /providers/new-york and /careers/<slug> still render hero CTAs (Apply now / Why Lumo) — intentional per code. Admin: /admin shows amber 'REFERRAL TRACKING SETUP' banner (37/38 missing), CTA switches tab to affiliates and rewrites URL to ?tab=affiliates. Direct /admin?tab=affiliates deep link works. Settings sub-tab renders 38 affiliates-key-* inputs; save shows toast 'Tracking IDs saved'. AffiliateBlock on /for-customers renders 7 clickable affiliate-setup-<slug> buttons for admin — clicking navigates to /admin?tab=affiliates without opening the offer's external URL (e.preventDefault + navigate works). Same on /for-providers (8). The /careers/cleaning URL in the review request does NOT match a real slug ('cleaner' is the correct slug).",
+  "rca of the issue": "N/A — no bugs found. Two minor spec/data mismatches called out under action_items (careers/cleaning slug, global-category needs_setup=false)."
+}
