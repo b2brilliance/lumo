@@ -133,6 +133,7 @@ function App() {
             <Route path="/restaurants/:id" element={<StoreProfile role="restaurant" />} />
 
             <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/marketplace/new" element={<Marketplace />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/jobs/:id/track" element={<Protected><LiveTrack /></Protected>} />

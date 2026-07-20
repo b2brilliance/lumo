@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 42 frontend-only testing. ProviderExplainer works fully as specified (all data-testids, scene switching, pause behavior, CTA nav all PASS). Marketplace 'Sell an item' flow has a URL-persistence bug: navigating to /marketplace/new (via landing tile or deep link) opens the listing dialog correctly, BUT the URL is immediately rewritten to /marketplace on mount before the user can dismiss. Regression tests all PASS (dialog does NOT auto-open on /marketplace, marketplace-create button still opens dialog, filters work).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Sell an item / deep-link /marketplace/new",
+        "issue": "URL is rewritten from /marketplace/new to /marketplace on mount BEFORE the user closes the dialog. Both useEffects in Marketplace.jsx run on mount; the second effect fires while openCreate is still `false` (initial state) and calls navigate('/marketplace', {replace:true}). Dialog still opens (setOpenCreate(true) also fires), but the intended contract 'URL stays /marketplace/new while dialog is open, rewrites to /marketplace on dismiss' is broken. Test spec explicitly says: 'you should land on /marketplace/new AND the New listing dialog should be open automatically' — the second half passes, the first half fails.",
+        "affected_selectors": ["[data-testid=listing-dialog]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix the useEffect race condition in /app/frontend/src/pages/Marketplace.jsx lines 46-51. Suggested fix: introduce `const wasOpenRef = useRef(false);` and guard the navigate call so it only fires when the dialog was previously opened and is now being closed. Example:\n\n  const wasOpenRef = useRef(false);\n  useEffect(() => {\n    if (openCreate) wasOpenRef.current = true;\n    if (!openCreate && wasOpenRef.current && location.pathname === '/marketplace/new') {\n      navigate('/marketplace', { replace: true });\n    }\n  }, [openCreate]);\n\nThis preserves the /marketplace/new URL while the dialog is open (so the tab is bookmarkable / shareable) and only rewrites once the user actually dismisses the dialog."
+  ],
+  "critical_code_review_comments": [
+    "Marketplace.jsx: The two useEffects that couple `openCreate` with `location.pathname` fight each other on mount (see integration_issues above). Guard the redirect effect with a ref-tracked 'was previously open' flag.",
+    "ProviderExplainer.jsx: overall code is clean. Minor: the progress bar interval fires every 100ms even when the user has switched tabs — consider clearing on visibilitychange. Not blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "89% (8 of 9 acceptance criteria pass; the /marketplace/new URL-persistence check fails)"},
+  "test_credentials": "customer@lumo.test / password123 (Customer role picker on /login)",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "ProviderExplainer is fully verified — no need to retest scene-switching, pause, CTA. Focus retest on Marketplace.jsx URL persistence after the useRef fix: (1) direct nav to /marketplace/new should keep URL /marketplace/new until dialog is closed, then rewrite to /marketplace; (2) landing 'Sell an item' tile click should also keep URL /marketplace/new until dismissed; (3) regression: /marketplace no auto-open, marketplace-create button still opens dialog.",
+  "rca of the issue": {
+    "bug": "URL /marketplace/new immediately rewrites to /marketplace on mount",
+    "reproduction_steps": [
+      "1. Navigate directly to https://<host>/marketplace/new (or click 'Sell an item' tile from landing)",
+      "2. Observe: listing dialog opens (good), BUT window.location.pathname is already '/marketplace' (bad)",
+      "3. Expected per spec: pathname should remain '/marketplace/new' until user dismisses the dialog, then rewrite to '/marketplace'"
+    ],
+    "root_cause": "In Marketplace.jsx, two useEffects both run on initial mount. Effect A (line 38, dep=[location.pathname]) sees pathname='/marketplace/new' and schedules setOpenCreate(true). Effect B (line 46, dep=[openCreate]) also runs on mount — with the INITIAL value of openCreate (false) — so its guard `!openCreate && pathname === '/marketplace/new'` evaluates true and it calls navigate('/marketplace', {replace:true}). React batches the state updates so both fire before the next render, and the URL rewrite wins the race.",
+    "mitigation": "Add a useRef to track whether the dialog has ever been open, and only trigger the URL rewrite on the true open→closed transition (not on initial mount). See action_items for a code snippet."
+  }
+}

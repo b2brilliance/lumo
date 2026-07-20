@@ -15,6 +15,7 @@ import {
   RECRUITING_CATEGORIES,
 } from "@/lib/marketing";
 import AffiliateBlock from "@/components/AffiliateBlock";
+import ProviderExplainer from "@/components/ProviderExplainer";
 
 const HOOK_ICONS = { wallet: Wallet, clock: Clock, calendar: Calendar, "map-pin": MapPin };
 
@@ -350,6 +351,7 @@ export function ForProviders() {
         title="Earn on your terms. Keep 90% of every dollar."
         subtitle="Lumo takes 10%. That's it. No lead fees, no boost fees, no monthly minimums. Payouts hit your bank in under 24 hours. Pick the jobs you want; skip the ones you don't. No 1099 quotas — do one job a month or a hundred."
       />
+      <ProviderExplainer />
       <HooksGrid />
       <section className="border-b border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-4 py-16">

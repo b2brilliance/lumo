@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useLocale } from "@/lib/locale";
 import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
+import { useLocation, useNavigate } from "react-router-dom";
 import { MapPin, Search, X, SlidersHorizontal } from "lucide-react";
 
 // Default fallback fee when seller hasn't provided a pickup location yet.
@@ -27,6 +28,28 @@ export default function Marketplace() {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   const [items, setItems] = useState([]);
   const [openCreate, setOpenCreate] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Deep-link support: /marketplace/new auto-opens the "list an item" dialog
+  // so the "Sell an item" tile on Landing can drop users straight into the
+  // seller flow. If the user isn't signed in we still open the dialog — the
+  // form's own submit path will redirect them to /login as needed.
+  useEffect(() => {
+    if (location.pathname === "/marketplace/new") {
+      setOpenCreate(true);
+    }
+  }, [location.pathname]);
+
+  // When the dialog closes on /marketplace/new, rewrite the URL back to
+  // /marketplace so refreshing doesn't loop the modal open again.
+  useEffect(() => {
+    if (!openCreate && location.pathname === "/marketplace/new") {
+      navigate("/marketplace", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openCreate]);
+
   const [form, setForm] = useState({
     title: "", description: "", price: "", category: "other",
     media_url: null, media_type: null, delivery_available: true,
