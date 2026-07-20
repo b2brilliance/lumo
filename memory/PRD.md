@@ -8,6 +8,14 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Reviews & ratings on providers + storefronts
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
+
+## Iteration 40 — Feb 2026 (this session)
+### Marketing pages refactor + admin referral-tracking nudge
+- **MarketingPages.jsx**: Removed hero CTAs on info-first pages (HowItWorks, ForProviders, ForCustomers, About, ProviderCityIndex). Added shared `FinalCTA` component rendered at the END of every marketing page (data-testid=`marketing-final-cta`) with primary + secondary buttons. Added `AffiliateBlock` at bottom of HowItWorks/ForCustomers/ForProviders so info pages also expose partner referral opportunities. Added a "Why every step of Lumo is built to protect both sides" info section on HowItWorks and a "28+ services, one flow" info block on ForCustomers.
+- **AffiliateBlock.jsx**: The "Admin: add tracking ID" pill on partner cards is now a clickable `<button>` (data-testid=`affiliate-setup-<slug>`) for admin users that navigates to `/admin?tab=affiliates` via react-router `useNavigate`. Non-admins still see the static hint.
+- **AdminConsole.jsx**: New amber banner (data-testid=`admin-affiliate-setup-banner`) shown when partner tracking IDs are unfilled — displays `N of M partner tracking IDs still need to be added` with an "Add tracking IDs" CTA that jumps to the Affiliates tab. Tab state now syncs to `?tab=` querystring so deep links from AffiliateBlock land on the right tab. 100% frontend test pass (iteration_40.json).
+
+
 - Country-specific provider business / tax registration credentials (SIRET, EIN, GSTIN, etc.) across 15 countries
 - AI document verification (Claude Sonnet 4.6 → Gemini 3.1 Pro fallback) with on-demand buttons on credentials + media
 - **Rentals marketplace — 11 categories, instant-book + request-to-book, security deposits, per-category attributes**
