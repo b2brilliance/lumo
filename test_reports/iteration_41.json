@@ -1,0 +1,57 @@
+{
+  "summary": "Iter 41 — ScrollToTop, Marketplace filters, and Adzuna/Reed aggregator additions all working. 7/7 backend tests pass, all frontend flows pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter41_aggregators_marketplace.py",
+    "/app/test_reports/pytest/iter41.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is ~7240 lines — over the 700-line guideline. Consider splitting into feature modules (already flagged in prior iterations).",
+    "aggregators.py graceful degradation is clean: fetch_adzuna / fetch_reed log an info line and return [] when keys missing — /api/admin/aggregators/sync returned 200 with {adzuna:0, reed:0} and no traceback.",
+    "Marketplace.jsx filter logic is client-side only (useMemo). For very large listing sets this could bottleneck; server-side filtering would scale better but is not needed at current volume.",
+    "ScrollToTop.jsx correctly skips POP navigations and hash-only changes — behavior verified in both /how-it-works→/services and /marketplace→/ transitions."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter41_aggregators_marketplace.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@lumo.test / password123, customer@lumo.test / password123 (auto-seeded)",
+  "seed_data_creation": "None — used existing TEST_chair seeds (14 items) and TEST_iter24_listing_with_loc",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend aggregator sync currently returns counts={'usajobs':0,'greenhouse':0,'remoteok':3,'wwr':0,'adzuna':0,'reed':0} without external API keys. Once ADZUNA_APP_ID/ADZUNA_APP_KEY/REED_API_KEY are added to backend/.env, re-run /api/admin/aggregators/sync as admin to confirm ingestion. Marketplace has 16 total listings including 14 TEST_chair rows at $40 (furniture) + 1 TEST_iter24 at $25 + 1 at $600 — makes for reliable filter validation.",
+  "detailed_results": {
+    "backend": {
+      "test_aggregator_module_imports": "PASS — fetch_adzuna, fetch_reed, ingest_aggregated_jobs importable",
+      "test_map_jobs_public_returns_list": "PASS — GET /api/map/jobs 200",
+      "test_map_jobs_include_external_returns_list": "PASS — GET /api/map/jobs?include_external=true 200",
+      "test_admin_aggregators_status": "PASS — GET /api/admin/aggregators 200",
+      "test_admin_aggregators_sync_no_5xx": "PASS — POST /api/admin/aggregators/sync 200 in 14.2s, counts={usajobs:0,greenhouse:0,remoteok:3,wwr:0,adzuna:0,reed:0}, no traceback in backend.err.log",
+      "test_admin_aggregators_sync_forbidden_for_non_admin": "PASS — customer gets 403",
+      "test_marketplace_listings_returns_list": "PASS — /api/marketplace/listings shape valid, no _id leak"
+    },
+    "frontend": {
+      "ScrollToTop_HowItWorks_to_Services": "PASS — scrolled to y=2990 then clicked FinalCTA, landed at /services with scrollY=0",
+      "ScrollToTop_Marketplace_to_Home": "PASS — scrolled to y=1500 then clicked Lumo logo, landed at / with scrollY=0",
+      "Marketplace_filter_render_base": "PASS — filters, search, sort, toggle, result-count all present",
+      "Marketplace_filter_render_expanded": "PASS — category, min-price, max-price, radius, use-location all present",
+      "Marketplace_filter_search_chair": "PASS — 16→14 listings, all contain 'chair'",
+      "Marketplace_filter_price_30_50": "PASS — all 14 items in range",
+      "Marketplace_filter_category_furniture": "PASS — all 14 items are furniture",
+      "Marketplace_filter_sort_asc": "PASS — [25,40,40,40,40] ascending",
+      "Marketplace_filter_sort_desc": "PASS — [600,40,40,40,40] descending",
+      "Marketplace_filter_reset": "PASS — clears search value + badge disappears",
+      "Marketplace_nearest_first_gated": "PASS — Nearest first + radius both disabled without location",
+      "Marketplace_location_enables_filters": "PASS — after grant_permissions(geolocation) + Use my location, radius enabled and Nearest first selectable"
+    }
+  }
+}

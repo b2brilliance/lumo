@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useLocale } from "@/lib/locale";
 import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
+import { MapPin, Search, X, SlidersHorizontal } from "lucide-react";
 
 // Default fallback fee when seller hasn't provided a pickup location yet.
 const FALLBACK_DELIVERY_FEE = 9.99;
@@ -40,6 +41,90 @@ export default function Marketplace() {
     notes: "",
   });
   const [busy, setBusy] = useState(false);
+
+  // ── Filters (client-side, applied to the loaded items list) ───────────
+  const [filters, setFilters] = useState({
+    search: "",
+    category: "all",
+    minPrice: "",
+    maxPrice: "",
+    radius: "any", // "any" | "5" | "10" | "25" | "50" | "100"
+    sort: "newest", // "newest" | "price_asc" | "price_desc" | "distance"
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  // Buyer coords for distance filtering / distance sort. Priority: saved
+  // default_delivery_address → browser geolocation (opt-in).
+  const [buyerCoords, setBuyerCoords] = useState(null);
+  useEffect(() => {
+    const dfl = user?.default_delivery_address;
+    if (dfl?.lat != null && dfl?.lng != null && !buyerCoords) {
+      setBuyerCoords({ lat: dfl.lat, lng: dfl.lng, label: dfl.address || "Saved address" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { toast.error("Geolocation unsupported"); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setBuyerCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: "My location" }),
+      () => toast.error("Location access denied"),
+    );
+  };
+  const resetFilters = () => setFilters({ search: "", category: "all", minPrice: "", maxPrice: "", radius: "any", sort: "newest" });
+
+  // Compute filtered + sorted items. Distance is calculated per item once.
+  const filteredItems = useMemo(() => {
+    const q = filters.search.trim().toLowerCase();
+    const min = filters.minPrice ? parseFloat(filters.minPrice) : null;
+    const max = filters.maxPrice ? parseFloat(filters.maxPrice) : null;
+    const radius = filters.radius !== "any" ? parseFloat(filters.radius) : null;
+
+    const withDistance = items.map((it) => {
+      let dist = null;
+      if (buyerCoords && it.location?.lat != null && it.location?.lng != null) {
+        dist = milesBetween(buyerCoords, { lat: it.location.lat, lng: it.location.lng });
+      }
+      return { ...it, _distance: dist };
+    });
+
+    const result = withDistance.filter((it) => {
+      if (q) {
+        const hay = `${it.title || ""} ${it.description || ""} ${it.seller_name || ""} ${(it.attributes && Object.values(it.attributes).join(" ")) || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filters.category !== "all" && it.category !== filters.category) return false;
+      if (min != null && it.price < min) return false;
+      if (max != null && it.price > max) return false;
+      if (radius != null) {
+        if (it._distance == null) return false; // no coords → can't guarantee radius
+        if (it._distance > radius) return false;
+      }
+      return true;
+    });
+
+    result.sort((a, b) => {
+      switch (filters.sort) {
+        case "price_asc":  return (a.price || 0) - (b.price || 0);
+        case "price_desc": return (b.price || 0) - (a.price || 0);
+        case "distance":
+          if (a._distance == null && b._distance == null) return 0;
+          if (a._distance == null) return 1;
+          if (b._distance == null) return -1;
+          return a._distance - b._distance;
+        case "newest":
+        default:
+          return (b.created_at || "").localeCompare(a.created_at || "");
+      }
+    });
+    return result;
+  }, [items, filters, buyerCoords]);
+
+  const activeFilterCount =
+    (filters.search ? 1 : 0) +
+    (filters.category !== "all" ? 1 : 0) +
+    (filters.minPrice ? 1 : 0) +
+    (filters.maxPrice ? 1 : 0) +
+    (filters.radius !== "any" ? 1 : 0) +
+    (filters.sort !== "newest" ? 1 : 0);
 
   // Pre-fill default delivery address from the user's saved Settings preference.
   const defaultAddr = user?.default_delivery_address;
@@ -154,9 +239,139 @@ export default function Marketplace() {
       />
       <div className="px-4 sm:px-6 pb-10">
 
+      {/* ── FILTER BAR ─────────────────────────────────────────────── */}
+      <div className="mt-4 border border-slate-200 bg-white" data-testid="marketplace-filters">
+        {/* Row 1: Search + primary actions */}
+        <div className="flex flex-wrap items-center gap-2 p-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              placeholder="Search listings…"
+              className="pl-9"
+              data-testid="marketplace-filter-search"
+            />
+          </div>
+          <Select value={filters.sort} onValueChange={(v) => setFilters((f) => ({ ...f, sort: v }))}>
+            <SelectTrigger className="w-[170px]" data-testid="marketplace-filter-sort">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="price_asc">Price ↑</SelectItem>
+              <SelectItem value="price_desc">Price ↓</SelectItem>
+              <SelectItem value="distance" disabled={!buyerCoords}>Nearest first{!buyerCoords ? " (set location)" : ""}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters((v) => !v)}
+            className="rounded-none"
+            data-testid="marketplace-filter-toggle"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
+            {showFilters ? "Hide filters" : "More filters"}
+            {activeFilterCount > 0 && (
+              <span className="ml-2 bg-teal-700 text-white text-[10px] font-mono px-1.5 py-0.5">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+          {activeFilterCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={resetFilters} data-testid="marketplace-filter-reset" className="text-xs text-slate-500">
+              <X className="w-3 h-3 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Row 2: expandable filter grid */}
+        {showFilters && (
+          <div className="border-t border-slate-200 p-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div>
+              <Label className="overline text-[10px]">Category</Label>
+              <Select value={filters.category} onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}>
+                <SelectTrigger className="mt-1" data-testid="marketplace-filter-category"><SelectValue placeholder="Any" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {MARKETPLACE_CATEGORY_OPTIONS.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="overline text-[10px]">Min price</Label>
+              <Input
+                type="number"
+                min="0"
+                value={filters.minPrice}
+                onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
+                placeholder="$0"
+                className="mt-1"
+                data-testid="marketplace-filter-min-price"
+              />
+            </div>
+            <div>
+              <Label className="overline text-[10px]">Max price</Label>
+              <Input
+                type="number"
+                min="0"
+                value={filters.maxPrice}
+                onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
+                placeholder="$∞"
+                className="mt-1"
+                data-testid="marketplace-filter-max-price"
+              />
+            </div>
+            <div>
+              <Label className="overline text-[10px]">Within</Label>
+              <Select value={filters.radius} onValueChange={(v) => setFilters((f) => ({ ...f, radius: v }))} disabled={!buyerCoords}>
+                <SelectTrigger className="mt-1" data-testid="marketplace-filter-radius">
+                  <SelectValue placeholder={buyerCoords ? "Any distance" : "Set location"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any distance</SelectItem>
+                  <SelectItem value="5">5 mi</SelectItem>
+                  <SelectItem value="10">10 mi</SelectItem>
+                  <SelectItem value="25">25 mi</SelectItem>
+                  <SelectItem value="50">50 mi</SelectItem>
+                  <SelectItem value="100">100 mi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="overline text-[10px]">Location</Label>
+              {buyerCoords ? (
+                <div className="mt-1 flex items-center gap-1">
+                  <div className="border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs flex-1 truncate flex items-center gap-1" title={buyerCoords.label}>
+                    <MapPin className="w-3 h-3 text-teal-700 flex-shrink-0" />
+                    <span className="truncate">{buyerCoords.label}</span>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setBuyerCoords(null); setFilters((f) => ({ ...f, radius: "any", sort: f.sort === "distance" ? "newest" : f.sort })); }} data-testid="marketplace-filter-clear-location" className="px-2">
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" onClick={useMyLocation} className="mt-1 w-full rounded-none" data-testid="marketplace-filter-use-location">
+                  <MapPin className="w-3.5 h-3.5 mr-1" /> Use my location
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Result count */}
+        <div className="border-t border-slate-100 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-slate-500 flex justify-between" data-testid="marketplace-result-count">
+          <span>{filteredItems.length} of {items.length} listing{items.length === 1 ? "" : "s"}</span>
+          {buyerCoords && filters.sort === "distance" && <span>sorted by distance</span>}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-px bg-slate-200 mt-2 border border-slate-200" data-testid="marketplace-grid">
-        {items.length === 0 && <div className="bg-white p-8 text-sm text-slate-500 col-span-full">No listings yet.</div>}
-        {items.map((it) => {
+        {filteredItems.length === 0 && <div className="bg-white p-8 text-sm text-slate-500 col-span-full">{items.length === 0 ? "No listings yet." : "No listings match your filters."}</div>}
+        {filteredItems.map((it) => {
           const img = it.media_url ? (it.media_url.startsWith("http") ? it.media_url : `${BACKEND_URL}${it.media_url}`) : null;
           return (
             <div key={it.id} className="bg-white flex flex-col" data-testid={`marketplace-item-${it.id}`}>
@@ -173,7 +388,14 @@ export default function Marketplace() {
                   <div className="font-display text-2xl font-bold">${it.price.toFixed(2)}</div>
                   <Button size="sm" onClick={() => openBuy(it)} className="bg-teal-700 hover:bg-teal-800" data-testid={`marketplace-buy-${it.id}`}>Buy</Button>
                 </div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-2">{it.seller_name}</div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-2 flex justify-between">
+                  <span>{it.seller_name}</span>
+                  {it._distance != null && (
+                    <span className="text-teal-700 flex items-center gap-0.5">
+                      <MapPin className="w-2.5 h-2.5" /> {it._distance < 10 ? it._distance.toFixed(1) : Math.round(it._distance)} mi
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           );

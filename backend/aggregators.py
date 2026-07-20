@@ -4,11 +4,17 @@ listings into Lumo's jobs collection so they appear on /map alongside
 native postings.
 
 Sources (all legal, no scraping):
-  • USAJobs.gov — public US federal job API
+  • USAJobs.gov — public US federal job API. Higher rate limits when the
+    optional USAJOBS_API_KEY + USAJOBS_USER_EMAIL env vars are set.
   • Greenhouse Job Board API — every company that uses Greenhouse exposes a
     public, ToS-permitted JSON feed
   • RemoteOK — public JSON feed (https://remoteok.com/api)
   • WeWorkRemotely — public RSS feeds per category
+  • Adzuna — cross-country job aggregator (US/UK/CA/AU + more). Requires
+    ADZUNA_APP_ID + ADZUNA_APP_KEY. Free tier: 1,000 calls/month.
+    https://developer.adzuna.com/
+  • Reed — UK-focused jobs API. Requires REED_API_KEY.
+    https://www.reed.co.uk/developers/jobseeker
 
 Each aggregator returns a list of normalized dicts. The ingest function
 upserts on (source, source_id) so re-runs are idempotent. External jobs
@@ -18,6 +24,7 @@ are stored as on-platform records with `apply_url` set, so the existing
 from __future__ import annotations
 import asyncio
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
@@ -75,12 +82,17 @@ def _now_iso() -> str:
 
 # ── Aggregator: USAJobs ──────────────────────────────────────────────────
 async def fetch_usajobs(per_page: int = 100) -> List[Dict[str, Any]]:
-    """Public US federal jobs. No key required — User-Agent header is enough."""
+    """Public US federal jobs. Works anonymously; if USAJOBS_API_KEY and
+    USAJOBS_USER_EMAIL are set we send them for higher rate limits + richer
+    metadata (recommended for production)."""
     url = "https://data.usajobs.gov/api/search"
     headers = {
-        "User-Agent": USER_AGENT,
+        "User-Agent": os.environ.get("USAJOBS_USER_EMAIL") or USER_AGENT,
         "Host": "data.usajobs.gov",
     }
+    api_key = os.environ.get("USAJOBS_API_KEY")
+    if api_key:
+        headers["Authorization-Key"] = api_key
     params = {"ResultsPerPage": per_page, "Page": 1}
     out: List[Dict[str, Any]] = []
     try:
@@ -257,6 +269,143 @@ async def fetch_wwr() -> List[Dict[str, Any]]:
     return out
 
 
+# ── Aggregator: Adzuna ───────────────────────────────────────────────────
+async def fetch_adzuna(results_per_country: int = 50) -> List[Dict[str, Any]]:
+    """Adzuna — cross-country job aggregator.
+
+    Env vars required (otherwise returns []):
+      • ADZUNA_APP_ID
+      • ADZUNA_APP_KEY
+
+    Optional:
+      • ADZUNA_COUNTRIES — comma-separated country codes to poll. Defaults
+        to 'us,gb,ca'. Full list: us, gb, at, au, br, ca, ch, de, es, fr,
+        in, it, mx, nl, nz, pl, sg, za.
+    """
+    app_id = os.environ.get("ADZUNA_APP_ID")
+    app_key = os.environ.get("ADZUNA_APP_KEY")
+    if not app_id or not app_key:
+        logger.info("Adzuna skipped — ADZUNA_APP_ID / ADZUNA_APP_KEY not set")
+        return []
+    countries = [c.strip() for c in (os.environ.get("ADZUNA_COUNTRIES") or "us,gb,ca").split(",") if c.strip()]
+
+    out: List[Dict[str, Any]] = []
+    async with httpx.AsyncClient(timeout=30, headers={"User-Agent": USER_AGENT}) as client:
+        for cc in countries:
+            url = f"https://api.adzuna.com/v1/api/jobs/{cc}/search/1"
+            params = {
+                "app_id": app_id,
+                "app_key": app_key,
+                "results_per_page": results_per_country,
+                "content-type": "application/json",
+            }
+            try:
+                r = await client.get(url, params=params)
+                r.raise_for_status()
+                data = r.json()
+            except Exception as e:
+                logger.warning(f"Adzuna {cc} fetch failed: {e}")
+                continue
+            for it in (data.get("results") or []):
+                sid = it.get("id")
+                if not sid:
+                    continue
+                title = it.get("title") or "Job"
+                desc = (it.get("description") or "")[:1500]
+                salary_min = float(it.get("salary_min") or 0)
+                salary_max = float(it.get("salary_max") or 0)
+                pay_rate = round((salary_min + salary_max) / 2, 2) if salary_max else salary_min
+                pay_unit = "year"  # Adzuna returns annual salaries by default
+                lat = it.get("latitude")
+                lng = it.get("longitude")
+                loc = it.get("location") or {}
+                address = loc.get("display_name")
+                is_remote = "remote" in title.lower() or "remote" in desc.lower()
+                out.append({
+                    "source": "adzuna",
+                    "source_id": f"{cc}-{sid}",
+                    "title": title,
+                    "description": desc,
+                    "category": _guess_category(title, desc),
+                    "pay_rate": pay_rate,
+                    "pay_unit": pay_unit,
+                    "estimated_units": 1.0,
+                    "employment_type": "w2",
+                    "schedule": (it.get("contract_time") or "").replace("_", " ").title() or "Full-time",
+                    "is_remote": is_remote,
+                    "pickup_location": {
+                        "lat": float(lat) if lat is not None else None,
+                        "lng": float(lng) if lng is not None else None,
+                        "address": address,
+                    } if (lat is not None and lng is not None) else None,
+                    "apply_url": it.get("redirect_url") or "",
+                    "external_employer": ((it.get("company") or {}).get("display_name")) or "Adzuna partner",
+                })
+    return out
+
+
+# ── Aggregator: Reed ─────────────────────────────────────────────────────
+async def fetch_reed(results_to_take: int = 100) -> List[Dict[str, Any]]:
+    """Reed.co.uk — UK-focused jobs API.
+
+    Env vars required (otherwise returns []):
+      • REED_API_KEY
+
+    Optional:
+      • REED_KEYWORDS — comma-separated search terms. Defaults to
+        'driver,cleaner,handyman,delivery,customer,warehouse,admin'.
+    """
+    api_key = os.environ.get("REED_API_KEY")
+    if not api_key:
+        logger.info("Reed skipped — REED_API_KEY not set")
+        return []
+    keywords = [k.strip() for k in (os.environ.get("REED_KEYWORDS") or "driver,cleaner,handyman,delivery,customer,warehouse,admin").split(",") if k.strip()]
+
+    out: List[Dict[str, Any]] = []
+    async with httpx.AsyncClient(timeout=30, headers={"User-Agent": USER_AGENT}, auth=(api_key, "")) as client:
+        for kw in keywords:
+            url = "https://www.reed.co.uk/api/1.0/search"
+            params = {"keywords": kw, "resultsToTake": results_to_take}
+            try:
+                r = await client.get(url, params=params)
+                r.raise_for_status()
+                data = r.json()
+            except Exception as e:
+                logger.warning(f"Reed '{kw}' fetch failed: {e}")
+                continue
+            for it in (data.get("results") or []):
+                sid = it.get("jobId")
+                if sid is None:
+                    continue
+                title = it.get("jobTitle") or "Role"
+                desc = (it.get("jobDescription") or "")[:1500]
+                # Reed returns min/max annual GBP.
+                mn = float(it.get("minimumSalary") or 0)
+                mx = float(it.get("maximumSalary") or 0)
+                pay_rate = round((mn + mx) / 2, 2) if mx else mn
+                address = it.get("locationName")
+                is_remote = bool(address and "remote" in address.lower())
+                out.append({
+                    "source": "reed",
+                    "source_id": str(sid),
+                    "title": title,
+                    "description": desc,
+                    "category": _guess_category(title, desc),
+                    "pay_rate": pay_rate,
+                    "pay_unit": "year",
+                    "estimated_units": 1.0,
+                    "employment_type": "w2",
+                    "schedule": "Full-time" if it.get("fullTime") else "Part-time",
+                    "is_remote": is_remote,
+                    "pickup_location": {"lat": None, "lng": None, "address": address} if address else None,
+                    "apply_url": it.get("jobUrl") or "",
+                    "external_employer": it.get("employerName") or "Reed partner",
+                })
+    return out
+
+
+
+
 def _xml_tag(block: str, tag: str) -> Optional[str]:
     m = re.search(rf"<{tag}>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</{tag}>", block, re.S)
     if not m:
@@ -283,6 +432,10 @@ async def ingest_aggregated_jobs(db) -> Dict[str, int]:
         sources["remoteok"] = await fetch_remoteok()
     if enabled.get("wwr", True):
         sources["wwr"] = await fetch_wwr()
+    if enabled.get("adzuna", True):
+        sources["adzuna"] = await fetch_adzuna()
+    if enabled.get("reed", True):
+        sources["reed"] = await fetch_reed()
 
     counts: Dict[str, int] = {}
     for source, items in sources.items():

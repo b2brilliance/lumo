@@ -9,6 +9,7 @@ import NavBar from "@/components/NavBar";
 import MobileTabBar from "@/components/MobileTabBar";
 import CacheBuster from "@/components/CacheBuster";
 import RefCapture from "@/components/RefCapture";
+import ScrollToTop from "@/components/ScrollToTop";
 import {
   HowItWorks, ForProviders, ForCustomers, Apply,
   ProviderCity, ProviderCityIndex, CareersCategory, CareersIndex,
@@ -98,6 +99,7 @@ function App() {
           <AuthProvider>
             <CartProvider>
               <NavBar />
+              <ScrollToTop />
               <RefCapture />
               <NotificationsBridge />
               <AutoTranslator />
