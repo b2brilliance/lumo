@@ -7,6 +7,48 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ExternalLink, Plus, Save, Trash2, RefreshCw, KeyRound, BarChart3 } from "lucide-react";
 
+/* Shared network catalogue — used by SettingsForm (to group tracking-ID
+ * inputs) and SignupGuide (checklist view). Order = display order. Keys
+ * marked in RECOMMENDED_NETWORKS get a "start here" badge. */
+const RECOMMENDED_NETWORKS = new Set([
+  "Skimlinks", "Amazon Associates", "Impact (impact.com)", "CJ Affiliate", "FlexOffers",
+]);
+const NETWORKS = [
+  { name: "Amazon Associates",    url: "https://affiliate-program.amazon.com/",                     keys: ["amazon_tag"], note: "Add your site (golumo.app). Approval after first sale. Tag looks like 'yourname-20'." },
+  { name: "Skimlinks",            url: "https://skimlinks.com/publishers/",                        keys: ["skimlinks_publisher_id"], note: "Single signup → 60,000+ merchants auto-monetized. Highest leverage. Approve in ~24h." },
+  { name: "Rakuten Advertising",  url: "https://rakutenadvertising.com/affiliate-publishers/",     keys: ["rakuten_ref"], note: "Apply to merchant programs individually after approval. ~3–7 days." },
+  { name: "Impact (impact.com)",  url: "https://impact.com/partnerships/affiliate-marketing/",     keys: ["impact_publisher_id", "impact_click_id"], note: "Network used by Walmart, Target, Best Buy, Lemonade, Stride, Better, HomeLight, Carvana." },
+  { name: "CJ Affiliate",         url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Used by Wayfair, GrubHub, Hippo, Credit Karma, Namecheap. Approval ~5 days." },
+  { name: "FlexOffers",           url: "https://publisher.flexoffers.com/signup/?Refid=lumo",      keys: ["flexoffers_id"], note: "Capital One Auto, Discover, Rocket Mortgage. Fast approval." },
+  { name: "Awin",                 url: "https://www.awin.com/us/publishers",                       keys: ["awin_id"], note: "Etsy, Amex (some regions), many UK / EU brands. $5 deposit refunded after first earn." },
+  { name: "eBay Partner Network", url: "https://partnernetwork.ebay.com/",                         keys: ["ebay_campid"], note: "Direct signup. Up to 6% per item, paid monthly." },
+  { name: "Booking.com Partner",  url: "https://www.booking.com/affiliate-program/v2/index.html",  keys: ["booking_aid"], note: "Earn up to 4% per completed stay. AID number in your dashboard." },
+  { name: "Expedia Group",        url: "https://www.expediagroup.com/affiliate-program",           keys: ["expedia_siteid", "expedia_camref"], note: "Covers Expedia, Hotels.com, Vrbo. Site ID + camref." },
+  { name: "Viator Affiliates",    url: "https://www.partner.viator.com/en/affiliate-network/",     keys: ["viator_pid"], note: "8% on every tour. Strong for city hubs." },
+  { name: "GetYourGuide",         url: "https://partner.getyourguide.com/",                        keys: ["gyg_pid"], note: "8% on attraction bookings." },
+  { name: "Skyscanner",           url: "https://www.partners.skyscanner.net/affiliates",           keys: ["skyscanner_aid"], note: "Pays per click-out to airline. Best for travel pages." },
+  { name: "Kayak Affiliate",      url: "https://www.kayak.com/about/affiliates",                   keys: ["kayak_aid"], note: "Click + booking commission. Apply with Kayak directly." },
+  { name: "Agoda Partners",       url: "https://partners.agoda.com/",                              keys: ["agoda_cid"], note: "Best for Asia travel hubs (Tokyo, Singapore, Bangkok)." },
+  { name: "SafetyWing",           url: "https://safetywing.com/affiliate-program",                 keys: ["safetywing_ref"], note: "Nomad health + travel insurance. 10% recurring commission." },
+  { name: "Turo Host Referral",   url: "https://turo.com/us/en/become-a-host",                     keys: ["turo_ref"], note: "$25 per host signup. Grab your unique link from your host dashboard." },
+  { name: "Chime Refer-a-Friend", url: "https://www.chime.com/refer-a-friend/",                    keys: ["chime_ref"], note: "Sign up for Chime first → grab personal referral code → $100 per direct-deposit signup." },
+  { name: "EarnIn",               url: "https://www.earnin.com/",                                  keys: ["earnin_ref"], note: "Open account → refer-a-friend → link code goes into earnin_ref." },
+  { name: "SoFi Money",           url: "https://www.sofi.com/refer/money/",                        keys: ["sofi_ref"], note: "$75–$300 per referral. Code from your SoFi account." },
+  { name: "Robinhood Free Stock", url: "https://robinhood.com/referral",                           keys: ["robinhood_ref"], note: "Both you + invitee get a free stock. Code from Robinhood app." },
+  { name: "Coinbase Affiliate",   url: "https://www.coinbase.com/affiliates",                      keys: ["coinbase_ref"], note: "50% of trading fees from each referral for 3 months." },
+  { name: "Wise (TransferWise)",  url: "https://wise.com/invite",                                  keys: ["wise_ref"], note: "Free £50/3 referrals. Code from Wise dashboard." },
+  { name: "DoorDash Dasher Refer", url: "https://dasher.doordash.com/en-us/refer",                 keys: ["doordash_ref"], note: "Become a Dasher first → unique referral link → up to $300 per referral." },
+  { name: "Uber Drive Refer",     url: "https://www.uber.com/us/en/drive/",                        keys: ["uber_ref"], note: "Uber/Uber Eats unified referral. Code is in your driver dashboard." },
+  { name: "Instacart Shopper",    url: "https://shoppers.instacart.com/",                          keys: ["instacart_ref"], note: "Refer new shoppers → $50–$200 bonus." },
+  { name: "Shopify Partners",     url: "https://www.shopify.com/partners",                         keys: ["shopify_ref"], note: "$150 per merchant referral. Apply for partner account." },
+  { name: "Square Referrals",     url: "https://squareup.com/us/en/referrals",                     keys: ["square_ref"], note: "$100 per business referred." },
+  { name: "Fiverr Affiliates",    url: "https://affiliates.fiverr.com/",                           keys: ["fiverr_oid"], note: "Up to $150 per first-time buyer." },
+  { name: "Namecheap Affiliates", url: "https://www.namecheap.com/affiliates/",                    keys: ["namecheap_affid"], note: "Up to 35% on hosting plans." },
+  { name: "Discover Refer",       url: "https://www.discover.com/credit-cards/refer-a-friend",     keys: ["discover_ref"], note: "Existing cardholders only. Refer for cashback bonus." },
+  { name: "Chase Cards (CardRatings)", url: "https://www.cardratings.com/affiliates.html",         keys: ["chase_cell"], note: "Apply with CardRatings to promote Chase cards." },
+  { name: "Amex Refer-a-Friend",  url: "https://www.americanexpress.com/en-us/business/loyalty/referrals/", keys: ["amex_ref"], note: "Existing Amex cardholders only — refer friends for points." },
+];
+
 /* AffiliatesTab — admin UI for affiliate offers + tracking-ID settings +
  * click analytics. Mounted inside <AdminConsole/>.                       */
 export default function AffiliatesTab() {
@@ -201,8 +243,8 @@ function SettingsForm() {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Collect every placeholder used across all offers, so the form
-  // automatically lists the IDs the admin still needs to provide.
+  // Every placeholder actually used across offers, so we don't hide any
+  // orphan keys the network catalog doesn't cover.
   const [placeholders, setPlaceholders] = useState([]);
 
   useEffect(() => {
@@ -213,7 +255,6 @@ function SettingsForm() {
           api.get("/admin/affiliates/offers"),
         ]);
         setKeys(s.keys || {});
-        // Discover all unique placeholders the offers reference.
         const all = new Set();
         (o.offers || []).forEach((off) => {
           const matches = (off.url_template || "").match(/\{([a-zA-Z0-9_]+)\}/g) || [];
@@ -237,32 +278,127 @@ function SettingsForm() {
 
   if (loading) return <div className="text-slate-500 font-mono text-sm py-12">Loading…</div>;
 
+  // Build the network → keys map, dropping networks whose keys aren't used
+  // by any offer (so we don't show dead fields), and computing per-network
+  // fill status for the progress badge.
+  const knownKeys = new Set();
+  const groupedNetworks = NETWORKS
+    .map((n) => {
+      const relevantKeys = n.keys.filter((k) => placeholders.includes(k));
+      relevantKeys.forEach((k) => knownKeys.add(k));
+      return { ...n, relevantKeys };
+    })
+    .filter((n) => n.relevantKeys.length > 0);
+  const orphanKeys = placeholders.filter((p) => !knownKeys.has(p));
+
+  const totalKeys = placeholders.length;
+  const filledKeys = placeholders.filter((k) => (keys[k] || "").trim().length > 0).length;
+
   return (
-    <div className="space-y-4" data-testid="affiliates-settings">
-      <div className="flex items-center gap-2">
-        <KeyRound className="w-4 h-4 text-teal-700" />
-        <h3 className="font-display text-xl font-black tracking-tighter flex-1">Tracking IDs ({placeholders.length} placeholders)</h3>
-        <Button size="sm" onClick={save} data-testid="affiliates-settings-save"><Save className="w-3.5 h-3.5 mr-1" />Save</Button>
+    <div className="space-y-6" data-testid="affiliates-settings">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <KeyRound className="w-4 h-4 text-teal-700" />
+          <h3 className="font-display text-xl font-black tracking-tighter">Tracking IDs</h3>
+          <span className="text-[10px] font-mono uppercase tracking-widest border border-slate-200 bg-slate-50 text-slate-700 px-2 py-0.5" data-testid="affiliates-settings-progress">
+            {filledKeys} / {totalKeys} filled
+          </span>
+        </div>
+        <Button size="sm" onClick={save} data-testid="affiliates-settings-save" className="bg-slate-900 hover:bg-slate-800">
+          <Save className="w-3.5 h-3.5 mr-1" /> Save all
+        </Button>
       </div>
-      <p className="text-xs text-slate-500">
-        Paste each affiliate-network ID exactly as the network shows it. Empty fields are fine — the link will still work, just without your tracking attached. See the &quot;Signup guide&quot; tab for where to get each one.
+      <p className="text-xs text-slate-500 max-w-3xl leading-relaxed">
+        Sign up for each affiliate network (link next to each block), then paste the ID they give you into the matching input below. Empty fields are safe — the outbound link still works, you just won&apos;t earn commission until the ID is filled in. Save any time; you can come back and edit later.
       </p>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {placeholders.map((p) => (
-          <div key={p}>
-            <Label>{p}</Label>
-            <Input
-              value={keys[p] || ""}
-              onChange={(e) => setKeys({ ...keys, [p]: e.target.value })}
-              placeholder={`Your ${p}`}
-              data-testid={`affiliates-key-${p}`}
-            />
+
+      <div className="border border-slate-200 divide-y divide-slate-100">
+        {groupedNetworks.map((n) => {
+          const nFilled = n.relevantKeys.filter((k) => (keys[k] || "").trim().length > 0).length;
+          const nDone = nFilled === n.relevantKeys.length;
+          return (
+            <div key={n.name} className="p-4" data-testid={`affiliates-network-${n.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}>
+              <div className="flex items-start flex-wrap gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-display font-bold">{n.name}</span>
+                    {RECOMMENDED_NETWORKS.has(n.name) && (
+                      <span className="text-[9px] font-mono uppercase tracking-widest bg-teal-100 text-teal-800 border border-teal-200 px-1.5 py-0.5">
+                        Start here
+                      </span>
+                    )}
+                    <span className={`text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border ${nDone ? "bg-teal-50 text-teal-700 border-teal-200" : "bg-amber-50 text-amber-800 border-amber-200"}`}>
+                      {nFilled}/{n.relevantKeys.length}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{n.note}</p>
+                </div>
+                <a
+                  href={n.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider border border-slate-300 bg-white text-slate-700 px-3 py-1.5 hover:border-teal-700 hover:text-teal-700 flex-shrink-0"
+                  data-testid={`affiliates-network-signup-${n.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
+                >
+                  Sign up <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="mt-3 grid sm:grid-cols-2 gap-3">
+                {n.relevantKeys.map((k) => (
+                  <div key={k}>
+                    <Label className="text-[10px] font-mono uppercase tracking-widest text-slate-500">{k}</Label>
+                    <Input
+                      value={keys[k] || ""}
+                      onChange={(e) => setKeys({ ...keys, [k]: e.target.value })}
+                      placeholder={`Paste your ${k} here`}
+                      data-testid={`affiliates-key-${k}`}
+                      className="mt-1 font-mono text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {orphanKeys.length > 0 && (
+          <div className="p-4 bg-slate-50" data-testid="affiliates-orphan-keys">
+            <div className="flex items-center gap-2">
+              <span className="font-display font-bold">Other tracking IDs</span>
+              <span className="text-[9px] font-mono uppercase tracking-widest bg-slate-200 text-slate-700 px-1.5 py-0.5">
+                {orphanKeys.length} unmapped
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Placeholders used by custom offers that aren&apos;t tied to a listed network. Paste values manually if you know where they come from.
+            </p>
+            <div className="mt-3 grid sm:grid-cols-2 gap-3">
+              {orphanKeys.map((k) => (
+                <div key={k}>
+                  <Label className="text-[10px] font-mono uppercase tracking-widest text-slate-500">{k}</Label>
+                  <Input
+                    value={keys[k] || ""}
+                    onChange={(e) => setKeys({ ...keys, [k]: e.target.value })}
+                    placeholder={`Your ${k}`}
+                    data-testid={`affiliates-key-${k}`}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
       </div>
+
+      <div className="flex items-center justify-end">
+        <Button size="sm" onClick={save} data-testid="affiliates-settings-save-bottom" className="bg-slate-900 hover:bg-slate-800">
+          <Save className="w-3.5 h-3.5 mr-1" /> Save all tracking IDs
+        </Button>
+      </div>
+
       <details className="text-xs">
-        <summary className="text-slate-400 font-mono uppercase tracking-wider cursor-pointer">Raw JSON</summary>
-        <Textarea rows={6} value={draft} onChange={(e) => { setDraft(e.target.value); try { setKeys(JSON.parse(e.target.value)); } catch { /* still typing */ } }} className="font-mono text-xs" />
+        <summary className="text-slate-400 font-mono uppercase tracking-wider cursor-pointer">Raw JSON (advanced)</summary>
+        <Textarea rows={6} value={draft} onChange={(e) => { setDraft(e.target.value); try { setKeys(JSON.parse(e.target.value)); } catch { /* still typing */ } }} className="font-mono text-xs mt-2" />
       </details>
     </div>
   );
@@ -306,41 +442,10 @@ function ClicksAnalytics() {
 }
 
 function SignupGuide() {
-  const networks = [
-    { name: "Amazon Associates",    url: "https://affiliate-program.amazon.com/",                     keys: ["amazon_tag"], note: "Add your site (golumo.app). Approval after first sale. Tag looks like 'yourname-20'." },
-    { name: "Skimlinks",            url: "https://skimlinks.com/publishers/",                        keys: ["skimlinks_publisher_id"], note: "Single signup → 60,000+ merchants auto-monetized. Highest leverage. Approve in ~24h." },
-    { name: "Rakuten Advertising",  url: "https://rakutenadvertising.com/affiliate-publishers/",     keys: ["rakuten_ref"], note: "Apply to merchant programs individually after approval. ~3–7 days." },
-    { name: "Impact (impact.com)",  url: "https://impact.com/partnerships/affiliate-marketing/",     keys: ["impact_publisher_id", "impact_click_id"], note: "Network used by Walmart, Target, Best Buy, Lemonade, Stride, Better, HomeLight, Carvana." },
-    { name: "CJ Affiliate",         url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Used by Wayfair, GrubHub, Hippo, Credit Karma, Namecheap. Approval ~5 days." },
-    { name: "FlexOffers",           url: "https://publisher.flexoffers.com/signup/?Refid=lumo",      keys: ["flexoffers_id"], note: "Capital One Auto, Discover, Rocket Mortgage. Fast approval." },
-    { name: "Awin",                 url: "https://www.awin.com/us/publishers",                       keys: ["awin_id"], note: "Etsy, Amex (some regions), many UK / EU brands. $5 deposit refunded after first earn." },
-    { name: "eBay Partner Network", url: "https://partnernetwork.ebay.com/",                         keys: ["ebay_campid"], note: "Direct signup. Up to 6% per item, paid monthly." },
-    { name: "Booking.com Partner",  url: "https://www.booking.com/affiliate-program/v2/index.html",  keys: ["booking_aid"], note: "Earn up to 4% per completed stay. AID number in your dashboard." },
-    { name: "Expedia Group",        url: "https://www.expediagroup.com/affiliate-program",           keys: ["expedia_siteid", "expedia_camref"], note: "Covers Expedia, Hotels.com, Vrbo. Site ID + camref." },
-    { name: "Viator Affiliates",    url: "https://www.partner.viator.com/en/affiliate-network/",     keys: ["viator_pid"], note: "8% on every tour. Strong for city hubs." },
-    { name: "GetYourGuide",         url: "https://partner.getyourguide.com/",                        keys: ["gyg_pid"], note: "8% on attraction bookings." },
-    { name: "Skyscanner",           url: "https://www.partners.skyscanner.net/affiliates",           keys: ["skyscanner_aid"], note: "Pays per click-out to airline. Best for travel pages." },
-    { name: "Kayak Affiliate",      url: "https://www.kayak.com/about/affiliates",                   keys: ["kayak_aid"], note: "Click + booking commission. Apply with Kayak directly." },
-    { name: "Agoda Partners",       url: "https://partners.agoda.com/",                              keys: ["agoda_cid"], note: "Best for Asia travel hubs (Tokyo, Singapore, Bangkok)." },
-    { name: "Carvana (Impact)",     url: "https://app.impact.com/campaign-mediapartner-signup/Carvana.brand",       keys: ["impact_click_id", "impact_publisher_id"], note: "Apply via Impact. CarMax, Best Buy and Walmart use the same Impact infra." },
-    { name: "Turo Host Referral",   url: "https://turo.com/us/en/become-a-host",                     keys: ["turo_ref"], note: "$25 per host signup. Grab your unique link from your host dashboard." },
-    { name: "Chime Refer-a-Friend", url: "https://www.chime.com/refer-a-friend/",                    keys: ["chime_ref"], note: "Sign up for Chime first → grab personal referral code → $100 per direct-deposit signup." },
-    { name: "EarnIn",               url: "https://www.earnin.com/",                                  keys: ["earnin_ref"], note: "Open account → refer-a-friend → link code goes into earnin_ref." },
-    { name: "SoFi Money",           url: "https://www.sofi.com/refer/money/",                        keys: ["sofi_ref"], note: "$75–$300 per referral. Code from your SoFi account." },
-    { name: "Robinhood Free Stock", url: "https://robinhood.com/referral",                           keys: ["robinhood_ref"], note: "Both you + invitee get a free stock. Code from Robinhood app." },
-    { name: "Coinbase Affiliate",   url: "https://www.coinbase.com/affiliates",                      keys: ["coinbase_ref"], note: "50% of trading fees from each referral for 3 months." },
-    { name: "Wise (TransferWise)",  url: "https://wise.com/invite",                                  keys: ["wise_ref"], note: "Free £50/3 referrals. Code from Wise dashboard." },
-    { name: "DoorDash Dasher Refer", url: "https://dasher.doordash.com/en-us/refer",                 keys: ["doordash_ref"], note: "Become a Dasher first → unique referral link → up to $300 per referral." },
-    { name: "Uber Drive Refer",     url: "https://www.uber.com/us/en/drive/",                        keys: ["uber_ref"], note: "Uber/Uber Eats unified referral. Code is in your driver dashboard." },
-    { name: "Instacart Shopper",    url: "https://shoppers.instacart.com/",                          keys: ["instacart_ref"], note: "Refer new shoppers → $50–$200 bonus." },
-    { name: "Shopify Partners",     url: "https://www.shopify.com/partners",                         keys: ["shopify_ref"], note: "$150 per merchant referral. Apply for partner account." },
-    { name: "Square Referrals",     url: "https://squareup.com/us/en/referrals",                     keys: ["square_ref"], note: "$100 per business referred." },
-    { name: "Fiverr Affiliates",    url: "https://affiliates.fiverr.com/",                           keys: ["fiverr_oid"], note: "Up to $150 per first-time buyer." },
-    { name: "Namecheap Affiliates", url: "https://www.namecheap.com/affiliates/",                    keys: ["namecheap_affid"], note: "Up to 35% on hosting plans." },
-    { name: "Discover Refer",       url: "https://www.discover.com/credit-cards/refer-a-friend",     keys: ["discover_ref"], note: "Existing cardholders only. Refer for cashback bonus." },
-    { name: "Chase Cards (CardRatings)", url: "https://www.cardratings.com/affiliates.html",         keys: ["chase_cell"], note: "Apply with CardRatings to promote Chase cards." },
-    { name: "Amex Refer-a-Friend",  url: "https://www.americanexpress.com/en-us/business/loyalty/referrals/", keys: ["amex_ref"], note: "Existing Amex cardholders only — refer friends for points." },
-    // ── INSURANCE NETWORKS ─────────────────────────────────────────────
+  // Insurance-specific networks aren't in the shared NETWORKS list because
+  // their keys are already covered by parent networks (Impact / CJ / FlexOffers).
+  // We surface them here for onboarding context only.
+  const insuranceExtras = [
     { name: "Progressive (CJ)",     url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Auto insurance — high-volume, pays per completed quote. CJ network." },
     { name: "GEICO (CJ)",           url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Auto + rideshare insurance. Apply via CJ Affiliate." },
     { name: "Root Insurance (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/Root-Insurance.brand", keys: ["impact_click_id"], note: "Pay-by-driving auto insurance. Impact network." },
@@ -356,8 +461,8 @@ function SignupGuide() {
     { name: "Trupanion (CJ)",       url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Pet health insurance with direct pay at vet's office." },
     { name: "Hippo Home (CJ)",      url: "https://signup.cj.com/member/signup/publisher/",           keys: ["cj_pid", "cj_aid"], note: "Modern home-insurance quotes in 60 seconds." },
     { name: "World Nomads (Impact)", url: "https://app.impact.com/campaign-mediapartner-signup/World-Nomads.brand",   keys: ["impact_click_id"], note: "Travel + adventure-sports insurance — strong for travel pages." },
-    { name: "SafetyWing",           url: "https://safetywing.com/affiliate-program",                 keys: ["safetywing_ref"], note: "Nomad health + travel insurance. 10% recurring commission." },
   ];
+  const networks = [...NETWORKS, ...insuranceExtras];
 
   return (
     <div className="space-y-4" data-testid="affiliates-guide">
