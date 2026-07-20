@@ -8,22 +8,77 @@ import PageHero from "@/components/PageHero";
 import { useLocale } from "@/lib/locale";
 
 const SECTIONS = [
-  { key: "stores",       label: "Stores",          icon: Store,           color: "#2563eb" },
-  { key: "restaurants",  label: "Restaurants",     icon: UtensilsCrossed, color: "#dc2626" },
-  { key: "rentals",      label: "Rentals",         icon: KeyRound,        color: "#7c3aed" },
-  { key: "autos",        label: "Auto Sales",      icon: Car,             color: "#059669" },
-  { key: "marketplace",  label: "Community Market", icon: ShoppingBag,    color: "#d97706" },
+  { key: "stores",       label: "Stores",          icon: Store,           color: "#2563eb",
+    hero: {
+      title: "Local stores, one click away.",
+      subtitle: "Retailers on Lumo — browse inventory, arrange delivery, and check reviews. Only stores here; rentals, cars and community listings each have their own page.",
+      image: "https://images.pexels.com/photos/1005638/pexels-photo-1005638.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    },
+    emptyLabel: "Nothing in Stores matches",
+    emptyEmpty: "No stores in this area yet.",
+  },
+  { key: "restaurants",  label: "Restaurants",     icon: UtensilsCrossed, color: "#dc2626",
+    hero: {
+      title: "Order from restaurants near you.",
+      subtitle: "Local restaurants with delivery on Lumo. Only restaurants here — everything else has its own dedicated page.",
+      image: "https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    },
+    emptyLabel: "Nothing in Restaurants matches",
+    emptyEmpty: "No restaurants in this area yet.",
+  },
+  { key: "rentals",      label: "Rentals",         icon: KeyRound,        color: "#7c3aed",
+    hero: {
+      title: "Rent anything, hosted by people you can meet.",
+      subtitle: "Homes, cars, venues, gear and more. Each host runs their own listing.",
+      image: "https://images.pexels.com/photos/2467287/pexels-photo-2467287.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    },
+    emptyLabel: "No rentals match",
+    emptyEmpty: "No rentals live yet.",
+  },
+  { key: "autos",        label: "Auto Sales",      icon: Car,             color: "#059669",
+    hero: {
+      title: "Cars, trucks and EVs from Lumo sellers.",
+      subtitle: "Only vehicles for sale — full VIN, mileage and history. Rentals live on the Rentals page.",
+      image: "https://images.pexels.com/photos/193021/pexels-photo-193021.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    },
+    emptyLabel: "No vehicles match",
+    emptyEmpty: "No vehicles listed yet.",
+  },
+  { key: "marketplace",  label: "Community Market", icon: ShoppingBag,    color: "#d97706",
+    hero: {
+      title: "From your neighbors.",
+      subtitle: "Personal goods listed by locals — furniture, electronics, tools and more.",
+      image: "https://images.pexels.com/photos/2467287/pexels-photo-2467287.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    },
+    emptyLabel: "No listings match",
+    emptyEmpty: "No community listings yet.",
+  },
 ];
 
-export default function Directory({ role }) {
-  // Default selected section when arriving via /stores or /restaurants
-  const initialSection = role === "restaurant" ? "restaurants" : "stores";
-  const [active, setActive] = useState(initialSection);
+export default function Directory({ role, section, mode = "single" }) {
+  // Section resolution:
+  //   • Explicit `section` prop wins (e.g. <Directory section="autos" />).
+  //   • Otherwise map `role` (legacy) → section.
+  //   • Fallback to "stores".
+  const roleToSection = { retailer: "stores", restaurant: "restaurants" };
+  const forcedSection = section || (role ? roleToSection[role] : null);
+
+  // mode="single"  → lock to one section, hide section pills, use section-specific hero
+  // mode="unified" → all sections + pills, cross-marketplace search hub
+  const isUnified = mode === "unified" && !forcedSection;
+
+  const [active, setActive] = useState(forcedSection || "stores");
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const { formatPrice } = useLocale();
+
+  // Locked pages ignore attempts to change the active section (prevents e.g. a
+  // stray URL param from switching /stores into rentals).
+  useEffect(() => {
+    if (forcedSection && active !== forcedSection) setActive(forcedSection);
+  }, [forcedSection, active]);
 
   // Debounce the search input by 250ms
   useEffect(() => {
@@ -34,12 +89,14 @@ export default function Directory({ role }) {
   // Fetch unified search results whenever the active section or query changes
   useEffect(() => {
     setLoading(true);
-    const types = active === "all" ? SECTIONS.map((s) => s.key).join(",") : active;
+    const types = isUnified && active === "all"
+      ? SECTIONS.map((s) => s.key).join(",")
+      : active;
     api.get(`/search/marketplaces?q=${encodeURIComponent(debouncedQ)}&types=${types}&limit=40`)
       .then(({ data }) => setResults(Array.isArray(data) ? data : []))
       .catch(() => setResults([]))
       .finally(() => setLoading(false));
-  }, [active, debouncedQ]);
+  }, [active, debouncedQ, isUnified]);
 
   const grouped = useMemo(() => {
     const byType = {};
@@ -51,13 +108,23 @@ export default function Directory({ role }) {
     return byType;
   }, [results]);
 
+  const activeSection = SECTIONS.find((s) => s.key === active) || SECTIONS[0];
+  const hero = isUnified
+    ? {
+        title: "Find anything local.",
+        subtitle: "One search across every marketplace on Lumo — stores, restaurants, rentals, cars for sale, and community listings from your neighbors.",
+        image: "https://images.pexels.com/photos/2467287/pexels-photo-2467287.jpeg?auto=compress&cs=tinysrgb&w=1600",
+      }
+    : activeSection.hero;
+  const overline = isUnified ? "Marketplaces" : activeSection.label;
+
   return (
-    <div className="max-w-screen-2xl mx-auto py-0" data-testid="marketplace-directory">
+    <div className="max-w-screen-2xl mx-auto py-0" data-testid={`marketplace-directory-${active}`}>
       <PageHero
-        image="https://images.pexels.com/photos/2467287/pexels-photo-2467287.jpeg?auto=compress&cs=tinysrgb&w=1600"
-        overline="Marketplaces"
-        title="Find anything local."
-        subtitle="One search across every marketplace on Lumo — stores, restaurants, rentals, cars for sale, and community listings from your neighbors."
+        image={hero.image}
+        overline={overline}
+        title={hero.title}
+        subtitle={hero.subtitle}
       />
       <div className="px-4 sm:px-6 pb-10">
 
@@ -66,7 +133,7 @@ export default function Directory({ role }) {
         <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         <input
           type="search"
-          placeholder="Search stores, food, rentals, cars, marketplace…"
+          placeholder={isUnified ? "Search stores, food, rentals, cars, marketplace…" : `Search ${activeSection.label.toLowerCase()}…`}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="w-full pl-11 pr-10 py-3 border border-slate-300 bg-white font-mono text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
@@ -84,41 +151,68 @@ export default function Directory({ role }) {
         )}
       </div>
 
-      {/* Section filter pills */}
-      <div className="mt-5 flex items-center gap-2 flex-wrap" data-testid="marketplace-section-pills">
-        <button
-          type="button"
-          onClick={() => setActive("all")}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 border font-mono text-sm transition-colors ${
-            active === "all"
-              ? "bg-slate-900 text-white border-slate-900"
-              : "bg-white text-slate-700 border-slate-300 hover:border-slate-900"
-          }`}
-          data-testid="section-pill-all"
-        >
-          <span className="font-bold uppercase tracking-wider text-[11px]">All</span>
-        </button>
-        {SECTIONS.map((s) => {
-          const Icon = s.icon;
-          const isActive = active === s.key;
-          return (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setActive(s.key)}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 border font-mono text-sm transition-colors ${
-                isActive
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-300 hover:border-slate-900"
-              }`}
-              data-testid={`section-pill-${s.key}`}
-            >
-              <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "#fff" : s.color }} />
-              <span className="font-bold uppercase tracking-wider text-[11px]">{s.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Section filter pills — only in unified mode. Dedicated pages hide
+       * these to enforce single-marketplace focus. */}
+      {isUnified && (
+        <div className="mt-5 flex items-center gap-2 flex-wrap" data-testid="marketplace-section-pills">
+          <button
+            type="button"
+            onClick={() => setActive("all")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 border font-mono text-sm transition-colors ${
+              active === "all"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-300 hover:border-slate-900"
+            }`}
+            data-testid="section-pill-all"
+          >
+            <span className="font-bold uppercase tracking-wider text-[11px]">All</span>
+          </button>
+          {SECTIONS.map((s) => {
+            const Icon = s.icon;
+            const isActive = active === s.key;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setActive(s.key)}
+                className={`inline-flex items-center gap-2 px-3.5 py-2 border font-mono text-sm transition-colors ${
+                  isActive
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-300 hover:border-slate-900"
+                }`}
+                data-testid={`section-pill-${s.key}`}
+              >
+                <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "#fff" : s.color }} />
+                <span className="font-bold uppercase tracking-wider text-[11px]">{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Sister-page hints — only on dedicated single-section pages.
+       * Reassures visitors we didn't lose their other categories, we just
+       * moved them to their own URLs. */}
+      {!isUnified && (
+        <div className="mt-5 flex items-center gap-2 flex-wrap text-xs text-slate-500" data-testid="sister-marketplace-links">
+          <span className="font-mono uppercase tracking-widest text-[10px] text-slate-400 mr-1">Also browse:</span>
+          {SECTIONS.filter((s) => s.key !== active).map((s) => {
+            const Icon = s.icon;
+            const paths = { stores: "/stores", restaurants: "/restaurants", rentals: "/rentals", autos: "/autos", marketplace: "/marketplace" };
+            return (
+              <Link
+                key={s.key}
+                to={paths[s.key]}
+                className="inline-flex items-center gap-1.5 border border-slate-200 bg-white px-2.5 py-1 hover:border-slate-900"
+                data-testid={`sister-link-${s.key}`}
+              >
+                <Icon className="w-3 h-3" style={{ color: s.color }} />
+                <span className="font-mono uppercase tracking-widest text-[10px]">{s.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       {/* Results */}
       <div className="mt-6 text-xs font-mono text-slate-500" data-testid="results-count">
@@ -130,13 +224,13 @@ export default function Directory({ role }) {
       {!loading && results.length === 0 && (
         <div className="mt-6 border border-dashed border-slate-300 p-10 text-center text-slate-500 text-sm" data-testid="marketplace-empty">
           {debouncedQ
-            ? `Nothing matches "${debouncedQ}" in this section. Try the "All" pill or a different keyword.`
-            : "No listings in this section yet."}
+            ? `${isUnified ? "Nothing matches" : activeSection.emptyLabel} "${debouncedQ}".`
+            : (isUnified ? "No listings in this section yet." : activeSection.emptyEmpty)}
         </div>
       )}
 
-      {active === "all" ? (
-        // Grouped by section when "All" is selected
+      {isUnified && active === "all" ? (
+        // Grouped by section when unified + "All" is selected
         SECTIONS.map((s) => {
           const items = grouped[s.key] || [];
           if (items.length === 0) return null;

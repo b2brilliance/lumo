@@ -129,6 +129,7 @@ function App() {
 
             <Route path="/stores" element={<Directory role="retailer" />} />
             <Route path="/restaurants" element={<Directory role="restaurant" />} />
+            <Route path="/marketplaces" element={<Directory mode="unified" />} />
             <Route path="/stores/:id" element={<StoreProfile role="retailer" />} />
             <Route path="/restaurants/:id" element={<StoreProfile role="restaurant" />} />
 
