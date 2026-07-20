@@ -7168,6 +7168,13 @@ def _require_admin():
 
 app.include_router(_create_analytics_router(db=db, require_admin=_require_admin()))
 
+# Admin CRUD — users + unified content management
+from admin_crud import build_admin_crud_router  # noqa: E402
+app.include_router(
+    build_admin_crud_router(get_current_user=get_current_user, require_admin=_require_admin()),
+    prefix="/api",
+)
+
 # Site-wide settings (social media footer)
 from site_settings import create_router as _create_site_router  # noqa: E402
 app.include_router(_create_site_router(db=db, require_admin=_require_admin()))
