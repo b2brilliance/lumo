@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 44 end-to-end verification of the new provider signup dropdown + dynamic qualifications questionnaire + document uploader. Backend: 5/5 pytest cases pass — anonymous JPG upload returns {media_url, media_type, id} and the media is retrievable, text/plain is rejected with 400 'Only images or PDF files are accepted', PDF is accepted, /api/auth/register (role=provider) persists primary_category + qualifications and GET /api/auth/me reflects them, and customer register regression still works. Frontend: every acceptance criterion in the request passes — step 2 avatar upload gates step 3, step 3 opens with the teal-bordered '1. Pick your job type' card + native <select> (data-testid=register-primary-category) containing all 20 provider categories, selecting Delivery renders qual-block-delivery with vehicle_type/years_driving selects, has_dashcam radios and drivers_license/vehicle_insurance/vehicle_registration doc uploaders, uploading a small image via the file input shows the 'Driver's license uploaded' toast + Replace button, switching primary to Auto renders qual-block-auto WITHOUT removing the delivery block, submit is blocked with 'Please complete the required fields and documents… Delivery: Driver's license (front), Vehicle insurance card' when docs are missing, and with all required answers + docs the provider is created and redirected to /provider. Customer regression register (no primary_category, skips step 3 entirely) succeeds and lands on /customer.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter44_provider_qualifications.py",
+    "/app/test_reports/pytest/iter44_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /api/media/upload-provider-doc has NO rate-limit / throttle. Because it's fully anonymous and writes to shared storage, a bad actor can burn quota by looping the endpoint. Consider adding _throttle(request, key='media.upload_anon', limit=30, window_sec=900) similar to the register endpoint.",
+    "server.py /api/media/upload-provider-doc stores files with owner_id='anonymous'. There is no re-association when the user later registers — the media records stay orphaned to a non-user. Consider a follow-up step that (a) claims the media doc on register when its id shows up inside `qualifications`, or (b) at least tags them with the newly created user_id so admin/support can audit them.",
+    "Register.jsx submit gate iterates form.categories but validateQualification is called for every category regardless of whether a schema exists. validateQualification short-circuits with { ok: true } when the schema is missing, so this is correct but wastes work. Non-blocking.",
+    "Register.jsx: switching primary_category to a category that has NO schema (e.g. Financial, which does have one — but hypothetically) would leave orphan qualification data in form.qualifications. The final POST would still send it. Consider filtering form.qualifications to only include categories currently in form.categories at submit time.",
+    "providerQualifications.js line 27 has a typo — YEARS_OPTIONS uses en-dash (–) in labels ('1–2 years') which is fine visually but tests using ASCII '3-5 years' would fail. Consistent — tests must match exactly. Doc-only note.",
+    "QualificationBlock.jsx DocUpload: the hidden <input type='file'> resets e.target.value BEFORE calling upload(f). If upload() throws synchronously the file input is already blank — user cannot immediately retry the same file. Non-blocking but a UX polish opportunity.",
+    "Register.jsx step-3 submit button label 'Pick at least one employment type' correctly gates on employment_types.length, but the validateQualification error is shown INSIDE the submit handler AFTER the button is enabled. Order of validation to the user is slightly confusing (they can't press submit without an emp type, but once they do, they might see a doc error). Consider inlining the qualification-missing summary next to each qual-block for better locality."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter44_provider_qualifications.py (new)",
+    "/app/test_reports/iteration_44.json (new)"
+  ],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% (all acceptance criteria pass)"},
+  "test_credentials": "customer@lumo.test / password123 (regression baseline). Iteration 44 does NOT need admin login — the /media/upload-provider-doc endpoint is intentionally anonymous, and the register flow creates fresh users each test run (test_provider_qual_<hex>@lumo.test and test_ui_provider_<ts>@lumo.test).",
+  "seed_data_creation": "Every test run creates throwaway users prefixed test_provider_qual_ / test_customer_reg_ / test_ui_provider_ / test_ui_customer_ (all @lumo.test). No cleanup fixture because the entries are harmless dev-DB records and the emails are randomised per run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The primary-category dropdown is a NATIVE <select> — use page.select_option('[data-testid=register-primary-category]', '<key>'). QualificationBlock's field-type <Select> IS a shadcn Radix Select — you must click the trigger first, then click get_by_role('option', name='Car', exact=True) because 'Car' would otherwise strict-mode-match 'Van / cargo van' via substring. Doc uploaders expose the hidden file input at '[data-testid=\"qual-doc-<cat>-<doc>\"] input[type=\"file\"]' — set_input_files() there triggers the /api/media/upload-provider-doc call. When testing submit-gate errors, remember step-3 submit is ALSO gated on employment_types.length > 0 (data-testid=register-emp-on_demand); if you don't select one first, the submit button says 'Pick at least one employment type' and won't invoke the qualification validator. To force a validation error, click a required doc's -remove button after uploading, then submit.",
+  "rca of the issue": "N/A — all tests pass."
+}

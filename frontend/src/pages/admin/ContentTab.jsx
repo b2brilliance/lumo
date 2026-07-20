@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Search, Save, Trash2, Package, Home, Car, Store, Briefcase } from "lucide-react";
 import { useLocale } from "@/lib/locale";
@@ -249,7 +249,10 @@ function ContentEditDialog({ type, item, editableFields, onClose, onSaved }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg" data-testid="admin-content-edit-dialog">
-        <DialogHeader><DialogTitle>Edit {TYPE_ICONS[type]?.label?.slice(0, -1) || type}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Edit {TYPE_ICONS[type]?.label?.slice(0, -1) || type}</DialogTitle>
+          <DialogDescription>Only whitelisted fields for this content type can be changed here.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           {editableFields.map((f) => (
             <div key={f}>

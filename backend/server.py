@@ -174,9 +174,11 @@ class UserCreate(BaseModel):
     avatar_url: Optional[str] = None  # Required when role == "provider"
     # Provider-only signup fields (ignored for other roles)
     employment_types: Optional[List[str]] = None  # ['on_demand','staffing','w2','remote']
+    primary_category: Optional[str] = None         # dropdown-chosen main job type
     categories: Optional[List[str]] = None        # top-level category keys
     subcategories: Optional[List[str]] = None     # specific sub-services (hard filter)
     provider_profile: Optional[dict] = None       # {bio, certifications:[], work_history:[]}
+    qualifications: Optional[dict] = None         # { <category_key>: {answers:{}, documents:{}} }
     ref_code: Optional[str] = None                # Referral code — captured from `?ref=XXX` in frontend
 
 class UserLogin(BaseModel):
@@ -591,8 +593,10 @@ async def register(body: UserCreate, request: Request):
         "categories": body.categories or [],
         "storefront": None,
         "employment_types": body.employment_types or [],
+        "primary_category": body.primary_category or None,
         "subcategories": body.subcategories or [],
         "provider_profile": body.provider_profile or None,
+        "qualifications": body.qualifications or {},
         "created_at": now_iso(),
     }
     if referred_by:
@@ -715,6 +719,40 @@ async def upload_avatar_public(file: UploadFile = File(...)):
     }
     await db.media.insert_one(media_doc)
     return {"media_url": f"/api/media/{media_doc['id']}", "media_type": media_type, "id": media_doc["id"]}
+
+@api.post("/media/upload-provider-doc")
+async def upload_provider_doc_public(file: UploadFile = File(...)):
+    """Anonymous document upload for the provider signup flow — used before a
+    JWT exists, so an applicant can attach their driver's license,
+    insurance card, professional cert or a background-check consent PDF as
+    part of the same registration form.
+
+    Limits (kept modest to prevent abuse):
+      • 8 MB per file (accommodates a decent phone photo of a licence)
+      • Accepted mime prefixes: image/* and application/pdf
+    """
+    media_type = file.content_type or "application/octet-stream"
+    if not (media_type.startswith("image/") or media_type == "application/pdf"):
+        raise HTTPException(status_code=400, detail="Only images or PDF files are accepted")
+    data = await file.read()
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (8MB max)")
+    ext = (file.filename or "doc").rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ("pdf" if media_type == "application/pdf" else "jpg")
+    path = f"{APP_NAME}/provider_docs/anon/{uuid.uuid4()}.{ext}"
+    result = put_object(path, data, media_type)
+    media_doc = {
+        "id": str(uuid.uuid4()),
+        "storage_path": result["path"],
+        "media_type": media_type,
+        "size": result.get("size", len(data)),
+        "owner_id": "anonymous",
+        "is_deleted": False,
+        "created_at": now_iso(),
+        "kind": "provider_credential",
+    }
+    await db.media.insert_one(media_doc)
+    return {"media_url": f"/api/media/{media_doc['id']}", "media_type": media_type, "id": media_doc["id"]}
+
 
 @api.get("/media/{media_id}")
 async def get_media(media_id: str):

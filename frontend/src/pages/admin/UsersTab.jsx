@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Search, Save, Trash2, Ban, UserCog, X } from "lucide-react";
 
@@ -165,7 +165,10 @@ function UserEditDialog({ user, onClose, onSaved }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg" data-testid="admin-user-edit-dialog">
-        <DialogHeader><DialogTitle>Edit user</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Edit user</DialogTitle>
+          <DialogDescription>Change the user&apos;s profile, role or wallet. Ban blocks login instantly.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label className="overline text-[10px]">Name</Label>

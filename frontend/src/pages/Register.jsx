@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import AvatarUploader from "@/components/AvatarUploader";
+import QualificationBlock from "@/components/QualificationBlock";
+import { QUALIFICATION_SCHEMAS, validateQualification } from "@/lib/providerQualifications";
 import { toast } from "sonner";
 import {
   User as UserIcon, Briefcase, Store, UtensilsCrossed, ChevronRight, ChevronLeft,
@@ -72,9 +74,11 @@ export default function Register() {
     name: "", email: "", password: "", phone: "",
     avatar_url: null,
     employment_types: [],
+    primary_category: "",  // dropdown-selected primary job type (drives qual UI)
     categories: [],
     subcategories: [],
     provider_profile: { bio: "", certifications: "", work_history: "" },
+    qualifications: {},    // { <category_key>: { answers: {}, documents: {} } }
   });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,6 +92,24 @@ export default function Register() {
 
   const submit = async () => {
     setBusy(true); setErr("");
+    // Provider-specific qualification gate: every selected category with a
+    // schema must have its required fields + required docs filled.
+    if (isProvider) {
+      const missingByCat = [];
+      form.categories.forEach((catKey) => {
+        const v = form.qualifications[catKey] || {};
+        const check = validateQualification(catKey, v.answers, v.documents);
+        if (!check.ok) {
+          const label = PROVIDER_CATEGORIES.find((c) => c.key === catKey)?.label || catKey;
+          missingByCat.push(`${label}: ${check.missing.join(", ")}`);
+        }
+      });
+      if (missingByCat.length) {
+        setErr(`Please complete the required fields and documents before submitting:\n${missingByCat.join("\n")}`);
+        setBusy(false);
+        return;
+      }
+    }
     const payload = {
       role: form.role,
       name: form.name,
@@ -98,9 +120,11 @@ export default function Register() {
     };
     if (isProvider) {
       payload.employment_types = form.employment_types;
+      payload.primary_category = form.primary_category || null;
       payload.categories = form.categories;
       payload.subcategories = form.subcategories;
       payload.provider_profile = form.provider_profile;
+      payload.qualifications = form.qualifications;
     }
     const r = await register(payload);
     setBusy(false);
@@ -229,9 +253,62 @@ export default function Register() {
       {/* ── STEP 3 — Provider details (employment + categories + sub) ─── */}
       {step === 3 && isProvider && (
         <div className="mt-10 space-y-6" data-testid="register-step-details">
+          {/* ── Primary job-type dropdown ─────────────────────────────
+           * Sits at the top of Step 3 so the applicant EXPLICITLY chooses
+           * their main line of work. Selecting a category here:
+           *   1. Adds it to `categories` (so the checklist below is in sync)
+           *   2. Sets `primary_category` (used for search ranking + email tags)
+           *   3. Shows a dedicated qualification block for that category
+           *      immediately underneath, with questions specific to the job. */}
+          <div className="border border-teal-200 bg-teal-50/40 p-4 sm:p-5">
+            <div className="overline text-teal-700 mb-2">1. Pick your job type</div>
+            <Label className="text-sm text-slate-800">What service will you primarily provide? <span className="text-red-600">*</span></Label>
+            <p className="text-xs text-slate-500 mt-1 mb-3">This drives the questions we ask next. You can offer more services below.</p>
+            <select
+              value={form.primary_category}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => {
+                  const cats = v && !f.categories.includes(v) ? [...f.categories, v] : f.categories;
+                  return { ...f, primary_category: v, categories: cats };
+                });
+              }}
+              className="w-full border border-slate-300 bg-white h-11 px-3 font-mono text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
+              data-testid="register-primary-category"
+            >
+              <option value="">— Choose your primary job type —</option>
+              {PROVIDER_CATEGORIES.map((c) => (
+                <option key={c.key} value={c.key}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Category-specific qualification form(s) — one block per selected
+           * category. Primary appears first, others follow in selection order. */}
+          {form.categories.length > 0 && (
+            <div className="space-y-4" data-testid="register-qualification-blocks">
+              {[...(form.primary_category ? [form.primary_category] : []), ...form.categories.filter((c) => c !== form.primary_category)]
+                .filter((catKey, i, arr) => arr.indexOf(catKey) === i)
+                .filter((catKey) => QUALIFICATION_SCHEMAS[catKey])
+                .map((catKey) => {
+                  const cat = PROVIDER_CATEGORIES.find((c) => c.key === catKey);
+                  const schema = QUALIFICATION_SCHEMAS[catKey];
+                  const val = form.qualifications[catKey] || { answers: {}, documents: {} };
+                  return (
+                    <QualificationBlock
+                      key={catKey}
+                      category={{ key: catKey, label: cat?.label || catKey, schema }}
+                      value={val}
+                      onChange={(next) => set("qualifications", { ...form.qualifications, [catKey]: next })}
+                    />
+                  );
+                })}
+            </div>
+          )}
+
           {/* Employment types */}
           <div>
-            <div className="overline mb-3">What kind of work are you open to? <span className="text-red-600">*</span></div>
+            <div className="overline mb-3">2. What kind of work are you open to? <span className="text-red-600">*</span></div>
             <div className="grid sm:grid-cols-2 gap-2">
               {EMP_TYPES.map((e) => {
                 const Icon = e.icon;
@@ -258,8 +335,8 @@ export default function Register() {
 
           {/* Service categories with conditional sub-category checkboxes */}
           <div>
-            <div className="overline mb-3">Which services will you offer?</div>
-            <p className="text-xs text-slate-500 mb-3">Pick the categories you&apos;ll work in. Within each, tick the specific sub-services you&apos;ll accept. <strong>Only jobs matching your picks will appear in your feed.</strong></p>
+            <div className="overline mb-3">3. Add other services (optional)</div>
+            <p className="text-xs text-slate-500 mb-3">Tick the categories you&apos;ll also accept jobs in. For each, drill into the specific sub-services. <strong>Only jobs matching your picks will appear in your feed.</strong></p>
             <div className="border border-slate-200 divide-y divide-slate-100">
               {PROVIDER_CATEGORIES.map((cat) => {
                 const active = form.categories.includes(cat.key);
