@@ -9,6 +9,24 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 43 — Feb 2026
+### Admin CRUD (Users + unified Content)
+- **admin_crud.py (new)**: PATCH /admin/users/{id}, DELETE /admin/users/{id}, GET /admin/content?type={type}, PATCH /admin/content/{type}/{id}, DELETE /admin/content/{type}/{id}, POST /admin/content/bulk-delete, GET /admin/content/types. Whitelisted editable fields per type. Prevents self-deletion of admin account.
+- **UsersTab.jsx (new)**: Search + role filter + edit dialog (name/email/role/wallet/banned) + delete confirm.
+- **ContentTab.jsx (new)**: 5 type pills (listing/inventory/rental/auto/job) + search + status filter + edit dialog (per-type editable fields) + delete + bulk-delete.
+- **AdminConsole.jsx**: added Content tab; replaced legacy read-only UsersAdmin with new UsersTab.
+- Testing: iteration_43 → 100% backend (17/17) + 100% frontend.
+
+## Iteration 44 — Feb 2026 (this session)
+### Category-driven provider signup with qualifications + document upload
+- **providerQualifications.js (new)**: schema catalogue for 20+ categories (delivery, courier, ride-share, towing, cleaning, handyman, auto, landscaping, moving, pet-care, medical, personal-care, digital-tech, marketing, business-admin, education, legal, financial, events, remote-work). Each schema declares questionnaire fields (text/number/select/radio/checkbox) + required + optional documents.
+- **QualificationBlock.jsx (new)**: renders one schema per selected category — question fields plus an integrated document uploader that hits the new public `POST /api/media/upload-provider-doc` endpoint (JPG/PNG/PDF, 8 MB max, no JWT required).
+- **Register.jsx**: added a native `<select>` primary-category dropdown as the FIRST section of step 3 (data-testid=register-primary-category). Selecting a category auto-adds it to the multi-category list and renders the corresponding QualificationBlock immediately. Submit is gated by `validateQualification()` — required fields + docs must be filled per selected category.
+- **server.py**: RegisterBody accepts `primary_category` + `qualifications`; register endpoint persists both. New public `/api/media/upload-provider-doc` endpoint (line ~720).
+- Testing: iteration_44 → **100% backend (5/5) + 100% frontend**, zero issues.
+
+
+
 ## Iteration 42 — Feb 2026 (this session)
 ### Provider explainer video + Sell-an-item deep link
 - **ProviderExplainer.jsx (new)**: Full 60-second product-tour section rendered right after the `/for-providers` hero. Supports three source modes via `REACT_APP_PROVIDER_VIDEO_URL`: YouTube iframe, Vimeo iframe, or direct HTML5 `<video>` (mp4/webm). When the env var is unset (default today) it falls back to a CSS-animated tour: 4 scenes × 15 s each with scene-accent colour transitions, sliding detail cards, progress bar, clickable scene dots, play/pause, and a live 0:xx / 1:00 counter. Below-video hint tiles reinforce the 10% flat fee + 24-h payout pitch.
