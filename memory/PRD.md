@@ -9,6 +9,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 41 — Feb 2026 (this session)
+### ScrollToTop, Marketplace filters, Adzuna + Reed aggregator wiring
+- **ScrollToTop.jsx (new)**: mounted inside `BrowserRouter` in `App.js`. Fires `window.scrollTo(0, 0)` on every PUSH/REPLACE route change; ignores POP (back/forward) and hash-only changes so browser history feels natural. Fixes the footer-link problem where clicking About or How-it-Works would drop you halfway down the destination page.
+- **Marketplace.jsx**: added a full filter bar above the item grid — search text, category select, min/max price, distance-radius (5/10/25/50/100 mi), sort (newest / price ↑ / price ↓ / nearest first), "Use my location" button (browser geolocation, or auto-pulled from `user.default_delivery_address` when signed in), active-filter badge, "Clear" reset, and a live result count (`N of M listings`). Distance shown on each card when buyer coords are set. All client-side filtering on the loaded list.
+- **aggregators.py**: added `fetch_adzuna()` (reads `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `ADZUNA_COUNTRIES`) and `fetch_reed()` (reads `REED_API_KEY`, `REED_KEYWORDS`). Both gracefully return `[]` with an info log when keys aren't set. `fetch_usajobs()` upgraded to send `Authorization-Key` + email User-Agent when `USAJOBS_API_KEY` / `USAJOBS_USER_EMAIL` are set. Wired all new sources into `ingest_aggregated_jobs()`. User will add keys to `backend/.env` at a later date.
+- Testing: `testing_agent_v3_fork` iteration_41 → **100% backend + 100% frontend** pass, zero blockers.
+
+
+
 ## Iteration 40 — Feb 2026 (this session)
 ### Marketing pages refactor + admin referral-tracking nudge
 - **MarketingPages.jsx**: Removed hero CTAs on info-first pages (HowItWorks, ForProviders, ForCustomers, About, ProviderCityIndex). Added shared `FinalCTA` component rendered at the END of every marketing page (data-testid=`marketing-final-cta`) with primary + secondary buttons. Added `AffiliateBlock` at bottom of HowItWorks/ForCustomers/ForProviders so info pages also expose partner referral opportunities. Added a "Why every step of Lumo is built to protect both sides" info section on HowItWorks and a "28+ services, one flow" info block on ForCustomers.
