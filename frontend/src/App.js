@@ -9,6 +9,11 @@ import NavBar from "@/components/NavBar";
 import MobileTabBar from "@/components/MobileTabBar";
 import CacheBuster from "@/components/CacheBuster";
 import RefCapture from "@/components/RefCapture";
+import {
+  HowItWorks, ForProviders, ForCustomers, Apply,
+  ProviderCity, ProviderCityIndex, CareersCategory, CareersIndex,
+  About, Press,
+} from "@/pages/MarketingPages";
 import NotificationsBridge from "@/components/NotificationsBridge";
 import AssistantWidget from "@/components/AssistantWidget";
 import AutoTranslator from "@/components/AutoTranslator";
@@ -140,6 +145,18 @@ function App() {
             <Route path="/remote-jobs" element={<RemoteJobs />} />
             <Route path="/regions/:slug" element={<RegionHub />} />
             <Route path="/regions" element={<RegionHub />} />
+
+            {/* Marketing / SEO pages (recruiting-focused per Feb 2026) */}
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/for-providers" element={<ForProviders />} />
+            <Route path="/for-customers" element={<ForCustomers />} />
+            <Route path="/apply" element={<Apply />} />
+            <Route path="/providers" element={<ProviderCityIndex />} />
+            <Route path="/providers/:city" element={<ProviderCity />} />
+            <Route path="/careers" element={<CareersIndex />} />
+            <Route path="/careers/:category" element={<CareersCategory />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/press" element={<Press />} />
 
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />

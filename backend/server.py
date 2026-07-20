@@ -3914,6 +3914,9 @@ async def sitemap_xml(request: Request):
         # High-value recruiting landing pages (provider + seller)
         "/become-a-provider", "/earn",
         "/list-your-stuff", "/sell-on-lumo",
+        # Marketing / recruiting pages added Feb 2026
+        "/how-it-works", "/for-providers", "/for-customers", "/apply",
+        "/providers", "/careers", "/press",
     ]
     for p in core_paths:
         # Boost priority on the recruiting pages so Google crawls them often.
@@ -3935,6 +3938,29 @@ async def sitemap_xml(request: Request):
             lines.append(f"  <url><loc>{origin}/{ptype}/{cat}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
             for city in LANDING_CITIES:
                 lines.append(f"  <url><loc>{origin}/{ptype}/{cat}/{city['slug']}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>")
+
+    # Recruiting-first marketing SEO — /providers/<city> and /careers/<slug>
+    # (mirror of lib/marketing.js RECRUITING_CITIES + RECRUITING_CATEGORIES).
+    _REC_CITIES = [
+        "new-york","los-angeles","chicago","houston","phoenix","philadelphia",
+        "san-antonio","san-diego","dallas","san-francisco","seattle","boston",
+        "austin","miami","atlanta","denver","portland","toronto","vancouver",
+        "montreal","mexico-city","london","manchester","edinburgh","dublin",
+        "paris","berlin","munich","madrid","barcelona","rome","amsterdam",
+        "stockholm","copenhagen","sydney","melbourne","auckland","singapore",
+        "hong-kong","tokyo","seoul","bangalore","mumbai","delhi","dubai",
+        "cape-town","johannesburg","lagos","nairobi","sao-paulo","buenos-aires",
+    ]
+    _REC_CATEGORIES = [
+        "cleaner","handyman","mover","delivery-driver","landscaper",
+        "roadside-tech","tow-operator","auto-detailer","mechanic",
+        "electrician","plumber","pet-sitter","personal-shopper","notary",
+        "appliance-tech","event-staff","beauty-pro","photographer",
+    ]
+    for city_slug in _REC_CITIES:
+        lines.append(f"  <url><loc>{origin}/providers/{city_slug}</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>")
+    for cat_slug in _REC_CATEGORIES:
+        lines.append(f"  <url><loc>{origin}/careers/{cat_slug}</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>")
 
     # Auto-generated blog posts
     try:
@@ -7018,6 +7044,13 @@ app.include_router(_create_stripe_connect_router(db=db, get_current_user=get_cur
 # wired into _credit_provider above so every payout event rewards the
 # referrer of the earning provider).
 app.include_router(_create_referrals_router(db=db, get_current_user=get_current_user), prefix="/api")
+
+# Recruit-lead capture — /api/recruits (marketing pages + admin dashboard)
+from recruits import create_router as _create_recruits_router  # noqa: E402
+app.include_router(
+    _create_recruits_router(db=db, throttle=_throttle, get_current_user=get_current_user),
+    prefix="/api",
+)
 
 
 @app.on_event("startup")

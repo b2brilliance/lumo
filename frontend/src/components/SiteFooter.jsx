@@ -130,6 +130,12 @@ export default function SiteFooter() {
             <div className="overline text-slate-500 mb-2">Earn</div>
             <nav className="flex flex-col gap-1.5 text-sm">
               <Link to="/become-a-provider" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-become-provider">Become a provider</Link>
+              <Link to="/for-providers" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-for-providers">For providers</Link>
+              <Link to="/for-customers" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-for-customers">For customers</Link>
+              <Link to="/how-it-works" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-how-it-works">How Lumo works</Link>
+              <Link to="/careers"       className="text-slate-700 hover:text-teal-700" data-testid="footer-link-careers">Careers</Link>
+              <Link to="/providers"     className="text-slate-700 hover:text-teal-700" data-testid="footer-link-providers">Provider cities</Link>
+              <Link to="/apply"         className="text-slate-700 hover:text-teal-700" data-testid="footer-link-apply">Apply now</Link>
               <Link to="/list-your-stuff"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-list-stuff">List your stuff</Link>
               <Link to="/rentals/host"      className="text-slate-700 hover:text-teal-700" data-testid="footer-link-host-rental">Host a rental</Link>
               <Link to="/cities"            className="text-slate-700 hover:text-teal-700" data-testid="footer-link-cities">All cities</Link>
@@ -155,6 +161,7 @@ export default function SiteFooter() {
             <div className="overline text-slate-500 mb-2">Lumo</div>
             <nav className="flex flex-col gap-1.5 text-sm">
               <Link to="/about"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-about">About</Link>
+              <Link to="/press"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-press">Press</Link>
               <Link to="/contact" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-contact">Contact</Link>
               <Link to="/terms"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-terms">Terms of service</Link>
               <Link to="/privacy" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-privacy">Privacy policy</Link>
