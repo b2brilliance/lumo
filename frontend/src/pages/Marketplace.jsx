@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,17 +35,25 @@ export default function Marketplace() {
   // so the "Sell an item" tile on Landing can drop users straight into the
   // seller flow. If the user isn't signed in we still open the dialog — the
   // form's own submit path will redirect them to /login as needed.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
     if (location.pathname === "/marketplace/new") {
       setOpenCreate(true);
     }
   }, [location.pathname]);
 
-  // When the dialog closes on /marketplace/new, rewrite the URL back to
-  // /marketplace so refreshing doesn't loop the modal open again.
+  // When the dialog CLOSES on /marketplace/new (was open, now shut), rewrite
+  // the URL back to /marketplace so refreshing doesn't loop the modal open
+  // again. We track wasOpenRef so we don't rewrite on the very first mount
+  // (where openCreate is still `false` before the pathname effect flips it).
   useEffect(() => {
-    if (!openCreate && location.pathname === "/marketplace/new") {
+    if (openCreate) {
+      wasOpenRef.current = true;
+      return;
+    }
+    if (wasOpenRef.current && location.pathname === "/marketplace/new") {
       navigate("/marketplace", { replace: true });
+      wasOpenRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openCreate]);

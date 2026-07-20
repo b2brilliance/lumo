@@ -9,6 +9,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 42 — Feb 2026 (this session)
+### Provider explainer video + Sell-an-item deep link
+- **ProviderExplainer.jsx (new)**: Full 60-second product-tour section rendered right after the `/for-providers` hero. Supports three source modes via `REACT_APP_PROVIDER_VIDEO_URL`: YouTube iframe, Vimeo iframe, or direct HTML5 `<video>` (mp4/webm). When the env var is unset (default today) it falls back to a CSS-animated tour: 4 scenes × 15 s each with scene-accent colour transitions, sliding detail cards, progress bar, clickable scene dots, play/pause, and a live 0:xx / 1:00 counter. Below-video hint tiles reinforce the 10% flat fee + 24-h payout pitch.
+- **App.js**: added `<Route path="/marketplace/new" element={<Marketplace />} />` so the Landing "Sell an item" tile (and any share-linked deep link) resolves.
+- **Marketplace.jsx**: `location.pathname === "/marketplace/new"` auto-opens the "Create listing" dialog. `wasOpenRef` guards a second effect that rewrites the URL back to `/marketplace` only *after* the dialog has been opened and then closed — so the URL stays shareable while the dialog is up.
+- Testing: `testing_agent_v3_fork` iteration_42 initial run: 89% (one bug — URL rewrote on mount before dialog dismissed). Fixed via `useRef` guard + manual screenshot verify → URL stays `/marketplace/new` while dialog open, rewrites on Escape.
+
+
+
 ## Iteration 41 — Feb 2026 (this session)
 ### ScrollToTop, Marketplace filters, Adzuna + Reed aggregator wiring
 - **ScrollToTop.jsx (new)**: mounted inside `BrowserRouter` in `App.js`. Fires `window.scrollTo(0, 0)` on every PUSH/REPLACE route change; ignores POP (back/forward) and hash-only changes so browser history feels natural. Fixes the footer-link problem where clicking About or How-it-Works would drop you halfway down the destination page.
