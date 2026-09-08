@@ -44,10 +44,10 @@ const NAV_BY_ROLE = {
 };
 
 function linkClass({ isActive }) {
-  return `px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+  return `px-3 py-2 text-sm font-medium transition-colors ${
     isActive
-      ? "border-teal-700 text-slate-900"
-      : "border-transparent text-slate-500 hover:text-slate-900"
+      ? "text-black"
+      : "text-neutral-500 hover:text-black"
   }`;
 }
 
@@ -63,15 +63,15 @@ export default function NavBar() {
   const links = NAV_BY_ROLE[roleForNav] || NAV_BY_ROLE.guest;
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200" data-testid="nav-bar">
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 flex items-center gap-3 sm:gap-6 h-14">
+    <header className="sticky top-0 z-40 nav-glass border-b border-neutral-200" data-testid="nav-bar">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-3 sm:gap-6 h-16">
         <Link to="/" className="flex items-center gap-2 flex-shrink-0" data-testid="nav-logo">
-          <div className="w-7 h-7 bg-slate-900 text-white flex items-center justify-center font-display font-black text-sm">L</div>
-          <span className="font-display font-bold text-lg tracking-tight">Lumo</span>
+          <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-display font-bold text-base rounded-full">L</div>
+          <span className="font-display font-bold text-xl tracking-tight text-black">Lumo</span>
         </Link>
 
-        {/* Language / currency selector */}
-        <div className="flex-shrink-0" data-testid="nav-locale-left"><LocaleSwitcher /></div>
+        {/* Language / currency selector — subtle in the new palette */}
+        <div className="flex-shrink-0 hidden lg:block" data-testid="nav-locale-left"><LocaleSwitcher /></div>
 
         {/* Role-siloed primary nav */}
         <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden" data-testid={`nav-${roleForNav}`}>
@@ -79,7 +79,7 @@ export default function NavBar() {
             const Icon = l.icon;
             return (
               <NavLink key={l.to} to={l.to} className={linkClass} data-testid={l.testId}>
-                <Icon className="inline w-3.5 h-3.5 mr-1" />{l.label}
+                <Icon className="inline w-4 h-4 mr-1.5" strokeWidth={2} />{l.label}
               </NavLink>
             );
           })}
@@ -90,54 +90,55 @@ export default function NavBar() {
           {user && user !== false ? (
             <>
               {role === "provider" && (
-                <NavLink to="/wallet" className="text-xs sm:text-sm text-slate-600 hover:text-slate-900 px-2 sm:px-3 py-1 border border-slate-200 whitespace-nowrap" data-testid="nav-wallet">
+                <NavLink to="/wallet" className="text-xs sm:text-sm text-neutral-700 hover:text-black px-3 py-1.5 border border-neutral-200 rounded-full whitespace-nowrap font-medium hover:border-black transition-colors" data-testid="nav-wallet">
                   <Wallet className="inline w-3.5 h-3.5 mr-1" /> ${Number(user.wallet_balance || 0).toFixed(2)}
                 </NavLink>
               )}
               {(role === "customer" || role === "provider") && (
-                <NavLink to="/chats" className="text-slate-500 hover:text-slate-900 hidden lg:inline-flex" data-testid="nav-chats" title="Messages">
+                <NavLink to="/chats" className="text-neutral-500 hover:text-black p-2 hidden lg:inline-flex rounded-full hover:bg-neutral-100 transition-colors" data-testid="nav-chats" title="Messages">
                   <MessageSquare className="w-4 h-4" />
                 </NavLink>
               )}
               {role === "customer" && (
-                <NavLink to="/cart" className="relative text-slate-500 hover:text-slate-900" data-testid="nav-cart" title="Cart">
+                <NavLink to="/cart" className="relative text-neutral-500 hover:text-black p-2 rounded-full hover:bg-neutral-100 transition-colors" data-testid="nav-cart" title="Cart">
                   <ShoppingCart className="w-4 h-4" />
                   {cart && cart.total_items > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-teal-700 text-white text-[9px] font-mono px-1 py-0 rounded-full min-w-[14px] text-center">
+                    <span className="absolute -top-0.5 -right-0.5 bg-[#276EF1] text-white text-[9px] font-mono px-1 py-0 rounded-full min-w-[16px] text-center font-semibold">
                       {cart.total_items}
                     </span>
                   )}
                 </NavLink>
               )}
-              <NavLink to="/settings" className="text-slate-500 hover:text-slate-900" data-testid="nav-settings"><Settings className="w-4 h-4" /></NavLink>
-              <span className="text-sm text-slate-700 hidden xl:inline" data-testid="nav-user-name">{user.name}</span>
-              <Button variant="ghost" size="sm" onClick={() => { logout(); nav("/"); }} data-testid="nav-logout" className="whitespace-nowrap">
-                <LogOut className="w-3.5 h-3.5 mr-1" /> <span className="hidden sm:inline">Sign out</span>
-              </Button>
+              <NavLink to="/settings" className="text-neutral-500 hover:text-black p-2 rounded-full hover:bg-neutral-100 transition-colors" data-testid="nav-settings"><Settings className="w-4 h-4" /></NavLink>
+              <button onClick={() => { logout(); nav("/"); }} data-testid="nav-logout" className="btn-lumo btn-lumo-ghost">
+                <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sign out</span>
+              </button>
             </>
           ) : (
             <>
-              <Link to="/login"><Button variant="outline" size="sm" data-testid="nav-login" className="whitespace-nowrap">Sign in</Button></Link>
-              <Link to="/register" className="hidden sm:block"><Button size="sm" className="bg-slate-900 hover:bg-slate-800 whitespace-nowrap" data-testid="nav-register">Get started <Sparkles className="ml-1 w-3.5 h-3.5" /></Button></Link>
+              <Link to="/login" data-testid="nav-login" className="btn-lumo btn-lumo-ghost">Sign in</Link>
+              <Link to="/register" className="hidden sm:block" data-testid="nav-register">
+                <span className="btn-lumo btn-lumo-primary btn-lumo-sm">Get started</span>
+              </Link>
             </>
           )}
         </div>
       </div>
 
-      {/* Mobile sub-nav — same role-siloed links but wrapped in tiles */}
-      <div className="md:hidden border-t border-slate-200 bg-slate-50" data-testid="mobile-subnav">
-        <div className="grid grid-cols-3 divide-x divide-slate-200">
+      {/* Mobile sub-nav — same role-siloed links wrapped in tiles */}
+      <div className="md:hidden border-t border-neutral-200 bg-white" data-testid="mobile-subnav">
+        <div className="grid grid-cols-3 divide-x divide-neutral-200">
           {links.slice(0, 3).map((l) => {
             const Icon = l.icon;
             return (
               <Link
                 key={l.to}
                 to={l.to}
-                className="flex flex-col items-center justify-center py-3 px-2 text-center hover:bg-teal-50 active:bg-slate-200 transition-colors"
+                className="flex flex-col items-center justify-center py-3 px-2 text-center hover:bg-neutral-50 active:bg-neutral-100 transition-colors"
                 data-testid={`mobile-${l.testId}`}
               >
-                <Icon className="w-5 h-5 mb-1 text-teal-700" />
-                <div className="font-display font-bold text-xs text-slate-900 leading-tight">{l.label}</div>
+                <Icon className="w-5 h-5 mb-1 text-black" strokeWidth={2} />
+                <div className="font-display font-semibold text-xs text-black leading-tight">{l.label}</div>
               </Link>
             );
           })}

@@ -103,7 +103,7 @@ export default function SiteFooter() {
 
   return (
     <footer
-      className="border-t border-slate-200 bg-slate-50 mt-auto"
+      className="bg-black text-white mt-auto"
       data-testid="site-footer"
     >
       <div className="max-w-7xl mx-auto px-6 py-10">
@@ -111,7 +111,7 @@ export default function SiteFooter() {
           {/* Brand + tagline */}
           <div className="md:col-span-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-slate-900 text-white grid place-items-center font-display font-black">
+              <div className="w-7 h-7 bg-white text-black grid place-items-center font-display font-bold rounded-full">
                 L
               </div>
               <div className="font-display text-xl tracking-tighter font-black">
@@ -119,7 +119,7 @@ export default function SiteFooter() {
               </div>
             </div>
             {social.tagline && (
-              <p className="text-sm text-slate-600 mt-3 max-w-md leading-relaxed">
+              <p className="text-sm text-white/70 mt-4 max-w-md leading-relaxed">
                 {social.tagline}
               </p>
             )}
@@ -127,42 +127,42 @@ export default function SiteFooter() {
 
           {/* Earn / List — SEO recruiting */}
           <div className="md:col-span-2">
-            <div className="overline text-slate-500 mb-2">Earn</div>
+            <div className="overline text-white/50 mb-3">Earn</div>
             <nav className="flex flex-col gap-1.5 text-sm">
-              <Link to="/become-a-provider" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-become-provider">Become a provider</Link>
-              <Link to="/for-providers" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-for-providers">For providers</Link>
-              <Link to="/for-customers" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-for-customers">For customers</Link>
-              <Link to="/how-it-works" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-how-it-works">How Lumo works</Link>
-              <Link to="/careers"       className="text-slate-700 hover:text-teal-700" data-testid="footer-link-careers">Careers</Link>
-              <Link to="/providers"     className="text-slate-700 hover:text-teal-700" data-testid="footer-link-providers">Provider cities</Link>
-              <Link to="/apply"         className="text-slate-700 hover:text-teal-700" data-testid="footer-link-apply">Apply now</Link>
-              <Link to="/list-your-stuff"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-list-stuff">List your stuff</Link>
-              <Link to="/cities"            className="text-slate-700 hover:text-teal-700" data-testid="footer-link-cities">All cities</Link>
-              <Link to="/map"               className="text-slate-700 hover:text-teal-700" data-testid="footer-link-jobs">Jobs near you</Link>
+              <Link to="/become-a-provider" className="text-white/80 hover:text-white" data-testid="footer-link-become-provider">Become a provider</Link>
+              <Link to="/for-providers" className="text-white/80 hover:text-white" data-testid="footer-link-for-providers">For providers</Link>
+              <Link to="/for-customers" className="text-white/80 hover:text-white" data-testid="footer-link-for-customers">For customers</Link>
+              <Link to="/how-it-works" className="text-white/80 hover:text-white" data-testid="footer-link-how-it-works">How Lumo works</Link>
+              <Link to="/careers"       className="text-white/80 hover:text-white" data-testid="footer-link-careers">Careers</Link>
+              <Link to="/providers"     className="text-white/80 hover:text-white" data-testid="footer-link-providers">Provider cities</Link>
+              <Link to="/apply"         className="text-white/80 hover:text-white" data-testid="footer-link-apply">Apply now</Link>
+              <Link to="/list-your-stuff"   className="text-white/80 hover:text-white" data-testid="footer-link-list-stuff">List your stuff</Link>
+              <Link to="/cities"            className="text-white/80 hover:text-white" data-testid="footer-link-cities">All cities</Link>
+              <Link to="/map"               className="text-white/80 hover:text-white" data-testid="footer-link-jobs">Jobs near you</Link>
             </nav>
           </div>
 
           {/* Marketplaces */}
           <div className="md:col-span-2">
-            <div className="overline text-slate-500 mb-2">Browse</div>
+            <div className="overline text-white/50 mb-3">Browse</div>
             <nav className="flex flex-col gap-1.5 text-sm">
-              <Link to="/services"     className="text-slate-700 hover:text-teal-700" data-testid="footer-link-services">All services</Link>
-              <Link to="/marketplace"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-marketplace">Community Market</Link>
+              <Link to="/services"     className="text-white/80 hover:text-white" data-testid="footer-link-services">All services</Link>
+              <Link to="/marketplace"  className="text-white/80 hover:text-white" data-testid="footer-link-marketplace">Community Market</Link>
             </nav>
           </div>
 
           {/* Page links */}
           <div className="md:col-span-2">
-            <div className="overline text-slate-500 mb-2">Lumo</div>
+            <div className="overline text-white/50 mb-3">Lumo</div>
             <nav className="flex flex-col gap-1.5 text-sm">
-              <Link to="/about"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-about">About</Link>
-              <Link to="/press"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-press">Press</Link>
-              <Link to="/contact" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-contact">Contact</Link>
-              <Link to="/terms"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-terms">Terms of service</Link>
-              <Link to="/privacy" className="text-slate-700 hover:text-teal-700" data-testid="footer-link-privacy">Privacy policy</Link>
-              <Link to="/blog"    className="text-slate-700 hover:text-teal-700" data-testid="footer-link-blog">Blog</Link>
+              <Link to="/about"   className="text-white/80 hover:text-white" data-testid="footer-link-about">About</Link>
+              <Link to="/press"   className="text-white/80 hover:text-white" data-testid="footer-link-press">Press</Link>
+              <Link to="/contact" className="text-white/80 hover:text-white" data-testid="footer-link-contact">Contact</Link>
+              <Link to="/terms"   className="text-white/80 hover:text-white" data-testid="footer-link-terms">Terms of service</Link>
+              <Link to="/privacy" className="text-white/80 hover:text-white" data-testid="footer-link-privacy">Privacy policy</Link>
+              <Link to="/blog"    className="text-white/80 hover:text-white" data-testid="footer-link-blog">Blog</Link>
               {user?.role === "admin" && (
-                <Link to="/admin" className="text-slate-700 hover:text-teal-700 inline-flex items-center gap-1" data-testid="footer-link-admin">
+                <Link to="/admin" className="text-white/80 hover:text-white inline-flex items-center gap-1" data-testid="footer-link-admin">
                   <ShieldCheck className="w-3.5 h-3.5" /> Admin dashboard
                 </Link>
               )}
@@ -185,7 +185,7 @@ export default function SiteFooter() {
 
           {/* Socials */}
           <div className="md:col-span-2">
-            <div className="overline text-slate-500 mb-2">Follow us</div>
+            <div className="overline text-white/50 mb-3">Follow us</div>
             {hasLinks ? (
               <div className="flex flex-wrap gap-2" data-testid="footer-social-icons">
                 {activeLinks.map(([key, url]) => {
@@ -223,7 +223,7 @@ export default function SiteFooter() {
           </div>
         </div>
 
-        <div className="border-t border-slate-200 mt-8 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-slate-500">
+        <div className="border-t border-slate-200 mt-8 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-white/50">
           <div>© {year} Lumo. All rights reserved.</div>
           <div className="font-mono">Built for everyday hustle.</div>
         </div>

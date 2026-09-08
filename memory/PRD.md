@@ -9,6 +9,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 46 — Feb 2026 (this session)
+### 🎨 Uber-inspired redesign
+- **Design tokens** (`index.css`): flipped root palette to stark black + white with single blue accent (#276EF1). Space Grotesk headings (with -0.02em tracking), IBM Plex Sans body, IBM Plex Mono for overlines/labels. New utility classes: `.btn-lumo` variants (primary/secondary/accent/outline/ghost + sm/lg sizes) — all pill-shaped with active-scale, `.card-lumo` + hoverable variant, `.nav-glass` for glass-blurred sticky nav, `.hero-vignette` for image overlays.
+- **NavBar rewrite**: sticky glass-blurred nav (`backdrop-filter: saturate(180%) blur(14px)`), circular black-white "L" logo, pill Sign-in/Get-started buttons, role-siloed testids preserved.
+- **Landing.jsx complete rewrite**: 6-section Uber-inspired layout — (1) split hero with big Space Grotesk headline + pill search + right-side courier photo with vignette, (2) 8-tile service grid with hover lift, (3) how-it-works 3-step, (4) obsidian black trust-stat bar (10%/<24h/100%/4.9), (5) Community Market teaser section, (6) provider recruitment dark banner with benefit tiles.
+- **SiteFooter** flipped to obsidian black — high-contrast white text on black, matches the new dark-banner ending pattern.
+- Route isolation from iteration 45 preserved (guest/customer/provider/admin nav silos). Every service tile, quick-book chip, marketplace + provider CTA has a data-testid.
+- Testing: iteration_46 → **100% frontend (23/23)**, zero issues, zero regressions.
+
+
+
 ## Iteration 45 — Feb 2026 (this session)
 ### 🔀 P2P-only pivot — kill stores/restaurants/rentals/autos + role-siloed nav
 - **Backend**:

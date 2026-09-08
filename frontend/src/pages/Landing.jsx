@@ -2,224 +2,253 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import {
-  Search, MapPin, ShoppingBag, UtensilsCrossed, Car, Home,
-  KeyRound, Store, Wrench, Sparkles, Truck, PawPrint,
-  Laptop, Briefcase, HardHat, Scissors,
-  ArrowRight, Zap,
+  Search, MapPin, ShoppingBag, Car, Wrench, Sparkles, Truck, PawPrint,
+  Laptop, HardHat, Scissors, ArrowRight, Zap, ShieldCheck, Star, Wallet,
+  Clock, DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { useLocale } from "@/lib/locale";
 
-/* Uber × Craigslist homepage
- * ─────────────────────────
- * Top: "What do you need?" search + auto-detected location (editable).
- * Middle: dense category grid — one tap to browse.
- * Bottom: how it works (3 tiles) + 90% commission tile. Nothing else.
- * Removed marketing bloat, subscribe form, philosophy sections. */
+/* ── Landing (Feb 2026 Uber-inspired redesign) ────────────────────
+ *
+ * Structure:
+ *   1. Full-bleed split hero — big editorial headline + floating request
+ *      card (service picker + address input) on white, high-contrast
+ *      photograph on the right
+ *   2. Service grid — 8 headline categories + "All services" tile
+ *   3. How it works — three numbered steps in dense mono
+ *   4. Trust markers — 4 stats in a horizontal bar
+ *   5. P2P marketplace teaser — Community Market side-section
+ *   6. Provider recruitment banner — full-bleed obsidian black card CTA
+ *
+ * Palette: stark black + white, single blue accent for state/highlights.
+ * No gradients. Pill-shaped CTAs. Space Grotesk display type.        */
 
 const SERVICES = [
-  { key: "delivery",     label: "Delivery",     Icon: Truck,           to: "/order/delivery" },
-  { key: "cleaning",     label: "Cleaning",     Icon: Sparkles,        to: "/order/cleaning" },
-  { key: "moving",       label: "Moving",       Icon: HardHat,         to: "/order/moving" },
-  { key: "handyman",     label: "Handyman",     Icon: Wrench,          to: "/order/handyman" },
-  { key: "pet_care",     label: "Pet care",     Icon: PawPrint,        to: "/order/pet_care" },
-  { key: "personal_care",label: "Beauty",       Icon: Scissors,        to: "/order/personal_care" },
-  { key: "it_support",   label: "Tech help",    Icon: Laptop,          to: "/order/it_support" },
-  { key: "more",         label: "More services",Icon: ArrowRight,      to: "/services" },
+  { key: "delivery",     label: "Delivery",       tagline: "Under 30 min",   Icon: Truck,       to: "/order/delivery" },
+  { key: "cleaning",     label: "Cleaning",       tagline: "Same-day pros",  Icon: Sparkles,    to: "/order/cleaning" },
+  { key: "moving",       label: "Moving",         tagline: "Hourly / haul",  Icon: HardHat,     to: "/order/moving" },
+  { key: "handyman",     label: "Handyman",       tagline: "Fix anything",   Icon: Wrench,      to: "/order/handyman" },
+  { key: "auto",         label: "Mechanic",       tagline: "Mobile repair",  Icon: Car,         to: "/order/auto" },
+  { key: "pet_care",     label: "Pet care",       tagline: "Walks + boards", Icon: PawPrint,    to: "/order/pet_care" },
+  { key: "personal_care",label: "Beauty",         tagline: "At-home glam",   Icon: Scissors,    to: "/order/personal_care" },
+  { key: "digital_tech", label: "Tech help",      tagline: "In-person or remote", Icon: Laptop, to: "/order/digital_tech" },
 ];
 
-const BROWSE = [
-  { key: "marketplace",  label: "For sale",     Icon: ShoppingBag,     to: "/marketplace" },
+const HOW_IT_WORKS = [
+  { n: "01", t: "Pick + describe", b: "Choose a service, tell us what you need. Category-specific fields — no forms bloat." },
+  { n: "02", t: "Instant match",   b: "Nearby providers see your request within seconds. Watch the map fill up. Compare & accept." },
+  { n: "03", t: "Track + rate",    b: "Live GPS the whole way. 10% deposit locks the booking, balance releases only when you confirm." },
 ];
 
-const COUNTRY_LABELS = {
-  US: "United States", CA: "Canada", GB: "United Kingdom", FR: "France", DE: "Germany",
-  ES: "Spain", IT: "Italy", MX: "Mexico", AU: "Australia", JP: "Japan", IN: "India",
-  BR: "Brazil", AE: "United Arab Emirates", SG: "Singapore", NG: "Nigeria",
-};
+const TRUST_STATS = [
+  { Icon: Wallet,       n: "10%",   l: "Flat platform fee" },
+  { Icon: Clock,        n: "<24h",  l: "Payout to providers" },
+  { Icon: ShieldCheck,  n: "100%",  l: "Escrow protected" },
+  { Icon: Star,         n: "4.9",   l: "Avg. rating" },
+];
 
 export default function Landing() {
-  const { user } = useAuth();
-  const { country, setCountryOverride } = useLocale() || {};
-  const nav = useNavigate();
   const [q, setQ] = useState("");
-  const [locOpen, setLocOpen] = useState(false);
+  const { user } = useAuth();
+  const nav = useNavigate();
 
   const submit = (e) => {
     e?.preventDefault?.();
     const query = q.trim();
-    if (!query) { nav("/services"); return; }
-    nav(`/services?q=${encodeURIComponent(query)}`);
+    nav(query ? `/services?q=${encodeURIComponent(query)}` : "/services");
   };
 
-  const locLabel = COUNTRY_LABELS[country] || country || "Set location";
-
   return (
-    <div className="bg-white min-h-screen">
+    <div className="bg-white" data-testid="page-landing">
       <Helmet>
-        <title>Lumo — What do you need? Local services, jobs, delivery, rentals</title>
-        <meta name="description" content="One tap to find local help, order delivery, sell your stuff, rent anything, or hire a pro. Lumo — like Uber met Craigslist and everyone won." />
-        <link rel="canonical" href="https://golumo.app/" />
+        <title>Lumo — Post a request. Get matched in minutes.</title>
+        <meta name="description" content="Lumo is the on-demand marketplace for real-world help. Delivery, cleaning, moving, mechanics, tutors, pet care and 30+ more services. Providers keep 90%." />
       </Helmet>
 
-      {/* ─── Hero: search + location ─────────────────────────────── */}
-      <section className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-14">
-          <h1 className="font-display text-3xl sm:text-5xl font-black tracking-tighter text-center">
-            What do you need?
-          </h1>
+      {/* ═════════════ HERO ═════════════════════════════════════════════ */}
+      <section className="relative overflow-hidden bg-white" data-testid="landing-hero">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-16 sm:py-24 lg:py-32 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div>
+            <div className="overline mb-4" data-testid="hero-overline">On-demand marketplace</div>
+            <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-black leading-[1.02] tracking-tight">
+              Get almost anything, done today.
+            </h1>
+            <p className="mt-6 text-lg sm:text-xl text-neutral-600 leading-relaxed max-w-xl">
+              Delivery, cleaning, moving, mechanics, tutors, pet care — 30+ services from vetted local providers. One tap to book. Live GPS the whole way.
+            </p>
 
-          <form onSubmit={submit} className="mt-6 sm:mt-8" data-testid="home-search-form">
-            <div className="flex items-stretch border-2 border-slate-900 bg-white shadow-lg">
-              <div className="flex items-center pl-3 sm:pl-4 text-slate-500">
-                <Search className="w-5 h-5" />
+            {/* Search / picker card */}
+            <form onSubmit={submit} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-2xl" data-testid="hero-search-form">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="What do you need help with?"
+                  className="w-full bg-neutral-50 border border-neutral-300 focus:border-black focus:bg-white focus:ring-2 focus:ring-black rounded-full pl-12 pr-4 h-14 text-base text-black placeholder:text-neutral-500 transition-all outline-none"
+                  data-testid="hero-search-input"
+                />
               </div>
-              <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Try 'cleaning', 'used couch', 'moving help'..."
-                aria-label="What do you need?"
-                className="flex-1 min-w-0 px-3 py-4 text-base sm:text-lg focus:outline-none"
-                data-testid="home-search-input"
-              />
-              <button
-                type="submit"
-                className="bg-slate-900 text-white px-4 sm:px-6 font-mono text-xs sm:text-sm uppercase tracking-wider hover:bg-teal-700 transition-colors"
-                data-testid="home-search-submit"
-              >
-                Search
+              <button type="submit" className="btn-lumo btn-lumo-primary btn-lumo-lg" data-testid="hero-search-submit">
+                Find help <ArrowRight className="w-4 h-4" />
               </button>
+            </form>
+
+            {/* Quick actions */}
+            <div className="mt-6 flex flex-wrap items-center gap-2 text-sm">
+              <span className="overline text-[10px]">Quick book:</span>
+              {SERVICES.slice(0, 4).map((s) => (
+                <Link key={s.key} to={s.to} className="btn-lumo btn-lumo-secondary btn-lumo-sm" data-testid={`hero-quick-${s.key}`}>
+                  <s.Icon className="w-3.5 h-3.5" /> {s.label}
+                </Link>
+              ))}
             </div>
-          </form>
-
-          {/* Location bar */}
-          <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-            <MapPin className="w-4 h-4 text-teal-700" />
-            <span className="text-slate-500">Showing near</span>
-            <button
-              onClick={() => setLocOpen((v) => !v)}
-              className="font-display font-bold text-slate-900 underline decoration-dotted underline-offset-2 hover:text-teal-700"
-              data-testid="home-location-toggle"
-            >
-              {locLabel}
-            </button>
           </div>
 
-          {locOpen && (
-            <div className="mt-3 max-w-md mx-auto border border-slate-300 bg-white p-3" data-testid="home-location-picker">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">Change location</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-                {Object.entries(COUNTRY_LABELS).map(([c, name]) => (
-                  <button
-                    key={c}
-                    onClick={() => { setCountryOverride?.(c); setLocOpen(false); }}
-                    className={`text-left px-2 py-1.5 text-sm hover:bg-slate-100 ${country === c ? "bg-teal-50 text-teal-800 font-bold" : "text-slate-700"}`}
-                    data-testid={`home-loc-${c}`}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
+          {/* Right — photograph with vignette */}
+          <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden hero-vignette hidden lg:block" data-testid="hero-image">
+            <img
+              src="https://images.unsplash.com/photo-1607130232670-52123ba5be5c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBjaXR5JTIwdXJiYW4lMjBzdHJlZXQlMjBkcml2ZXIlMjBzZXJ2aWNlJTIwY291cmllciUyMHRlY2huaWNpYW4lMjB0YXNrJTIwZGVsaXZlcnl8ZW58MHx8fHwxNzg4ODY1NzIzfDA&ixlib=rb-4.1.0&q=85&w=1200"
+              alt="Local Lumo courier arriving at customer"
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="eager"
+            />
+            <div className="absolute bottom-6 left-6 right-6 text-white z-10">
+              <div className="overline text-white/70 mb-2">Live in your city</div>
+              <div className="font-display text-2xl font-semibold leading-tight">Providers arrive in minutes, not days.</div>
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* ─── "Get help" — services (Uber-style order flow) ─────── */}
-      <section className="border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-          <div className="flex items-center justify-between mb-3">
-            <div className="overline">Get help — order now</div>
-            <Link to="/services" className="text-xs font-mono uppercase tracking-wider text-teal-700 hover:underline" data-testid="home-more-services">All services →</Link>
-          </div>
-          <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-px bg-slate-200 border border-slate-200">
-            {SERVICES.map((c) => (
-              <Link
-                key={c.key}
-                to={c.to}
-                className="bg-white flex flex-col items-center justify-center text-center p-3 sm:p-5 hover:bg-teal-50 active:bg-teal-100 transition-colors min-h-[90px] sm:min-h-[110px]"
-                data-testid={`home-service-${c.key}`}
-              >
-                <c.Icon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-700" />
-                <div className="text-[11px] sm:text-sm font-display font-bold mt-2 leading-tight">{c.label}</div>
-              </Link>
-            ))}
           </div>
         </div>
       </section>
 
-      {/* ─── "Browse & buy" — marketplaces ─────────────────────── */}
-      <section className="border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-6 sm:pb-10">
-          <div className="overline mb-3">Browse & buy</div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-slate-200 border border-slate-200">
-            {BROWSE.map((c) => (
-              <Link
-                key={c.key}
-                to={c.to}
-                className="bg-white flex flex-col items-center justify-center text-center p-3 sm:p-5 hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[90px] sm:min-h-[110px]"
-                data-testid={`home-browse-${c.key}`}
-              >
-                <c.Icon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-700" />
-                <div className="text-[11px] sm:text-sm font-display font-bold mt-2 leading-tight">{c.label}</div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Quick actions strip — Uber-style CTAs ────────────────── */}
-      <section className="border-b border-slate-200 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          {[
-            { to: "/customer",           t: "Post a job",       Icon: Zap,       color: "text-red-600" },
-            { to: "/map",                t: "Jobs near me",     Icon: Briefcase, color: "text-blue-600" },
-            { to: "/marketplace/new",    t: "Sell an item",     Icon: ShoppingBag, color: "text-amber-600" },
-            { to: "/become-a-provider",  t: "Earn on Lumo",     Icon: HardHat,   color: "text-teal-700" },
-          ].map((a) => (
-            <Link
-              key={a.t}
-              to={a.to}
-              className="flex items-center gap-2 sm:gap-3 bg-white border border-slate-200 hover:border-slate-900 px-3 py-3 sm:py-4 group"
-              data-testid={`home-action-${a.t.toLowerCase().replace(/\s+/g, '-')}`}
-            >
-              <a.Icon className={`w-5 h-5 ${a.color} flex-shrink-0`} />
-              <div className="font-display font-bold text-sm sm:text-base flex-1 leading-tight">{a.t}</div>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-all" />
+      {/* ═════════════ SERVICE GRID ═════════════════════════════════════ */}
+      <section className="border-t border-neutral-200" data-testid="landing-services">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-16 sm:py-24">
+          <div className="flex items-end justify-between mb-10 gap-4 flex-wrap">
+            <div>
+              <div className="overline mb-3">Book now</div>
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-black leading-tight tracking-tight">Every service, one app.</h2>
+            </div>
+            <Link to="/services" className="btn-lumo btn-lumo-outline btn-lumo-sm" data-testid="services-all">
+              All services <ArrowRight className="w-3.5 h-3.5" />
             </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6" data-testid="services-grid">
+            {SERVICES.map((s) => {
+              const Icon = s.Icon;
+              return (
+                <Link
+                  key={s.key}
+                  to={s.to}
+                  className="group card-lumo card-lumo-hoverable flex flex-col justify-between h-full"
+                  data-testid={`service-tile-${s.key}`}
+                >
+                  <div className="w-11 h-11 rounded-full bg-neutral-100 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                    <Icon className="w-5 h-5" strokeWidth={2} />
+                  </div>
+                  <div className="mt-8">
+                    <div className="font-display font-semibold text-lg text-black leading-tight">{s.label}</div>
+                    <div className="overline text-[10px] mt-1">{s.tagline}</div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ═════════════ HOW IT WORKS ═════════════════════════════════════ */}
+      <section className="border-t border-neutral-200 bg-neutral-50" data-testid="landing-how-it-works">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-16 sm:py-24">
+          <div className="overline mb-3">How it works</div>
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-black leading-tight tracking-tight max-w-2xl">Three taps. No back-and-forth.</h2>
+          <div className="mt-12 grid md:grid-cols-3 gap-6 sm:gap-8">
+            {HOW_IT_WORKS.map((s) => (
+              <div key={s.n} className="card-lumo bg-white" data-testid={`how-step-${s.n}`}>
+                <div className="font-mono text-[#276EF1] text-sm font-semibold tracking-widest">{s.n}</div>
+                <h3 className="mt-3 font-display font-semibold text-xl text-black leading-tight">{s.t}</h3>
+                <p className="mt-3 text-neutral-600 text-[15px] leading-relaxed">{s.b}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═════════════ TRUST STATS BAR ══════════════════════════════════ */}
+      <section className="border-t border-neutral-200 bg-black text-white" data-testid="landing-trust">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-14 grid grid-cols-2 md:grid-cols-4 gap-6">
+          {TRUST_STATS.map((s, i) => (
+            <div key={i} className="flex flex-col" data-testid={`trust-stat-${i}`}>
+              <s.Icon className="w-5 h-5 text-white/60 mb-3" strokeWidth={2} />
+              <div className="font-display text-3xl sm:text-4xl font-bold leading-none">{s.n}</div>
+              <div className="overline text-white/50 mt-2">{s.l}</div>
+            </div>
           ))}
         </div>
       </section>
 
-      {/* ─── 90% keep + how it works (compact, no essay) ──────────── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-        <div className="grid md:grid-cols-3 gap-px bg-slate-200 border border-slate-200">
-          <div className="bg-white p-6">
-            <div className="font-display text-4xl sm:text-5xl font-black tracking-tighter text-teal-700">90%</div>
-            <div className="text-sm text-slate-600 mt-2 leading-snug">Workers keep 90% of every job. Lumo takes a flat 10% — half what most gig apps charge.</div>
+      {/* ═════════════ MARKETPLACE TEASER ══════════════════════════════ */}
+      <section className="border-t border-neutral-200 bg-white" data-testid="landing-marketplace">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-16 sm:py-24 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div>
+            <div className="overline mb-3">Community Market</div>
+            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-black leading-tight tracking-tight">Sell what you don&apos;t need. Find what you do.</h2>
+            <p className="mt-5 text-lg text-neutral-600 leading-relaxed max-w-xl">
+              Neighbor-to-neighbor resale — no fees for buyers, 5% for sellers when your item sells. Locally sortable, escrow-protected, live-tracked handoff via Lumo delivery.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link to="/marketplace" className="btn-lumo btn-lumo-primary" data-testid="marketplace-browse">
+                Browse marketplace <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link to="/marketplace/new" className="btn-lumo btn-lumo-outline" data-testid="marketplace-sell">
+                Sell an item
+              </Link>
+            </div>
           </div>
-          <div className="bg-white p-6">
-            <div className="font-display text-4xl sm:text-5xl font-black tracking-tighter text-slate-900">1 tap</div>
-            <div className="text-sm text-slate-600 mt-2 leading-snug">Accept jobs, book help, buy an item — everything is one tap. GPS-based, escrow-protected, instant confirmation.</div>
-          </div>
-          <div className="bg-white p-6">
-            <div className="font-display text-4xl sm:text-5xl font-black tracking-tighter text-red-600">24 hr</div>
-            <div className="text-sm text-slate-600 mt-2 leading-snug">Payouts land in your bank within 24 hours of the job being marked complete. No 7-day holds.</div>
+          <div className="relative aspect-square lg:aspect-[4/5] w-full rounded-2xl overflow-hidden" data-testid="marketplace-image">
+            <img
+              src="https://images.unsplash.com/photo-1604605801370-3396f9bd9cf0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBjaXR5JTIwdXJiYW4lMjBzdHJlZXQlMjBkcml2ZXIlMjBzZXJ2aWNlJTIwY291cmllciUyMHRlY2huaWNpYW4lMjB0YXNrJTIwZGVsaXZlcnl8ZW58MHx8fHwxNzg4ODY1NzIzfDA&ixlib=rb-4.1.0&q=85&w=1200"
+              alt="Neighbor handing off a package"
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+            />
           </div>
         </div>
+      </section>
 
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-slate-500">
-            {user ? "Welcome back — jump into your dashboard." : "New here? Sign up in 30 seconds."}
+      {/* ═════════════ PROVIDER RECRUITMENT BANNER ═════════════════════ */}
+      <section className="bg-black text-white border-t border-black" data-testid="landing-provider-cta">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-20 sm:py-28 grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <div className="overline text-[#276EF1] mb-3">Earn on Lumo</div>
+            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">Keep 90%.<br/>Get paid in 24 hours.</h2>
+            <p className="mt-5 text-lg text-white/80 leading-relaxed max-w-xl">
+              We take 10% flat. No lead fees, no boost fees, no monthly minimum. Same-day payouts via Stripe. Pick the jobs you want; skip the ones you don&apos;t.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link to={user ? "/provider" : "/register?role=provider"} className="btn-lumo btn-lumo-lg bg-white text-black hover:bg-neutral-100" data-testid="provider-signup">
+                Start earning today <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link to="/for-providers" className="btn-lumo btn-lumo-lg bg-transparent border-white/40 text-white hover:bg-white/10 border" data-testid="provider-learn">
+                How it works for providers
+              </Link>
+            </div>
           </div>
-          <Link
-            to={user ? "/customer" : "/signin"}
-            className="bg-slate-900 text-white px-5 py-2.5 font-mono uppercase tracking-wider text-xs sm:text-sm hover:bg-teal-700"
-            data-testid="home-primary-cta"
-          >
-            {user ? "Open dashboard" : "Get started"} <ArrowRight className="inline w-3.5 h-3.5 ml-1" />
-          </Link>
+          <div className="grid grid-cols-2 gap-3" data-testid="provider-benefits">
+            {[
+              { Icon: DollarSign,  t: "10% flat fee",     b: "Half of TaskRabbit's cut" },
+              { Icon: Clock,       t: "24h payouts",      b: "Stripe Connect same-day" },
+              { Icon: ShieldCheck, t: "Escrow protected", b: "Money already secured" },
+              { Icon: Zap,         t: "No lead fees",     b: "Only pay when you earn" },
+            ].map((h, i) => (
+              <div key={i} className="p-5 border border-white/20 rounded-xl bg-white/5 backdrop-blur">
+                <h.Icon className="w-4 h-4 text-[#276EF1]" strokeWidth={2} />
+                <div className="mt-3 overline text-white/60">{h.t}</div>
+                <div className="mt-1 text-white text-[15px] font-medium">{h.b}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

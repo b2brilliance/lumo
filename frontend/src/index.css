@@ -5,26 +5,32 @@
 @tailwind utilities;
 
 :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 4%;
+    /* ── Uber-inspired obsidian palette (Feb 2026 redesign) ───────────
+     * Stark black + white with a single blue accent (#276EF1). All UI
+     * defaults to grayscale — colour is reserved for state (success /
+     * warning / destructive) and the single blue link/accent.        */
+    --background: 0 0% 100%;              /* #FFFFFF */
+    --foreground: 0 0% 0%;                /* #000000 */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 4%;
+    --card-foreground: 0 0% 0%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 4%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 174 78% 26%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 0 0% 0%;                   /* Black — the app's action colour */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95%;                /* #F3F3F3 */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 96%;                    /* #F6F6F6 */
+    --muted-foreground: 0 0% 33%;         /* #545454 */
+    --accent: 220 90% 55%;                /* #276EF1 — Uber blue */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 174 78% 26%;
-    --radius: 0.375rem;
+    --success: 149 96% 33%;               /* #05A357 */
+    --warning: 32 92% 46%;                /* #E18308 */
+    --destructive: 6 100% 44%;            /* #E11900 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89%;                   /* #E2E2E2 */
+    --input: 0 0% 89%;
+    --ring: 0 0% 0%;
+    --radius: 0.75rem;                    /* 12px default — pill buttons override to 9999px */
 }
 
 * {
@@ -65,6 +71,119 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.2em;
     color: hsl(var(--muted-foreground));
 }
+
+/* ── Uber-inspired button system (Feb 2026 redesign) ───────────────
+ * Every primary CTA in the app should end up on one of these. They're
+ * pill-shaped, high-contrast, and give a subtle active-scale on tap for
+ * tactile feedback on mobile.                                       */
+.btn-lumo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 9999px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    line-height: 1;
+    transition: background-color 200ms, transform 100ms, box-shadow 200ms;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+.btn-lumo:active { transform: scale(0.98); }
+.btn-lumo:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-lumo-primary {
+    background: #000;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.btn-lumo-primary:hover { background: #1F1F1F; }
+
+.btn-lumo-secondary {
+    background: #F3F3F3;
+    color: #000;
+}
+.btn-lumo-secondary:hover { background: #E5E5E5; }
+
+.btn-lumo-accent {
+    background: #276EF1;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(39,110,241,0.16);
+}
+.btn-lumo-accent:hover { background: #1E58C8; }
+
+.btn-lumo-outline {
+    background: transparent;
+    color: #000;
+    border-color: #000;
+}
+.btn-lumo-outline:hover { background: #000; color: #fff; }
+
+.btn-lumo-ghost {
+    background: transparent;
+    color: #000;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+}
+.btn-lumo-ghost:hover { background: #F3F3F3; }
+
+.btn-lumo-lg { padding: 1.125rem 2rem; font-size: 1rem; }
+.btn-lumo-sm { padding: 0.5rem 1rem; font-size: 0.8125rem; }
+
+/* ── Uber-inspired card system ───────────────────────────────────── */
+.card-lumo {
+    background: #fff;
+    border: 1px solid #E2E2E2;
+    border-radius: 0.875rem;
+    padding: 1.5rem;
+    transition: border-color 200ms, box-shadow 200ms, transform 200ms;
+}
+.card-lumo-hoverable {
+    cursor: pointer;
+}
+.card-lumo-hoverable:hover {
+    border-color: #000;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.10);
+    transform: translateY(-2px);
+}
+
+.card-lumo-dark {
+    background: #000;
+    color: #fff;
+    border-radius: 1.25rem;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ── Sticky glass nav backdrop ───────────────────────────────────── */
+.nav-glass {
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    background: rgba(255,255,255,0.90);
+}
+.nav-glass-dark {
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    background: rgba(0,0,0,0.85);
+}
+
+/* ── Micro-scroll effect for hero photography ────────────────────── */
+.hero-vignette {
+    position: relative;
+}
+.hero-vignette::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 45%, rgba(0,0,0,0) 100%);
+    pointer-events: none;
+}
+
 
 /* Category dots */
 .dot {
