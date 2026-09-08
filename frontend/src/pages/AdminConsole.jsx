@@ -3,7 +3,7 @@ import { Navigate, Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe, DollarSign, Package } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe, DollarSign, Package, Store } from "lucide-react";
 import { toast } from "sonner";
 import AdStudio from "@/components/AdStudio";
 import Distribution from "@/components/Distribution";
@@ -16,11 +16,13 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import AffiliatesTab from "@/pages/admin/AffiliatesTab";
 import UsersTab from "@/pages/admin/UsersTab";
 import ContentTab from "@/pages/admin/ContentTab";
+import ShopTab from "@/pages/admin/ShopTab";
 
 const TABS = [
   { key: "analytics",   label: "Analytics",   icon: BarChart3 },
   { key: "users",       label: "Users",       icon: UserCog },
   { key: "content",     label: "Content",     icon: Package },
+  { key: "shop",        label: "Shop",        icon: Store },
   { key: "payments",    label: "Payments",    icon: KeyRound },
   { key: "blog",        label: "Blog & email", icon: BookOpen },
   { key: "credentials", label: "Credentials", icon: ShieldCheck },
@@ -394,6 +396,7 @@ export default function AdminConsole() {
           {tab === "payments" && <PaymentsAdmin />}
           {tab === "users" && <UsersTab />}
           {tab === "content" && <ContentTab />}
+          {tab === "shop" && <ShopTab />}
           {tab === "blog" && <BlogAdmin />}
           {tab === "visitors" && <VisitorsTab />}
           {tab === "affiliates" && <AffiliatesTab />}

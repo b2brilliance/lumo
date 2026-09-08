@@ -253,6 +253,96 @@ def create_router(
             await db.shop_products.insert_many(docs)
         return {"inserted": len(docs)}
 
+    @router.post("/admin/shop/products/auto-import")
+    async def auto_import(payload: Dict[str, Any], _admin=Depends(require_admin)):
+        """Fetch a retailer product URL and extract title / image / price
+        from Open Graph meta tags. Returns a draft ShopProduct the admin
+        can review and save. No commit until they click Save."""
+        url = (payload.get("url") or "").strip()
+        if not url or not url.startswith(("http://", "https://")):
+            raise HTTPException(400, "Provide a valid product URL (http/https)")
+        try:
+            import httpx
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/120 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+            async with httpx.AsyncClient(follow_redirects=True, timeout=15.0, headers=headers) as client:
+                r = await client.get(url)
+                html = r.text
+        except Exception as e:
+            raise HTTPException(502, f"Could not fetch URL: {e}")
+
+        import re
+        def meta(prop: str) -> Optional[str]:
+            m = re.search(
+                rf'<meta[^>]+(?:property|name)=["\']{re.escape(prop)}["\'][^>]+content=["\']([^"\']+)["\']',
+                html, flags=re.I,
+            )
+            if m: return m.group(1).strip()
+            m = re.search(
+                rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']{re.escape(prop)}["\']',
+                html, flags=re.I,
+            )
+            return m.group(1).strip() if m else None
+
+        title = meta("og:title") or meta("twitter:title")
+        if not title:
+            tm = re.search(r"<title[^>]*>([^<]+)</title>", html, flags=re.I)
+            title = tm.group(1).strip() if tm else ""
+        image = meta("og:image") or meta("twitter:image") or ""
+        description = meta("og:description") or meta("twitter:description") or ""
+        price_raw = (
+            meta("product:price:amount") or meta("og:price:amount") or
+            meta("twitter:data1") or meta("price")
+        )
+        price = None
+        if price_raw:
+            pm = re.search(r"(\d+(?:\.\d+)?)", str(price_raw))
+            if pm:
+                try: price = float(pm.group(1))
+                except Exception: price = None
+
+        # Retailer detection from hostname
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or ""
+        host_l = host.lower()
+        retailer_map = [
+            ("amazon.", "amazon", "Amazon"),
+            ("bestbuy.", "best_buy", "Best Buy"),
+            ("wayfair.", "wayfair", "Wayfair"),
+            ("target.", "target", "Target"),
+            ("walmart.", "walmart", "Walmart"),
+            ("homedepot.", "home_depot", "Home Depot"),
+            ("lowes.", "lowes", "Lowe's"),
+            ("etsy.", "etsy", "Etsy"),
+            ("ebay.", "ebay", "eBay"),
+        ]
+        retailer_value = "other"
+        retailer_label = "Partner"
+        for pat, val, lbl in retailer_map:
+            if pat in host_l:
+                retailer_value = val
+                retailer_label = lbl
+                break
+
+        return {
+            "draft": {
+                "title": title[:200] if title else "",
+                "description": description[:600] if description else "",
+                "image_url": image,
+                "price": price,
+                "price_display": f"${price:.2f}" if price else None,
+                "retailer": retailer_value,
+                "retailer_label": retailer_label,
+                "affiliate_url": url,
+                "category": "other",
+                "is_active": True,
+                "is_featured": False,
+            }
+        }
+
     return router
 
 

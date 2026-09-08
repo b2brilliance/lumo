@@ -7,6 +7,7 @@ import {
   Clock, DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import FeaturedShopWidget from "@/components/FeaturedShopWidget";
 
 /* ── Landing (Feb 2026 Uber-inspired redesign) ────────────────────
  *
@@ -172,6 +173,9 @@ export default function Landing() {
           ))}
         </div>
       </section>
+
+      {/* ═════════════ FEATURED SHOP ═══════════════════════════════════ */}
+      <FeaturedShopWidget />
 
       {/* ═════════════ MARKETPLACE TEASER ══════════════════════════════ */}
       <section className="border-t border-neutral-200 bg-white" data-testid="landing-marketplace">

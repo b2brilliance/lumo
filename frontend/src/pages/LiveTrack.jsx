@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import ChatPanel from "@/components/ChatPanel";
 import useProviderLocationPinger from "@/hooks/useProviderLocationPinger";
 import { toast } from "sonner";
-import { MapPin, Truck, CheckCircle2, Flag, Navigation } from "lucide-react";
+import { MapPin, Truck, CheckCircle2, Flag, Navigation, Phone, MessageCircle } from "lucide-react";
 
 const GOOGLE_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const LIBRARIES = ["places"];
@@ -167,6 +167,48 @@ export default function LiveTrack() {
           {isCustomer ? `Tracking ${tr.provider_name || "your provider"}` : `Heading to ${tr.customer_name || "customer"}`}
         </h1>
         <div className="text-sm text-slate-500 mt-1" data-testid="tracker-job-title">{tr.job_title}</div>
+
+        {/* Post-match action bar — appears the moment a provider accepts.
+            Call is a tel: link; message scrolls the ChatPanel into view. */}
+        {tr.provider_id && !finished && (
+          <div className="mt-4 flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white" data-testid="tracker-contact-bar">
+            {tr.counterparty_avatar_url ? (
+              <img src={tr.counterparty_avatar_url} alt="" className="w-11 h-11 rounded-full object-cover border border-slate-200" />
+            ) : (
+              <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center font-display font-bold text-sm" data-testid="tracker-counterparty-initials">
+                {((isCustomer ? tr.provider_name : tr.customer_name) || "L").slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="overline">{isCustomer ? "Your provider" : "Customer"}</div>
+              <div className="font-display font-semibold text-sm truncate">
+                {isCustomer ? (tr.provider_name || "Provider") : (tr.customer_name || "Customer")}
+              </div>
+            </div>
+            {tr.counterparty_phone && (
+              <a
+                href={`tel:${tr.counterparty_phone}`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors text-sm font-medium"
+                data-testid="tracker-call"
+              >
+                <Phone className="w-4 h-4" /> Call
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const chat = document.querySelector('[data-testid="chat-panel"]') || document.querySelector('aside');
+                if (chat && chat.scrollIntoView) chat.scrollIntoView({ behavior: "smooth", block: "center" });
+                const input = chat && chat.querySelector('input, textarea');
+                if (input) setTimeout(() => input.focus(), 400);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white hover:bg-slate-800 transition-colors text-sm font-medium"
+              data-testid="tracker-message"
+            >
+              <MessageCircle className="w-4 h-4" /> Message
+            </button>
+          </div>
+        )}
 
         <div className="mt-5 border border-slate-200 bg-slate-100" style={{ height: 520 }} data-testid="tracker-map">
           {!GOOGLE_KEY && (

@@ -9,6 +9,15 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 50 — Feb 2026 (this session)
+### 🛠️ Admin Shop Manager + Post-Match Contact Bar + Auto-Import + Featured Home Widget
+- **Admin Shop Manager**: New `/admin?tab=shop` (data-testid `admin-shop-tab`) — list of all products with retailer chips, per-row Show/Hide (data-testid `admin-shop-toggle-{id}`), Edit dialog with 12 fields, Delete confirm, and a top-bar "Paste retailer URL to auto-import…" input.
+- **Retailer Auto-Import**: `POST /api/admin/shop/products/auto-import` — accepts `{url}`, fetches the page with httpx + browser UA, regex-parses OG meta tags for title/image/price/description, detects retailer from hostname across 9 mapped retailers (Amazon, Best Buy, Wayfair, Target, Walmart, Home Depot, Lowe's, Etsy, eBay), and returns a draft ShopProduct the admin can review + save.
+- **Post-Match Contact Bar**: `LiveTrack.jsx` now renders `tracker-contact-bar` under the tracker title the moment `provider_id` is set. Shows counterparty avatar (or initials fallback `tracker-counterparty-initials`), a Call anchor (`tracker-call`, tel: link — only when the tracking endpoint returns `counterparty_phone`) and a Message button (`tracker-message`, focuses the ChatPanel input). Backend `GET /api/jobs/{id}/tracking` extended with `counterparty_phone` + `counterparty_avatar_url`.
+- **Featured Shop Widget**: `FeaturedShopWidget.jsx` — 3-card featured-product grid inserted on `Landing.jsx` between the trust bar and Community Market teaser. Card click records affiliate click + opens retailer in a new tab. Silently hides if no featured products exist.
+- **Testing**: iter_50 → **100% backend (12/12 pytest)** + **100% frontend**, zero regressions vs iter_49.
+
+
 ## Iteration 48–49 — Feb 2026 (this session)
 ### 🛍️ Affiliate Shop + Live Tracker + Provider Video + Instant Payout
 - **Affiliate Shop (`/shop`) — new**: Public product feed importing 25 seed items across Amazon, Best Buy, Wayfair, Target, Walmart. New `backend/shop.py` with `create_router` + `seed_shop_products` boot hook. Endpoints: `GET /api/shop/products` (with retailer / category / q / featured / pagination filters), `GET /api/shop/retailers`, `GET /api/shop/categories`, `POST /api/shop/click/{id}` (records click + returns affiliate URL), plus admin CRUD (`POST/PATCH/DELETE /api/admin/shop/products`, `POST /api/admin/shop/products/bulk`). Frontend `Shop.jsx` has retailer chips, featured strip, product cards (with retailer accent badge + rating), disclosure block, and an affiliate-marketing tagline. Lumo does NOT fulfill or ship — clicks open the retailer in a new tab. NavBar gained `nav-shop` for guests + customers.

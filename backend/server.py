@@ -1232,6 +1232,16 @@ async def get_tracking(job_id: str, user: dict = Depends(get_current_user)):
     dest = _tracking_destination(j)
     prov_loc = j.get("provider_live_location")
     eta = _eta_minutes(prov_loc, dest) if prov_loc else None
+    # Look up counterparty phone/avatar so the tracker can offer a
+    # one-tap call/message the moment the provider accepts.
+    counterparty_id = j.get("provider_id") if user["id"] == j.get("customer_id") else j.get("customer_id")
+    counterparty_phone = None
+    counterparty_avatar_url = None
+    if counterparty_id:
+        cp = await db.users.find_one({"id": counterparty_id}, {"phone": 1, "avatar_url": 1, "_id": 0})
+        if cp:
+            counterparty_phone = cp.get("phone")
+            counterparty_avatar_url = cp.get("avatar_url")
     return {
         "job_id": job_id,
         "tracking_status": j.get("tracking_status") or ("accepted" if j.get("provider_id") else None),
@@ -1240,6 +1250,8 @@ async def get_tracking(job_id: str, user: dict = Depends(get_current_user)):
         "provider_name": j.get("provider_name"),
         "customer_id": j.get("customer_id"),
         "customer_name": j.get("customer_name"),
+        "counterparty_phone": counterparty_phone,
+        "counterparty_avatar_url": counterparty_avatar_url,
         "provider_live_location": prov_loc,
         "destination": dest,
         "pickup_location": j.get("pickup_location"),
