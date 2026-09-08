@@ -65,9 +65,9 @@ export default function Landing() {
         <meta name="description" content="Lumo is the on-demand marketplace for real-world help. Delivery, cleaning, moving, mechanics, tutors, pet care and 30+ more services. Providers keep 90%." />
       </Helmet>
 
-      {/* ═════════════ HERO ═════════════════════════════════════════════ */}
+      {/* ═════════════ HERO + SERVICES (unified) ══════════════════════ */}
       <section className="relative overflow-hidden bg-white" data-testid="landing-hero">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-16 sm:py-24 lg:py-32 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-16 sm:pt-20 lg:pt-24 pb-4 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <div className="overline mb-4" data-testid="hero-overline">On-demand marketplace</div>
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-black leading-[1.02] tracking-tight">
@@ -94,16 +94,6 @@ export default function Landing() {
                 Find help <ArrowRight className="w-4 h-4" />
               </button>
             </form>
-
-            {/* Quick actions */}
-            <div className="mt-6 flex flex-wrap items-center gap-2 text-sm">
-              <span className="overline text-[10px]">Quick book:</span>
-              {SERVICES.slice(0, 4).map((s) => (
-                <Link key={s.key} to={s.to} className="btn-lumo btn-lumo-secondary btn-lumo-sm" data-testid={`hero-quick-${s.key}`}>
-                  <s.Icon className="w-3.5 h-3.5" /> {s.label}
-                </Link>
-              ))}
-            </div>
           </div>
 
           {/* Right — photograph with vignette */}
@@ -120,21 +110,16 @@ export default function Landing() {
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ═════════════ SERVICE GRID ═════════════════════════════════════ */}
-      <section className="border-t border-neutral-200" data-testid="landing-services">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-16 sm:py-24">
-          <div className="flex items-end justify-between mb-10 gap-4 flex-wrap">
-            <div>
-              <div className="overline mb-3">Book now</div>
-              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-black leading-tight tracking-tight">Every service, one app.</h2>
-            </div>
-            <Link to="/services" className="btn-lumo btn-lumo-outline btn-lumo-sm" data-testid="services-all">
+        {/* Service tiles — same section, no visual break */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pb-16 sm:pb-24" data-testid="landing-services">
+          <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+            <div className="overline">Or jump straight in</div>
+            <Link to="/services" className="btn-lumo btn-lumo-ghost" data-testid="services-all">
               All services <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6" data-testid="services-grid">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" data-testid="services-grid">
             {SERVICES.map((s) => {
               const Icon = s.Icon;
               return (
