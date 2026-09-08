@@ -137,7 +137,6 @@ export default function SiteFooter() {
               <Link to="/providers"     className="text-slate-700 hover:text-teal-700" data-testid="footer-link-providers">Provider cities</Link>
               <Link to="/apply"         className="text-slate-700 hover:text-teal-700" data-testid="footer-link-apply">Apply now</Link>
               <Link to="/list-your-stuff"   className="text-slate-700 hover:text-teal-700" data-testid="footer-link-list-stuff">List your stuff</Link>
-              <Link to="/rentals/host"      className="text-slate-700 hover:text-teal-700" data-testid="footer-link-host-rental">Host a rental</Link>
               <Link to="/cities"            className="text-slate-700 hover:text-teal-700" data-testid="footer-link-cities">All cities</Link>
               <Link to="/map"               className="text-slate-700 hover:text-teal-700" data-testid="footer-link-jobs">Jobs near you</Link>
             </nav>
@@ -145,14 +144,10 @@ export default function SiteFooter() {
 
           {/* Marketplaces */}
           <div className="md:col-span-2">
-            <div className="overline text-slate-500 mb-2">Marketplaces</div>
+            <div className="overline text-slate-500 mb-2">Browse</div>
             <nav className="flex flex-col gap-1.5 text-sm">
+              <Link to="/services"     className="text-slate-700 hover:text-teal-700" data-testid="footer-link-services">All services</Link>
               <Link to="/marketplace"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-marketplace">Community Market</Link>
-              <Link to="/stores"       className="text-slate-700 hover:text-teal-700" data-testid="footer-link-stores">Stores</Link>
-              <Link to="/restaurants"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-restaurants">Restaurants</Link>
-              <Link to="/rentals"      className="text-slate-700 hover:text-teal-700" data-testid="footer-link-rentals">Rentals</Link>
-              <Link to="/real-estate"  className="text-slate-700 hover:text-teal-700" data-testid="footer-link-realestate">Real Estate</Link>
-              <Link to="/autos"        className="text-slate-700 hover:text-teal-700" data-testid="footer-link-autos">Auto Sales</Link>
             </nav>
           </div>
 

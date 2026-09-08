@@ -9,6 +9,19 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 45 — Feb 2026 (this session)
+### 🔀 P2P-only pivot — kill stores/restaurants/rentals/autos + role-siloed nav
+- **Backend**:
+  - `BUSINESS_ROLES_DISABLED = {retailer, restaurant}` added; `POST /auth/register` rejects those roles with a 400 pointing users to sign up as providers instead.
+  - New startup hook `_deactivate_business_accounts` stamps `deactivated_at` on every existing retailer/restaurant so they're preserved (not deleted) but hidden.
+  - Owner admin bootstrap now seeds a password hash (Mason0123 via `OWNER_ADMIN_PASSWORD` env override).
+- **Frontend routing** (App.js): `/stores`, `/restaurants`, `/rentals*`, `/autos*`, `/real-estate*`, `/marketplaces`, `/retailer`, `/restaurant` all redirect to `/services` (or `/marketplace` in one case) via `<Navigate replace />`. Community `/marketplace` stays as the sole P2P surface.
+- **NavBar.jsx (full rewrite)**: Role-siloed nav via `NAV_BY_ROLE` table. Guest → services/marketplace/earn. Customer → services/marketplace/my-orders. Provider → jobs-near-you/dashboard. Admin → admin only. Container `data-testid=nav-{role}` so tests can assert isolation.
+- **Register.jsx**: ROLES list trimmed to Customer + Service provider only. **Landing.jsx**: BROWSE tiles trimmed to Marketplace only. **SiteFooter.jsx**: Marketplaces column replaced with a two-item Browse (services + marketplace).
+- Testing: iteration_45 → **100% backend + 100% frontend**, zero issues. Legacy business accounts confirmed deactivated (not deleted).
+
+
+
 ## Iteration 43 — Feb 2026
 ### Admin CRUD (Users + unified Content)
 - **admin_crud.py (new)**: PATCH /admin/users/{id}, DELETE /admin/users/{id}, GET /admin/content?type={type}, PATCH /admin/content/{type}/{id}, DELETE /admin/content/{type}/{id}, POST /admin/content/bulk-delete, GET /admin/content/types. Whitelisted editable fields per type. Prevents self-deletion of admin account.

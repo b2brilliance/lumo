@@ -124,14 +124,26 @@ function App() {
             <Route path="/training" element={<Training />} />
             <Route path="/services" element={<Services />} />
             <Route path="/provider" element={<Protected roles={["provider"]}><ProviderHub /></Protected>} />
-            <Route path="/retailer" element={<Protected roles={["retailer"]}><StoreManager role="retailer" /></Protected>} />
-            <Route path="/restaurant" element={<Protected roles={["restaurant"]}><StoreManager role="restaurant" /></Protected>} />
-
-            <Route path="/stores" element={<Directory role="retailer" />} />
-            <Route path="/restaurants" element={<Directory role="restaurant" />} />
-            <Route path="/marketplaces" element={<Directory mode="unified" />} />
-            <Route path="/stores/:id" element={<StoreProfile role="retailer" />} />
-            <Route path="/restaurants/:id" element={<StoreProfile role="restaurant" />} />
+            <Route path="/retailer" element={<Navigate to="/services" replace />} />
+            <Route path="/restaurant" element={<Navigate to="/services" replace />} />
+            {/* Legacy business-storefront routes — Lumo is P2P-only now.
+             * Redirect to /services so nobody hits a broken page from a
+             * bookmark or shared link. */}
+            <Route path="/stores" element={<Navigate to="/services" replace />} />
+            <Route path="/stores/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/restaurants" element={<Navigate to="/services" replace />} />
+            <Route path="/restaurants/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/marketplaces" element={<Navigate to="/marketplace" replace />} />
+            <Route path="/rentals" element={<Navigate to="/services" replace />} />
+            <Route path="/rentals/host" element={<Navigate to="/services" replace />} />
+            <Route path="/rentals/inbox" element={<Navigate to="/services" replace />} />
+            <Route path="/rentals/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/autos" element={<Navigate to="/services" replace />} />
+            <Route path="/autos/list" element={<Navigate to="/services" replace />} />
+            <Route path="/autos/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/real-estate" element={<Navigate to="/services" replace />} />
+            <Route path="/real-estate/list" element={<Navigate to="/services" replace />} />
+            <Route path="/real-estate/:id" element={<Navigate to="/services" replace />} />
 
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/marketplace/new" element={<Marketplace />} />
@@ -170,17 +182,7 @@ function App() {
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
             <Route path="/cart" element={<Protected><Cart /></Protected>} />
-            <Route path="/rentals" element={<Rentals />} />
-            <Route path="/rentals/host" element={<Protected><RentalHost /></Protected>} />
-            <Route path="/rentals/inbox" element={<Protected><RentalInbox /></Protected>} />
-            <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />
-            <Route path="/real-estate" element={<RealEstate />} />
-            <Route path="/real-estate/list" element={<Protected><RealEstateList /></Protected>} />
-            <Route path="/real-estate/:id" element={<RealEstateDetail />} />
-            <Route path="/autos" element={<Autos />} />
-            <Route path="/autos/list" element={<Protected><AutoList /></Protected>} />
-            <Route path="/autos/:id" element={<AutoDetail />} />
             <Route path="/inquiries" element={<Protected><Inquiries /></Protected>} />
             <Route path="/inquiries/:id" element={<Protected><Inquiries /></Protected>} />
             <Route path="/work/:category" element={<LandingPage pageType="work" />} />

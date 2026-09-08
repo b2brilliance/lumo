@@ -29,12 +29,7 @@ const SERVICES = [
 ];
 
 const BROWSE = [
-  { key: "food",         label: "Food",         Icon: UtensilsCrossed, to: "/restaurants" },
   { key: "marketplace",  label: "For sale",     Icon: ShoppingBag,     to: "/marketplace" },
-  { key: "autos",        label: "Cars",         Icon: Car,             to: "/autos" },
-  { key: "rentals",      label: "Rentals",      Icon: KeyRound,        to: "/rentals" },
-  { key: "housing",      label: "Housing",      Icon: Home,            to: "/real-estate" },
-  { key: "stores",       label: "Stores",       Icon: Store,           to: "/stores" },
 ];
 
 const COUNTRY_LABELS = {
@@ -53,8 +48,8 @@ export default function Landing() {
   const submit = (e) => {
     e?.preventDefault?.();
     const query = q.trim();
-    if (!query) { nav("/map"); return; }
-    nav(`/stores?q=${encodeURIComponent(query)}`);
+    if (!query) { nav("/services"); return; }
+    nav(`/services?q=${encodeURIComponent(query)}`);
   };
 
   const locLabel = COUNTRY_LABELS[country] || country || "Set location";

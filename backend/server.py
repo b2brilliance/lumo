@@ -161,7 +161,11 @@ def clean_doc(doc: dict) -> dict:
 # ────────────────────────────────────────────────────────────────────────────
 # Models
 # ────────────────────────────────────────────────────────────────────────────
+# NOTE: retailer + restaurant were removed as PUBLIC roles (Lumo is P2P-only
+# now). We keep them in the Literal so existing legacy accounts in Mongo still
+# validate on read, but the /auth/register endpoint rejects them.
 Role = Literal["customer", "provider", "retailer", "restaurant", "admin"]
+BUSINESS_ROLES_DISABLED = {"retailer", "restaurant"}
 PayUnit = Literal["hour", "day", "week", "flat"]
 PaymentMethod = Literal["app", "cash", "card"]
 
@@ -565,8 +569,16 @@ from referrals import (  # noqa: E402
 @api.post("/auth/register")
 async def register(body: UserCreate, request: Request):
     email = body.email.lower()
+    # Business-account signups are disabled — Lumo is P2P-only until we
+    # expand back to storefronts. Anyone signing up as a retailer or
+    # restaurant is redirected to become a service provider instead.
+    if body.role in BUSINESS_ROLES_DISABLED:
+        raise HTTPException(
+            status_code=400,
+            detail="Business accounts (retailer / restaurant) are temporarily disabled. Register as a service provider instead.",
+        )
     # Providers MUST upload a profile photo at sign-up so customers can see
-    # who's coming to their door. Customers/retailers/restaurants are optional.
+    # who's coming to their door.
     if body.role == "provider" and not body.avatar_url:
         raise HTTPException(status_code=400, detail="Profile photo is required for service providers")
     # Brute-force protection: 20 attempts per IP per 15 min. Higher than
@@ -7295,6 +7307,22 @@ async def _ensure_owner_admin():
         "created_at": now_iso(),
     })
     logger.info(f"Bootstrapped owner-admin account: {OWNER_ADMIN_EMAIL}")
+
+
+@app.on_event("startup")
+async def _deactivate_business_accounts():
+    """Lumo pivoted to P2P-only — existing retailer / restaurant accounts
+    can still log in but their storefronts / catalogs are hidden. On next
+    login they get a banner telling them to re-register as a provider."""
+    res = await db.users.update_many(
+        {"role": {"$in": list(BUSINESS_ROLES_DISABLED)}, "deactivated_at": {"$exists": False}},
+        {"$set": {
+            "deactivated_at": now_iso(),
+            "deactivated_reason": "business_accounts_paused_p2p_pivot",
+        }},
+    )
+    if res.modified_count:
+        logger.info(f"Deactivated {res.modified_count} legacy business accounts (retailer/restaurant)")
 
 app.add_middleware(
     CORSMiddleware,

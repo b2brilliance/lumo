@@ -18,10 +18,8 @@ import {
 
 // ── Role catalog ──────────────────────────────────────────────────────────
 const ROLES = [
-  { value: "customer",   label: "Customer",   icon: UserIcon,        desc: "Post requests, book services, shop & order. Also for recruiters and staffing-agency contacts." },
-  { value: "provider",   label: "Service provider", icon: Briefcase, desc: "On-demand gigs · staffing & temp shifts · remote contracts · salaried openings." },
-  { value: "retailer",   label: "Retailer",   icon: Store,           desc: "Open a storefront with inventory and delivery." },
-  { value: "restaurant", label: "Restaurant", icon: UtensilsCrossed, desc: "List your menu and accept delivery orders." },
+  { value: "customer",   label: "Customer",   icon: UserIcon,        desc: "Post requests, book services, shop & order." },
+  { value: "provider",   label: "Service provider", icon: Briefcase, desc: "Individuals & businesses offering services to customers. On-demand gigs · staffing shifts · remote contracts." },
 ];
 
 // Employment-type catalog (providers only).
@@ -130,7 +128,7 @@ export default function Register() {
     setBusy(false);
     if (r.ok) {
       toast.success("Welcome to Lumo");
-      const dest = { customer: "/customer", provider: "/provider", retailer: "/retailer", restaurant: "/restaurant" }[r.user.role] || "/";
+      const dest = { customer: "/customer", provider: "/provider" }[r.user.role] || "/";
       nav(dest);
     } else setErr(r.error);
   };
