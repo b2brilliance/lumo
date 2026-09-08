@@ -33,15 +33,122 @@ export function AboutPage() {
 }
 
 export function ContactPage() {
+  const [form, setForm] = React.useState({ name: "", email: "", topic: "general", subject: "", message: "" });
+  const [busy, setBusy] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setError("");
+    try {
+      const { api } = await import("@/lib/api");
+      await api.post("/contact", form);
+      setSent(true);
+      setForm({ name: "", email: "", topic: "general", subject: "", message: "" });
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Something went wrong. Please email us directly.");
+    } finally { setBusy(false); }
+  };
+
   return (
     <Page title="Contact us" testId="page-contact">
-      <p>We&apos;d love to hear from you — questions, feedback, partnerships, press.</p>
-      <h2>General inquiries</h2>
-      <p><a href="mailto:hello@golumo.app">hello@golumo.app</a></p>
-      <h2>Support</h2>
-      <p>If you have an issue with a job, order, or payout, please reach out via your in-app inbox or email <a href="mailto:support@golumo.app">support@golumo.app</a>.</p>
-      <h2>Press & partnerships</h2>
-      <p><a href="mailto:press@golumo.app">press@golumo.app</a></p>
+      <p>Questions, feedback, partnerships, press — we&apos;d love to hear from you. Fill out the form and we&apos;ll reply within 24 hours.</p>
+
+      {sent ? (
+        <div className="not-prose mt-6 border-l-4 border-teal-600 bg-teal-50 p-6" data-testid="contact-form-success">
+          <div className="font-display font-bold text-lg text-slate-900">Thanks — got it.</div>
+          <p className="text-sm text-slate-700 mt-2">We&apos;ll get back to you at the email you provided within 24 hours. If it&apos;s urgent, message us via your in-app inbox once you have an account.</p>
+          <button
+            type="button"
+            onClick={() => setSent(false)}
+            className="mt-4 text-sm font-mono uppercase tracking-widest text-teal-700 hover:underline"
+            data-testid="contact-form-send-another"
+          >
+            Send another →
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="not-prose mt-6 space-y-4" data-testid="contact-form">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">Name</label>
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full border border-slate-300 bg-white h-11 px-3 text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
+                data-testid="contact-form-name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">Email</label>
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full border border-slate-300 bg-white h-11 px-3 text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
+                data-testid="contact-form-email"
+              />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">Topic</label>
+              <select
+                value={form.topic}
+                onChange={(e) => setForm({ ...form, topic: e.target.value })}
+                className="w-full border border-slate-300 bg-white h-11 px-3 text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
+                data-testid="contact-form-topic"
+              >
+                <option value="general">General inquiry</option>
+                <option value="support">Account / support issue</option>
+                <option value="partnership">Partnership / business</option>
+                <option value="press">Press / media</option>
+                <option value="feedback">Feedback / feature request</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">Subject (optional)</label>
+              <input
+                value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                className="w-full border border-slate-300 bg-white h-11 px-3 text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
+                data-testid="contact-form-subject"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">Message</label>
+            <textarea
+              required
+              rows={6}
+              minLength={5}
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              className="w-full border border-slate-300 bg-white p-3 text-sm focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none"
+              data-testid="contact-form-message"
+            />
+          </div>
+          {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 p-3" data-testid="contact-form-error">{error}</div>}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <p className="text-[11px] font-mono uppercase tracking-widest text-slate-400">Never shared. Never sold.</p>
+            <button
+              type="submit"
+              disabled={busy}
+              className="bg-slate-900 text-white hover:bg-teal-700 disabled:opacity-60 h-11 px-6 text-sm font-mono uppercase tracking-widest"
+              data-testid="contact-form-submit"
+            >
+              {busy ? "Sending…" : "Send message →"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <hr className="my-8 border-slate-200" />
+      <h2>Prefer email?</h2>
+      <p>Reach us direct: <a href="mailto:hello@golumo.app">hello@golumo.app</a> for general questions, <a href="mailto:press@golumo.app">press@golumo.app</a> for media.</p>
     </Page>
   );
 }

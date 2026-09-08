@@ -300,17 +300,12 @@ async def _save_image(image_bytes: bytes) -> tuple[str, str]:
     and return (image_url, image_path)."""
     img_id = str(uuid.uuid4())
     image_path = f"blog/{img_id}.jpg"
-    try:
-        from server import put_object  # type: ignore
-        put_object(image_path, image_bytes, "image/jpeg")
-        return f"/api/storage/{image_path}", image_path
-    except Exception:
-        import os
-        local_dir = "/app/backend/storage/blog"
-        os.makedirs(local_dir, exist_ok=True)
-        with open(f"{local_dir}/{img_id}.jpg", "wb") as f:
-            f.write(image_bytes)
-        return f"/api/blog-image/{img_id}.jpg", image_path
+    # Object storage is REQUIRED — pod-local disk is ephemeral and files vanish
+    # on redeploy, which breaks blog images on production. If the object-storage
+    # call fails we surface it as a hard error so the caller can retry.
+    from server import put_object  # type: ignore
+    put_object(image_path, image_bytes, "image/jpeg")
+    return f"/api/storage/{image_path}", image_path
 
 
 async def _publish_one(db, force: bool = False) -> dict:

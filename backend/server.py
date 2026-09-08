@@ -7213,6 +7213,13 @@ app.include_router(
     prefix="/api",
 )
 
+# Contact form — public submit + admin view
+from contact import build_contact_router  # noqa: E402
+app.include_router(
+    build_contact_router(get_db=lambda: db, require_admin=_require_admin()),
+    prefix="/api",
+)
+
 # Site-wide settings (social media footer)
 from site_settings import create_router as _create_site_router  # noqa: E402
 app.include_router(_create_site_router(db=db, require_admin=_require_admin()))
