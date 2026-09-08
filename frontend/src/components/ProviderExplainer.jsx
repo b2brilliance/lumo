@@ -260,7 +260,7 @@ export default function ProviderExplainer() {
           {[
             { Icon: Wallet, t: "10% flat fee", b: "You keep 90%" },
             { Icon: Clock, t: "24-hour payout", b: "Via Stripe Connect" },
-            { Icon: ShieldCheck, t: "Escrow protected", b: "Money already secured" },
+            { Icon: ShieldCheck, t: "$25 referral bonus", b: "Per invited provider" },
             { Icon: Star, t: "No lead fees", b: "Only pay when you earn" },
           ].map((h, i) => {
             const HIcon = h.Icon;

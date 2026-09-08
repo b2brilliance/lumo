@@ -9,6 +9,16 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 51 — Feb 2026 (this session)
+### 🎁 Provider Referral $25 Milestone Bonus
+- **Backend `referrals.py`**: New `credit_referrer_milestone()` — when a referred provider's 10th paid job (any credit-type `wallet_transactions` row with `ref_kind` outside {"referral", None}) is written, the referrer's wallet is credited a flat $25 via an atomic `update_one` guard on `milestone_10_awarded_at` (double-pay proof). Logs a `referral_milestones` row + `wallet_transactions` row + `notifications` row. Zero effect for non-provider users, users without a referrer, or after the milestone has fired once.
+- **`_credit_provider()` hook**: Fires `credit_referrer_milestone(db, provider_id=...)` on BOTH the Stripe Connect transfer path and the wallet-fallback path, after the current payout's `wallet_transactions` row is written so it counts toward the total.
+- **`/api/referrals/me` extended**: Now returns `milestone_bonus_amount` (25), `milestone_bonus_goal` (10), `milestone_awarded_count`, `milestone_total_earned`, and a per-recruit `recruits[]` list with `{name, avatar_url, jobs_completed, milestone_goal, milestone_awarded}` — sorted with unpaid + most-progress-first. `reward_copy` updated to advertise "$25 when they complete their first 10 paid jobs".
+- **`ReferralCard.jsx`**: New `referral-milestones` section with total-earned + paid-count summary, per-recruit rows (`referral-recruit-{id}`) with amber progress bars (teal + "+$25 paid" when awarded), and `referral-recruits-empty` fallback.
+- **`ProviderExplainer.jsx`**: Below-video hint tile swapped from "Escrow protected" → "$25 referral bonus / Per invited provider" so the recruitment surface advertises the new bonus.
+- **Testing**: iter_51 → **100% backend (7/7 pytest)** + **100% frontend**, verified idempotency (11th job doesn't double-pay), role guard, empty-referrer guard, and copy accuracy.
+
+
 ## Iteration 50 — Feb 2026 (this session)
 ### 🛠️ Admin Shop Manager + Post-Match Contact Bar + Auto-Import + Featured Home Widget
 - **Admin Shop Manager**: New `/admin?tab=shop` (data-testid `admin-shop-tab`) — list of all products with retailer chips, per-row Show/Hide (data-testid `admin-shop-toggle-{id}`), Edit dialog with 12 fields, Delete confirm, and a top-bar "Paste retailer URL to auto-import…" input.

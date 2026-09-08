@@ -159,6 +159,72 @@ export default function ReferralCard() {
           </details>
         )}
       </div>
+
+      {/* ── Provider recruit milestones ($25 at N jobs) ─────────────── */}
+      {(data.recruits && data.recruits.length > 0) || Number(data.milestone_bonus_amount) > 0 ? (
+        <div className="border-t border-slate-200 bg-slate-50/60 p-6" data-testid="referral-milestones">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <div className="overline flex items-center gap-2">
+                <Gift className="w-4 h-4 text-amber-600" />
+                ${Number(data.milestone_bonus_amount || 0).toFixed(0)} milestone bonus
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed max-w-md">
+                Every provider you invite who completes {data.milestone_bonus_goal || 10} paid jobs
+                puts a flat ${Number(data.milestone_bonus_amount || 0).toFixed(0)} in your wallet —
+                on top of the per-job commission split above.
+              </p>
+            </div>
+            <div className="text-right font-mono text-xs text-slate-500 whitespace-nowrap" data-testid="referral-milestone-totals">
+              <div className="font-display font-bold text-lg text-black">
+                ${Number(data.milestone_total_earned || 0).toFixed(0)}
+              </div>
+              <div>{data.milestone_awarded_count || 0} paid</div>
+            </div>
+          </div>
+          {data.recruits && data.recruits.length > 0 ? (
+            <ul className="divide-y divide-slate-100 border border-slate-200 bg-white" data-testid="referral-recruits">
+              {data.recruits.slice(0, 5).map((r) => {
+                const goal = r.milestone_goal || 10;
+                const pct = Math.min(100, Math.round((r.jobs_completed / goal) * 100));
+                return (
+                  <li key={r.id} className="p-3 flex items-center gap-3" data-testid={`referral-recruit-${r.id}`}>
+                    {r.avatar_url ? (
+                      <img src={r.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-display font-bold flex-shrink-0">
+                        {(r.name || "?").slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-display font-semibold text-sm truncate">{r.name}</div>
+                        <div className="font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                          {r.milestone_awarded ? (
+                            <span className="text-teal-700 font-bold">+${Number(data.milestone_bonus_amount).toFixed(0)} paid</span>
+                          ) : (
+                            <>{r.jobs_completed}/{goal} jobs</>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-1.5 h-1 rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className={`h-full ${r.milestone_awarded ? "bg-teal-600" : "bg-amber-500"} transition-all`}
+                          style={{ width: `${r.milestone_awarded ? 100 : pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-xs text-slate-500 italic" data-testid="referral-recruits-empty">
+              No providers signed up with your code yet. Share your link above to start earning.
+            </p>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

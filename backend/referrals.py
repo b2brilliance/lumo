@@ -155,6 +155,104 @@ async def credit_referrer(
     return record
 
 
+# ── Provider referral milestone bonus (one-time $25 at job #10) ──────
+# When a REFERRED PROVIDER completes their 10th paid job (payout event),
+# their referrer gets a flat $25 milestone bonus on top of the running
+# per-job commission split above. Fires at most once per referred
+# provider — tracked by setting `milestone_10_awarded_at` on their user
+# record before crediting.
+PROVIDER_MILESTONE_JOBS = 10
+PROVIDER_MILESTONE_BONUS = 25.00
+
+
+async def credit_referrer_milestone(
+    db,
+    *,
+    provider_id: str,
+) -> Optional[dict]:
+    """If `provider_id` was referred, is a provider, has just crossed
+    PROVIDER_MILESTONE_JOBS paid completions, and hasn't been paid the
+    milestone bonus yet — credit their referrer's wallet with a flat
+    PROVIDER_MILESTONE_BONUS and log a `referral_milestone` record.
+
+    Returns the created record or None.
+    """
+    if not provider_id:
+        return None
+    prov = await db.users.find_one(
+        {"id": provider_id},
+        {"_id": 0, "role": 1, "referred_by_user_id": 1, "milestone_10_awarded_at": 1},
+    )
+    if not prov or prov.get("role") != "provider":
+        return None
+    referrer_id = prov.get("referred_by_user_id")
+    if not referrer_id:
+        return None
+    if prov.get("milestone_10_awarded_at"):
+        return None  # already paid
+
+    # Count paid payout events for this provider. Any credit-type wallet
+    # transaction with ref_kind != 'referral' counts (job or escrow).
+    count = await db.wallet_transactions.count_documents({
+        "user_id": provider_id,
+        "type": {"$in": ["credit", "stripe_payout"]},
+        "ref_kind": {"$nin": ["referral", None]},
+    })
+    if count < PROVIDER_MILESTONE_JOBS:
+        return None
+
+    now = _now_iso()
+    # Guard: atomic set-if-absent so concurrent payouts don't double-pay.
+    res = await db.users.update_one(
+        {"id": provider_id, "milestone_10_awarded_at": {"$exists": False}},
+        {"$set": {"milestone_10_awarded_at": now}},
+    )
+    if res.modified_count == 0:
+        return None  # someone else got there first
+
+    record = {
+        "id": str(uuid.uuid4()),
+        "referrer_user_id": referrer_id,
+        "source_user_id": provider_id,
+        "source_type": "provider_milestone_10",
+        "amount": PROVIDER_MILESTONE_BONUS,
+        "jobs_completed": count,
+        "created_at": now,
+    }
+    await db.referral_milestones.insert_one(record)
+    await db.users.update_one(
+        {"id": referrer_id},
+        {"$inc": {"wallet_balance": PROVIDER_MILESTONE_BONUS}},
+    )
+    await db.wallet_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": referrer_id,
+        "amount": PROVIDER_MILESTONE_BONUS,
+        "type": "credit",
+        "reason": f"Referral milestone — provider completed {PROVIDER_MILESTONE_JOBS} jobs",
+        "ref_id": record["id"],
+        "ref_kind": "referral_milestone",
+        "created_at": now,
+    })
+    try:
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": referrer_id,
+            "type": "referral_milestone",
+            "title": f"You just earned ${PROVIDER_MILESTONE_BONUS:.0f} 🚀",
+            "body": (
+                f"A provider you referred just completed their {PROVIDER_MILESTONE_JOBS}th job on Lumo. "
+                "Nice work — keep inviting more."
+            ),
+            "link": "/wallet",
+            "read": False,
+            "created_at": now,
+        })
+    except Exception:
+        pass
+    return record
+
+
 # ── Router ─────────────────────────────────────────────────────────────
 def create_router(*, db, get_current_user):
     r = APIRouter(prefix="/referrals", tags=["referrals"])
@@ -202,6 +300,39 @@ def create_router(*, db, get_current_user):
         referred_users = await db.users.count_documents(
             {"referred_by_user_id": user["id"]}
         )
+
+        # Provider recruits — per-referred-provider progress toward the
+        # $25 milestone bonus at PROVIDER_MILESTONE_JOBS completed jobs.
+        recruits = []
+        milestone_total = 0.0
+        milestone_count = 0
+        cur_users = db.users.find(
+            {"referred_by_user_id": user["id"], "role": "provider"},
+            {"_id": 0, "id": 1, "name": 1, "avatar_url": 1, "created_at": 1, "milestone_10_awarded_at": 1},
+        )
+        async for u in cur_users:
+            uid = u["id"]
+            jobs_done = await db.wallet_transactions.count_documents({
+                "user_id": uid,
+                "type": {"$in": ["credit", "stripe_payout"]},
+                "ref_kind": {"$nin": ["referral", None]},
+            })
+            recruits.append({
+                "id": uid,
+                "name": u.get("name") or "New provider",
+                "avatar_url": u.get("avatar_url"),
+                "signed_up_at": u.get("created_at"),
+                "jobs_completed": jobs_done,
+                "milestone_goal": PROVIDER_MILESTONE_JOBS,
+                "milestone_awarded": bool(u.get("milestone_10_awarded_at")),
+                "milestone_awarded_at": u.get("milestone_10_awarded_at"),
+            })
+            if u.get("milestone_10_awarded_at"):
+                milestone_count += 1
+                milestone_total += PROVIDER_MILESTONE_BONUS
+        # Sort: not-yet-earned with most progress first, then already-paid
+        recruits.sort(key=lambda r: (r["milestone_awarded"], -r["jobs_completed"]))
+
         return {
             "code": code,
             "share_url": share_url,
@@ -209,10 +340,15 @@ def create_router(*, db, get_current_user):
             "events": count,
             "total_earned": round(total_earned, 2),
             "recent": recent,
+            "recruits": recruits,
+            "milestone_bonus_amount": PROVIDER_MILESTONE_BONUS,
+            "milestone_bonus_goal": PROVIDER_MILESTONE_JOBS,
+            "milestone_awarded_count": milestone_count,
+            "milestone_total_earned": round(milestone_total, 2),
             "reward_copy": (
-                "You earn 10% of Lumo's platform commission every time "
-                "someone you referred completes a paid job or order. "
-                "That's roughly $1 for every $100 they earn."
+                f"Invite a provider — get ${PROVIDER_MILESTONE_BONUS:.0f} when they complete "
+                f"their first {PROVIDER_MILESTONE_JOBS} paid jobs, plus 10% of Lumo's platform "
+                "commission on every job they ever do."
             ),
         }
 

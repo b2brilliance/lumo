@@ -1,0 +1,26 @@
+{
+  "summary": "Iter 51 — Provider Referral $25 Milestone Bonus. Backend: 7/7 pytest pass, covering /api/referrals/me shape (new milestone fields + reward_copy), credit_referrer_milestone unit tests (fires exactly once at 10 paid jobs, idempotent on 11th, no fire under threshold, no fire for non-provider role, no fire without referrer, referral-typed txs don't count), and regression of the 1% per-job commission. Frontend: /wallet renders referral-milestones section with milestone-totals ($0 / 0 paid initially), referral-recruits-empty when no recruits, reward_copy contains '$25' and '10 paid jobs'. /for-providers shows the '$25 referral bonus / Per invited provider' tile in the below-video hints grid.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter51_referral_milestone.py",
+    "/app/test_reports/pytest/iter51_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "credit_referrer_milestone uses a $set-if-not-exists atomic guard via update_one with milestone_10_awarded_at $exists=false — good race protection.",
+    "Milestone tx count excludes ref_kind in ['referral', None] — but wallet_transactions rows written without a ref_kind key (e.g. legacy) would also be excluded because $nin treats missing as None. Verified in test_referral_txs_dont_count_toward_milestone. Consider adding an integration test that legacy null-ref_kind rows also don't inflate the count.",
+    "In server.py _credit_provider, milestone check is called after inserting the wallet_transactions row on both the stripe_payout and wallet-fallback paths — correct ordering so the 10th row is visible when the count runs.",
+    "The 1% per-job credit_referrer runs BEFORE the wallet_transactions row for the current payout is inserted; on the wallet-fallback path this means the milestone check counts the current job (row inserted right after credit_referrer). Consistent for both branches. OK.",
+    "referrals.py imports asyncio via 'import asyncio' is not actually used in unit tests file though — cosmetic."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter51_referral_milestone.py"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all data-testids present, copy correct, tile present)"},
+  "test_credentials": "customer@lumo.test / password123 (used for /referrals/me + wallet UI); test uses direct DB inserts for isolated milestone unit tests (TEST_ prefix, cleaned up per test).",
+  "seed_data_creation": "None persisted — all TEST_-prefixed users/wallet_transactions/referral_milestones/notifications are cleaned in per-test try/finally.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "pytest-asyncio 1.4.0 was installed; run backend tests with `pytest --asyncio-mode=auto`. Motor client must be created per-test (function-scoped fixture) so it binds to the current event loop — module-scoped fixtures cause 'Event loop is closed'. Users collection has a unique index on email — always set an email field on TEST_ user inserts."
+}

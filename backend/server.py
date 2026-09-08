@@ -562,6 +562,7 @@ from referrals import (  # noqa: E402
     ensure_referral_code as _ensure_referral_code,
     resolve_ref_code as _resolve_ref_code,
     credit_referrer as _credit_referrer,
+    credit_referrer_milestone as _credit_referrer_milestone,
     create_router as _create_referrals_router,
 )
 
@@ -7080,6 +7081,12 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
             "read": False,
             "created_at": now_iso(),
         })
+        # After the payout transaction row is on file, evaluate whether
+        # this provider just crossed the referral-milestone threshold.
+        try:
+            await _credit_referrer_milestone(db, provider_id=provider_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"milestone bonus check failed for provider={provider_id}: {exc}")
         return
 
     # Fallback — simulated wallet credit
@@ -7094,6 +7101,11 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
         "ref_kind": ref_kind,
         "created_at": now_iso(),
     })
+    # Milestone check on the wallet-fallback path too.
+    try:
+        await _credit_referrer_milestone(db, provider_id=provider_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"milestone bonus check failed for provider={provider_id}: {exc}")
 
 
 app.include_router(_create_escrow_router(db=db, get_current_user=get_current_user,
