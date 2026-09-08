@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 47 — verified 4-step Uber-styled OrderService wizard + role-siloed dashboard redirects. Backend regression on POST /api/jobs: 5/5 pytest cases pass (logins for customer/provider/admin, plus delivery + cleaning payload shapes) → 100%. Frontend browser automation: 33/33 checks pass across two runs. Verified: guest /order shows Step 1 with data-testid=order-category-<value> tiles (delivery/cleaning/handyman + order-category-other); clicking tile navigates to /order/<value> and switches to Step 2 with 'Step 2 of 4 · Cleaning' indicator; deep-link /order/cleaning skips Step 1 and lands directly on Step 2; sticky footer shows Continue on Steps 2/3 and 'Send request' on Step 4; Step 2 Continue without a subcategory triggers toast 'Pick a subcategory to continue.' and stays on Step 2; ServiceDetailsForm renders native <select> options driven by category schema; after picking subcategory Continue advances to Step 3 with pickup address input + When toggle (Now/Schedule); selecting Schedule reveals data-testid=order-schedule-at datetime-local input; Continue without address on Step 3 shows toast and stays; Step 4 shows summary rows and the low-key deposit note div[data-testid=summary-deposit-note] containing the exact string 'Nothing charged yet.'; deposit note is absent on Steps 1/2/3 (count()==0 on all three); order-back on Step 2 (deep-linked) goes back a page; submit as authenticated customer returns success page with 'Request sent.' text and data-testid=order-success. Role redirects: provider@lumo.test hitting /, /order/cleaning, /cart is silently redirected to /provider; julius.a.mason@gmail.com (admin) hitting / and /order/cleaning is silently redirected to /admin; guest submitting from Step 4 is routed to /signin.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_jobs_regression.py",
+    "/app/test_reports/pytest/iter47_jobs.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OrderService.jsx is 651 lines — approaching the 700-line file-size guideline. Consider extracting Step1Category / Step2Details / Step3Dispatch / Step4Summary into /components/order/ modules for maintainability.",
+    "goBack() from Step 2 when deep-linked uses nav(-1) which can land on an unrelated previous page; consider nav('/order') for a predictable Step 1 fallback.",
+    "priceNum falls back to parseFloat(form.pay_rate) but form.pay_rate is never user-editable in the wizard; the fallback branch is effectively dead code.",
+    "Deposit note copy references '10% escrow deposit' — main agent should confirm this dollar percentage is authoritative product copy (previously flagged as low-key/subtle).",
+    "SERVICE_META duplicates label/blurb/cta metadata that likely already lives in ALL_CATEGORIES/api.js — potential DRY consolidation."
+  ],
+  "updated_files": ["/app/backend/tests/test_jobs_regression.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% (33/33)"},
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123, julius.a.mason@gmail.com / Mason0123 — all logins returned 200",
+  "seed_data_creation": "Created 2 jobs via /api/jobs (TEST_ Delivery from wizard, TEST_ Cleaning from wizard) plus 1 job through UI submit flow (TEST_ Wizard cleaning). No cleanup performed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "OrderService wizard uses native <select> for subcategory (no data-testid on subcategory selects). Selects can be programmatically set via page.select_option. Step 1 renders POPULAR_CATEGORIES (12 tiles: delivery/moving/cleaning/handyman/auto/roadside/pet_care/landscaping/personal_care/it_support/notary/errand) plus a separate order-category-other button. Deep-linked deep steps use nav(-1) for back."
+}

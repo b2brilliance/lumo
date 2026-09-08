@@ -80,13 +80,49 @@ if (typeof window !== "undefined") {
   initNativeShell();
 }
 
+// Where each role considers "home". Wrong-role hits any siloed route
+// get silently punted here (P2P pivot: no cross-role UX bleed).
+const HOME_FOR_ROLE = {
+  customer: "/",
+  provider: "/provider",
+  admin: "/admin",
+};
+
+function homeFor(user) {
+  if (!user || user === false) return "/";
+  return HOME_FOR_ROLE[user.role] || "/";
+}
+
+// CustomerOnly — allows guests + customers, silently redirects
+// providers/admins to their own home. Used on customer-specific flows
+// (order wizard, cart) so wrong-role logins don't accidentally see them.
+function CustomerOnly({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
+  if (user && user !== false && user.role !== "customer") {
+    return <Navigate to={homeFor(user)} replace />;
+  }
+  return children;
+}
+
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
-  if (!user || user === false) return <Navigate to="/signin" state={{ from: loc.pathname }} />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" />;
+  if (!user || user === false) return <Navigate to="/signin" state={{ from: loc.pathname }} replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to={homeFor(user)} replace />;
   return children;
+}
+
+// Landing gate — if a provider/admin lands on "/", silently send them
+// to their own dashboard. Guests + customers see the marketing landing.
+function RoleAwareLanding() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
+  if (user && user !== false && user.role !== "customer") {
+    return <Navigate to={homeFor(user)} replace />;
+  }
+  return <Landing />;
 }
 
 function App() {
@@ -112,7 +148,7 @@ function App() {
                 testid="app-error"
               >
               <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<RoleAwareLanding />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
@@ -156,8 +192,8 @@ function App() {
             <Route path="/earn" element={<BecomeProvider />} />
             <Route path="/cities" element={<CitiesIndex />} />
             <Route path="/cities/:slug" element={<CityHub />} />
-            <Route path="/order/:service" element={<OrderService />} />
-            <Route path="/order" element={<OrderService />} />
+            <Route path="/order/:service" element={<CustomerOnly><OrderService /></CustomerOnly>} />
+            <Route path="/order" element={<CustomerOnly><OrderService /></CustomerOnly>} />
             <Route path="/remote-jobs" element={<RemoteJobs />} />
             <Route path="/regions/:slug" element={<RegionHub />} />
             <Route path="/regions" element={<RegionHub />} />
@@ -181,7 +217,7 @@ function App() {
             <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
-            <Route path="/cart" element={<Protected><Cart /></Protected>} />
+            <Route path="/cart" element={<Protected roles={["customer"]}><Cart /></Protected>} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />
             <Route path="/inquiries" element={<Protected><Inquiries /></Protected>} />
             <Route path="/inquiries/:id" element={<Protected><Inquiries /></Protected>} />

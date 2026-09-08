@@ -9,6 +9,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 47 — Feb 2026 (this session)
+### 🛒 4-step Uber-styled Order wizard + role-siloed route guards
+- **OrderService.jsx complete rewrite**: Deep-linked `/order/:service` now flows through a wizard with a persistent progress-dots header (`data-testid=order-step-indicator`) + sticky bottom footer CTA:
+  - **Step 1 — Category picker** (skipped when URL has a valid service). 12 popular tiles + Describe-custom-request fallback. `data-testid=order-category-<value>`.
+  - **Step 2 — Details**. Short title, description, schema-driven `ServiceDetailsForm`. Continue is blocked until a subcategory is chosen (toast on invalid).
+  - **Step 3 — Dispatch**. Address input(s) driven by `locationModeFor(cat)` (single onsite / pickup+dropoff), plus Now/Schedule pill toggle with `datetime-local` when scheduled.
+  - **Step 4 — Review**. Summary rows + auto-quote breakdown (delivery/moving/market) + low-key deposit note (`data-testid=summary-deposit-note`) that ONLY appears on this step (per user directive — no heavy deposit advertising elsewhere).
+- **Role-siloed guards (App.js)**: New `RoleAwareLanding` silently redirects logged-in providers → `/provider` and admins → `/admin` when they hit `/`. New `CustomerOnly` wrapper on `/order` and `/order/:service` silently punts wrong-role logins to their own home. `/cart` upgraded to `roles=['customer']`. Redirect targets computed by `homeFor(user)`.
+- **Testing**: iteration_47 → **100% backend (5/5 pytest)** + **100% frontend (33/33 browser)**, zero regressions. Deposit note absent on Steps 1-3, present only on Step 4. Guest+customer flows submit; provider/admin get redirected to their silos across `/`, `/order/*`, `/cart`.
+
+
 ## Iteration 46 — Feb 2026 (this session)
 ### 🎨 Uber-inspired redesign
 - **Design tokens** (`index.css`): flipped root palette to stark black + white with single blue accent (#276EF1). Space Grotesk headings (with -0.02em tracking), IBM Plex Sans body, IBM Plex Mono for overlines/labels. New utility classes: `.btn-lumo` variants (primary/secondary/accent/outline/ghost + sm/lg sizes) — all pill-shaped with active-scale, `.card-lumo` + hoverable variant, `.nav-glass` for glass-blurred sticky nav, `.hero-vignette` for image overlays.
