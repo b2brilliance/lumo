@@ -34,6 +34,7 @@ import StoreManager from "@/pages/StoreManager";
 import Directory from "@/pages/Directory";
 import StoreProfile from "@/pages/StoreProfile";
 import Marketplace from "@/pages/Marketplace";
+import Shop from "@/pages/Shop";
 import MapPage from "@/pages/MapPage";
 import JobDetail from "@/pages/JobDetail";
 import LiveTrack from "@/pages/LiveTrack";
@@ -183,6 +184,7 @@ function App() {
 
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/marketplace/new" element={<Marketplace />} />
+            <Route path="/shop" element={<Shop />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/jobs/:id/track" element={<Protected><LiveTrack /></Protected>} />

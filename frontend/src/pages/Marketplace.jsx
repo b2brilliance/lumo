@@ -593,8 +593,17 @@ export default function Marketplace() {
           )}
         </DialogContent>
       </Dialog>
-      <div className="mt-10 -mx-4 sm:-mx-6">
-        <AffiliateBlock category="marketplace" title="Earn cashback while you shop" subtitle="Cashback portals, gift cards, and exclusive deals from our partners." />
+      <div className="mt-10 -mx-4 sm:-mx-6 border-t border-neutral-200 bg-neutral-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" data-testid="marketplace-shop-teaser">
+          <div>
+            <div className="overline mb-1">Also on Lumo</div>
+            <div className="font-display font-semibold text-xl text-black">Looking for something new instead?</div>
+            <p className="text-sm text-neutral-600 mt-1">Browse hand-picked products from Amazon, Best Buy, Wayfair and more in the Lumo Shop.</p>
+          </div>
+          <a href="/shop" className="btn-lumo btn-lumo-primary flex-shrink-0" data-testid="marketplace-shop-link">
+            Visit the shop →
+          </a>
+        </div>
       </div>
       </div>
     </div>

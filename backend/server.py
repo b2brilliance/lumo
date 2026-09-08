@@ -7240,6 +7240,17 @@ app.include_router(_create_site_router(db=db, require_admin=_require_admin()))
 from admin_data import create_router as _create_admin_data_router  # noqa: E402
 app.include_router(_create_admin_data_router(db=db, require_admin=_require_admin()))
 
+# Affiliate Shop — imported partner products (Amazon, Best Buy, Wayfair, …)
+from shop import create_router as _create_shop_router, seed_shop_products as _seed_shop  # noqa: E402
+app.include_router(_create_shop_router(db=db, get_current_user=get_current_user, require_admin=_require_admin()))
+
+@app.on_event("startup")
+async def _seed_shop_on_boot():
+    try:
+        await _seed_shop(db)
+    except Exception as e:
+        logger.warning(f"[shop] seed skipped: {e}")
+
 # Admin payments (Stripe API keys editor — encrypted at rest)
 from admin_payments import create_router as _create_admin_payments_router  # noqa: E402
 app.include_router(_create_admin_payments_router(db=db, require_admin=_require_admin()))

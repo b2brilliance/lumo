@@ -1,0 +1,22 @@
+{
+  "summary": "Retested the 2 medium bugs from iteration_48. Both fixes verified via UI + network capture on the preview URL. Shop.jsx: default view now renders shop-featured with exactly 3 featured cards and 22 non-featured cards in the grid (no duplicates). Amazon retailer chip hides shop-featured and renders 6 cards in the grid, including the previously-missing featured Amazon Echo Dot. Search 'echo' hides the featured strip and returns the Echo Dot in the grid (featured product matches search). ProviderHub.jsx: seeded provider@lumo.test wallet with $50 credit via motor; on hub load walletBalance is fetched from GET /api/wallet and header shows $50.00. provider-instant-payout enabled → clicking POSTs /api/wallet/withdraw with body {\"amount\":50,\"method\":\"bank_transfer\"} (matches header amount). After response header updates to $0.00 and button becomes disabled=true. Second click at $0 is a no-op (disabled button — no POST fires, no toast). Note: the disabled attribute means the onClick zero-balance info toast branch cannot fire; the tooltip title 'Complete a job to earn a payout' provides the equivalent affordance.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ProviderHub instant payout: because the button carries the native `disabled` attribute at $0, the onClick zero-balance branch (toast.info('Complete a job to earn a payout')) is unreachable. Either drop the disabled attribute and rely on the walletBalance<=0 guard in onClick, or rely on the tooltip alone. Currently harmless — the safer 'disabled' behavior wins — but the info-toast code path is dead. Minor.",
+    "ProviderHub loadWallet still races with the initial user object read (`useState(Number(user.wallet_balance || 0))`). If GET /api/wallet fails, the stale user.wallet_balance is used. Consider setting initial state to `null` and gating the header on that, or falling back to 0 explicitly on error."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only retest)", "frontend": "100% (6/6 test cases passed)"},
+  "test_credentials": "provider@lumo.test / password123 (verified). Seeded a fresh $50 wallet credit for the retest via motor: db.users.$inc wallet_balance=50 + wallet_transactions insert.",
+  "seed_data_creation": "Inserted 1 wallet_transactions row (TEST_retest seed credit +$50) and incremented provider@lumo.test wallet_balance by $50 before the ProviderHub test. Test then withdrew the $50 via the UI, leaving the wallet back at $0.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both iteration_48 medium bugs are fixed and verified in iteration_49. Shop.jsx featured/rest memos now use a `filterActive` flag so the featured strip vanishes on filter/query but featured products still appear in the grid. ProviderHub reads GET /api/wallet on mount into local walletBalance state which drives both the header amount and the disabled gate — clicking withdraws exactly the header value, then zeros the header and disables the button. Provider wallet is currently $0 again after the retest (drew down the $50 seed). If retesting is required, re-seed via /app/backend motor as documented above."
+}

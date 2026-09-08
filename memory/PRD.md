@@ -9,6 +9,16 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 48–49 — Feb 2026 (this session)
+### 🛍️ Affiliate Shop + Live Tracker + Provider Video + Instant Payout
+- **Affiliate Shop (`/shop`) — new**: Public product feed importing 25 seed items across Amazon, Best Buy, Wayfair, Target, Walmart. New `backend/shop.py` with `create_router` + `seed_shop_products` boot hook. Endpoints: `GET /api/shop/products` (with retailer / category / q / featured / pagination filters), `GET /api/shop/retailers`, `GET /api/shop/categories`, `POST /api/shop/click/{id}` (records click + returns affiliate URL), plus admin CRUD (`POST/PATCH/DELETE /api/admin/shop/products`, `POST /api/admin/shop/products/bulk`). Frontend `Shop.jsx` has retailer chips, featured strip, product cards (with retailer accent badge + rating), disclosure block, and an affiliate-marketing tagline. Lumo does NOT fulfill or ship — clicks open the retailer in a new tab. NavBar gained `nav-shop` for guests + customers.
+- **Marketplace cleanup**: Removed the "Earn cashback while you shop" AffiliateBlock; replaced with a subtle `marketplace-shop-teaser` block linking to `/shop`.
+- **Order Live Tracker (Step 4 → success screen)**: `OrderService.jsx` success state now shows 3-layer pulsing ping animation around a check icon, `data-testid=order-track-live` primary CTA that links to `/jobs/:id/track` (the existing LiveTrack page with real-time GPS map + status pill + ETA), plus a secondary `order-see-requests` fallback.
+- **Provider Onboarding Video**: `ProviderExplainer` component (already existed with 4-scene animated tour + optional `REACT_APP_PROVIDER_VIDEO_URL` embed) is now injected at the top of `Register.jsx` whenever `role=provider` on step ≥ 2, wrapped in `data-testid=register-provider-explainer`.
+- **Wallet Instant Payout**: `ProviderHub.jsx` header gained a `provider-instant-payout` pill button. Balance is now sourced live from `GET /api/wallet` (no more stale `user.wallet_balance`); button gates on that state, and click posts `POST /api/wallet/withdraw` with the exact header amount, then zeroes the header and disables the button.
+- **Testing**: iter_48 → **100% backend (10/10 pytest)** + 92% frontend with 2 medium bugs found. iter_49 retest → **100% frontend (6/6)** — both bugs fixed (Shop filter+featured coexistence; ProviderHub live balance source-of-truth).
+
+
 ## Iteration 47 — Feb 2026 (this session)
 ### 🛒 4-step Uber-styled Order wizard + role-siloed route guards
 - **OrderService.jsx complete rewrite**: Deep-linked `/order/:service` now flows through a wizard with a persistent progress-dots header (`data-testid=order-step-indicator`) + sticky bottom footer CTA:

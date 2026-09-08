@@ -17,11 +17,11 @@ import { checkCredentialMatch } from "@/lib/credentialMatch";
 import { KIND_LABEL } from "@/lib/credentialKinds";
 import { providerEarningsBreakdown } from "@/lib/deliveryPricing";
 import { toast } from "sonner";
-import { Wallet, MapPin, Briefcase } from "lucide-react";
+import { Wallet, MapPin, Briefcase, Zap } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
 export default function ProviderHub() {
-  const { user, updateMe } = useAuth();
+  const { user, updateMe, refresh } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [pins, setPins] = useState([]);
@@ -34,6 +34,15 @@ export default function ProviderHub() {
   const [profileBusy, setProfileBusy] = useState(false);
   const [quoteTarget, setQuoteTarget] = useState(null);
   const [myQuotes, setMyQuotes] = useState([]);
+  const [walletBalance, setWalletBalance] = useState(Number(user.wallet_balance || 0));
+  const [payoutBusy, setPayoutBusy] = useState(false);
+  const loadWallet = async () => {
+    try {
+      const { data } = await api.get("/wallet");
+      setWalletBalance(Number(data.balance || 0));
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { loadWallet(); /* eslint-disable-next-line */ }, []);
   const [profile, setProfile] = useState({
     address: user.location?.address || "",
     lat: user.location?.lat || 40.7128,
@@ -224,10 +233,33 @@ export default function ProviderHub() {
           <h1 className="font-display text-4xl font-black tracking-tighter mt-2">Live opportunities</h1>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={async () => {
+              if (walletBalance <= 0) { toast.info("Complete a job to earn a payout"); return; }
+              setPayoutBusy(true);
+              try {
+                await api.post("/wallet/withdraw", { amount: walletBalance, method: "bank_transfer" });
+                toast.success(`Instant payout requested — $${walletBalance.toFixed(2)} on the way to your bank`);
+                setWalletBalance(0);
+                await refresh?.();
+              } catch (err) {
+                toast.error(formatApiError(err));
+              } finally {
+                setPayoutBusy(false);
+              }
+            }}
+            disabled={walletBalance <= 0 || payoutBusy}
+            className="btn-lumo btn-lumo-primary btn-lumo-sm disabled:opacity-40"
+            data-testid="provider-instant-payout"
+            title={walletBalance <= 0 ? "Complete a job to earn a payout" : "Cash out today's earnings"}
+          >
+            <Zap className="w-3.5 h-3.5" /> Instant payout
+          </button>
           <Link to="/wallet" className="border border-slate-200 px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50" data-testid="provider-wallet-link">
             <Wallet className="w-4 h-4 text-teal-700" />
             <span className="overline">Wallet</span>
-            <span className="font-display font-bold">${Number(user.wallet_balance || 0).toFixed(2)}</span>
+            <span className="font-display font-bold">${walletBalance.toFixed(2)}</span>
           </Link>
           <Link to="/credentials" className="border border-slate-200 px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50" data-testid="provider-credentials-link">
             <span className="overline">Credentials</span>

@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import {
   LogOut, MapPin, Sparkles, ShoppingBag, Briefcase, User,
-  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck,
+  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store,
 } from "lucide-react";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
@@ -27,11 +27,13 @@ const NAV_BY_ROLE = {
   guest: [
     { to: "/services",   label: "Services",   icon: Sparkles, testId: "nav-services" },
     { to: "/marketplace",label: "Marketplace",icon: ShoppingBag, testId: "nav-marketplace" },
+    { to: "/shop",       label: "Shop",       icon: Store, testId: "nav-shop" },
     { to: "/for-providers", label: "Earn",    icon: HardHat, testId: "nav-earn" },
   ],
   customer: [
     { to: "/services",   label: "Services",   icon: Sparkles, testId: "nav-services" },
     { to: "/marketplace",label: "Marketplace",icon: ShoppingBag, testId: "nav-marketplace" },
+    { to: "/shop",       label: "Shop",       icon: Store, testId: "nav-shop" },
     { to: "/customer",   label: "My orders",  icon: User,     testId: "nav-customer" },
   ],
   provider: [

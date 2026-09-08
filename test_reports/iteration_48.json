@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 48 — Verified 4 new Lumo features: Affiliate Shop (/shop + admin CRUD), OrderService live-tracker success screen, Provider Register explainer, and ProviderHub Instant payout. Backend: 10/10 pytest cases pass — public shop endpoints (products/retailers/categories/click), admin CRUD guards (unauth+customer blocked, admin CRUD flow works), wallet/withdraw responds 200 for provider. Frontend: all requested data-testids present. Confirmed: /shop renders with page-shop/shop-search-input/shop-retailer-bar; 25 seeded product cards; retailer chips (all/amazon/best_buy/wayfair/target/walmart) filter correctly; featured strip shows exactly 3 items when All+no query and hides when a retailer or query is set; product click calls POST /api/shop/click/{id} and opens affiliate URL in a new tab (verified popup url=https://www.amazon.com/dp/B09B8V1LZ3); shop-disclosure at bottom. NavBar nav-shop present for guest and customer, absent for provider. Marketplace: 'Earn cashback while you shop' text is gone, marketplace-shop-teaser + marketplace-shop-link (href=/shop) present. Register: role=provider then Continue reveals register-provider-explainer wrapping provider-explainer; role=customer path does NOT render register-provider-explainer. OrderService: submitting /order/cleaning as customer@lumo.test returns order-success with 3 pulsing (animate-ping/animate-pulse) elements + order-track-live linking to /jobs/{id}/track + order-see-requests fallback. ProviderHub as provider@lumo.test: provider-instant-payout button in header, click triggers /api/wallet/withdraw and shows toast 'Instant payout requested — $540.00 on the way to your bank'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Shop.jsx (rest useMemo, line 64)", "issue": "When a retailer/query filter is applied, `rest` still excludes featured items but the featured strip is also hidden — result: 6 Amazon products in backend render as only 5 cards (Amazon Echo Dot, the featured one, disappears). Fix: when a filter/query is active, include featured products in `rest` (e.g. `rest = (retailer||q) ? products : products.filter(p=>!p.is_featured)`).", "selector": "[data-testid=shop-retailer-amazon]", "priority": "MEDIUM"},
+      {"component": "ProviderHub — provider-instant-payout", "issue": "Spec requires the Instant payout button to be DISABLED at $0 balance and show an info toast when clicked at $0. Actual: wallet chip in header reads '$0.00' but the button is enabled and clicking it calls /api/wallet/withdraw which returns a success toast for $540.00. Either (a) the wallet header value is stale/wrong, or (b) the disabled-at-zero guard isn't wired. Reconcile balance source-of-truth and gate the button (or backend) accordingly.", "selector": "[data-testid=provider-instant-payout]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter48_shop_wallet.py",
+    "/app/test_reports/pytest/iter48_shop.xml"
+  ],
+  "action_items": [
+    "Fix Shop.jsx `rest` memo so featured items still render when a retailer chip or search query is active (currently the Amazon-featured Echo Dot vanishes when Amazon chip is clicked).",
+    "Reconcile ProviderHub wallet balance display vs Instant payout behavior: header shows $0.00 but backend paid out $540. Either surface the real balance in header, disable the button at $0, or both.",
+    "Optional: debounce shop search input so filtering happens as user types (currently requires Enter/Submit — works but discoverability is low)."
+  ],
+  "critical_code_review_comments": [
+    "Shop.jsx `rest` memo (line 64) conflates two concerns; splitting featured vs grid based on whether any filter is active would be clearer and prevent the missing-card bug.",
+    "shop.py aggregate pipelines for /retailers and /categories don't apply the same 60-item pagination as /products — fine for now but worth capping in case seed grows.",
+    "ProviderHub instant payout appears to always post the *cached provider balance* rather than a live re-read; racing with a concurrent withdraw could double-pay. Consider server-side atomic set-to-zero on withdraw."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter48_shop_wallet.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "~92% (feature-coverage: all requested data-testids found; 2 behavioral gaps flagged)"},
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123, julius.a.mason@gmail.com / Mason0123 — all logins returned 200",
+  "seed_data_creation": "Created and deleted 1 admin shop product (TEST_iter48 product) during CRUD test. Submitted 1 cleaning job via OrderService as customer (job id 071c98a6-af63-4334-9fcc-b3c059e7f4de). Recorded 1 click on Amazon Echo Dot product.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Shop.jsx renders 25 seeded products across 5 retailers (amazon=6, best_buy=6, wayfair=6, target=4, walmart=3). Featured strip pulls the 3 products with is_featured=true (Amazon Echo Dot, Wayfair Mid-Century Sofa, Best Buy AirPods Pro). ProviderHub for provider@lumo.test shows wallet=$0.00 in header but withdraw returns $540 — main agent should confirm which is authoritative before disabling the button. OrderService success page renders 3 concentric animate-ping/animate-pulse layers around a check icon."
+}

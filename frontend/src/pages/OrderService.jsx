@@ -242,20 +242,40 @@ export default function OrderService() {
   };
 
   if (done) {
+    const jobId = done !== "sent" ? done : null;
     return (
-      <div className="max-w-lg mx-auto px-4 sm:px-6 py-20 text-center" data-testid="order-success">
-        <div className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center mx-auto">
-          <CheckCircle2 className="w-9 h-9" strokeWidth={2} />
+      <div className="max-w-lg mx-auto px-4 sm:px-6 py-16" data-testid="order-success">
+        {/* Animated pulsing "searching" state — feels like the app is
+            already working the moment you tap submit. */}
+        <div className="relative mx-auto w-40 h-40 flex items-center justify-center">
+          <span className="absolute inset-0 rounded-full bg-black opacity-10 animate-ping" />
+          <span className="absolute inset-4 rounded-full bg-black opacity-15 animate-ping [animation-delay:200ms]" />
+          <span className="absolute inset-8 rounded-full bg-black opacity-20 animate-ping [animation-delay:400ms]" />
+          <div className="relative w-20 h-20 bg-black text-white rounded-full flex items-center justify-center shadow-xl">
+            <CheckCircle2 className="w-10 h-10" strokeWidth={2} />
+          </div>
         </div>
-        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mt-6">Request sent.</h1>
-        <p className="text-neutral-600 mt-3 leading-relaxed">
-          Nearby providers can now see your {meta.label.toLowerCase()} request. You'll get a notification the moment someone accepts — no charge until then.
-        </p>
+
+        <div className="text-center mt-6">
+          <div className="overline">Live search</div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mt-2">Finding a {meta.label.toLowerCase()} pro near you…</h1>
+          <p className="text-neutral-600 mt-3 leading-relaxed">
+            Nearby providers just got pinged. You'll see them arrive on the live map — no charge until someone accepts.
+          </p>
+        </div>
+
         <div className="mt-10 flex flex-col gap-3">
-          <Link to="/customer" className="btn-lumo btn-lumo-primary btn-lumo-lg" data-testid="order-see-requests">
-            See my requests
+          {jobId ? (
+            <Link to={`/jobs/${jobId}/track`} className="btn-lumo btn-lumo-primary btn-lumo-lg" data-testid="order-track-live">
+              Track live <ArrowRight className="w-4 h-4" />
+            </Link>
+          ) : null}
+          <Link to="/customer" className="btn-lumo btn-lumo-secondary" data-testid="order-see-requests">
+            See all my requests
           </Link>
-          <Link to="/" className="text-neutral-500 hover:text-black text-sm underline underline-offset-4">Back to home</Link>
+          <Link to="/" className="text-neutral-500 hover:text-black text-sm underline underline-offset-4 text-center mt-2">
+            Back to home
+          </Link>
         </div>
       </div>
     );

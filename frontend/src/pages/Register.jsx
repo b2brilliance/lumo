@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import AvatarUploader from "@/components/AvatarUploader";
 import QualificationBlock from "@/components/QualificationBlock";
+import ProviderExplainer from "@/components/ProviderExplainer";
 import { QUALIFICATION_SCHEMAS, validateQualification } from "@/lib/providerQualifications";
 import { toast } from "sonner";
 import {
@@ -134,7 +135,16 @@ export default function Register() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12" data-testid="register-wizard">
+    <div data-testid="register-wizard">
+      {/* Provider onboarding video — shows on any step when signing up as a
+          provider. Puts the value proposition (10% fee, 24h payout) front
+          and centre before the applicant has to fill anything. */}
+      {isProvider && step >= 2 && (
+        <div className="-mt-2" data-testid="register-provider-explainer">
+          <ProviderExplainer />
+        </div>
+      )}
+      <div className="max-w-2xl mx-auto px-6 py-12">
       {/* Progress bar */}
       <ol className="flex items-center gap-3 mb-8 text-[10px] font-mono uppercase tracking-widest">
         <StepDot active={step >= 1} done={step > 1} label="Role" testid="step-1" />
@@ -417,6 +427,7 @@ export default function Register() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
