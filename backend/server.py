@@ -7252,27 +7252,41 @@ start_email_loop(app, db)
 
 
 # Make sure the platform owner's email always has admin access on boot.
+# Two ways to sign in:
+#   1. Google OAuth button → matches by email → same admin account
+#   2. Classic email + password using OWNER_ADMIN_PASSWORD
 OWNER_ADMIN_EMAIL = "julius.a.mason@gmail.com"
+OWNER_ADMIN_PASSWORD = os.environ.get("OWNER_ADMIN_PASSWORD", "Mason0123")
 
 
 @app.on_event("startup")
 async def _ensure_owner_admin():
+    owner_hash = hash_password(OWNER_ADMIN_PASSWORD)
     existing = await db.users.find_one({"email": OWNER_ADMIN_EMAIL})
     if existing:
+        # Force role=admin AND make sure the classic password login works.
+        # We refresh the password hash on every boot so if you rotate
+        # OWNER_ADMIN_PASSWORD via the env var, it takes effect on next
+        # deploy. To disable password login for this account entirely,
+        # set OWNER_ADMIN_PASSWORD="" — we then wipe the hash instead.
+        updates = {}
         if existing.get("role") != "admin":
-            await db.users.update_one(
-                {"id": existing["id"]},
-                {"$set": {"role": "admin"}},
-            )
-            logger.info(f"Promoted {OWNER_ADMIN_EMAIL} to admin role")
+            updates["role"] = "admin"
+        if OWNER_ADMIN_PASSWORD:
+            updates["password_hash"] = owner_hash
+        else:
+            updates["password_hash"] = None
+        if updates:
+            await db.users.update_one({"id": existing["id"]}, {"$set": updates})
+            logger.info(f"Refreshed owner-admin ({OWNER_ADMIN_EMAIL}): {list(updates.keys())}")
         return
     await db.users.insert_one({
         "id": str(uuid.uuid4()),
         "email": OWNER_ADMIN_EMAIL,
         "name": "Julius Mason",
         "role": "admin",
-        "password_hash": None,
-        "auth_provider": "google",  # signs in via Google one-tap
+        "password_hash": owner_hash if OWNER_ADMIN_PASSWORD else None,
+        "auth_provider": "google",  # Google one-tap ALSO works for this account
         "wallet_balance": 0.0,
         "location": None,
         "service_radius_miles": 25.0,
