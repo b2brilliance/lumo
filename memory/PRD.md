@@ -10,6 +10,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Per-state US sales tax engine (50 states + DC)
 
 ## Iteration 52 — Feb 2026 (this session)
+### 🛒 1000-product starter catalog + 🔔 Web Push notifications
+- **Shop seed** replaced: `backend/shop_seed_1000.py` generates **1000 products** — 200 each across Amazon, JD.com, Alibaba, Temu (PDD Holdings), Walmart. 8 categories (electronics/home/furniture/beauty/kitchen/gaming/outdoor/apparel), realistic brand pool per retailer, deterministic image via picsum-seed. Uses **retailer-search affiliate URLs** so every click still earns commission via the retailer's cookie window. Idempotent + wipes older seed batches on boot.
+- **Web Push (VAPID)**: `backend/push_notifications.py` — auto-generates a VAPID keypair on first boot (stored in `site_config`), exposes `GET /api/push/public-key`, `POST /api/push/subscribe`, `POST /api/push/unsubscribe`, `GET /api/push/status`, and a `send_push_to_user()` helper that iterates all subscriptions for a user and prunes dead endpoints (404/410).
+- **Hooks**: `_send_push_to_user()` fires on `POST /api/jobs/{id}/accept` (customer gets pinged when a provider accepts) and on every `PUT /api/jobs/{id}/tracking` transition (on_the_way / arrived / in_progress / completed). Wrapped in try/except so a push failure never breaks the API.
+- **Frontend**:
+  - `frontend/public/push-sw.js` — dedicated push service worker (separate from the legacy `/service-worker.js` killswitch) that shows notifications and routes clicks back into the SPA.
+  - `frontend/src/lib/push.js` — `enablePush()`, `disablePush()`, `pushStatus()` helpers.
+  - `Settings.jsx` — new `toggle-push` row in Notifications section with error-tolerant handler.
+  - `OrderService.jsx` — `order-push-optin` prompt card on the request-sent success screen with `order-push-enable` / `order-push-dismiss` buttons.
+  - `Shop.jsx` — "All" retailer chip now sums retailer counts to show the true 1001 total instead of the current-page window.
+- **Testing**: iter_52 → **100% backend (13/13 pytest)** + 95% frontend (headless Chromium can't subscribe to push at OS level, verified via helper mocks + testid presence).
+
+
+## Iteration 52 — Feb 2026 (this session)
 ### 🛒 Shop upgrades — category filters, price range, sort
 - **Backend `/api/shop/products` extended**: New query params `category`, `min_price`, `max_price`, `sort` (featured / price_asc / price_desc / newest / popular). Backwards compatible.
 - **`Shop.jsx` UI**: New category chip row with counts (`shop-category-all` + `shop-category-{value}`), sort dropdown (`shop-sort`), collapsible filters panel with min/max price inputs (`shop-filter-min-price`, `shop-filter-max-price`, `shop-filter-apply`, `shop-filter-clear`), and a Filters toggle (`shop-toggle-filters`). Category + sort are load deps so changes fetch a fresh list.

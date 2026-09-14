@@ -133,7 +133,7 @@ export default function Shop() {
             className={`btn-lumo btn-lumo-sm flex-shrink-0 ${retailer === "" ? "btn-lumo-primary" : "btn-lumo-secondary"}`}
             data-testid="shop-retailer-all"
           >
-            All ({total || products.length})
+            All ({retailers.reduce((n, r) => n + (r.count || 0), 0) || total || products.length})
           </button>
           {retailers.map((r) => (
             <button

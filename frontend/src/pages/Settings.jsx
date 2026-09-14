@@ -16,6 +16,7 @@ import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import AvatarUploader from "@/components/AvatarUploader";
 import ProviderProfileSection from "@/components/ProviderProfileSection";
+import { enablePush, disablePush, pushStatus } from "@/lib/push";
 
 const DEFAULT_NOTIFS = {
   order_updates: true,
@@ -51,6 +52,39 @@ export default function Settings() {
   // ── UI state ───────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
+  const [pushState, setPushState] = useState({ supported: false, permission: "default", subscribed: false });
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    pushStatus().then(setPushState).catch(() => {});
+  }, []);
+
+  const togglePush = async (v) => {
+    setPushBusy(true);
+    try {
+      if (v) {
+        let r;
+        try {
+          r = await enablePush();
+        } catch (err) {
+          r = { ok: false, reason: "error", err };
+        }
+        if (!r.ok) {
+          if (r.reason === "denied") toast.error("Notifications blocked — enable them in your browser settings.");
+          else if (r.reason === "unsupported") toast.error("This browser doesn't support push notifications.");
+          else toast.error("Couldn't enable push notifications on this device.");
+        } else {
+          toast.success("Push notifications on");
+        }
+      } else {
+        try { await disablePush(); } catch (_) { /* ignore */ }
+        toast.success("Push notifications off");
+      }
+      setPushState(await pushStatus());
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   // Re-hydrate when the user object first arrives (Auth boots after first paint).
   useEffect(() => {
@@ -204,6 +238,20 @@ export default function Settings() {
 
       {/* ── Notifications ───────────────────────────────────────────────────── */}
       <SettingsSection icon={Bell} title="Notifications" testid="section-notifs">
+        {pushState.supported && (
+          <ToggleRow
+            label="Push notifications on this device"
+            desc={
+              pushState.permission === "denied"
+                ? "Blocked in browser settings. Enable notifications for this site to turn on."
+                : "Instant pings the moment a provider accepts, is on the way, arrives, or finishes."
+            }
+            checked={pushState.subscribed}
+            onChange={togglePush}
+            testid="toggle-push"
+            disabled={pushBusy || pushState.permission === "denied"}
+          />
+        )}
         <ToggleRow
           label="Order & job updates"
           desc="Real-time pings when a provider responds, an order ships, or a delivery is confirmed."

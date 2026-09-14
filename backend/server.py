@@ -998,6 +998,17 @@ async def accept_job(job_id: str, user: dict = Depends(get_current_user)):
             "read": False,
             "created_at": now_iso(),
         })
+        try:
+            await _send_push_to_user(
+                db,
+                user_id=j["customer_id"],
+                title=f"{user['name']} accepted your request",
+                body="Tap to confirm and pay the 10% deposit.",
+                url=f"/jobs/{job_id}",
+                tag=f"job-{job_id}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[push] accept push failed for job={job_id}: {exc}")
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
 
@@ -1220,6 +1231,19 @@ async def update_tracking_status(job_id: str, body: TrackingStatusUpdate, user: 
             "read": False,
             "created_at": now_iso(),
         })
+        # Also fire a native push notification if the customer has
+        # subscribed. Silent no-op if they haven't.
+        try:
+            await _send_push_to_user(
+                db,
+                user_id=j["customer_id"],
+                title=title,
+                body=body_txt,
+                url=f"/jobs/{job_id}/track",
+                tag=f"job-{job_id}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[push] tracking push failed for job={job_id}: {exc}")
     j = await db.jobs.find_one({"id": job_id})
     return clean_doc(j)
 
@@ -7265,8 +7289,16 @@ from admin_data import create_router as _create_admin_data_router  # noqa: E402
 app.include_router(_create_admin_data_router(db=db, require_admin=_require_admin()))
 
 # Affiliate Shop — imported partner products (Amazon, Best Buy, Wayfair, …)
-from shop import create_router as _create_shop_router, seed_shop_products as _seed_shop  # noqa: E402
+from shop import create_router as _create_shop_router  # noqa: E402
+from shop_seed_1000 import seed_1000_products as _seed_shop  # noqa: E402
 app.include_router(_create_shop_router(db=db, get_current_user=get_current_user, require_admin=_require_admin()))
+
+# Web Push notifications (VAPID + pywebpush)
+from push_notifications import (  # noqa: E402
+    create_router as _create_push_router,
+    send_push_to_user as _send_push_to_user,
+)
+app.include_router(_create_push_router(db=db, get_current_user=get_current_user))
 
 @app.on_event("startup")
 async def _seed_shop_on_boot():
@@ -7274,6 +7306,14 @@ async def _seed_shop_on_boot():
         await _seed_shop(db)
     except Exception as e:
         logger.warning(f"[shop] seed skipped: {e}")
+
+@app.on_event("startup")
+async def _push_subscriptions_index():
+    try:
+        await db.push_subscriptions.create_index("endpoint", unique=True)
+        await db.push_subscriptions.create_index("user_id")
+    except Exception as e:
+        logger.warning(f"[push] index setup skipped: {e}")
 
 # Admin payments (Stripe API keys editor — encrypted at rest)
 from admin_payments import create_router as _create_admin_payments_router  # noqa: E402

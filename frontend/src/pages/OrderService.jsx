@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
 import {
-  ArrowLeft, ArrowRight, MapPin, Clock, Sparkles, CheckCircle2, Check,
+  ArrowLeft, ArrowRight, MapPin, Clock, Sparkles, CheckCircle2, Check, Bell,
   Truck, Wrench, PawPrint, Baby, Scissors, Laptop, HardHat,
   Car, GraduationCap, Camera, ShieldCheck,
   KeyRound, Building2, Zap,
@@ -17,6 +17,7 @@ import AddressInput from "@/components/AddressInput";
 import ServiceDetailsForm from "@/components/ServiceDetailsForm";
 import { computeDeliveryQuote, computeMovingQuote, milesBetween } from "@/lib/deliveryPricing";
 import { computeMarketQuote, NO_BUDGET_CATEGORIES } from "@/lib/serviceQuotes";
+import { enablePush, pushStatus } from "@/lib/push";
 
 /* ─────────────────────────────────────────────────────────────────
  * OrderService — Uber-styled 4-step request wizard.
@@ -264,7 +265,9 @@ export default function OrderService() {
           </p>
         </div>
 
-        <div className="mt-10 flex flex-col gap-3">
+        <PushOptInCard />
+
+        <div className="mt-6 flex flex-col gap-3">
           {jobId ? (
             <Link to={`/jobs/${jobId}/track`} className="btn-lumo btn-lumo-primary btn-lumo-lg" data-testid="order-track-live">
               Track live <ArrowRight className="w-4 h-4" />
@@ -666,6 +669,63 @@ function StepDots({ current }) {
           }`}
         />
       ))}
+    </div>
+  );
+}
+
+/* Push opt-in card — appears on the request-sent success screen.
+   Silently hides itself if the browser doesn't support push or the
+   user is already subscribed. */
+function PushOptInCard() {
+  const [state, setState] = React.useState({ supported: false, permission: "default", subscribed: false });
+  const [busy, setBusy] = React.useState(false);
+  const [dismissed, setDismissed] = React.useState(false);
+
+  React.useEffect(() => {
+    pushStatus().then(setState).catch(() => {});
+  }, []);
+
+  const enable = async () => {
+    setBusy(true);
+    const r = await enablePush();
+    setState(await pushStatus());
+    if (r.ok) toast.success("Push notifications on — we'll ping you when a provider accepts");
+    else if (r.reason === "denied") toast.error("Notifications blocked in your browser");
+    setBusy(false);
+  };
+
+  if (dismissed) return null;
+  if (!state.supported) return null;
+  if (state.subscribed || state.permission === "denied") return null;
+
+  return (
+    <div className="mt-8 border border-neutral-200 rounded-xl p-4 flex items-start gap-3 bg-neutral-50" data-testid="order-push-optin">
+      <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center flex-shrink-0">
+        <Bell className="w-5 h-5" strokeWidth={2} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-display font-semibold text-sm text-black">Ping me when a provider accepts</div>
+        <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
+          Instant push the moment someone takes your job — plus every arrival + completion update.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={enable}
+            disabled={busy}
+            className="btn-lumo btn-lumo-primary btn-lumo-sm"
+            data-testid="order-push-enable"
+          >
+            {busy ? "Enabling…" : "Turn on"}
+          </button>
+          <button
+            onClick={() => setDismissed(true)}
+            className="btn-lumo btn-lumo-ghost btn-lumo-sm"
+            data-testid="order-push-dismiss"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
