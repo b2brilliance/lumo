@@ -80,8 +80,9 @@ For **Amazon only** — save your tag (e.g. `lumo-20`) in `/admin?tab=affiliates
 
 ---
 
-## Step 3 — Add a product (3 clicks)
+## Step 3 — Add products (3 ways)
 
+### Option A — Paste a single URL (best for hand-picking)
 1. Open **`/admin?tab=shop`** as the admin (`julius.a.mason@gmail.com`).
 2. Find the product on the retailer's site. Copy the URL.
    - **Amazon**: use Site Stripe → "Get Link" → Text — the URL already has `?tag=lumo-20`.
@@ -95,6 +96,25 @@ For **Amazon only** — save your tag (e.g. `lumo-20`) in `/admin?tab=affiliates
    - Set **Category** (electronics / home / furniture / kitchen / etc.).
    - Toggle **Featured** for the 3 you want on the homepage widget.
    - Click **Save**. The product is live on `/shop` instantly.
+
+### Option B — CSV bulk upload (best for hundreds/thousands at once)
+1. In `/admin?tab=shop`, click **Template** to download the correct CSV header format.
+2. Grab a product feed CSV from your affiliate network:
+   - **Impact.com** (Best Buy / Target / Walmart / Home Depot): dashboard → **Content → Data Sync → Export product catalog**. Choose CSV. You'll get thousands of rows.
+   - **CJ Affiliate** (Wayfair / Lowe's): **Advertisers → Product Catalog → Download CSV**.
+   - **Awin** (Etsy): **Toolbox → Product Feeds → Download**.
+   - **Amazon PA-API**: once you have API keys, use the `paapi5-python-sdk` to export a CSV — I can wire this for you separately.
+3. Reshape the CSV columns to match Lumo's template. Required columns: `title, image_url, affiliate_url`. Optional: `retailer, retailer_label, category, price, price_display, description, rating, review_count, is_featured, is_active`.
+4. Click **Upload CSV** in `/admin?tab=shop` and pick your file. Products appear on `/shop` immediately.
+
+### Option C — Live API integration (when you have keys)
+For a self-refreshing catalog (products update daily from the retailer), you'll want live API integrations:
+- **Amazon PA-API 5** — needs your Associates account approved + 3 qualified sales in 180 days. Then hand me your access key / secret key / associate tag and I'll wire the ItemSearch loop.
+- **Best Buy Products API** — free at `developer.bestbuy.com`. Rate-limited but fine for daily syncs.
+- **Impact.com Publisher Feed API** — direct XML/JSON feed from your Impact account.
+- Ping me with any of these keys and I'll build the sync as a nightly job.
+
+*(Note: JD.com, Alibaba, and Temu don't offer public product APIs to non-mainland-China developers as of Feb 2026, so CSV / manual paste is the way for those.)*
 
 ## Step 4 — Watch it earn
 

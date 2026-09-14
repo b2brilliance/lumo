@@ -270,8 +270,17 @@ export default function Shop() {
             ))}
           </div>
         ) : products.length === 0 ? (
-          <div className="text-center py-24 text-neutral-500" data-testid="shop-empty">
-            No products match your filters.
+          <div className="text-center py-24 max-w-md mx-auto" data-testid="shop-empty">
+            <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+              <Search className="w-7 h-7 text-neutral-400" strokeWidth={1.5} />
+            </div>
+            <div className="font-display font-semibold text-xl text-black">The shop is being restocked</div>
+            <p className="text-sm text-neutral-500 mt-2 leading-relaxed">
+              We're curating a new lineup of products from Amazon, JD.com, Alibaba, Temu and Walmart with real affiliate links. Check back soon.
+            </p>
+            <Link to="/services" className="btn-lumo btn-lumo-primary btn-lumo-sm mt-6" data-testid="shop-empty-cta">
+              Book a Lumo pro instead
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6" data-testid="shop-grid">

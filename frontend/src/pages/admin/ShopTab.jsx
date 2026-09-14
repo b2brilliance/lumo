@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import React, { useEffect, useState } from "react";import { api, formatApiError } from "@/lib/api";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +8,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Plus, Trash2, Edit3, ExternalLink, Search, Star, Wand2, Eye, EyeOff, Loader2,
+  Plus, Trash2, Edit3, ExternalLink, Search, Star, Wand2, Eye, EyeOff, Loader2, Upload, Download,
 } from "lucide-react";
 
 /* Admin Shop Manager — list + add/import + edit + delete affiliate
@@ -52,6 +51,45 @@ export default function ShopTab() {
   const [editing, setEditing] = useState(null);
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
+  const [csvBusy, setCsvBusy] = useState(false);
+  const csvInputRef = React.useRef(null);
+
+  const uploadCsv = async (file) => {
+    if (!file) return;
+    setCsvBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/admin/shop/products/csv", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (data.inserted > 0) toast.success(`Imported ${data.inserted} products`);
+      else toast.info("No rows imported");
+      if (data.error_count > 0) {
+        toast.warning(`${data.error_count} rows skipped — check CSV headers`);
+        // eslint-disable-next-line no-console
+        console.warn("CSV import errors:", data.errors);
+      }
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setCsvBusy(false);
+      if (csvInputRef.current) csvInputRef.current.value = "";
+    }
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const { data } = await api.get("/admin/shop/products/csv-template", { responseType: "blob" });
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url; a.download = "lumo-shop-template.csv"; a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(formatApiError(err));
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -178,6 +216,33 @@ export default function ShopTab() {
           </div>
           <Button onClick={openNew} className="bg-slate-900 hover:bg-slate-800" data-testid="admin-shop-new">
             <Plus className="w-4 h-4 mr-1" /> New product
+          </Button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => uploadCsv(e.target.files?.[0])}
+            className="hidden"
+            data-testid="admin-shop-csv-input"
+          />
+          <Button
+            onClick={() => csvInputRef.current?.click()}
+            disabled={csvBusy}
+            variant="outline"
+            className="rounded-none"
+            data-testid="admin-shop-csv-upload"
+          >
+            {csvBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+            {csvBusy ? "Uploading…" : "Upload CSV"}
+          </Button>
+          <Button
+            onClick={downloadTemplate}
+            variant="ghost"
+            className="text-slate-600"
+            title="Download a CSV template with correct headers"
+            data-testid="admin-shop-csv-template"
+          >
+            <Download className="w-4 h-4 mr-1" /> Template
           </Button>
         </div>
       </div>

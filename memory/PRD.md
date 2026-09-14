@@ -9,6 +9,18 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 53 — Feb 2026 (this session)
+### 🗑️ Wiped fake seed catalog + 📥 real CSV bulk import
+- **Wiped**: All 1001 placeholder shop products (picsum-seeded generic titles/images from `starter_1000_v1` seed) deleted from MongoDB. Auto-seed on startup has been disabled. Shop starts empty until admin adds real products.
+- **CSV bulk import**:
+  - `POST /api/admin/shop/products/csv` — multipart upload endpoint. Required columns: `title, image_url, affiliate_url`. Optional: `retailer, retailer_label, category, price, price_display, description, rating, review_count, is_featured, is_active`. Skips blank rows, reports per-row errors, handles UTF-8-BOM + latin-1 encodings.
+  - `GET /api/admin/shop/products/csv-template` — returns a downloadable CSV with the exact header + one example row.
+  - Admin ShopTab UI: **Upload CSV** button + **Template** download button next to New product.
+- **/shop empty state redesigned**: Instead of "No products match", empty state now shows a proper "The shop is being restocked" card with an icon and CTA to `/services`.
+- **AFFILIATE_SETUP_GUIDE.md**: Rewrote Step 3 with three add paths — (A) paste URL, (B) CSV bulk from Impact/CJ/Awin product-feed exports, (C) live API when the user gets Amazon PA-API / Best Buy Products API keys. Explicit note that JD.com / Alibaba / Temu don't offer public product APIs outside mainland China, so CSV/paste is the only path there.
+- **Testing**: Backend endpoints validated via curl — template downloads, CSV upload inserts 1 row cleanly, `/shop` total goes 0 → 1 → 0.
+
+
 ## Iteration 52 — Feb 2026 (this session)
 ### 🛒 1000-product starter catalog + 🔔 Web Push notifications
 - **Shop seed** replaced: `backend/shop_seed_1000.py` generates **1000 products** — 200 each across Amazon, JD.com, Alibaba, Temu (PDD Holdings), Walmart. 8 categories (electronics/home/furniture/beauty/kitchen/gaming/outdoor/apparel), realistic brand pool per retailer, deterministic image via picsum-seed. Uses **retailer-search affiliate URLs** so every click still earns commission via the retailer's cookie window. Idempotent + wipes older seed batches on boot.

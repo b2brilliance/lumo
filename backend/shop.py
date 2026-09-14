@@ -27,7 +27,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
@@ -268,6 +268,79 @@ def create_router(
         if docs:
             await db.shop_products.insert_many(docs)
         return {"inserted": len(docs)}
+
+    @router.post("/admin/shop/products/csv")
+    async def csv_import(
+        file: UploadFile = File(...),
+        _admin=Depends(require_admin),
+    ):
+        """CSV bulk import. Accepts a file with headers:
+        title, image_url, affiliate_url, retailer, retailer_label,
+        category, price, price_display, description, rating,
+        review_count, is_featured, is_active.
+        The first three (title, image_url, affiliate_url) are required.
+        Unknown columns are ignored. Blank rows are skipped."""
+        import csv, io
+        raw = await file.read()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1")
+        reader = csv.DictReader(io.StringIO(text))
+        inserted = 0
+        errors: List[str] = []
+        docs = []
+        for idx, row in enumerate(reader, start=2):  # header is row 1
+            row = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+            if not row.get("title") or not row.get("image_url") or not row.get("affiliate_url"):
+                if any(row.values()):
+                    errors.append(f"Row {idx}: missing title/image_url/affiliate_url")
+                continue
+            def _f(k):
+                v = row.get(k)
+                if v in (None, ""): return None
+                try: return float(v)
+                except Exception: return None
+            def _i(k):
+                v = row.get(k)
+                if v in (None, ""): return None
+                try: return int(float(v))
+                except Exception: return None
+            def _b(k, default=True):
+                v = (row.get(k) or "").lower()
+                if v in ("", None): return default
+                return v in ("1", "true", "yes", "y", "on")
+            data = {
+                "title": row["title"][:200],
+                "description": row.get("description", "")[:600],
+                "image_url": row["image_url"],
+                "price": _f("price"),
+                "price_display": row.get("price_display") or (f"${_f('price'):.2f}" if _f("price") else None),
+                "retailer": (row.get("retailer") or "other").lower().replace(" ", "_"),
+                "retailer_label": row.get("retailer_label") or (row.get("retailer") or "Partner").title(),
+                "affiliate_url": row["affiliate_url"],
+                "category": (row.get("category") or "other").lower(),
+                "rating": _f("rating"),
+                "review_count": _i("review_count"),
+                "is_active": _b("is_active", True),
+                "is_featured": _b("is_featured", False),
+            }
+            docs.append(ShopProduct(**data).model_dump())
+        if docs:
+            await db.shop_products.insert_many(docs)
+            inserted = len(docs)
+        return {"inserted": inserted, "errors": errors[:20], "error_count": len(errors)}
+
+    @router.get("/admin/shop/products/csv-template")
+    async def csv_template(_admin=Depends(require_admin)):
+        from fastapi.responses import PlainTextResponse
+        header = "title,image_url,affiliate_url,retailer,retailer_label,category,price,price_display,description,rating,review_count,is_featured,is_active"
+        example = (
+            "Apple AirPods Pro (2nd Gen),https://m.media-amazon.com/images/I/61SUj2aKoEL._AC_SL1500_.jpg,"
+            "https://www.amazon.com/dp/B0BDHWDR12?tag=lumo-20,amazon,Amazon,electronics,199.99,$199.99,"
+            "Active Noise Cancellation with USB-C.,4.7,12000,true,true"
+        )
+        return PlainTextResponse(f"{header}\n{example}\n", media_type="text/csv")
 
     @router.post("/admin/shop/products/auto-import")
     async def auto_import(payload: Dict[str, Any], _admin=Depends(require_admin)):

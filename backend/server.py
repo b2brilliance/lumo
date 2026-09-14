@@ -7289,8 +7289,10 @@ from admin_data import create_router as _create_admin_data_router  # noqa: E402
 app.include_router(_create_admin_data_router(db=db, require_admin=_require_admin()))
 
 # Affiliate Shop — imported partner products (Amazon, Best Buy, Wayfair, …)
+# NOTE: auto-seed disabled — the shop starts empty and only contains
+# products the admin adds via /admin?tab=shop (paste-URL auto-import or
+# CSV bulk upload) or real retailer product feed APIs once keys are set.
 from shop import create_router as _create_shop_router  # noqa: E402
-from shop_seed_1000 import seed_1000_products as _seed_shop  # noqa: E402
 app.include_router(_create_shop_router(db=db, get_current_user=get_current_user, require_admin=_require_admin()))
 
 # Web Push notifications (VAPID + pywebpush)
@@ -7299,13 +7301,6 @@ from push_notifications import (  # noqa: E402
     send_push_to_user as _send_push_to_user,
 )
 app.include_router(_create_push_router(db=db, get_current_user=get_current_user))
-
-@app.on_event("startup")
-async def _seed_shop_on_boot():
-    try:
-        await _seed_shop(db)
-    except Exception as e:
-        logger.warning(f"[shop] seed skipped: {e}")
 
 @app.on_event("startup")
 async def _push_subscriptions_index():
