@@ -150,6 +150,9 @@ def create_router(
         category: Optional[str] = None,
         q: Optional[str] = Query(default=None, description="Free-text search"),
         featured: Optional[bool] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        sort: Optional[str] = Query(default=None, description="featured|price_asc|price_desc|newest|popular"),
         limit: int = 60,
         skip: int = 0,
     ):
@@ -160,14 +163,27 @@ def create_router(
             query["category"] = category
         if featured is not None:
             query["is_featured"] = featured
+        if min_price is not None or max_price is not None:
+            price_q: Dict[str, Any] = {}
+            if min_price is not None:
+                price_q["$gte"] = min_price
+            if max_price is not None:
+                price_q["$lte"] = max_price
+            query["price"] = price_q
         if q:
             query["$or"] = [
                 {"title": {"$regex": q, "$options": "i"}},
                 {"description": {"$regex": q, "$options": "i"}},
             ]
-        cursor = db.shop_products.find(query, {"_id": 0}).sort(
-            [("is_featured", -1), ("click_count", -1), ("created_at", -1)]
-        ).skip(max(0, skip)).limit(max(1, min(200, limit)))
+        sort_map = {
+            "price_asc":  [("price", 1), ("created_at", -1)],
+            "price_desc": [("price", -1), ("created_at", -1)],
+            "newest":     [("created_at", -1)],
+            "popular":    [("click_count", -1), ("created_at", -1)],
+            "featured":   [("is_featured", -1), ("click_count", -1), ("created_at", -1)],
+        }
+        sort_spec = sort_map.get(sort or "featured", sort_map["featured"])
+        cursor = db.shop_products.find(query, {"_id": 0}).sort(sort_spec).skip(max(0, skip)).limit(max(1, min(200, limit)))
         items = await cursor.to_list(length=limit)
         total = await db.shop_products.count_documents(query)
         return {"items": items, "total": total}

@@ -9,6 +9,13 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 52 — Feb 2026 (this session)
+### 🛒 Shop upgrades — category filters, price range, sort
+- **Backend `/api/shop/products` extended**: New query params `category`, `min_price`, `max_price`, `sort` (featured / price_asc / price_desc / newest / popular). Backwards compatible.
+- **`Shop.jsx` UI**: New category chip row with counts (`shop-category-all` + `shop-category-{value}`), sort dropdown (`shop-sort`), collapsible filters panel with min/max price inputs (`shop-filter-min-price`, `shop-filter-max-price`, `shop-filter-apply`, `shop-filter-clear`), and a Filters toggle (`shop-toggle-filters`). Category + sort are load deps so changes fetch a fresh list.
+- **Docs**: `/app/AFFILIATE_SETUP_GUIDE.md` — step-by-step for applying to Amazon Associates, Impact.com (Best Buy/Target/Walmart), CJ (Wayfair/Lowe's), Awin (Etsy) and EPN (eBay), plus how to grab the affiliate URL and paste it into `/admin?tab=shop`. Includes payout schedules, commission rates and a launch checklist.
+
+
 ## Iteration 51 — Feb 2026 (this session)
 ### 🎁 Provider Referral $25 Milestone Bonus
 - **Backend `referrals.py`**: New `credit_referrer_milestone()` — when a referred provider's 10th paid job (any credit-type `wallet_transactions` row with `ref_kind` outside {"referral", None}) is written, the referrer's wallet is credited a flat $25 via an atomic `update_one` guard on `milestone_10_awarded_at` (double-pay proof). Logs a `referral_milestones` row + `wallet_transactions` row + `notifications` row. Zero effect for non-provider users, users without a referrer, or after the milestone has fired once.

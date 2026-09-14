@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { Search, Star, ExternalLink, Info } from "lucide-react";
+import { Search, Star, ExternalLink, Info, SlidersHorizontal, X } from "lucide-react";
 import { api } from "@/lib/api";
 
 /* Shop — affiliate product feed.
@@ -21,30 +21,48 @@ const RETAILER_ACCENT = {
 export default function Shop() {
   const [products, setProducts] = useState([]);
   const [retailers, setRetailers] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [retailer, setRetailer] = useState("");
+  const [category, setCategory] = useState("");
+  const [sort, setSort] = useState("featured");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [total, setTotal] = useState(0);
 
   const load = async () => {
     setLoading(true);
     try {
-      const params = { limit: 120 };
+      const params = { limit: 120, sort };
       if (retailer) params.retailer = retailer;
+      if (category) params.category = category;
       if (q.trim()) params.q = q.trim();
-      const [prod, ret] = await Promise.all([
+      if (minPrice !== "" && !isNaN(Number(minPrice))) params.min_price = Number(minPrice);
+      if (maxPrice !== "" && !isNaN(Number(maxPrice))) params.max_price = Number(maxPrice);
+      const [prod, ret, cat] = await Promise.all([
         api.get("/shop/products", { params }),
-        api.get("/shop/retailers"),
+        retailers.length ? Promise.resolve({ data: { items: retailers } }) : api.get("/shop/retailers"),
+        categories.length ? Promise.resolve({ data: { items: categories } }) : api.get("/shop/categories"),
       ]);
       setProducts(prod.data.items || []);
       setTotal(prod.data.total || 0);
-      setRetailers(ret.data.items || []);
+      if (!retailers.length) setRetailers(ret.data.items || []);
+      if (!categories.length) setCategories(cat.data.items || []);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [retailer]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [retailer, category, sort]);
+
+  const clearAll = () => {
+    setRetailer(""); setCategory(""); setQ(""); setSort("featured");
+    setMinPrice(""); setMaxPrice("");
+  };
+
+  const filtersActive = Boolean(retailer || category || q.trim() || minPrice || maxPrice);
 
   const onSearch = (e) => {
     e?.preventDefault?.();
@@ -128,6 +146,100 @@ export default function Shop() {
             </button>
           ))}
         </div>
+      </section>
+
+      {/* Category chips + sort + advanced filters */}
+      <section className="border-b border-neutral-200 bg-white" data-testid="shop-category-bar">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setCategory("")}
+            className={`text-sm px-3 py-1.5 rounded-full transition-colors ${
+              category === "" ? "bg-black text-white" : "bg-neutral-100 text-black hover:bg-neutral-200"
+            }`}
+            data-testid="shop-category-all"
+          >
+            All categories
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c.value}
+              onClick={() => setCategory(c.value)}
+              className={`text-sm px-3 py-1.5 rounded-full transition-colors capitalize ${
+                category === c.value ? "bg-black text-white" : "bg-neutral-100 text-black hover:bg-neutral-200"
+              }`}
+              data-testid={`shop-category-${c.value}`}
+            >
+              {c.value.replace(/_/g, " ")} <span className="opacity-60">({c.count})</span>
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters((s) => !s)}
+              className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border ${
+                showFilters || minPrice || maxPrice ? "border-black text-black bg-neutral-50" : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
+              }`}
+              data-testid="shop-toggle-filters"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" /> Filters
+            </button>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="text-sm px-3 py-1.5 rounded-full border border-neutral-200 bg-white text-black focus:border-black outline-none cursor-pointer"
+              data-testid="shop-sort"
+            >
+              <option value="featured">Featured</option>
+              <option value="popular">Most popular</option>
+              <option value="newest">Newest</option>
+              <option value="price_asc">Price: low → high</option>
+              <option value="price_desc">Price: high → low</option>
+            </select>
+          </div>
+        </div>
+        {showFilters && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pb-4 flex flex-wrap items-end gap-4" data-testid="shop-filters-panel">
+            <div>
+              <label className="overline text-[10px] block mb-1">Min price</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                placeholder="$0"
+                className="w-28 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:border-black outline-none"
+                data-testid="shop-filter-min-price"
+              />
+            </div>
+            <div>
+              <label className="overline text-[10px] block mb-1">Max price</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                placeholder="$1000"
+                className="w-28 border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:border-black outline-none"
+                data-testid="shop-filter-max-price"
+              />
+            </div>
+            <button
+              onClick={load}
+              className="btn-lumo btn-lumo-primary btn-lumo-sm"
+              data-testid="shop-filter-apply"
+            >
+              Apply
+            </button>
+            {filtersActive && (
+              <button
+                onClick={clearAll}
+                className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-black"
+                data-testid="shop-filter-clear"
+              >
+                <X className="w-3.5 h-3.5" /> Clear all
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Featured strip */}
