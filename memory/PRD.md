@@ -9,6 +9,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 56 — Feb 2026 (this session)
+### 🎯 $100 city milestone + 📣 blog auto-post + 📢 daily recruit broadcast
+- **Milestone bonus reworked**: `$500 after 10 jobs` → `$100 after 100 jobs` for the first 100 providers per city. `recruit_cities._reseed_bonus_amounts` migration bumps legacy $500 rows down on boot. New `credit_city_milestone()` helper fires atomically once per provider (atomic guard on `city_milestone_awarded_at`), gated by `recruit_city_slug` + first-N rank (by created_at) + 100 non-milestone paid `wallet_transactions` rows. Hooked into `_credit_provider` on both Stripe-Connect and wallet-fallback branches.
+- **Social auto-publisher (`social_publisher.py`)**: Facebook Pages, Instagram Business, X (Twitter API v2), Reddit adapters. Graceful `{ok:false, skipped:true}` when creds missing — no 500s. Admin endpoints: `GET /api/admin/social/config`, `PUT /api/admin/social/config/{platform}`, `POST /api/admin/social/test`, `GET /api/admin/social/history` (paged). Persists every publish attempt into `social_posts` with per-platform status.
+- **Blog fanout**: `blog.py _share_to_channels` rewritten to lazy-import `_social_publish`. Every blog post going to `status=published` fans out to whichever channels are enabled.
+- **Daily recruit broadcast**: `recruit_autopost_loop()` cycles once per day, picks a random copy template per active city, composes {title, body, url=/join/{slug}, hero image, hashtags} and pushes via `_social_publish` to every enabled channel. Admin endpoints `GET/PUT /api/admin/recruit/autopost` (enable toggle) + `POST /api/admin/recruit/broadcast-now` (fire immediately, bypasses daily throttle). Logs runs in `recruit_broadcasts`.
+- **Frontend**:
+  - `/admin?tab=autopost` — new `SocialTab.jsx` with per-platform enable toggle, credentials fields (page_id/access_token/ig_user_id/bearer_token/reddit creds), Send-test button, recent-posts history.
+  - `/admin?tab=recruit` — new `admin-recruit-autopost` block with `admin-recruit-autopost-toggle` (daily on/off) + `admin-recruit-broadcast-now` button.
+  - `/join/{slug}` copy migrated from "$500 sign-on for the first 100" → "$100 loyalty bonus after your first 100 jobs".
+- **Docs**: `/app/SOCIAL_AUTOPOST_SETUP.md` — step-by-step credential setup for Facebook (Meta app + Page Access Token), Instagram (linked to FB Page), X (Bearer Token, $100/mo requirement flagged), Reddit (script-app OAuth), plus a "which are worth it" comparison table.
+- **Testing**: iter_56 → **100% backend (27/27 pytest)** + **100% frontend**, zero regressions vs iter_55/54/53.
+
+
 ## Iteration 55 — Feb 2026 (this session)
 ### 📍 City-targeted provider recruitment (LA, SF, Seattle, Tacoma, Chicago, Portland)
 - **Backend `recruit_cities.py`** — new module + collection. Auto-seeds 6 target cities on boot (`los-angeles-ca`, `san-francisco-ca`, `seattle-wa`, `tacoma-wa`, `chicago-il`, `portland-or`), each with goal_workers=300, bonus_amount=$500, bonus_first_n=100, hero_headline / hero_subhead / hero_image copy. Endpoints:

@@ -58,8 +58,9 @@ def test_list_cities_returns_seed_six():
                   "bonus_amount", "bonus_first_n", "progress_pct", "spots_remaining"]:
         assert field in la, f"missing field {field}"
     assert la["goal_workers"] == 300
-    assert la["bonus_amount"] == 500
+    assert la["bonus_amount"] == 100
     assert la["bonus_first_n"] == 100
+    assert la["bonus_job_count"] == 100
 
 
 def test_get_city_valid_slug():
