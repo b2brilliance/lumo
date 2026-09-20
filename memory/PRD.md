@@ -9,6 +9,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 55 — Feb 2026 (this session)
+### 📍 City-targeted provider recruitment (LA, SF, Seattle, Tacoma, Chicago, Portland)
+- **Backend `recruit_cities.py`** — new module + collection. Auto-seeds 6 target cities on boot (`los-angeles-ca`, `san-francisco-ca`, `seattle-wa`, `tacoma-wa`, `chicago-il`, `portland-or`), each with goal_workers=300, bonus_amount=$500, bonus_first_n=100, hero_headline / hero_subhead / hero_image copy. Endpoints:
+  - Public: `GET /api/recruit/cities`, `GET /api/recruit/cities/{slug}` (includes live signups_total, signups_last_7d, spots_remaining, progress_pct), `POST /api/recruit/cities/{slug}/click`
+  - Admin: `GET /api/admin/recruit/stats`, `POST /api/admin/recruit/cities` (409 on duplicate slug), `PATCH /api/admin/recruit/cities/{slug}`, `DELETE /api/admin/recruit/cities/{slug}`
+- **Attribution**: `POST /api/auth/register` extended with `recruit_city_slug` → the new user gets `recruit_city_slug`, `recruit_city`, `recruit_state` fields; unknown slugs silently ignored.
+- **`CityRecruit.jsx` (`/join/:slug`)**: Full landing page with hero image + headline + $500 sign-on bonus banner (shows "only N spots left"), live progress bar toward 300 goal, benefits grid (90% take-home / same-day pay / escrow / multi-service), milestone-bonus explainer card, final CTA. CTA carries `role=provider&recruit_city_slug={slug}` into `/register`.
+- **Admin `RecruitTab.jsx` (`/admin?tab=recruit`)**: KPI strip (Cities / Total signups / Goal / This week) + per-city table with progress bar + Copy-link / Open-live / Pause / Edit / Delete actions + New-city dialog. Playbook link footer.
+- **`RECRUITING_PLAYBOOK.md`** (persisted in `/app`): 8-channel playbook — Reddit (target subs + copy template), Facebook Groups (join-first strategy), Craigslist Gigs (winning ad body), Indeed / ZipRecruiter (budget + title format), Meta Ads (targeting stack + reel format), Google Ads (competitor-poach keywords + landing-page tip), Nextdoor + flyers, competitor poach. Weekly cadence, metrics-to-watch, SMS + email copy library, legal boilerplate.
+- **Register.jsx**: reads `?recruit_city_slug=…` and `?ref=…` from the URL and forwards both to `/api/auth/register` for full attribution.
+- **AdminConsole.jsx**: New `recruit` tab with `MapPin` icon between `shop` and later tabs.
+- **Testing**: iter_55 → **100% backend (14/14 pytest)** + **100% frontend**, zero regressions vs iter_54.
+
+
 ## Iteration 54 — Feb 2026 (this session)
 ### 📦 Bulk removal / modify on every admin tab
 - **Reusable primitives**:
