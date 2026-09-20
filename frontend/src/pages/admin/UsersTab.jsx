@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Search, Save, Trash2, Ban, UserCog, X } from "lucide-react";
+import { Search, Save, Trash2, Ban, UserCog, X, ShieldCheck } from "lucide-react";
+import BulkActionsBar, { BulkActionButton, BulkCheckbox } from "@/components/admin/BulkActionsBar";
+import useBulkSelection from "@/components/admin/useBulkSelection";
 
 /* UsersTab — admin CRUD over the users collection.
  *
@@ -67,6 +69,32 @@ export default function UsersTab() {
     } catch (e) { toast.error(formatApiError(e)); }
   };
 
+  const sel = useBulkSelection(users);
+
+  const bulkDelete = async () => {
+    if (!sel.count) return;
+    if (!window.confirm(`Delete ${sel.count} user${sel.count === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    try {
+      const { data } = await api.post("/admin/users/bulk-delete", { ids: sel.selectedIds });
+      toast.success(`Deleted ${data.deleted_count} user${data.deleted_count === 1 ? "" : "s"}${data.skipped_self ? " (your own account was skipped)" : ""}`);
+      sel.clear();
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const bulkBan = async (banned) => {
+    if (!sel.count) return;
+    try {
+      const { data } = await api.post("/admin/users/bulk-patch", {
+        ids: sel.selectedIds,
+        updates: { banned },
+      });
+      toast.success(`${banned ? "Banned" : "Unbanned"} ${data.modified_count} user${data.modified_count === 1 ? "" : "s"}`);
+      sel.clear();
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
   return (
     <div className="space-y-4" data-testid="admin-users-tab">
       <div className="flex items-center gap-2">
@@ -98,8 +126,17 @@ export default function UsersTab() {
 
       {/* Table */}
       <div className="border border-slate-200 divide-y divide-slate-100">
-        <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50 text-[10px] font-mono uppercase tracking-widest text-slate-500">
-          <div className="col-span-4">User</div>
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50 text-[10px] font-mono uppercase tracking-widest text-slate-500 items-center">
+          <div className="col-span-1 flex items-center">
+            <BulkCheckbox
+              checked={sel.allSelected}
+              indeterminate={sel.someSelected}
+              onChange={sel.toggleAll}
+              ariaLabel="Select all users on this page"
+              testId="admin-users-select-all"
+            />
+          </div>
+          <div className="col-span-3">User</div>
           <div className="col-span-2">Role</div>
           <div className="col-span-2 text-right">Wallet</div>
           <div className="col-span-2">Joined</div>
@@ -108,8 +145,16 @@ export default function UsersTab() {
         {loading && <div className="p-6 text-sm text-slate-500">Loading…</div>}
         {!loading && users.length === 0 && <div className="p-6 text-sm text-slate-500" data-testid="admin-users-empty">No users match.</div>}
         {!loading && users.map((u) => (
-          <div key={u.id} className="grid grid-cols-12 gap-2 items-center px-3 py-2.5 text-sm hover:bg-slate-50" data-testid={`admin-user-row-${u.id}`}>
-            <div className="col-span-12 sm:col-span-4">
+          <div key={u.id} className={`grid grid-cols-12 gap-2 items-center px-3 py-2.5 text-sm hover:bg-slate-50 ${sel.isSelected(u.id) ? "bg-slate-50" : ""}`} data-testid={`admin-user-row-${u.id}`}>
+            <div className="col-span-1 flex items-center">
+              <BulkCheckbox
+                checked={sel.isSelected(u.id)}
+                onChange={() => sel.toggle(u.id)}
+                ariaLabel={`Select ${u.email}`}
+                testId={`admin-user-select-${u.id}`}
+              />
+            </div>
+            <div className="col-span-11 sm:col-span-3">
               <div className="font-display font-bold text-slate-900 flex items-center gap-2">
                 {u.name || "—"}
                 {u.banned && <span className="text-[9px] font-mono uppercase tracking-widest bg-red-100 text-red-700 px-1.5 py-0.5">Banned</span>}
@@ -128,6 +173,18 @@ export default function UsersTab() {
           </div>
         ))}
       </div>
+
+      <BulkActionsBar count={sel.count} onClear={sel.clear} testId="admin-users-bulk-bar">
+        <BulkActionButton onClick={() => bulkBan(true)} variant="warning" testId="admin-users-bulk-ban">
+          <Ban className="w-3.5 h-3.5" /> Ban
+        </BulkActionButton>
+        <BulkActionButton onClick={() => bulkBan(false)} variant="success" testId="admin-users-bulk-unban">
+          <ShieldCheck className="w-3.5 h-3.5" /> Unban
+        </BulkActionButton>
+        <BulkActionButton onClick={bulkDelete} variant="danger" testId="admin-users-bulk-delete">
+          <Trash2 className="w-3.5 h-3.5" /> Delete
+        </BulkActionButton>
+      </BulkActionsBar>
 
       {editing && <UserEditDialog user={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </div>

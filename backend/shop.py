@@ -432,6 +432,26 @@ def create_router(
             }
         }
 
+    @router.post("/admin/shop/products/bulk-delete")
+    async def bulk_delete_products(body: Dict[str, Any], _admin=Depends(require_admin)):
+        ids = [i for i in (body.get("ids") or []) if i]
+        if not ids:
+            return {"deleted_count": 0}
+        res = await db.shop_products.delete_many({"id": {"$in": ids}})
+        return {"deleted_count": res.deleted_count}
+
+    @router.post("/admin/shop/products/bulk-patch")
+    async def bulk_patch_products(body: Dict[str, Any], _admin=Depends(require_admin)):
+        ids = [i for i in (body.get("ids") or []) if i]
+        updates = body.get("updates") or {}
+        allowed = {"is_active", "is_featured", "category", "retailer", "retailer_label"}
+        update = {k: v for k, v in updates.items() if k in allowed and v is not None}
+        if not ids or not update:
+            raise HTTPException(400, f"ids + updates required (allowed: {sorted(allowed)})")
+        update["updated_at"] = _now_iso()
+        res = await db.shop_products.update_many({"id": {"$in": ids}}, {"$set": update})
+        return {"matched_count": res.matched_count, "modified_count": res.modified_count}
+
     return router
 
 

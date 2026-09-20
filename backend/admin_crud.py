@@ -87,6 +87,15 @@ class BulkDeleteBody(BaseModel):
     ids: List[str]
 
 
+class BulkIdsBody(BaseModel):
+    ids: List[str] = Field(default_factory=list)
+
+
+class BulkPatchBody(BaseModel):
+    ids: List[str] = Field(default_factory=list)
+    updates: dict = Field(default_factory=dict)
+
+
 def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
     """Factory so we can wire the router into server.py without a circular
     import — server.py owns `get_current_user` / `_require_admin`."""
@@ -120,6 +129,36 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if res.deleted_count == 0:
             raise HTTPException(404, "User not found")
         return {"ok": True, "deleted": user_id}
+
+    @router.post("/users/bulk-delete")
+    async def bulk_delete_users(body: BulkIdsBody, admin: dict = Depends(require_admin)):
+        from server import db
+        # Never let an admin bulk-delete themselves.
+        target_ids = [i for i in body.ids if i and i != admin.get("id")]
+        if not target_ids:
+            return {"ok": True, "deleted_count": 0}
+        res = await db.users.delete_many({"id": {"$in": target_ids}})
+        return {"ok": True, "deleted_count": res.deleted_count, "skipped_self": len(body.ids) - len(target_ids)}
+
+    @router.post("/users/bulk-patch")
+    async def bulk_patch_users(body: BulkPatchBody, admin: dict = Depends(require_admin)):
+        from server import db
+        allowed = {"role", "banned", "wallet_balance"}
+        update = {k: v for k, v in (body.updates or {}).items() if k in allowed and v is not None}
+        if not update:
+            raise HTTPException(400, f"No updatable fields. Allowed: {sorted(allowed)}")
+        if "role" in update and update["role"] not in {"customer", "provider", "admin"}:
+            raise HTTPException(400, f"Invalid role: {update['role']}")
+        target_ids = [i for i in body.ids if i and i != admin.get("id")]
+        if not target_ids:
+            return {"ok": True, "matched_count": 0, "modified_count": 0}
+        res = await db.users.update_many({"id": {"$in": target_ids}}, {"$set": update})
+        return {
+            "ok": True,
+            "matched_count": res.matched_count,
+            "modified_count": res.modified_count,
+            "skipped_self": len(body.ids) - len(target_ids),
+        }
 
     # ── CONTENT (listings / rentals / autos / inventory / jobs) ─────────
     @router.get("/content")

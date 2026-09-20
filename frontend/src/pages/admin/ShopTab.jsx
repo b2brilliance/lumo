@@ -10,6 +10,8 @@ import {
 import {
   Plus, Trash2, Edit3, ExternalLink, Search, Star, Wand2, Eye, EyeOff, Loader2, Upload, Download,
 } from "lucide-react";
+import BulkActionsBar, { BulkActionButton, BulkCheckbox } from "@/components/admin/BulkActionsBar";
+import useBulkSelection from "@/components/admin/useBulkSelection";
 
 /* Admin Shop Manager — list + add/import + edit + delete affiliate
  * products displayed on the public /shop page. */
@@ -154,6 +156,29 @@ export default function ShopTab() {
     }
   };
 
+  const sel = useBulkSelection(items);
+
+  const bulkDelete = async () => {
+    if (!sel.count) return;
+    if (!window.confirm(`Delete ${sel.count} product${sel.count === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    try {
+      const { data } = await api.post("/admin/shop/products/bulk-delete", { ids: sel.selectedIds });
+      toast.success(`Deleted ${data.deleted_count} product${data.deleted_count === 1 ? "" : "s"}`);
+      sel.clear();
+      load();
+    } catch (err) { toast.error(formatApiError(err)); }
+  };
+
+  const bulkPatch = async (updates, label) => {
+    if (!sel.count) return;
+    try {
+      const { data } = await api.post("/admin/shop/products/bulk-patch", { ids: sel.selectedIds, updates });
+      toast.success(`${label} ${data.modified_count} product${data.modified_count === 1 ? "" : "s"}`);
+      sel.clear();
+      load();
+    } catch (err) { toast.error(formatApiError(err)); }
+  };
+
   const toggleActive = async (p) => {
     try {
       await api.patch(`/admin/shop/products/${p.id}`, { is_active: !p.is_active });
@@ -276,13 +301,31 @@ export default function ShopTab() {
 
       {/* Products list */}
       <div className="border border-slate-200 divide-y divide-slate-100" data-testid="admin-shop-list">
+        {items.length > 0 && (
+          <div className="p-2 bg-slate-50 flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+            <BulkCheckbox
+              checked={sel.allSelected}
+              indeterminate={sel.someSelected}
+              onChange={sel.toggleAll}
+              ariaLabel="Select all products on this page"
+              testId="admin-shop-select-all"
+            />
+            <span>{sel.count > 0 ? `${sel.count} selected` : `${items.length} products`}</span>
+          </div>
+        )}
         {loading ? (
           <div className="p-6 text-sm text-slate-500">Loading…</div>
         ) : items.length === 0 ? (
           <div className="p-6 text-sm text-slate-500">No products match your filters.</div>
         ) : (
           items.map((p) => (
-            <div key={p.id} className="p-3 flex items-center gap-3" data-testid={`admin-shop-row-${p.id}`}>
+            <div key={p.id} className={`p-3 flex items-center gap-3 ${sel.isSelected(p.id) ? "bg-slate-50" : ""}`} data-testid={`admin-shop-row-${p.id}`}>
+              <BulkCheckbox
+                checked={sel.isSelected(p.id)}
+                onChange={() => sel.toggle(p.id)}
+                ariaLabel={`Select ${p.title}`}
+                testId={`admin-shop-select-${p.id}`}
+              />
               <img
                 src={p.image_url}
                 alt={p.title}
@@ -333,6 +376,24 @@ export default function ShopTab() {
       </div>
 
       {/* Edit dialog */}
+      <BulkActionsBar count={sel.count} onClear={sel.clear} testId="admin-shop-bulk-bar">
+        <BulkActionButton onClick={() => bulkPatch({ is_active: true }, "Showed")} variant="success" testId="admin-shop-bulk-show">
+          <Eye className="w-3.5 h-3.5" /> Show
+        </BulkActionButton>
+        <BulkActionButton onClick={() => bulkPatch({ is_active: false }, "Hid")} variant="warning" testId="admin-shop-bulk-hide">
+          <EyeOff className="w-3.5 h-3.5" /> Hide
+        </BulkActionButton>
+        <BulkActionButton onClick={() => bulkPatch({ is_featured: true }, "Featured")} testId="admin-shop-bulk-feature">
+          <Star className="w-3.5 h-3.5" /> Feature
+        </BulkActionButton>
+        <BulkActionButton onClick={() => bulkPatch({ is_featured: false }, "Unfeatured")} testId="admin-shop-bulk-unfeature">
+          Unfeature
+        </BulkActionButton>
+        <BulkActionButton onClick={bulkDelete} variant="danger" testId="admin-shop-bulk-delete">
+          <Trash2 className="w-3.5 h-3.5" /> Delete
+        </BulkActionButton>
+      </BulkActionsBar>
+
       <Dialog open={!!editing} onOpenChange={(v) => !v && close()}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="admin-shop-dialog">
           <DialogHeader>

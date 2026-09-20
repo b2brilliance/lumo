@@ -17,6 +17,8 @@ import AffiliatesTab from "@/pages/admin/AffiliatesTab";
 import UsersTab from "@/pages/admin/UsersTab";
 import ContentTab from "@/pages/admin/ContentTab";
 import ShopTab from "@/pages/admin/ShopTab";
+import BulkActionsBar, { BulkActionButton, BulkCheckbox } from "@/components/admin/BulkActionsBar";
+import useBulkSelection from "@/components/admin/useBulkSelection";
 
 const TABS = [
   { key: "analytics",   label: "Analytics",   icon: BarChart3 },
@@ -185,16 +187,31 @@ function CredentialsTab() {
   useEffect(() => { load(); }, []);
   const verify = async (id) => { try { await api.post(`/admin/credentials/${id}/verify`); toast.success("Verified"); load(); } catch (e) { toast.error(formatApiError(e)); } };
   const reject = async (id) => { try { await api.post(`/admin/credentials/${id}/reject`); toast.success("Rejected"); load(); } catch (e) { toast.error(formatApiError(e)); } };
+  const sel = useBulkSelection(items);
+  const bulkVerify = async () => {
+    try { const { data } = await api.post("/admin/credentials/bulk-verify", { ids: sel.selectedIds }); toast.success(`Verified ${data.modified_count}`); sel.clear(); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+  const bulkReject = async () => {
+    if (!window.confirm(`Reject ${sel.count} credential${sel.count === 1 ? "" : "s"}?`)) return;
+    try { const { data } = await api.post("/admin/credentials/bulk-reject", { ids: sel.selectedIds }); toast.success(`Rejected ${data.modified_count}`); sel.clear(); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   if (items.length === 0) return <div className="p-6 text-sm text-slate-500">No pending credentials.</div>;
   return (
     <div className="divide-y divide-slate-200 border-y border-slate-200">
+      <div className="p-2 bg-slate-50 flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+        <BulkCheckbox checked={sel.allSelected} indeterminate={sel.someSelected} onChange={sel.toggleAll} ariaLabel="Select all credentials" testId="admin-cred-select-all" />
+        <span>{sel.count > 0 ? `${sel.count} selected` : `${items.length} pending`}</span>
+      </div>
       {items.map((c) => (
-        <div key={c.id} className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`admin-cred-${c.id}`}>
-          <div className="col-span-12 md:col-span-3">
+        <div key={c.id} className={`p-4 grid grid-cols-12 gap-3 items-center ${sel.isSelected(c.id) ? "bg-slate-50" : ""}`} data-testid={`admin-cred-${c.id}`}>
+          <div className="col-span-1"><BulkCheckbox checked={sel.isSelected(c.id)} onChange={() => sel.toggle(c.id)} ariaLabel={`Select credential ${c.id}`} testId={`admin-cred-select-${c.id}`} /></div>
+          <div className="col-span-11 md:col-span-3">
             <div className="font-display font-bold">{c.owner?.name || c.user_id}</div>
             <div className="text-xs text-slate-500">{c.owner?.email}</div>
           </div>
-          <div className="col-span-6 md:col-span-3 text-xs font-mono">
+          <div className="col-span-6 md:col-span-2 text-xs font-mono">
             <div className="text-slate-900">{c.kind}</div>
             <div className="text-slate-500 uppercase">{c.category} · {c.state || "—"}</div>
           </div>
@@ -210,19 +227,35 @@ function CredentialsTab() {
           </div>
         </div>
       ))}
+      <BulkActionsBar count={sel.count} onClear={sel.clear} testId="admin-cred-bulk-bar">
+        <BulkActionButton onClick={bulkVerify} variant="success" testId="admin-cred-bulk-verify"><Check className="w-3.5 h-3.5" /> Verify</BulkActionButton>
+        <BulkActionButton onClick={bulkReject} variant="danger" testId="admin-cred-bulk-reject"><X className="w-3.5 h-3.5" /> Reject</BulkActionButton>
+      </BulkActionsBar>
     </div>
   );
 }
 
 function WithdrawalsTab() {
   const [items, setItems] = useState([]);
-  useEffect(() => { api.get("/admin/withdrawals").then(({ data }) => setItems(data || [])).catch(() => {}); }, []);
+  const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data || [])).catch(() => {});
+  useEffect(() => { load(); }, []);
+  const sel = useBulkSelection(items);
+  const setStatus = async (status, label) => {
+    if (!sel.count) return;
+    try { const { data } = await api.post("/admin/withdrawals/bulk-patch", { ids: sel.selectedIds, status }); toast.success(`${label} ${data.modified_count}`); sel.clear(); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   if (items.length === 0) return <div className="p-6 text-sm text-slate-500">No withdrawal records.</div>;
   return (
     <div className="divide-y divide-slate-200 border-y border-slate-200">
+      <div className="p-2 bg-slate-50 flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+        <BulkCheckbox checked={sel.allSelected} indeterminate={sel.someSelected} onChange={sel.toggleAll} ariaLabel="Select all withdrawals" testId="admin-wd-select-all" />
+        <span>{sel.count > 0 ? `${sel.count} selected` : `${items.length} withdrawals`}</span>
+      </div>
       {items.map((w) => (
-        <div key={w.id} className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`admin-wd-${w.id}`}>
-          <div className="col-span-12 md:col-span-4">
+        <div key={w.id} className={`p-4 grid grid-cols-12 gap-3 items-center ${sel.isSelected(w.id) ? "bg-slate-50" : ""}`} data-testid={`admin-wd-${w.id}`}>
+          <div className="col-span-1"><BulkCheckbox checked={sel.isSelected(w.id)} onChange={() => sel.toggle(w.id)} ariaLabel={`Select ${w.owner?.email || w.id}`} testId={`admin-wd-select-${w.id}`} /></div>
+          <div className="col-span-11 md:col-span-3">
             <div className="font-display font-bold">{w.owner?.name}</div>
             <div className="text-xs text-slate-500">{w.owner?.email} · balance ${Number(w.owner?.wallet_balance || 0).toFixed(2)}</div>
           </div>
@@ -231,6 +264,10 @@ function WithdrawalsTab() {
           <div className="col-span-12 md:col-span-2 text-right text-[10px] font-mono uppercase tracking-widest border border-slate-200 px-2 py-1 inline-block">{w.status || "completed"}</div>
         </div>
       ))}
+      <BulkActionsBar count={sel.count} onClear={sel.clear} testId="admin-wd-bulk-bar">
+        <BulkActionButton onClick={() => setStatus("completed", "Approved")} variant="success" testId="admin-wd-bulk-approve"><Check className="w-3.5 h-3.5" /> Approve</BulkActionButton>
+        <BulkActionButton onClick={() => setStatus("denied", "Denied")} variant="danger" testId="admin-wd-bulk-deny"><X className="w-3.5 h-3.5" /> Deny</BulkActionButton>
+      </BulkActionsBar>
     </div>
   );
 }
@@ -240,35 +277,61 @@ function ReviewsTab() {
   const load = () => api.get("/admin/reviews").then(({ data }) => setItems(data || [])).catch(() => {});
   useEffect(() => { load(); }, []);
   const del = async (id) => { if (!window.confirm("Delete this review?")) return; try { await api.delete(`/admin/reviews/${id}`); toast.success("Deleted"); load(); } catch (e) { toast.error(formatApiError(e)); } };
+  const sel = useBulkSelection(items);
+  const bulkDelete = async () => {
+    if (!window.confirm(`Delete ${sel.count} review${sel.count === 1 ? "" : "s"}?`)) return;
+    try { const { data } = await api.post("/admin/reviews/bulk-delete", { ids: sel.selectedIds }); toast.success(`Deleted ${data.deleted_count}`); sel.clear(); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   if (items.length === 0) return <div className="p-6 text-sm text-slate-500">No reviews yet.</div>;
   return (
     <div className="divide-y divide-slate-200 border-y border-slate-200">
+      <div className="p-2 bg-slate-50 flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+        <BulkCheckbox checked={sel.allSelected} indeterminate={sel.someSelected} onChange={sel.toggleAll} ariaLabel="Select all reviews" testId="admin-review-select-all" />
+        <span>{sel.count > 0 ? `${sel.count} selected` : `${items.length} reviews`}</span>
+      </div>
       {items.map((r) => (
-        <div key={r.id} className="p-4" data-testid={`admin-review-${r.id}`}>
-          <div className="flex items-center justify-between">
+        <div key={r.id} className={`p-4 ${sel.isSelected(r.id) ? "bg-slate-50" : ""}`} data-testid={`admin-review-${r.id}`}>
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
+              <BulkCheckbox checked={sel.isSelected(r.id)} onChange={() => sel.toggle(r.id)} ariaLabel={`Select review by ${r.reviewer_name}`} testId={`admin-review-select-${r.id}`} />
               <span className="font-display font-bold">{r.reviewer_name}</span>
               <span className="text-xs text-amber-600">{"★".repeat(r.overall_stars)}</span>
               <span className="text-[10px] uppercase font-mono text-slate-400">→ {r.target_type}</span>
             </div>
             <Button size="sm" variant="ghost" onClick={() => del(r.id)} className="text-slate-400 hover:text-red-600 h-7 px-2" data-testid={`admin-review-del-${r.id}`}><Trash2 className="w-3.5 h-3.5" /></Button>
           </div>
-          {r.body && <p className="text-sm text-slate-700 mt-2">{r.body}</p>}
+          {r.body && <p className="text-sm text-slate-700 mt-2 pl-7">{r.body}</p>}
         </div>
       ))}
+      <BulkActionsBar count={sel.count} onClear={sel.clear} testId="admin-review-bulk-bar">
+        <BulkActionButton onClick={bulkDelete} variant="danger" testId="admin-review-bulk-delete"><Trash2 className="w-3.5 h-3.5" /> Delete</BulkActionButton>
+      </BulkActionsBar>
     </div>
   );
 }
 
 function RentalsTab() {
   const [items, setItems] = useState([]);
-  useEffect(() => { api.get("/admin/rental-bookings?status=pending_approval").then(({ data }) => setItems(data || [])).catch(() => {}); }, []);
+  const load = () => api.get("/admin/rental-bookings?status=pending_approval").then(({ data }) => setItems(data || [])).catch(() => {});
+  useEffect(() => { load(); }, []);
+  const sel = useBulkSelection(items);
+  const setStatus = async (status, label) => {
+    if (!sel.count) return;
+    try { const { data } = await api.post("/admin/rental-bookings/bulk-patch", { ids: sel.selectedIds, status }); toast.success(`${label} ${data.modified_count}`); sel.clear(); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   if (items.length === 0) return <div className="p-6 text-sm text-slate-500">No pending rental bookings.</div>;
   return (
     <div className="divide-y divide-slate-200 border-y border-slate-200">
+      <div className="p-2 bg-slate-50 flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+        <BulkCheckbox checked={sel.allSelected} indeterminate={sel.someSelected} onChange={sel.toggleAll} ariaLabel="Select all rentals" testId="admin-rb-select-all" />
+        <span>{sel.count > 0 ? `${sel.count} selected` : `${items.length} bookings`}</span>
+      </div>
       {items.map((b) => (
-        <div key={b.id} className="p-4 grid grid-cols-12 gap-3 items-center" data-testid={`admin-rb-${b.id}`}>
-          <div className="col-span-12 md:col-span-4">
+        <div key={b.id} className={`p-4 grid grid-cols-12 gap-3 items-center ${sel.isSelected(b.id) ? "bg-slate-50" : ""}`} data-testid={`admin-rb-${b.id}`}>
+          <div className="col-span-1"><BulkCheckbox checked={sel.isSelected(b.id)} onChange={() => sel.toggle(b.id)} ariaLabel={`Select booking ${b.id}`} testId={`admin-rb-select-${b.id}`} /></div>
+          <div className="col-span-11 md:col-span-3">
             <div className="font-display font-bold">{b.renter_name}</div>
             <Link to={`/rentals/${b.rental_id}`} className="text-xs text-teal-700 underline">view listing</Link>
           </div>
@@ -277,6 +340,10 @@ function RentalsTab() {
           <div className="col-span-12 md:col-span-2 text-right text-[10px] font-mono uppercase tracking-widest border border-amber-200 bg-amber-50 text-amber-700 px-2 py-1 inline-block">{b.status.replace(/_/g, " ")}</div>
         </div>
       ))}
+      <BulkActionsBar count={sel.count} onClear={sel.clear} testId="admin-rb-bulk-bar">
+        <BulkActionButton onClick={() => setStatus("approved", "Approved")} variant="success" testId="admin-rb-bulk-approve"><Check className="w-3.5 h-3.5" /> Approve</BulkActionButton>
+        <BulkActionButton onClick={() => setStatus("declined", "Declined")} variant="danger" testId="admin-rb-bulk-decline"><X className="w-3.5 h-3.5" /> Decline</BulkActionButton>
+      </BulkActionsBar>
     </div>
   );
 }

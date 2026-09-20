@@ -2542,6 +2542,61 @@ async def admin_review_delete(review_id: str, user: dict = Depends(_require_admi
         raise HTTPException(404, "Review not found")
     return {"deleted": True}
 
+@api.post("/admin/reviews/bulk-delete")
+async def admin_reviews_bulk_delete(body: dict, user: dict = Depends(_require_admin)):
+    ids = [i for i in (body.get("ids") or []) if i]
+    if not ids:
+        return {"deleted_count": 0}
+    res = await db.reviews.delete_many({"id": {"$in": ids}})
+    return {"deleted_count": res.deleted_count}
+
+@api.post("/admin/withdrawals/bulk-patch")
+async def admin_withdrawals_bulk_patch(body: dict, user: dict = Depends(_require_admin)):
+    ids = [i for i in (body.get("ids") or []) if i]
+    status = body.get("status")
+    if not ids or not status or status not in {"pending", "initiated", "completed", "denied", "cancelled"}:
+        raise HTTPException(400, "ids + valid status required")
+    res = await db.withdrawals.update_many(
+        {"id": {"$in": ids}},
+        {"$set": {"status": status, "reviewed_at": now_iso(), "reviewed_by": user["id"]}},
+    )
+    return {"matched_count": res.matched_count, "modified_count": res.modified_count}
+
+@api.post("/admin/credentials/bulk-verify")
+async def admin_credentials_bulk_verify(body: dict, user: dict = Depends(_require_admin)):
+    ids = [i for i in (body.get("ids") or []) if i]
+    if not ids:
+        return {"modified_count": 0}
+    res = await db.credentials.update_many(
+        {"id": {"$in": ids}},
+        {"$set": {"status": "verified", "verified_at": now_iso(), "verified_by": user["id"]}},
+    )
+    return {"modified_count": res.modified_count}
+
+@api.post("/admin/credentials/bulk-reject")
+async def admin_credentials_bulk_reject(body: dict, user: dict = Depends(_require_admin)):
+    ids = [i for i in (body.get("ids") or []) if i]
+    reason = body.get("reason")
+    if not ids:
+        return {"modified_count": 0}
+    res = await db.credentials.update_many(
+        {"id": {"$in": ids}},
+        {"$set": {"status": "rejected", "rejected_at": now_iso(), "rejected_by": user["id"], "rejection_reason": reason}},
+    )
+    return {"modified_count": res.modified_count}
+
+@api.post("/admin/rental-bookings/bulk-patch")
+async def admin_rental_bookings_bulk_patch(body: dict, user: dict = Depends(_require_admin)):
+    ids = [i for i in (body.get("ids") or []) if i]
+    status = body.get("status")
+    if not ids or not status or status not in {"pending_approval", "approved", "declined", "cancelled", "completed"}:
+        raise HTTPException(400, "ids + valid status required")
+    res = await db.rental_bookings.update_many(
+        {"id": {"$in": ids}},
+        {"$set": {"status": status, "reviewed_at": now_iso(), "reviewed_by": user["id"]}},
+    )
+    return {"matched_count": res.matched_count, "modified_count": res.modified_count}
+
 @api.get("/admin/rental-bookings")
 async def admin_rental_bookings(status: Optional[str] = None, user: dict = Depends(_require_admin)):
     f = {}
