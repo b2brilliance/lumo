@@ -117,6 +117,11 @@ export default function Register() {
       phone: form.phone || null,
       avatar_url: form.avatar_url,
     };
+    // Attribution — pulled from /join/{slug} query param or ?ref=CODE
+    const recruitSlug = searchParams.get("recruit_city_slug");
+    if (recruitSlug) payload.recruit_city_slug = recruitSlug;
+    const refCode = searchParams.get("ref");
+    if (refCode) payload.ref_code = refCode;
     if (isProvider) {
       payload.employment_types = form.employment_types;
       payload.primary_category = form.primary_category || null;

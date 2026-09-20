@@ -184,6 +184,7 @@ class UserCreate(BaseModel):
     provider_profile: Optional[dict] = None       # {bio, certifications:[], work_history:[]}
     qualifications: Optional[dict] = None         # { <category_key>: {answers:{}, documents:{}} }
     ref_code: Optional[str] = None                # Referral code — captured from `?ref=XXX` in frontend
+    recruit_city_slug: Optional[str] = None        # City recruitment attribution — /join/{slug}
 
 class UserLogin(BaseModel):
     email: str
@@ -615,6 +616,15 @@ async def register(body: UserCreate, request: Request):
     if referred_by:
         user_doc["referred_by_user_id"] = referred_by
         user_doc["referred_by_code"] = (body.ref_code or "").strip().upper()
+    # City recruitment attribution — set when the applicant lands on
+    # /join/{slug} and completes signup. Enables per-city hiring stats.
+    if body.recruit_city_slug:
+        slug = body.recruit_city_slug.strip().lower()
+        city = await db.recruit_cities.find_one({"slug": slug})
+        if city:
+            user_doc["recruit_city_slug"] = slug
+            user_doc["recruit_city"] = city.get("city")
+            user_doc["recruit_state"] = city.get("state")
     await db.users.insert_one(user_doc)
     # Auto-generate the new user's OWN referral code so they can share
     # immediately without waiting for a first API call.
@@ -7356,6 +7366,20 @@ from push_notifications import (  # noqa: E402
     send_push_to_user as _send_push_to_user,
 )
 app.include_router(_create_push_router(db=db, get_current_user=get_current_user))
+
+# City-targeted provider recruitment
+from recruit_cities import (  # noqa: E402
+    create_router as _create_recruit_router,
+    seed_recruit_cities as _seed_recruit_cities,
+)
+app.include_router(_create_recruit_router(db=db, require_admin=_require_admin()))
+
+@app.on_event("startup")
+async def _seed_recruit_cities_on_boot():
+    try:
+        await _seed_recruit_cities(db)
+    except Exception as e:
+        logger.warning(f"[recruit] seed skipped: {e}")
 
 @app.on_event("startup")
 async def _push_subscriptions_index():

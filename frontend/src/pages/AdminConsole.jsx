@@ -3,7 +3,7 @@ import { Navigate, Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe, DollarSign, Package, Store } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Wallet as WalletIcon, MessageSquare, Calendar, Users, Briefcase, X, Check, Trash2, Megaphone, Send, BarChart3, Share2, Database, KeyRound, UserCog, BookOpen, Globe, DollarSign, Package, Store, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import AdStudio from "@/components/AdStudio";
 import Distribution from "@/components/Distribution";
@@ -17,6 +17,7 @@ import AffiliatesTab from "@/pages/admin/AffiliatesTab";
 import UsersTab from "@/pages/admin/UsersTab";
 import ContentTab from "@/pages/admin/ContentTab";
 import ShopTab from "@/pages/admin/ShopTab";
+import RecruitTab from "@/pages/admin/RecruitTab";
 import BulkActionsBar, { BulkActionButton, BulkCheckbox } from "@/components/admin/BulkActionsBar";
 import useBulkSelection from "@/components/admin/useBulkSelection";
 
@@ -25,6 +26,7 @@ const TABS = [
   { key: "users",       label: "Users",       icon: UserCog },
   { key: "content",     label: "Content",     icon: Package },
   { key: "shop",        label: "Shop",        icon: Store },
+  { key: "recruit",     label: "Recruit",     icon: MapPin },
   { key: "payments",    label: "Payments",    icon: KeyRound },
   { key: "blog",        label: "Blog & email", icon: BookOpen },
   { key: "credentials", label: "Credentials", icon: ShieldCheck },
@@ -464,6 +466,7 @@ export default function AdminConsole() {
           {tab === "users" && <UsersTab />}
           {tab === "content" && <ContentTab />}
           {tab === "shop" && <ShopTab />}
+          {tab === "recruit" && <RecruitTab />}
           {tab === "blog" && <BlogAdmin />}
           {tab === "visitors" && <VisitorsTab />}
           {tab === "affiliates" && <AffiliatesTab />}
