@@ -248,8 +248,9 @@ def create_router(*, db, require_admin: Callable) -> APIRouter:
 
     @r.post("/preview")
     async def preview(body: PreviewBody, _admin=Depends(require_admin)):
-        """Force a rewrite even if disabled, and DO NOT persist to
-        `copy_history` so previews don't crowd out real variants."""
+        """Force a rewrite even if the rotator is currently disabled, and
+        persist the variant under `source_id='preview-…'` so the admin's
+        preview attempts don't crowd out real recent variants."""
         llm_key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
         if not llm_key:
             raise HTTPException(503, "EMERGENT_LLM_KEY missing — preview unavailable")

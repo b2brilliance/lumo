@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 56 — Tested AI Copy Rotator, self-signup-only affiliate filter, AdSense config, and digital_tech duration-field removal. Backend: 14/14 pytest passed. Frontend: all data-testids present; landing/blog/shop AdSense slots render when publisher ID set and disappear when cleared; admin Auto-post tab renders AI Copy Rotator card with working enable/tones/preview (LLM roundtrip ~15s returns rewritten copy with milestone facts preserved); admin Site tab exposes admin-adsense-input with validation; /order/digital_tech no longer shows an 'Expected duration' field.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter56_ai_copy_adsense.py",
+    "/app/test_reports/pytest/iter56.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ai_copy_rotator.preview: because rewrite_copy() persists to copy_history unconditionally when it succeeds, previews DO get logged (source_id prefixed 'preview-'). The module docstring for the preview handler still says 'DO NOT persist' — comment is stale but behaviour matches the review-request spec (previews should persist under preview- prefix). Consider updating the docstring to match.",
+    "site_settings.SocialLinksBody: adsense_client regex allows 10-20 digits after 'ca-pub-'. Real Google publisher IDs are always 16 digits — narrowing the regex would catch typos earlier.",
+    "affiliates.list_offers: self_signup filter relies on presence of non-empty signup_url + optional self_signup!=False flag; seed data uses these correctly, but adding an index on {active:1, category:1, signup_url:1} would help once the offer catalog grows."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter56_ai_copy_adsense.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "julius.a.mason@gmail.com / Mason0123 (admin) — confirmed working",
+  "seed_data_creation": "none (only ai_copy_rotator config toggled + copy_history preview entries)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin Auto-post tab is served at /admin?tab=autopost (NOT ?tab=social — that route is SocialLinksAdmin). AdSense visitor testids: adsense-landing, adsense-blog-top, adsense-blog-post, adsense-shop, adsense-city-recruit — hidden when adsense_client empty. Preview endpoint takes ~10-15s per LLM call.",
+  "rca of the issue": "N/A — all features passed."
+}

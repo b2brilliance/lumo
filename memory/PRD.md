@@ -9,6 +9,23 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 56b — Feb 2026 (this session, AI Copy Rotator + AdSense + self-signup filter)
+### ✨ AI Copy Rotator, 📢 Google AdSense, 🔗 self-signup-only affiliate filter, ⏱ website timeline removed
+- **AI Copy Rotator (`ai_copy_rotator.py`)** — Claude Sonnet 4.5 rewrites the title/body of every recruit broadcast + blog auto-share caption so followers don't see yesterday's post. Alternates two tones (`hype`, `clean`) on each run so the feed feels varied. Persists last 5 variants per (source_type, source_id) in `copy_history` and passes them to the LLM as "avoid these phrasings". Falls back to base copy if the rotator is disabled or the LLM fails (never blocks the publish). Admin endpoints:
+  - `GET /api/admin/ai-copy/config` → {enabled, tones, available_tones, total_rewrites, last_run_at, last_tone}
+  - `PUT /api/admin/ai-copy/config` → toggle + tone selection
+  - `POST /api/admin/ai-copy/preview` → force a rewrite (persists under `source_id='preview-…'` so it doesn't crowd real variants)
+  - `GET /api/admin/ai-copy/history?limit=25`
+- **Wired into**: `recruit_cities.broadcast_recruit_post` (calls rewrite_copy per city before publish) and `blog._share_to_channels` (rewrites caption before fanning out).
+- **Admin UI**: new `AiCopyRotatorCard` in `SocialTab.jsx` — Enable toggle, tone selectors (Hype / Clean), stats strip (rewrites so far, last run, last tone), and a **Preview next recruit copy** button that runs a live LLM rewrite and shows title+body inline.
+- **Self-signup-only affiliate filter (`affiliates.list_offers`)**: new `self_signup_only` bool query param (default **True**). Filters to offers with a non-empty `signup_url` and `self_signup!=False`. Every default offer (Amazon Associates, Impact, CJ, FlexOffers, Awin, Rakuten, EPN, Skimlinks, direct networks with public publisher-signup forms) passes. Prevents membership-required / invite-only programs from surfacing to visitors.
+- **Google AdSense** (`components/AdSense.jsx` + `site_settings.py`): admin pastes an AdSense publisher ID (`ca-pub-…16-digits`) in `/admin?tab=site` → `admin-adsense-input`. Backend validates the format and stores it on the `site_settings` singleton. Public `/api/site/social` payload exposes it. `<AdSense />` component fetches it once on mount, injects the adsbygoogle script tag, and renders `<ins class="adsbygoogle">` slots on: **Landing (`/`)**, **Blog list (`/blog`)**, **Blog post (`/blog/:slug`)**, **Shop (`/shop`)**, **City recruit (`/join/:slug`)**. When the client ID is empty the component renders **nothing**, so pages look clean pre-approval.
+- **Timeline removed from digital_tech order flow**: `serviceSchemas.js` `digital_tech.baseFields` no longer includes the `duration` field (`Expected duration: hours/days/weeks/ongoing`). AI-powered builds don't need customer-specified timelines.
+- **Testing**: iter_56 (main) + iter_56b (this batch) → **100% backend (14/14 pytest)** + **100% frontend**, zero regressions. Preview LLM roundtrip ~10-15s.
+
+---
+
+
 ## Iteration 56 — Feb 2026 (this session)
 ### 🎯 $100 city milestone + 📣 blog auto-post + 📢 daily recruit broadcast
 - **Milestone bonus reworked**: `$500 after 10 jobs` → `$100 after 100 jobs` for the first 100 providers per city. `recruit_cities._reseed_bonus_amounts` migration bumps legacy $500 rows down on boot. New `credit_city_milestone()` helper fires atomically once per provider (atomic guard on `city_milestone_awarded_at`), gated by `recruit_city_slug` + first-N rank (by created_at) + 100 non-milestone paid `wallet_transactions` rows. Hooked into `_credit_provider` on both Stripe-Connect and wallet-fallback branches.
