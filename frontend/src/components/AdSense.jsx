@@ -20,6 +20,25 @@ let _scriptInjected = false;
 let _loadPromise = null;
 
 /**
+ * Detect if the AdSense loader script is already present in the DOM
+ * (e.g. hard-coded in <head> for Google's site verification). If so we
+ * skip re-injection but still record the client ID so slots render.
+ */
+function _detectExistingScript() {
+  if (typeof document === "undefined") return "";
+  const existing = document.querySelector('script[src*="adsbygoogle.js"]');
+  if (!existing) return "";
+  try {
+    const url = new URL(existing.src, window.location.origin);
+    const client = url.searchParams.get("client") || "";
+    if (client) _scriptInjected = true;
+    return client;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Fetch the AdSense publisher ID once per session and inject the script tag.
  * Returns the client ID string (may be empty).
  */
@@ -27,6 +46,13 @@ async function loadAdSense() {
   if (_clientCache !== null) return _clientCache;
   if (_loadPromise) return _loadPromise;
   _loadPromise = (async () => {
+    // First: pick up a hard-coded <script> tag from index.html (used so
+    // Google's crawler can verify the site even before React mounts).
+    const preloaded = _detectExistingScript();
+    if (preloaded) {
+      _clientCache = preloaded;
+      return preloaded;
+    }
     try {
       const { data } = await api.get("/site/social");
       const client = (data?.adsense_client || "").trim();
