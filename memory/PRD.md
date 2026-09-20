@@ -9,6 +9,20 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 54 — Feb 2026 (this session)
+### 📦 Bulk removal / modify on every admin tab
+- **Reusable primitives**:
+  - `/app/frontend/src/components/admin/BulkActionsBar.jsx` — floating pill that appears when ≥1 row is selected; slot-based children accept `<BulkActionButton>`s with `default/danger/warning/success` variants; ships with matching `BulkCheckbox` (row + header, supports indeterminate).
+  - `/app/frontend/src/components/admin/useBulkSelection.js` — hook returning `{selected, selectedIds, count, isSelected, toggle, toggleAll, clear, allSelected, someSelected}`. Selection auto-clears on data reload.
+- **Backend endpoints (9 new)**:
+  - Users (`admin_crud.py`): `POST /api/admin/users/bulk-delete` (self-skip), `POST /api/admin/users/bulk-patch` (whitelist role/banned/wallet_balance, role enum aligned with single PATCH: customer/provider/retailer/restaurant/admin).
+  - Shop (`shop.py`): `POST /api/admin/shop/products/bulk-delete`, `POST /api/admin/shop/products/bulk-patch` (whitelist is_active/is_featured/category/retailer/retailer_label).
+  - Server-level: `POST /api/admin/reviews/bulk-delete`, `POST /api/admin/withdrawals/bulk-patch` (status enum), `POST /api/admin/credentials/bulk-verify`, `POST /api/admin/credentials/bulk-reject`, `POST /api/admin/rental-bookings/bulk-patch` (status enum).
+  - All 9 gated by `_require_admin`.
+- **Wired into 6 tabs**: UsersTab (Ban/Unban/Delete), ShopTab (Show/Hide/Feature/Unfeature/Delete), CredentialsTab (Verify/Reject), WithdrawalsTab (Approve/Deny), ReviewsTab (Delete), RentalsTab (Approve/Decline). ContentTab already had inline bulk-delete — unchanged.
+- **Testing**: iter_54 → **100% backend (15/15 pytest)** + **100% frontend** (all tabs with data validated via Playwright; Withdrawals empty in preview DB so select-all is correctly hidden — proper empty-state behavior).
+
+
 ## Iteration 53 — Feb 2026 (this session)
 ### 🗑️ Wiped fake seed catalog + 📥 real CSV bulk import
 - **Wiped**: All 1001 placeholder shop products (picsum-seeded generic titles/images from `starter_1000_v1` seed) deleted from MongoDB. Auto-seed on startup has been disabled. Shop starts empty until admin adds real products.

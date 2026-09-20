@@ -147,7 +147,7 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         update = {k: v for k, v in (body.updates or {}).items() if k in allowed and v is not None}
         if not update:
             raise HTTPException(400, f"No updatable fields. Allowed: {sorted(allowed)}")
-        if "role" in update and update["role"] not in {"customer", "provider", "admin"}:
+        if "role" in update and update["role"] not in {"customer", "provider", "retailer", "restaurant", "admin"}:
             raise HTTPException(400, f"Invalid role: {update['role']}")
         target_ids = [i for i in body.ids if i and i != admin.get("id")]
         if not target_ids:
