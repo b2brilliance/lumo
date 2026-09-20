@@ -397,6 +397,7 @@ async def broadcast_recruit_post(db, publish_fn, *, base_url: str = "") -> Dict[
     """Compose and publish one recruitment post per active city to every
     enabled social channel. Rotates copy templates so posts look fresh."""
     import random
+    from ai_copy_rotator import rewrite_copy as _rewrite_copy  # noqa: WPS433
     cursor = db.recruit_cities.find({"is_active": True}, {"_id": 0})
     fired: List[Dict[str, Any]] = []
     async for city in cursor:
@@ -409,17 +410,33 @@ async def broadcast_recruit_post(db, publish_fn, *, base_url: str = "") -> Dict[
             "jobs": city.get("bonus_job_count", 100),
             "bonus": float(city.get("bonus_amount", 100)),
         }
+        base_title = tpl_title.format(**fmt)
+        base_body = tpl_body.format(**fmt)
+        # Optional AI rewrite so daily broadcasts don't feel repetitive
+        rewritten = await _rewrite_copy(
+            db,
+            source_type="recruit",
+            source_id=city["slug"],
+            base_title=base_title,
+            base_body=base_body,
+            context={
+                "city": fmt["city"], "state": fmt["state_full"],
+                "milestone_jobs": fmt["jobs"], "bonus_usd": fmt["bonus"],
+                "first_n_signups": fmt["first_n"], "goal_workers": fmt["goal"],
+            },
+        )
         content = {
-            "title": tpl_title.format(**fmt),
-            "body": tpl_body.format(**fmt),
+            "title": rewritten.get("title") or base_title,
+            "body": rewritten.get("body") or base_body,
             "url": f"{base_url.rstrip('/')}/join/{city['slug']}",
             "image_url": city.get("hero_image"),
             "hashtags": ["lumo", "gigwork", city["city"].replace(" ", "")],
             "source_type": "recruit",
             "source_id": city["slug"],
+            "ai_tone": rewritten.get("tone", "off"),
         }
         results = await publish_fn(db, content)
-        fired.append({"slug": city["slug"], "results": results})
+        fired.append({"slug": city["slug"], "results": results, "ai_tone": rewritten.get("tone", "off")})
         await db.recruit_broadcasts.insert_one({
             "id": str(uuid.uuid4()),
             "slug": city["slug"],

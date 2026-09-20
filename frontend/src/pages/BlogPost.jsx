@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { ArrowLeft, Loader2, Calendar } from "lucide-react";
+import AdSense from "@/components/AdSense";
 
 const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }); } catch { return iso; } };
 
@@ -105,6 +106,8 @@ export default function BlogPost() {
         <div className="prose prose-slate max-w-none text-base mt-4">
           {renderMarkdown(post.body_md || "")}
         </div>
+
+        <AdSense testid="adsense-blog-post" />
 
         <div className="border-t border-slate-200 mt-12 pt-6">
           <div className="overline text-slate-500">Tags</div>

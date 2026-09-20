@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import FeaturedShopWidget from "@/components/FeaturedShopWidget";
+import AdSense from "@/components/AdSense";
 
 /* ── Landing (Feb 2026 Uber-inspired redesign) ────────────────────
  *
@@ -176,6 +177,11 @@ export default function Landing() {
 
       {/* ═════════════ FEATURED SHOP ═══════════════════════════════════ */}
       <FeaturedShopWidget />
+
+      {/* ═════════════ SPONSORED (Google AdSense) ══════════════════════ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12">
+        <AdSense testid="adsense-landing" />
+      </div>
 
       {/* ═════════════ MARKETPLACE TEASER ══════════════════════════════ */}
       <section className="border-t border-neutral-200 bg-white" data-testid="landing-marketplace">

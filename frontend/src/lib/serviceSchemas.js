@@ -705,12 +705,6 @@ export const SERVICE_SCHEMAS = {
     },
     baseFields: [
       { name: "tech_stack", label: "Stack / platform", type: "text", placeholder: "React, Node, Postgres, AWS…" },
-      { name: "duration", label: "Expected duration", type: "select", options: [
-        { value: "hours", label: "A few hours" },
-        { value: "days", label: "A few days" },
-        { value: "weeks", label: "A few weeks" },
-        { value: "ongoing", label: "Ongoing" },
-      ]},
     ],
   },
   marketing: {

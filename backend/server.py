@@ -7393,6 +7393,11 @@ from social_publisher import (  # noqa: E402
 )
 app.include_router(_create_social_router(db=db, require_admin=_require_admin()))
 
+# AI Copy Rotator — GPT rewrites recruit + blog captions daily so social
+# feeds don't feel repetitive to followers who saw yesterday's posts.
+from ai_copy_rotator import create_router as _create_ai_copy_router  # noqa: E402
+app.include_router(_create_ai_copy_router(db=db, require_admin=_require_admin()))
+
 # Public base URL — used by recruit auto-broadcasts to build /join/{slug} URLs
 REACT_APP_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 

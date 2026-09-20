@@ -41,6 +41,9 @@ class SocialLinksBody(BaseModel):
     tagline: Optional[str] = Field(
         None, description="Short footer tagline shown above the link rows."
     )
+    adsense_client: Optional[str] = Field(
+        None, description="Google AdSense publisher ID (e.g. 'ca-pub-1234567890123456'). Empty string disables ads."
+    )
 
 
 def _validate_url(url: str) -> str:
@@ -86,6 +89,7 @@ def create_router(*, db, require_admin) -> APIRouter:
         return {
             "links": active,
             "tagline": doc.get("tagline"),
+            "adsense_client": doc.get("adsense_client") or "",
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
         }
@@ -98,6 +102,7 @@ def create_router(*, db, require_admin) -> APIRouter:
         return {
             "links": doc.get("links") or {},
             "tagline": doc.get("tagline"),
+            "adsense_client": doc.get("adsense_client") or "",
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
         }
@@ -118,6 +123,12 @@ def create_router(*, db, require_admin) -> APIRouter:
                 update_doc[f"links.{k}"] = v
         if body.tagline is not None:
             update_doc["tagline"] = body.tagline.strip()[:200]
+        if body.adsense_client is not None:
+            ad = body.adsense_client.strip()[:64]
+            # Validate shape: ca-pub-1234567890123456 (16 digits) — empty clears it
+            if ad and not re.match(r"^ca-pub-\d{10,20}$", ad):
+                raise HTTPException(400, "AdSense client must look like 'ca-pub-1234567890123456' (empty to disable).")
+            update_doc["adsense_client"] = ad
 
         await db.site_settings.update_one(
             {"_id": "social"}, {"$set": update_doc}, upsert=True
@@ -126,6 +137,7 @@ def create_router(*, db, require_admin) -> APIRouter:
         return {
             "links": doc.get("links") or {},
             "tagline": doc.get("tagline"),
+            "adsense_client": doc.get("adsense_client") or "",
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
             "ok": True,

@@ -6,6 +6,7 @@ import {
   ShieldCheck, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import AdSense from "@/components/AdSense";
 
 /* CityRecruit — /join/:slug
  *
@@ -204,6 +205,9 @@ export default function CityRecruit() {
       </section>
 
       {/* Final CTA */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-8">
+        <AdSense testid="adsense-city-recruit" />
+      </div>
       <section className="border-t border-neutral-200 bg-black text-white" data-testid="city-cta-final">
         <div className="max-w-4xl mx-auto px-4 sm:px-8 py-20 text-center">
           <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-white/60 mb-4">

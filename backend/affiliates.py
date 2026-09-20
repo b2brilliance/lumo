@@ -781,14 +781,27 @@ def create_affiliates_router(db, get_current_user, require_role):
 
     # ── Public ──────────────────────────────────────────────────────────────
     @router.get("/offers")
-    async def list_offers(category: str = "", country: str = ""):
+    async def list_offers(category: str = "", country: str = "", self_signup_only: bool = True):
         """Return offers tagged for `category` (and optionally filtered by ISO2
-        country). Empty category returns global offers only."""
+        country). Empty category returns global offers only.
+
+        `self_signup_only` (default True): hide any partner where you'd need
+        prior membership / retailer account. Programs are considered
+        self-signup if they expose a public `signup_url` — every default
+        offer runs on Impact, CJ, FlexOffers, Awin, Rakuten, EPN or the
+        merchant's own public publisher-signup form, so all defaults pass.
+        """
         clauses: list[dict] = [{"active": True}]
         if category:
             clauses.append({"$or": [{"category": category}, {"category": "global"}]})
         if country:
             clauses.append({"$or": [{"country": country.upper()}, {"country": "*"}]})
+        if self_signup_only:
+            clauses.append({"$and": [
+                {"signup_url": {"$exists": True}},
+                {"signup_url": {"$nin": ["", None]}},
+                {"$or": [{"self_signup": {"$ne": False}}, {"self_signup": {"$exists": False}}]},
+            ]})
         q = {"$and": clauses} if len(clauses) > 1 else clauses[0]
         cursor = db.affiliate_offers.find(q).sort("priority", -1)
         offers = []
@@ -799,6 +812,7 @@ def create_affiliates_router(db, get_current_user, require_role):
             needs = [p for p in placeholders if not keys.get(p) and p not in ("city_slug",)]
             doc["needs_setup"] = bool(needs)
             doc["missing_keys"] = needs
+            doc.setdefault("self_signup", True)
             offers.append(doc)
         return {"offers": offers, "count": len(offers)}
 

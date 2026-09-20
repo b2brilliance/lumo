@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Calendar, Tag, ArrowUpRight, Loader2 } from "lucide-react";
+import AdSense from "@/components/AdSense";
 
 const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }); } catch { return iso; } };
 
@@ -39,6 +40,7 @@ export default function BlogIndex() {
       </section>
 
       <section className="max-w-screen-2xl mx-auto px-6 py-12">
+        <AdSense testid="adsense-blog-top" />
         {data.items.length === 0 ? (
           <div className="text-center py-24 text-slate-400 border border-slate-200">
             <div className="font-display text-2xl font-bold text-slate-700">First post coming soon.</div>

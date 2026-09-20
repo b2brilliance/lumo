@@ -372,14 +372,34 @@ async def _share_to_channels(db, post: dict):
     except Exception:
         logger.info("Social publisher not available — skipping blog auto-share.")
         return
+    base_title = post["title"]
+    base_body = post.get("excerpt") or (post.get("body_md") or "")[:240]
+    # Optional AI rewrite so the caption reads fresh vs the blog headline
+    try:
+        from ai_copy_rotator import rewrite_copy as _rewrite_copy
+        rewritten = await _rewrite_copy(
+            db,
+            source_type="blog",
+            source_id=post["id"],
+            base_title=base_title,
+            base_body=base_body,
+            context={"topic": post.get("topic_label"), "slug": post.get("slug")},
+        )
+        caption_title = rewritten.get("title") or base_title
+        caption_body = rewritten.get("body") or base_body
+        ai_tone = rewritten.get("tone", "off")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[blog] AI rewrite skipped: {e}")
+        caption_title, caption_body, ai_tone = base_title, base_body, "off"
     content = {
-        "title": post["title"],
-        "body": post.get("excerpt") or (post.get("body_md") or "")[:240],
+        "title": caption_title,
+        "body": caption_body,
         "url": f"/blog/{post['slug']}",
         "image_url": post.get("hero_image_url"),
         "hashtags": post.get("tags", []),
         "source_type": "blog",
         "source_id": post["id"],
+        "ai_tone": ai_tone,
     }
     results = await _social_publish(db, content)
     logger.info(f"[blog] auto-share results: {results}")

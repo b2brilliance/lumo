@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Facebook, Instagram, Twitter, MessageSquare, CheckCircle2, XCircle, Send, RefreshCw } from "lucide-react";
+import { Facebook, Instagram, Twitter, MessageSquare, CheckCircle2, XCircle, Send, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 
 /* SocialTab — configure Facebook / Instagram / X / Reddit auto-publishing
  * for blog posts + city recruit broadcasts. */
@@ -22,6 +22,142 @@ const FIELD_HINTS = {
   twitter:   ["bearer_token"],
   reddit:    ["client_id", "client_secret", "username", "password", "subreddit", "user_agent"],
 };
+
+const TONE_LABELS = {
+  hype:  "Hype / energetic",
+  clean: "Professional / clean",
+};
+
+function AiCopyRotatorCard() {
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/admin/ai-copy/config");
+      setCfg(data);
+    } catch (err) { toast.error(formatApiError(err)); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggleEnabled = async (enabled) => {
+    setSaving(true);
+    try {
+      const { data } = await api.put("/admin/ai-copy/config", { enabled });
+      setCfg(data);
+      toast.success(enabled ? "AI copy rotator ON — daily posts will rewrite themselves" : "AI copy rotator OFF");
+    } catch (err) { toast.error(formatApiError(err)); }
+    finally { setSaving(false); }
+  };
+
+  const toggleTone = async (tone) => {
+    const current = new Set(cfg?.tones || []);
+    if (current.has(tone)) current.delete(tone);
+    else current.add(tone);
+    const tones = Array.from(current);
+    if (tones.length === 0) {
+      toast.error("Pick at least one tone");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await api.put("/admin/ai-copy/config", { tones });
+      setCfg(data);
+    } catch (err) { toast.error(formatApiError(err)); }
+    finally { setSaving(false); }
+  };
+
+  const runPreview = async () => {
+    setPreviewing(true);
+    setPreview(null);
+    try {
+      const { data } = await api.post("/admin/ai-copy/preview", {
+        source_type: "recruit",
+        source_id: "los-angeles-ca",
+        base_title: "Drive with Lumo in Los Angeles — 90% take-home, same-day pay",
+        base_body: "Lumo is hiring 300 providers in Los Angeles, California. First 100 sign-ups earn a $100 bonus at job #100. No lead fees, cash out today.",
+        context: { city: "Los Angeles", milestone_jobs: 100, bonus_usd: 100 },
+      });
+      setPreview(data);
+    } catch (err) { toast.error(formatApiError(err)); }
+    finally { setPreviewing(false); }
+  };
+
+  if (loading) return <div className="p-6 text-sm text-slate-500">Loading AI copy config…</div>;
+
+  return (
+    <div className="border border-slate-200 p-5 bg-white" data-testid="admin-ai-copy-card">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-fuchsia-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="font-display font-bold text-lg text-slate-900">AI Copy Rotator</div>
+            <div className="text-xs text-slate-500">Rewrites recruit + blog captions every run so followers don't see yesterday's post</div>
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!cfg?.enabled}
+            onChange={(e) => toggleEnabled(e.target.checked)}
+            className="w-4 h-4 accent-slate-900"
+            data-testid="admin-ai-copy-enabled"
+            disabled={saving}
+          />
+          Enable
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4" data-testid="admin-ai-copy-tones">
+        {(cfg?.available_tones || ["hype", "clean"]).map((tone) => {
+          const active = (cfg?.tones || []).includes(tone);
+          return (
+            <button
+              key={tone}
+              type="button"
+              onClick={() => toggleTone(tone)}
+              className={`text-left border p-3 text-sm transition-colors ${active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-400"}`}
+              data-testid={`admin-ai-copy-tone-${tone}`}
+              disabled={saving}
+            >
+              <div className="font-display font-bold">{TONE_LABELS[tone] || tone}</div>
+              <div className={`text-xs mt-0.5 ${active ? "text-white/70" : "text-slate-500"}`}>
+                {tone === "hype" ? "Punchy, driver-culture, emoji ok" : "Benefits-first, no jargon, founder-tone"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-500">
+        <span>Rewrites so far: <b className="text-slate-900">{cfg?.total_rewrites ?? 0}</b></span>
+        {cfg?.last_run_at && <span>· Last run: {new Date(cfg.last_run_at).toLocaleString()}</span>}
+        {cfg?.last_tone && cfg.last_tone !== "off" && <span>· Last tone: {TONE_LABELS[cfg.last_tone] || cfg.last_tone}</span>}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={runPreview} disabled={previewing} className="bg-slate-900 hover:bg-slate-800 h-8" data-testid="admin-ai-copy-preview-btn">
+          <Wand2 className="w-3.5 h-3.5 mr-1" /> {previewing ? "Rewriting…" : "Preview next recruit copy"}
+        </Button>
+      </div>
+
+      {preview && (
+        <div className="mt-4 p-3 border border-dashed border-slate-300 bg-slate-50" data-testid="admin-ai-copy-preview-result">
+          <div className="overline text-slate-500 mb-1">Preview · tone: {TONE_LABELS[preview.tone] || preview.tone}</div>
+          <div className="font-display font-bold text-slate-900">{preview.title}</div>
+          <div className="text-sm text-slate-700 mt-1 whitespace-pre-line">{preview.body}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SocialTab() {
   const [items, setItems] = useState([]);
@@ -72,6 +208,8 @@ export default function SocialTab() {
         <h2 className="font-display text-2xl font-black tracking-tight">Blog + recruit broadcasts</h2>
         <p className="text-sm text-slate-500 mt-1">Every published blog post and every daily recruit broadcast fans out to whichever platforms are enabled below.</p>
       </div>
+
+      <AiCopyRotatorCard />
 
       {loading ? (
         <div className="p-6 text-sm text-slate-500">Loading…</div>

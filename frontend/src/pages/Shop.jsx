@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { Search, Star, ExternalLink, Info, SlidersHorizontal, X } from "lucide-react";
 import { api } from "@/lib/api";
+import AdSense from "@/components/AdSense";
 
 /* Shop — affiliate product feed.
  *
@@ -253,6 +254,11 @@ export default function Shop() {
           </div>
         </section>
       )}
+
+      {/* Sponsored ad slot (Google AdSense — hidden until admin sets pub ID) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12">
+        <AdSense testid="adsense-shop" />
+      </div>
 
       {/* Products grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-12" data-testid="shop-products">

@@ -17,6 +17,7 @@ export default function SocialLinksAdmin() {
   const [doc, setDoc] = useState(null);
   const [draft, setDraft] = useState({});
   const [tagline, setTagline] = useState("");
+  const [adsense, setAdsense] = useState("");
   const [savingKey, setSavingKey] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +27,7 @@ export default function SocialLinksAdmin() {
       setDoc(data);
       setDraft(data.links || {});
       setTagline(data.tagline || "");
+      setAdsense(data.adsense_client || "");
     } catch (e) {
       toast.error(formatApiError(e));
     } finally {
@@ -56,6 +58,17 @@ export default function SocialLinksAdmin() {
       const { data } = await api.put("/admin/site/social", { tagline });
       setDoc(data);
       toast.success("Tagline saved");
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  };
+
+  const saveAdsense = async () => {
+    if ((doc?.adsense_client || "") === adsense) return;
+    try {
+      const { data } = await api.put("/admin/site/social", { adsense_client: adsense });
+      setDoc(data);
+      toast.success(adsense ? "AdSense client saved — ads will appear on visitor pages" : "AdSense disabled");
     } catch (e) {
       toast.error(formatApiError(e));
     }
@@ -94,6 +107,26 @@ export default function SocialLinksAdmin() {
           data-testid="social-admin-tagline"
         />
         <div className="text-[10px] font-mono text-slate-400 mt-1 text-right">{tagline.length}/200</div>
+      </div>
+
+      {/* Google AdSense */}
+      <div className="mb-6 border border-slate-200 p-4" data-testid="admin-adsense-block">
+        <label className="overline block mb-2">Google AdSense publisher ID</label>
+        <Input
+          value={adsense}
+          onChange={(e) => setAdsense(e.target.value.trim())}
+          onBlur={saveAdsense}
+          maxLength={64}
+          placeholder="ca-pub-1234567890123456"
+          className="rounded-none font-mono text-sm"
+          data-testid="admin-adsense-input"
+        />
+        <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+          Paste your AdSense publisher ID (starts with <span className="font-mono">ca-pub-</span>).
+          Once saved, banner + in-feed ads render on visitor pages (home, shop, blog list, blog post, city recruit).
+          Leave empty to disable ads entirely. You'll need an approved AdSense account from{" "}
+          <a href="https://adsense.google.com/start" target="_blank" rel="noopener noreferrer" className="underline">adsense.google.com</a>.
+        </p>
       </div>
 
       {/* Links grid */}
