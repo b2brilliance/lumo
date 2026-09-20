@@ -7176,6 +7176,12 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
             await _credit_referrer_milestone(db, provider_id=provider_id)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"milestone bonus check failed for provider={provider_id}: {exc}")
+        # And the city recruit milestone ($100 at 100 jobs for the first
+        # 100 in each target city).
+        try:
+            await _credit_city_milestone(db, provider_id=provider_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"city milestone check failed for provider={provider_id}: {exc}")
         return
 
     # Fallback — simulated wallet credit
@@ -7195,6 +7201,10 @@ async def _credit_provider(*, provider_id: str, amount: float, reason: str,
         await _credit_referrer_milestone(db, provider_id=provider_id)
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"milestone bonus check failed for provider={provider_id}: {exc}")
+    try:
+        await _credit_city_milestone(db, provider_id=provider_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"city milestone check failed for provider={provider_id}: {exc}")
 
 
 app.include_router(_create_escrow_router(db=db, get_current_user=get_current_user,
@@ -7371,8 +7381,26 @@ app.include_router(_create_push_router(db=db, get_current_user=get_current_user)
 from recruit_cities import (  # noqa: E402
     create_router as _create_recruit_router,
     seed_recruit_cities as _seed_recruit_cities,
+    credit_city_milestone as _credit_city_milestone,
 )
 app.include_router(_create_recruit_router(db=db, require_admin=_require_admin()))
+
+# Social auto-publisher (Facebook / Instagram / X / Reddit)
+from social_publisher import (  # noqa: E402
+    create_router as _create_social_router,
+    publish_to_all as _social_publish,
+    PLATFORMS as _SOCIAL_PLATFORMS,
+)
+app.include_router(_create_social_router(db=db, require_admin=_require_admin()))
+
+# Public base URL — used by recruit auto-broadcasts to build /join/{slug} URLs
+REACT_APP_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+
+@app.on_event("startup")
+async def _recruit_autopost_startup():
+    import asyncio
+    from recruit_cities import recruit_autopost_loop as _recruit_loop
+    asyncio.create_task(_recruit_loop(db, _social_publish, lambda: REACT_APP_BASE_URL))
 
 @app.on_event("startup")
 async def _seed_recruit_cities_on_boot():

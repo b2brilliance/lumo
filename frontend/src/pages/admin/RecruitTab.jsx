@@ -26,6 +26,30 @@ export default function RecruitTab() {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [autopost, setAutopost] = useState({ enabled: false });
+
+  const loadAutopost = async () => {
+    try {
+      const { data } = await api.get("/admin/recruit/autopost");
+      setAutopost(data);
+    } catch { /* ignore */ }
+  };
+
+  const toggleAutopost = async (v) => {
+    try {
+      await api.put("/admin/recruit/autopost", { enabled: v });
+      setAutopost({ ...autopost, enabled: v });
+      toast.success(v ? "Daily recruit broadcasts enabled" : "Auto-posting paused");
+    } catch (err) { toast.error(formatApiError(err)); }
+  };
+
+  const broadcastNow = async () => {
+    if (!window.confirm("Send a recruit post to every enabled social channel for every active city — right now?")) return;
+    try {
+      const { data } = await api.post("/admin/recruit/broadcast-now");
+      toast.success(`Fired ${data.fired} city broadcasts`);
+    } catch (err) { toast.error(formatApiError(err)); }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -36,7 +60,7 @@ export default function RecruitTab() {
       toast.error(formatApiError(err));
     } finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadAutopost(); }, []);
 
   const openNew = () => setEditing({ ...EMPTY_DRAFT, _isNew: true });
   const openEdit = (c) => setEditing({ ...c, _isNew: false });
@@ -180,12 +204,42 @@ export default function RecruitTab() {
         </div>
       )}
 
-      {/* Recruiter playbook link */}
-      <div className="bg-slate-50 border border-slate-200 p-5 flex items-start gap-3" data-testid="admin-recruit-playbook">
-        <Share2 className="w-5 h-5 text-slate-900 mt-0.5 flex-shrink-0" />
-        <div className="text-sm text-slate-700 leading-relaxed">
-          <b className="text-slate-900">Recruiter playbook.</b> A step-by-step guide for posting to Reddit, Facebook groups, Craigslist, Indeed and Google Ads in each target city lives at{" "}
-          <a href="/RECRUITING_PLAYBOOK.md" className="underline hover:text-slate-900" target="_blank" rel="noreferrer">/app/RECRUITING_PLAYBOOK.md</a>.
+      {/* Recruiter playbook link + autopost controls */}
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="bg-slate-50 border border-slate-200 p-5 flex items-start gap-3" data-testid="admin-recruit-autopost">
+          <Share2 className="w-5 h-5 text-slate-900 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <div className="font-display font-bold text-slate-900">Automate recruiting</div>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Fire one recruit post per active city to every enabled social channel — daily.
+              Configure channels in <b>Admin → Auto-post</b>.
+            </p>
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autopost.enabled}
+                  onChange={(e) => toggleAutopost(e.target.checked)}
+                  className="w-4 h-4 accent-slate-900"
+                  data-testid="admin-recruit-autopost-toggle"
+                />
+                Daily auto-broadcast
+              </label>
+              <Button size="sm" variant="outline" onClick={broadcastNow} className="h-8" data-testid="admin-recruit-broadcast-now">
+                Broadcast now
+              </Button>
+            </div>
+            {autopost.last_run_at && (
+              <div className="mt-2 text-[10px] font-mono text-slate-500">Last run: {new Date(autopost.last_run_at).toLocaleString()}</div>
+            )}
+          </div>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 p-5 flex items-start gap-3" data-testid="admin-recruit-playbook">
+          <Share2 className="w-5 h-5 text-slate-900 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-slate-700 leading-relaxed">
+            <b className="text-slate-900">Recruiter playbook.</b> Step-by-step channel-by-channel guide at{" "}
+            <a href="/RECRUITING_PLAYBOOK.md" className="underline hover:text-slate-900" target="_blank" rel="noreferrer">/app/RECRUITING_PLAYBOOK.md</a>.
+          </div>
         </div>
       </div>
 

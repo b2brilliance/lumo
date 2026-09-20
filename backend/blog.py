@@ -365,27 +365,24 @@ async def _publish_one(db, force: bool = False) -> dict:
 
 
 async def _share_to_channels(db, post: dict):
-    """Fire each enabled Distribution channel with the new post."""
+    """Fan a newly published blog post out to every enabled social
+    channel (Facebook / Instagram / X / Reddit) via social_publisher."""
     try:
-        from server import _send_to_channel  # type: ignore
+        from server import _social_publish  # type: ignore
     except Exception:
-        logger.info("Distribution _send_to_channel not found — skipping auto-share.")
+        logger.info("Social publisher not available — skipping blog auto-share.")
         return
-    channels = [c async for c in db.distribution_channels.find({"enabled": {"$ne": False}})]
-    payload = {
-        "headline": post["title"],
-        "body": post["excerpt"] or post["body_md"][:240],
+    content = {
+        "title": post["title"],
+        "body": post.get("excerpt") or (post.get("body_md") or "")[:240],
+        "url": f"/blog/{post['slug']}",
         "image_url": post.get("hero_image_url"),
-        "video_url": None,
         "hashtags": post.get("tags", []),
-        "source_ad_id": post["id"],
-        "blog_post_url": f"/blog/{post['slug']}",
+        "source_type": "blog",
+        "source_id": post["id"],
     }
-    for ch in channels:
-        try:
-            await _send_to_channel(ch, payload)
-        except Exception as e:
-            logger.warning(f"Share to {ch.get('platform')} failed: {e}")
+    results = await _social_publish(db, content)
+    logger.info(f"[blog] auto-share results: {results}")
 
 
 # ── Background loop ────────────────────────────────────────────────────────

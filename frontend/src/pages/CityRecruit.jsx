@@ -90,7 +90,7 @@ export default function CityRecruit() {
           {bonusEligible && (
             <div className="mt-6 inline-flex items-center gap-3 px-4 py-3 rounded-full bg-amber-500 text-black font-semibold text-sm shadow-lg" data-testid="city-hero-bonus">
               <Zap className="w-4 h-4" />
-              <span>${Number(city.bonus_amount).toFixed(0)} sign-on for the first {city.bonus_first_n} — only {Math.max(0, city.bonus_first_n - (city.signups_total || 0))} spots left</span>
+              <span>${Number(city.bonus_amount).toFixed(0)} loyalty bonus after your first {city.bonus_job_count || 100} jobs — reserved for the first {city.bonus_first_n}, only {Math.max(0, city.bonus_first_n - (city.signups_total || 0))} spots left</span>
             </div>
           )}
 
@@ -167,13 +167,13 @@ export default function CityRecruit() {
           <div className="grid sm:grid-cols-2 gap-8 items-center">
             <div>
               <div className="overline flex items-center gap-2 mb-3">
-                <DollarSign className="w-3.5 h-3.5" /> Sign-on bonus
+                <DollarSign className="w-3.5 h-3.5" /> Loyalty bonus
               </div>
               <h2 className="font-display text-3xl sm:text-4xl font-bold text-black tracking-tight">
-                ${Number(city.bonus_amount).toFixed(0)} after your 10th job.
+                ${Number(city.bonus_amount).toFixed(0)} after job #{city.bonus_job_count || 100}.
               </h2>
               <p className="mt-4 text-neutral-600 leading-relaxed">
-                Complete 10 paid jobs on Lumo in {city.city} and we pay you a flat <b className="text-black">${Number(city.bonus_amount).toFixed(0)}</b> milestone bonus — on top of your normal earnings. Reserved for the <b>first {city.bonus_first_n}</b> providers who join in {city.city}.
+                Complete {city.bonus_job_count || 100} paid jobs on Lumo in {city.city} and we drop a flat <b className="text-black">${Number(city.bonus_amount).toFixed(0)}</b> into your wallet — on top of your normal earnings. Reserved for the <b>first {city.bonus_first_n}</b> providers who sign up in {city.city}.
               </p>
               <button onClick={startSignup} className="btn-lumo btn-lumo-primary btn-lumo-lg mt-6" data-testid="city-milestone-cta">
                 Claim my spot <ArrowRight className="w-4 h-4" />
@@ -196,7 +196,7 @@ export default function CityRecruit() {
               <div className="mt-4 space-y-2 text-sm text-neutral-700">
                 <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-600" /> Apply in 10 minutes</div>
                 <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-600" /> Approved same day (usually)</div>
-                <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-600" /> Bonus lands the moment you hit job #10</div>
+                <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-600" /> Bonus lands the moment you hit job #{city.bonus_job_count || 100}</div>
               </div>
             </div>
           </div>
