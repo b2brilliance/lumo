@@ -9,7 +9,21 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
-## Iteration 56b — Feb 2026 (this session, AI Copy Rotator + AdSense + self-signup filter)
+## Iteration 57 — Feb 2026 (this session, Nationwide seed + Permanent SW fix)
+### 🌎 122-city nationwide recruit expansion + 🛡 permanent stale-cache fix
+- **Nationwide recruit seed (`recruit_cities_us_seed.py`)** — top-100 US metros seeded on boot. Covers all 50 states + DC + AK + HI. Combined with the original 6 priority cities, `db.recruit_cities` now has **122 active landing pages** (`/join/{slug}`). Every city gets rotating hero copy (5 headline + 5 subhead templates) and a real Unsplash city photo. Admin can override any field in the RecruitTab.
+- **`/join` directory page (`CityRecruitIndex.jsx`)** — new visitor-facing index at `/join`. Hero shows total-cities + total-signups counters; live search input filters by city/state/state_full; cards grouped by state so 122 rows feel navigable. Every card links to the existing `/join/{slug}` page.
+- **Sitemap emits all 122 city URLs** — `sitemap_xml` in `server.py` now queries `db.recruit_cities` and emits one `<url>` per active city plus the `/join` hub URL. Google's crawler will index the full nationwide footprint on next re-crawl.
+- **Landing page CTA** — new "Pick your city" button (`data-testid='provider-city-picker'`) in the Landing provider-recruitment section links to `/join`.
+- **PERMANENT stale-cache fix (`public/index.html`)** — the recurring "site only loads in Incognito" bug has been root-caused: the previous SW killswitch unconditionally unregistered EVERY service worker at page load, including the legitimate `/push-sw.js` that opted-in users had installed. Combined with mobile Safari's bfcache aggressively restoring stale pages, this created reload loops and pinned users on broken states. Fix:
+  1. Killswitch now inspects each registration's `scriptURL` and preserves `/push-sw.js` while nuking any other legacy SW at scope `/`. Uses new sessionStorage key `lumo_sw_killswitch_v2` so users who hit the old broken killswitch flag get a fresh guard on next visit.
+  2. New `pageshow` bfcache handler: when the browser restores a page from bfcache (`event.persisted === true`), it re-checks `/api/meta` for the current buildTime and hard-reloads if the deploy has moved. This kills the "back-forward showed me a stale page from 3 deploys ago" symptom on iOS Safari / mobile Chrome.
+- **AdSense integrity retained** — `<script async src="…adsbygoogle.js?client=ca-pub-6859971059816782">` + `<meta name="google-adsense-account">` still in `<head>`; `/ads.txt` still serves at site root.
+- **Testing**: iter_57 → **100% backend + 100% frontend**, all 17 sampled city slugs resolve, 122 `/join/*` URLs in sitemap, killswitch strings all present, zero regressions on Blog / Shop / AI Copy / Affiliates / order flow.
+
+---
+
+
 ### ✨ AI Copy Rotator, 📢 Google AdSense, 🔗 self-signup-only affiliate filter, ⏱ website timeline removed
 - **AI Copy Rotator (`ai_copy_rotator.py`)** — Claude Sonnet 4.5 rewrites the title/body of every recruit broadcast + blog auto-share caption so followers don't see yesterday's post. Alternates two tones (`hype`, `clean`) on each run so the feed feels varied. Persists last 5 variants per (source_type, source_id) in `copy_history` and passes them to the LLM as "avoid these phrasings". Falls back to base copy if the rotator is disabled or the LLM fails (never blocks the publish). Admin endpoints:
   - `GET /api/admin/ai-copy/config` → {enabled, tones, available_tones, total_rewrites, last_run_at, last_tone}
