@@ -49,6 +49,7 @@ class RecruitCity(BaseModel):
     hero_headline: Optional[str] = None
     hero_subhead: Optional[str] = None
     hero_image: Optional[str] = None
+    neighborhoods: List[str] = Field(default_factory=list)   # 3-5 landmark neighborhoods for local SEO
     is_active: bool = True
     click_count: int = 0
     view_count: int = 0
@@ -67,6 +68,7 @@ class RecruitCityIn(BaseModel):
     hero_headline: Optional[str] = None
     hero_subhead: Optional[str] = None
     hero_image: Optional[str] = None
+    neighborhoods: List[str] = Field(default_factory=list)
     is_active: bool = True
 
 
@@ -81,6 +83,7 @@ class RecruitCityPatch(BaseModel):
     hero_headline: Optional[str] = None
     hero_subhead: Optional[str] = None
     hero_image: Optional[str] = None
+    neighborhoods: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
 
@@ -139,6 +142,41 @@ async def _reseed_bonus_amounts(db) -> int:
         {"$set": {"bonus_job_count": 100}},
     )
     return res.modified_count
+
+
+async def _backfill_local_enrichment(db) -> int:
+    """Backfill neighborhoods + unique photo IDs on any pre-existing
+    row that was seeded before those fields existed. Idempotent — only
+    touches rows where the field is missing OR the hero_image matches
+    the generic fallback that iter-57 used."""
+    from recruit_cities_local import CITY_PHOTO_IDS, CITY_NEIGHBORHOODS, _photo_url
+    updated = 0
+    FALLBACK = "https://images.unsplash.com/photo-1477414348463-c0eb7f1359b6?auto=format&fit=crop&w=1600&q=80"
+    cursor = db.recruit_cities.find({}, {"_id": 0, "slug": 1, "hero_image": 1, "neighborhoods": 1})
+    async for doc in cursor:
+        slug = doc.get("slug")
+        if not slug:
+            continue
+        patch: Dict[str, Any] = {}
+        # Neighborhoods
+        current_hoods = doc.get("neighborhoods") or []
+        curated_hoods = CITY_NEIGHBORHOODS.get(slug)
+        if curated_hoods and not current_hoods:
+            patch["neighborhoods"] = curated_hoods
+        # Hero image — only overwrite if we have a curated match AND the
+        # current image is either missing or the fallback iter-57 assigned.
+        curated_photo = CITY_PHOTO_IDS.get(slug)
+        if curated_photo:
+            new_url = _photo_url(slug, FALLBACK)
+            cur_url = doc.get("hero_image") or ""
+            if new_url != cur_url and (not cur_url or cur_url == FALLBACK):
+                patch["hero_image"] = new_url
+        if patch:
+            await db.recruit_cities.update_one({"slug": slug}, {"$set": patch})
+            updated += 1
+    if updated:
+        logger.info(f"[recruit] Backfilled local enrichment on {updated} cities")
+    return updated
 
 
 async def credit_city_milestone(db, *, provider_id: str) -> Optional[dict]:
@@ -249,11 +287,28 @@ async def seed_recruit_cities(db) -> int:
       2. Every top-100 US metro from `recruit_cities_us_seed.US_SEED_CITIES`
          so `/join/{slug}` works for every major American city out of the
          box. Admin can edit copy or set is_active=False anytime.
+      3. Applies per-city local enrichment (unique hero photo + curated
+         neighborhoods) from `recruit_cities_local.CITY_PHOTO_IDS` and
+         `CITY_NEIGHBORHOODS`.
+      4. Backfills local enrichment onto any pre-existing rows so old
+         seeds get the same treatment on next boot.
     """
     from recruit_cities_us_seed import US_SEED_CITIES  # local import to avoid boot-time cost when unused
+    from recruit_cities_local import (
+        CITY_PHOTO_IDS as _PHOTOS, CITY_NEIGHBORHOODS as _HOODS, _photo_url,
+    )
     await _reseed_bonus_amounts(db)
     inserted = 0
     seen_slugs: set = set()
+
+    def _apply_local(doc: Dict[str, Any]) -> Dict[str, Any]:
+        slug = doc.get("slug", "")
+        hoods = _HOODS.get(slug)
+        if hoods:
+            doc["neighborhoods"] = hoods
+        if _PHOTOS.get(slug):
+            doc["hero_image"] = _photo_url(slug, doc.get("hero_image", ""))
+        return doc
 
     # Priority cities first (preserves existing rows exactly)
     for c in SEED_CITIES:
@@ -261,7 +316,7 @@ async def seed_recruit_cities(db) -> int:
         exists = await db.recruit_cities.find_one({"slug": c["slug"]})
         if exists:
             continue
-        doc = RecruitCity(**c)
+        doc = RecruitCity(**_apply_local(dict(c)))
         await db.recruit_cities.insert_one(doc.model_dump())
         inserted += 1
 
@@ -273,12 +328,15 @@ async def seed_recruit_cities(db) -> int:
         exists = await db.recruit_cities.find_one({"slug": c["slug"]})
         if exists:
             continue
-        doc = RecruitCity(**c)
+        doc = RecruitCity(**_apply_local(dict(c)))
         await db.recruit_cities.insert_one(doc.model_dump())
         inserted += 1
 
     if inserted:
         logger.info(f"[recruit] Seeded {inserted} recruit cities (priority + US metros)")
+
+    # Backfill enrichment on any rows already in Mongo from earlier boots
+    await _backfill_local_enrichment(db)
     return inserted
 
 

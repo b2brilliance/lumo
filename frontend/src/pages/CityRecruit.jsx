@@ -61,12 +61,16 @@ export default function CityRecruit() {
   const pct = Number(city.progress_pct || 0);
   const bonusEligible = (city.signups_total || 0) < (city.bonus_first_n || 100);
   const displayName = `${city.city}, ${city.state_full || city.state}`;
+  const hoods = Array.isArray(city.neighborhoods) ? city.neighborhoods : [];
+  const localSeoBlurb = hoods.length
+    ? `Drive with Lumo in ${city.city} — serving ${hoods.slice(0, 4).join(", ")}. Keep 90%, same-day payouts, $${city.bonus_amount} bonus after your 100th job.`
+    : city.hero_subhead || `Lumo is hiring ${city.goal_workers} providers in ${displayName}. Keep 90% of every job, same-day payouts, $${city.bonus_amount} bonus.`;
 
   return (
     <div className="bg-white min-h-screen" data-testid={`page-city-recruit-${slug}`}>
       <Helmet>
         <title>{`Drive with Lumo in ${displayName} — apply in 10 minutes`}</title>
-        <meta name="description" content={city.hero_subhead || `Lumo is hiring ${city.goal_workers} providers in ${displayName}. Keep 90% of every job, same-day payouts, $${city.bonus_amount} sign-on for the first ${city.bonus_first_n}.`} />
+        <meta name="description" content={localSeoBlurb} />
       </Helmet>
 
       {/* Hero */}
@@ -87,6 +91,21 @@ export default function CityRecruit() {
           <p className="mt-6 text-lg sm:text-xl text-white/80 leading-relaxed max-w-2xl" data-testid="city-hero-subhead">
             {city.hero_subhead || `Lumo needs ${city.goal_workers} providers in ${displayName}. Keep 90% of every job, same-day payouts, no lead fees.`}
           </p>
+
+          {Array.isArray(city.neighborhoods) && city.neighborhoods.length > 0 && (
+            <div className="mt-6 flex flex-wrap gap-2" data-testid="city-neighborhoods">
+              <span className="text-xs font-mono uppercase tracking-widest text-white/50 self-center mr-2">Serving</span>
+              {city.neighborhoods.slice(0, 6).map((n, i) => (
+                <span
+                  key={i}
+                  className="px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-mono text-white/90"
+                  data-testid={`city-neighborhood-${i}`}
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          )}
 
           {bonusEligible && (
             <div className="mt-6 inline-flex items-center gap-3 px-4 py-3 rounded-full bg-amber-500 text-black font-semibold text-sm shadow-lg" data-testid="city-hero-bonus">
