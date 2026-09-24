@@ -16,6 +16,7 @@ import AddressInput from "@/components/AddressInput";
 import MapPickerButton from "@/components/MapPickerButton";
 import AvatarUploader from "@/components/AvatarUploader";
 import ProviderProfileSection from "@/components/ProviderProfileSection";
+import ProviderMediaSection from "@/components/ProviderMediaSection";
 import { enablePush, disablePush, pushStatus } from "@/lib/push";
 
 const DEFAULT_NOTIFS = {
@@ -206,6 +207,7 @@ export default function Settings() {
 
       {/* ── Provider profile (role==provider only) ─────────────────────── */}
       <ProviderProfileSection />
+      <ProviderMediaSection />
 
       {/* ── Default delivery address ────────────────────────────────────────── */}
       <SettingsSection

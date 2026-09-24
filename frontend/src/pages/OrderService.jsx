@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useLocale } from "@/lib/locale";
 import AddressInput from "@/components/AddressInput";
 import ServiceDetailsForm from "@/components/ServiceDetailsForm";
+import AttachmentUploader from "@/components/AttachmentUploader";
 import { computeDeliveryQuote, computeMovingQuote, milesBetween } from "@/lib/deliveryPricing";
 import { computeMarketQuote, NO_BUDGET_CATEGORIES } from "@/lib/serviceQuotes";
 import { enablePush, pushStatus } from "@/lib/push";
@@ -36,7 +37,6 @@ const SERVICE_META = {
   delivery:        { label: "Delivery",         Icon: Truck,            blurb: "Move a package across town, same day.",       cta: "Send request" },
   courier:         { label: "Same-day courier", Icon: Truck,            blurb: "Sensitive or urgent — hand-carried A → B.",   cta: "Send request" },
   moving:          { label: "Moving help",      Icon: HardHat,          blurb: "Load, drive, unload. Furniture-friendly.",    cta: "Send request" },
-  ride_share:      { label: "Rides",            Icon: Car,              blurb: "Any distance, driver picks you up.",          cta: "Send request" },
   towing:          { label: "Towing",           Icon: Truck,            blurb: "Full tows, breakdowns, long-distance.",       cta: "Send request" },
   roadside:        { label: "Roadside",         Icon: Zap,              blurb: "Jump-starts, tires, lockouts, fuel.",         cta: "Send request" },
   handyman:        { label: "Handyman",         Icon: Wrench,           blurb: "Repairs, mounting, assembly.",                cta: "Send request" },
@@ -44,7 +44,6 @@ const SERVICE_META = {
   landscaping:     { label: "Landscaping",      Icon: Sparkles,         blurb: "Lawn, hedges, seasonal cleanups.",            cta: "Send request" },
   auto:            { label: "Mobile mechanic",  Icon: Wrench,           blurb: "Mechanic comes to you.",                      cta: "Send request" },
   pet_care:        { label: "Pet care",         Icon: PawPrint,         blurb: "Walking, sitting, grooming, boarding.",       cta: "Send request" },
-  personal_care:   { label: "Beauty",           Icon: Scissors,         blurb: "Hair, nails, makeup — to your door.",         cta: "Send request" },
   medical:         { label: "In-home care",     Icon: ShieldCheck,      blurb: "Elder care, nursing, PT visits.",             cta: "Send request" },
   events:          { label: "Events",           Icon: Camera,           blurb: "Photographers, catering, staff.",             cta: "Send request" },
   notary:          { label: "Notary",           Icon: Building2,        blurb: "Mobile notary anywhere.",                     cta: "Send request" },
@@ -65,7 +64,15 @@ function metaFor(service) {
 
 const POPULAR_CATEGORIES = [
   "delivery", "moving", "cleaning", "handyman", "auto", "roadside",
-  "pet_care", "landscaping", "personal_care", "it_support", "notary", "errand",
+  "pet_care", "landscaping", "it_support", "notary", "errand", "events",
+];
+
+/* Employment-type options — customer's hire intent for THIS request.
+ * Rendered as pill buttons in the wizard's Step 3 (dispatch info). */
+export const EMPLOYMENT_TYPES = [
+  { value: "on_demand", label: "One-time / on-demand", blurb: "Just for this task — pay per completion." },
+  { value: "temp",      label: "Temporary hire",       blurb: "Short-term (days) or long-term (weeks/months) — flexible dates." },
+  { value: "employee",  label: "Hire as employee",     blurb: "Ongoing role with regular hours. We'll help draft an offer." },
 ];
 
 // Field-level validators per step.
@@ -227,6 +234,8 @@ export default function OrderService() {
         dropoff_location: null,
         details: { ...(form.details || {}), scheduled_for: form.when === "later" ? form.schedule_at : null },
         delivery_quote: deliveryQuote || movingQuote || null,
+        attachments: form.attachments || [],
+        employment_type: form.employment_type || "on_demand",
       };
       if (locMode === "pickup_dropoff") {
         body.pickup_location = form.pickup_address ? { lat: form.pickup_lat ?? 40.7128, lng: form.pickup_lng ?? -74.006, address: form.pickup_address } : null;
@@ -450,6 +459,19 @@ function Step2Details({ cat, meta, form, setForm }) {
             data-testid="order-description"
           />
         </div>
+        <div>
+          <label className="overline mb-2 block">Reference photos or videos <span className="text-neutral-400 normal-case font-normal">(optional but recommended)</span></label>
+          <p className="text-xs text-neutral-500 mb-3">
+            Show us what you want — a hairstyle screenshot, a photo of the broken part, a short video of the leak. Providers reply faster when they can see it.
+          </p>
+          <AttachmentUploader
+            value={form.attachments || []}
+            onChange={(atts) => set("attachments", atts)}
+            max={6}
+            maxSizeMB={25}
+            testId="order-attachments"
+          />
+        </div>
         <ServiceDetailsForm
           category={cat}
           details={form.details || {}}
@@ -478,6 +500,27 @@ function Step3Dispatch({ cat, locMode, locCopy, form, setForm }) {
       </p>
 
       <div className="mt-8 space-y-6">
+        <div data-testid="order-employment-type-block">
+          <label className="overline mb-2 block">How do you want to hire?</label>
+          <div className="grid sm:grid-cols-3 gap-2">
+            {EMPLOYMENT_TYPES.map((opt) => {
+              const active = (form.employment_type || "on_demand") === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => set("employment_type", opt.value)}
+                  className={`text-left p-4 border transition-colors ${active ? "border-black bg-black text-white" : "border-neutral-200 hover:border-neutral-400"}`}
+                  data-testid={`order-employment-${opt.value}`}
+                >
+                  <div className="font-display font-bold text-sm">{opt.label}</div>
+                  <div className={`text-xs mt-1 ${active ? "text-white/70" : "text-neutral-500"}`}>{opt.blurb}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {showAddress && (
           <div className="space-y-4" data-testid="order-address-block">
             <div>

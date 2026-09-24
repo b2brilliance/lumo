@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Camera, CheckCircle2, AlertTriangle, Loader2, Clock } from "lucide-react";
 import { toast } from "sonner";
 
-const PHYSICAL = new Set(["delivery", "courier", "moving", "ride_share", "towing"]);
+const PHYSICAL = new Set(["delivery", "courier", "moving", "towing"]);
 const MAX_PHOTOS = 3;
 const MAX_BYTES = 900_000;
 

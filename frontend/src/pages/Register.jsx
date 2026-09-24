@@ -35,7 +35,6 @@ const EMP_TYPES = [
 const PROVIDER_CATEGORIES = [
   { key: "delivery",       label: "Delivery" },
   { key: "courier",        label: "Courier" },
-  { key: "ride_share",     label: "Ride-share" },
   { key: "towing",         label: "Roadside & towing" },
   { key: "moving",         label: "Moving & hauling" },
   { key: "handyman",       label: "Handyman" },
@@ -44,7 +43,6 @@ const PROVIDER_CATEGORIES = [
   { key: "auto",           label: "Auto repair" },
   { key: "pet_care",       label: "Pet care" },
   { key: "events",         label: "Events" },
-  { key: "personal_care",  label: "Personal care" },
   { key: "medical",        label: "Medical / health" },
   { key: "digital_tech",   label: "Digital & tech" },
   { key: "marketing",      label: "Marketing" },

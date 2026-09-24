@@ -3,8 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import {
   Search, MapPin, ShoppingBag, Car, Wrench, Sparkles, Truck, PawPrint,
-  Laptop, HardHat, Scissors, ArrowRight, Zap, ShieldCheck, Star, Wallet,
-  Clock, DollarSign,
+  Laptop, HardHat, ArrowRight, Zap, ShieldCheck, Star, Wallet,
+  Clock, DollarSign, Camera,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import FeaturedShopWidget from "@/components/FeaturedShopWidget";
@@ -26,14 +26,14 @@ import AdSense from "@/components/AdSense";
  * No gradients. Pill-shaped CTAs. Space Grotesk display type.        */
 
 const SERVICES = [
-  { key: "delivery",     label: "Delivery",       tagline: "Under 30 min",   Icon: Truck,       to: "/order/delivery" },
-  { key: "cleaning",     label: "Cleaning",       tagline: "Same-day pros",  Icon: Sparkles,    to: "/order/cleaning" },
-  { key: "moving",       label: "Moving",         tagline: "Hourly / haul",  Icon: HardHat,     to: "/order/moving" },
-  { key: "handyman",     label: "Handyman",       tagline: "Fix anything",   Icon: Wrench,      to: "/order/handyman" },
-  { key: "auto",         label: "Mechanic",       tagline: "Mobile repair",  Icon: Car,         to: "/order/auto" },
-  { key: "pet_care",     label: "Pet care",       tagline: "Walks + boards", Icon: PawPrint,    to: "/order/pet_care" },
-  { key: "personal_care",label: "Beauty",         tagline: "At-home glam",   Icon: Scissors,    to: "/order/personal_care" },
-  { key: "digital_tech", label: "Tech help",      tagline: "In-person or remote", Icon: Laptop, to: "/order/digital_tech" },
+  { key: "delivery",     label: "Delivery",       tagline: "Under 30 min",        Icon: Truck,       to: "/order/delivery" },
+  { key: "cleaning",     label: "Cleaning",       tagline: "Same-day pros",       Icon: Sparkles,    to: "/order/cleaning" },
+  { key: "moving",       label: "Moving",         tagline: "Hourly / haul",       Icon: HardHat,     to: "/order/moving" },
+  { key: "handyman",     label: "Handyman",       tagline: "Fix anything",        Icon: Wrench,      to: "/order/handyman" },
+  { key: "auto",         label: "Mechanic",       tagline: "Mobile repair",       Icon: Car,         to: "/order/auto" },
+  { key: "pet_care",     label: "Pet care",       tagline: "Walks + boards",      Icon: PawPrint,    to: "/order/pet_care" },
+  { key: "digital_tech", label: "Tech help",      tagline: "In-person or remote", Icon: Laptop,      to: "/order/digital_tech" },
+  { key: "events",       label: "Events",         tagline: "Staff + catering",    Icon: Camera,      to: "/order/events" },
 ];
 
 const HOW_IT_WORKS = [

@@ -67,27 +67,6 @@ export const QUALIFICATION_SCHEMAS = {
       { key: "background_check_consent", label: "Background-check consent form (PDF)", required: false, help: "Speeds up approval for medical & legal courier work." },
     ],
   },
-  ride_share: {
-    summary: "Passenger transport. This is the strictest category — full driver check + vehicle inspection required.",
-    fields: [
-      { key: "vehicle_year", type: "number", label: "Vehicle year (must be 2010 or newer)", required: true },
-      { key: "seats", type: "select", label: "Passenger seats", required: true, options: [
-        { value: "4", label: "4 seats" }, { value: "5", label: "5 seats" }, { value: "6+", label: "6+ seats (SUV/van)" },
-      ]},
-      { key: "clean_driving_record", type: "radio", label: "Clean driving record in the last 3 years?", required: true, options: [
-        { value: "yes", label: "Yes" }, { value: "no", label: "No" },
-      ]},
-      { key: "commercial_licence", type: "radio", label: "Do you hold a commercial / TNC licence?", options: [
-        { value: "yes", label: "Yes" }, { value: "no", label: "No, but I'll get one" }, { value: "not_needed", label: "Not required in my area" },
-      ]},
-    ],
-    documents: [
-      { key: "drivers_license", label: "Driver's licence (front)", required: true },
-      { key: "vehicle_insurance", label: "Commercial-endorsed insurance", required: true },
-      { key: "vehicle_registration", label: "Vehicle registration", required: true },
-      { key: "vehicle_inspection", label: "Recent vehicle inspection cert", required: false, help: "Upload if you already have one. Otherwise we'll book you in." },
-    ],
-  },
   towing: {
     summary: "Roadside & tow-truck work. We verify licencing + insurance because you'll be handling other people's vehicles.",
     fields: [
@@ -241,23 +220,6 @@ export const QUALIFICATION_SCHEMAS = {
       { key: "medical_license", label: "Medical licence / certification", required: true },
       { key: "hipaa_cert", label: "HIPAA training certificate", required: false },
       { key: "background_check_consent", label: "Background-check consent (PDF)", required: true },
-    ],
-  },
-  personal_care: {
-    summary: "Hair, nails, massage, mobile spa. Cosmetology + massage boards vary by state — we verify.",
-    fields: [
-      { key: "license_type", type: "select", label: "Licence type", required: true, options: [
-        { value: "cosmetology", label: "Cosmetology" }, { value: "barbering", label: "Barbering" },
-        { value: "esthetics", label: "Esthetics" }, { value: "nail_tech", label: "Nail tech" },
-        { value: "massage_therapy", label: "Massage therapy (LMT)" }, { value: "makeup_only", label: "Makeup artist (no licence needed)" },
-      ]},
-      { key: "mobile_service", type: "radio", label: "Do house calls?", required: true, options: [
-        { value: "yes", label: "Yes — I bring gear" }, { value: "salon_only", label: "Salon-based only" },
-      ]},
-    ],
-    documents: [
-      { key: "cosmetology_license", label: "State cosmetology / massage licence", required: true },
-      { key: "liability_insurance", label: "Professional liability insurance", required: false },
     ],
   },
 

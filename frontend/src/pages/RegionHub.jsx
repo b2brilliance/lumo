@@ -97,7 +97,7 @@ const CATEGORIES = [
   { slug: "moving",    label: "Moving",    Icon: Briefcase },
   { slug: "handyman",  label: "Handyman",  Icon: Store },
   { slug: "pet_care",  label: "Pet care",  Icon: Briefcase },
-  { slug: "personal_care", label: "Beauty",Icon: Sparkles },
+  { slug: "events",    label: "Events",    Icon: Sparkles },
   { slug: "it_support",label: "Tech help", Icon: Store },
   { slug: "notary",    label: "Notary",    Icon: Building2 },
 ];

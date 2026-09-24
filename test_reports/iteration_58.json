@@ -1,0 +1,49 @@
+{
+  "summary": "Iter-58 recruit-city local enrichment tested end-to-end. Backend: 19/19 pytest passed (122 cities, no dup slugs, Miami hoods & photo exact, 10 curated cities have correct photo IDs + 3-5 hoods, fallback cities like jackson-ms/billings-mt render without hoods, admin PATCH neighborhoods persists, sitemap has 122 /join URLs). Frontend: /join/miami-fl, /join/atlanta-ga, /join/austin-tx each render 5 chips with data-testid city-neighborhood-0..4 + 'Serving' label. /join/jackson-ms renders without chips (no crash). /join index shows 122 city links. Regression: SW killswitch + AdSense pub-id present in index.html. Two minor issues found — see below.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "SEO meta description on /join/{slug}",
+        "issue": "Two <meta name=\"description\"> tags coexist in DOM: the default one from index.html and the Helmet-appended local-SEO one. Helmet appends instead of replacing because index.html's tag lacks a data-react-helmet sentinel. The local blurb (with Brickell/Wynwood...) IS present, but crawlers may see duplicate descriptions and pick the wrong one. document.querySelector('meta[name=description]') returns the default (first) tag, weakening the local-SEO win.",
+        "affected_selectors": ["meta[name='description']"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "/join/miami-fl hero",
+        "issues": ["The curated Unsplash photo (photo-1508009603885) visually looks like Chinatown-style neon signage, not a Miami landmark. Hero image is unique per-city as required, but this specific ID doesn't visually represent Miami. Recommend swapping to a South Beach / Brickell skyline photo. Same due-diligence pass recommended for other curated IDs."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter58_recruit_enrichment.py",
+    "/app/test_reports/pytest/iter58.xml"
+  ],
+  "action_items": [
+    "Fix Helmet meta-description duplication: add <meta name=\"description\" data-react-helmet=\"true\" ...> in /app/frontend/public/index.html (or remove the default meta on /join/{slug} route) so Helmet replaces rather than appends.",
+    "Review Miami's photo-1508009603885 — visually appears to be Asian-market/Chinatown neon, not Miami. Consider swapping (e.g. photo-1535498730771-e735b998cd64 or verified Miami skyline). Same visual QA pass on other CITY_PHOTO_IDS entries.",
+    "(Optional) Add data-testid='join-city-count' on the '122 cities live' badge for easier future regression."
+  ],
+  "critical_code_review_comments": [
+    "recruit_cities.py grows toward ~550 lines with mixed concerns (models, seed, milestone credit, admin router, broadcast loop). Consider splitting into recruit_models.py, recruit_seed.py, recruit_router.py.",
+    "_backfill_local_enrichment only overwrites hero_image when current is empty OR exactly equals the iter-57 fallback URL — correctly idempotent and admin-safe. Good.",
+    "_apply_local uses doc.get('hero_image', '') as fallback for _photo_url — but SEED_CITIES rows already carry hard-coded hero_image, so curated photo silently overrides them. Intended, but worth a comment.",
+    "CityRecruit.jsx: localSeoBlurb interpolates city.bonus_amount without Number()/toFixed — will render '100.0' if backend stores as float. Cosmetic.",
+    "CityRecruit.jsx slices to 4 hoods in blurb but renders 6 chips (slice(0,6)) — inconsistent with CITY_NEIGHBORHOODS max of 5. Not a bug but drift risk."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter58_recruit_enrichment.py"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "95% (5/5 flows work; 1 minor SEO tag duplication)"},
+  "test_credentials": "admin@lumo.test / password123 (seed-admin, JWT bearer)",
+  "seed_data_creation": "None (used existing seeded 122 cities). Admin PATCH test used atlanta-ga and restored original neighborhoods afterward.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-58 shipped 122-city local enrichment (unique Unsplash photo per metro + 3-5 curated neighborhoods per major city). Backfill in recruit_cities._backfill_local_enrichment runs on every boot and is idempotent (only patches when hoods missing or hero_image is empty/legacy fallback). Any future test should verify admin edits are not clobbered by re-boot. Also note: two duplicate <meta name=description> tags in DOM on /join/{slug} — expected until index.html adds the helmet sentinel.",
+  "rca of the issue": "Meta duplication RCA: React-Helmet-Async matches existing <meta> tags in the initial HTML head by a data-react-helmet attribute. /app/frontend/public/index.html declares <meta name=\"description\" content=\"...\"> without that attribute, so Helmet cannot claim ownership and appends a new tag instead of replacing. Fix: add data-react-helmet=\"true\" to the default meta in index.html, OR migrate to helmet's newer defer-based approach. Miami-photo RCA: CITY_PHOTO_IDS['miami-fl'] = 'photo-1508009603885-50cf7c579365' — the ID is unique per metro (test passes) but the underlying Unsplash asset is not a Miami landmark. Requires human curation."
+}

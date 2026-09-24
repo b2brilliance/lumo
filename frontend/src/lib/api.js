@@ -39,7 +39,6 @@ export const ALL_CATEGORIES = [
   { value: "delivery", label: "Delivery", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "courier", label: "Courier", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "moving", label: "Moving", group: "physical_delivery", location_mode: "pickup_dropoff" },
-  { value: "ride_share", label: "Ride / Rideshare", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "towing", label: "Towing", group: "physical_delivery", location_mode: "pickup_dropoff" },
   { value: "roadside", label: "Roadside assistance", group: "physical_delivery", location_mode: "onsite" },
   { value: "auto_detailing", label: "Auto detailing", group: "local_services", location_mode: "onsite" },
@@ -48,7 +47,6 @@ export const ALL_CATEGORIES = [
   { value: "landscaping", label: "Landscaping", group: "local_services", location_mode: "onsite" },
   { value: "auto", label: "Auto / Mechanic", group: "local_services", location_mode: "onsite" },
   { value: "pet_care", label: "Pet Care", group: "local_services", location_mode: "onsite" },
-  { value: "personal_care", label: "Personal Care", group: "local_services", location_mode: "onsite" },
   { value: "medical", label: "Medical & In-home Care", group: "local_services", location_mode: "onsite" },
   { value: "events", label: "Events", group: "local_services", location_mode: "onsite" },
   { value: "notary", label: "Notary", group: "local_services", location_mode: "onsite" },
@@ -156,19 +154,6 @@ export function locationLabelsFor(category, subcategory) {
   }
   if (category === "events") {
     return { title: "Event location", pickup_label: "Where is the event happening?", pickup_placeholder: "Venue or address" };
-  }
-  if (category === "personal_care") {
-    const verb = {
-      hair: "your hair done",
-      makeup: "your makeup done",
-      nails: "your nails done",
-      skincare: "your facial",
-      massage: "your massage",
-      barber: "your haircut",
-      fitness: "your training session",
-      lashes: "your lashes done",
-    }[subcategory] || "your appointment";
-    return { title: "Where the appointment is", pickup_label: `Where would you like ${verb}?`, pickup_placeholder: "Home, salon, or studio address" };
   }
   if (category === "medical") {
     return { title: "Where care is provided", pickup_label: "Where is the patient receiving care?", pickup_placeholder: "Patient's home or care location" };

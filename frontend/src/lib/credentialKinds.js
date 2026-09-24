@@ -56,14 +56,6 @@ export const CREDENTIAL_KINDS_BY_CATEGORY = {
     { value: "iicrc", label: "IICRC Cleaning Certification" },
     { value: "bonded", label: "Bonded & Insured" },
   ],
-  personal_care: [
-    { value: "cosmetology", label: "Cosmetology License" },
-    { value: "esthetician", label: "Esthetician License" },
-    { value: "nail_tech", label: "Nail Technician License" },
-    { value: "barber", label: "Barber License" },
-    { value: "massage_therapist", label: "Licensed Massage Therapist (LMT)" },
-    { value: "cpt_personal_trainer", label: "Certified Personal Trainer (NASM/ACE/etc.)" },
-  ],
   pet_care: [
     { value: "dvm", label: "Doctor of Veterinary Medicine (DVM)" },
     { value: "vet_tech", label: "Veterinary Technician" },

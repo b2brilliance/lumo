@@ -206,6 +206,9 @@ class UserOut(BaseModel):
     employment_types: List[str] = []
     subcategories: List[str] = []
     provider_profile: Optional[dict] = None
+    resume_url: Optional[str] = None                  # PDF/DOCX résumé (providers)
+    portfolio: List[dict] = []                        # [{type: 'image'|'video'|'link', url, title}]
+    social_links: Optional[dict] = None               # {x, facebook, instagram, tiktok, youtube}
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -221,6 +224,9 @@ class UserUpdate(BaseModel):
     default_delivery_address: Optional[dict] = None
     notification_prefs: Optional[dict] = None
     accessibility_prefs: Optional[dict] = None
+    resume_url: Optional[str] = None
+    portfolio: Optional[List[dict]] = None            # replace-in-full portfolio array
+    social_links: Optional[dict] = None               # {x, facebook, instagram, tiktok, youtube}
 
 class JobCreate(BaseModel):
     title: str
@@ -233,6 +239,8 @@ class JobCreate(BaseModel):
     estimated_units: float = 1.0  # e.g. 2 hours -> hourly
     media_url: Optional[str] = None
     media_type: Optional[str] = None  # image/jpeg, video/mp4
+    attachments: Optional[List[dict]] = None   # [{url, type, id}] — customer's reference photos/videos
+    employment_type: Optional[str] = None      # 'on_demand' | 'temp' | 'employee' (customer's hire intent)
     is_remote: Optional[bool] = None
     payment_terms: Optional[str] = None  # free text terms
     allowed_payment_methods: Optional[List[PaymentMethod]] = None
@@ -807,6 +815,8 @@ async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
         "estimated_units": body.estimated_units,
         "media_url": body.media_url,
         "media_type": body.media_type,
+        "attachments": body.attachments or [],
+        "employment_type": (body.employment_type or "on_demand"),
         "payment_terms": body.payment_terms or "",
         "allowed_payment_methods": body.allowed_payment_methods or ["app", "cash", "card"],
         "details": body.details or {},

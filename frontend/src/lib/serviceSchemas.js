@@ -178,55 +178,6 @@ export const SERVICE_SCHEMAS = {
       { name: "quantity", label: "Number of items", type: "number", min: 1, default: 1, required: true },
     ],
   },
-  ride_share: {
-    subcategoryLabel: "Ride type",
-    subcategories: {
-      standard: { label: "Standard ride (sedan)" },
-      xl: { label: "Group / XL (6+ seats)" },
-      premium: { label: "Premium / black car" },
-      accessibility: { label: "Wheelchair-accessible vehicle (WAV)" },
-      airport: { label: "Airport transfer" },
-      long_distance: { label: "Long-distance (50+ mi)" },
-      other: { label: "Other" },
-    },
-    baseFields: [
-      { name: "passengers", label: "How many passengers", type: "number", min: 1, max: 12, default: 1, required: true },
-      { name: "luggage", label: "Luggage", type: "select", required: true, options: [
-        { value: "none", label: "None" },
-        { value: "carry_on", label: "Carry-on only" },
-        { value: "checked_1_2", label: "1–2 checked bags" },
-        { value: "checked_3plus", label: "3+ checked bags / large items" },
-      ]},
-      { name: "vehicle_class", label: "Vehicle class preference", type: "select", required: true, options: [
-        { value: "any", label: "Any clean, comfortable car" },
-        { value: "sedan", label: "Sedan (4 doors)" },
-        { value: "suv", label: "SUV" },
-        { value: "minivan", label: "Minivan" },
-        { value: "luxury", label: "Luxury / executive" },
-        { value: "ev", label: "Electric vehicle preferred" },
-        { value: "wav", label: "Wheelchair-accessible" },
-      ]},
-      { name: "timing", label: "When", type: "select", required: true, options: [
-        { value: "now", label: "Pick me up now (≤ 15 min)" },
-        { value: "scheduled", label: "Schedule for later" },
-      ]},
-      { name: "scheduled_for", label: "If scheduled, when?", type: "datetime-local" },
-      { name: "stops", label: "Extra stops along the way", type: "number", min: 0, max: 5, default: 0 },
-      { name: "child_seat", label: "Child seat needed", type: "select", options: [
-        { value: "none", label: "Not needed" },
-        { value: "infant", label: "Infant seat (rear-facing)" },
-        { value: "toddler", label: "Toddler seat (forward)" },
-        { value: "booster", label: "Booster" },
-      ]},
-      { name: "pet_friendly", label: "Bringing a pet", type: "select", options: [
-        { value: "no", label: "No" },
-        { value: "small_carrier", label: "Small pet in carrier" },
-        { value: "service_animal", label: "Service animal" },
-        { value: "large_dog", label: "Large dog (off-leash in car)" },
-      ]},
-      { name: "special_requests", label: "Special requests / notes", type: "textarea", helpText: "Quiet ride, AC preference, flight #, etc." },
-    ],
-  },
   towing: {
     subcategoryLabel: "Tow type",
     subcategories: {
@@ -579,31 +530,6 @@ export const SERVICE_SCHEMAS = {
       ]},
     ],
   },
-  personal_care: {
-    subcategoryLabel: "Care type",
-    subcategories: {
-      hair: { label: "Hair" },
-      makeup: { label: "Makeup" },
-      nails: { label: "Nails" },
-      skincare: { label: "Skincare / facial" },
-      massage: { label: "Massage" },
-      barber: { label: "Barber" },
-      fitness: { label: "Personal training / fitness" },
-      lashes: { label: "Lashes / brows" },
-      other: { label: "Other" },
-    },
-    baseFields: [
-      { name: "num_people", label: "Number of people", type: "number", min: 1, default: 1 },
-      { name: "occasion", label: "Occasion", type: "select", options: [
-        { value: "everyday", label: "Everyday" },
-        { value: "event", label: "Event / special occasion" },
-        { value: "bridal", label: "Bridal / wedding" },
-        { value: "photoshoot", label: "Photoshoot" },
-        { value: "other", label: "Other" },
-      ]},
-    ],
-  },
-
   medical: {
     subcategoryLabel: "Care needed",
     subcategories: {

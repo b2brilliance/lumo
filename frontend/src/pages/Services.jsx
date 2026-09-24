@@ -14,27 +14,27 @@ import { Search, Home, Sparkles, Truck, Wrench, Heart, Briefcase, MonitorSmartph
 
 const GROUPS = [
   { key: "home",     label: "Home & Property",  Icon: Home,           categories: ["cleaning", "handyman", "landscaping", "appliance_repair", "locksmith", "security", "moving"] },
-  { key: "auto",     label: "Auto & Transport", Icon: Truck,          categories: ["delivery", "courier", "ride_share", "auto", "auto_detailing", "roadside", "towing"] },
-  { key: "personal", label: "Personal & Care",  Icon: Heart,          categories: ["personal_care", "medical", "pet_care", "events", "education"] },
+  { key: "auto",     label: "Auto & Transport", Icon: Truck,          categories: ["delivery", "courier", "auto", "auto_detailing", "roadside", "towing"] },
+  { key: "personal", label: "Personal & Care",  Icon: Heart,          categories: ["medical", "pet_care", "events", "education"] },
   { key: "biz",      label: "Business & Legal", Icon: Briefcase,      categories: ["business_admin", "marketing", "legal", "financial", "notary"] },
   { key: "tech",     label: "Digital & Tech",   Icon: MonitorSmartphone, categories: ["digital_tech", "it_support", "remote_work", "research"] },
   { key: "other",    label: "Errands & Other",  Icon: Sparkles,       categories: ["errand", "other"] },
 ];
 
 const PRETTY = {
-  delivery: "Delivery", courier: "Courier", ride_share: "Ride-share",
-  towing: "Towing", moving: "Moving", handyman: "Handyman",
-  cleaning: "Cleaning", landscaping: "Landscaping", auto: "Mobile mechanic",
-  auto_detailing: "Auto detailing",
-  roadside: "Roadside assistance", pet_care: "Pet care", events: "Events & catering",
-  personal_care: "Personal care", medical: "Medical & wellness",
+  delivery: "Delivery", courier: "Courier",
+  towing: "Towing", roadside: "Roadside assistance", moving: "Moving",
+  auto: "Mobile mechanic", auto_detailing: "Auto detailing",
+  handyman: "Handyman", cleaning: "Cleaning", landscaping: "Landscaping",
+  pet_care: "Pet care", events: "Events & catering",
+  medical: "Medical & wellness",
   digital_tech: "Digital & tech", marketing: "Marketing",
   business_admin: "Business admin", education: "Tutoring & education",
   legal: "Legal services", financial: "Financial services",
   remote_work: "Remote work", research: "Research",
   notary: "Notary", it_support: "IT support", errand: "Errands",
   appliance_repair: "Appliance repair", locksmith: "Locksmith",
-  security: "Home security", other: "Something else",
+  security: "Security", other: "Something else",
 };
 
 export default function Services() {

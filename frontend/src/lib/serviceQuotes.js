@@ -457,6 +457,6 @@ export function computeMarketQuote(category, details, extraCtx = {}) {
 export const NO_BUDGET_CATEGORIES = new Set([
   "medical", "legal", "financial", "marketing", "business_admin",
   "digital_tech", "it_support", "remote_work", "research", "education",
-  "personal_care", "events", "auto", "auto_detailing", "ride_share",
+  "events", "auto", "auto_detailing",
   "security", "locksmith", "other",
 ]);
