@@ -34,32 +34,32 @@ import { enablePush, pushStatus } from "@/lib/push";
  * ────────────────────────────────────────────────────────────── */
 
 const SERVICE_META = {
-  delivery:        { label: "Delivery",         Icon: Truck,            blurb: "Move a package across town, same day.",       cta: "Send request" },
-  courier:         { label: "Same-day courier", Icon: Truck,            blurb: "Sensitive or urgent — hand-carried A → B.",   cta: "Send request" },
-  moving:          { label: "Moving help",      Icon: HardHat,          blurb: "Load, drive, unload. Furniture-friendly.",    cta: "Send request" },
-  towing:          { label: "Towing",           Icon: Truck,            blurb: "Full tows, breakdowns, long-distance.",       cta: "Send request" },
-  roadside:        { label: "Roadside",         Icon: Zap,              blurb: "Jump-starts, tires, lockouts, fuel.",         cta: "Send request" },
-  handyman:        { label: "Handyman",         Icon: Wrench,           blurb: "Repairs, mounting, assembly.",                cta: "Send request" },
-  cleaning:        { label: "Cleaning",         Icon: Sparkles,         blurb: "House, apartment, or deep clean.",            cta: "Send request" },
-  landscaping:     { label: "Landscaping",      Icon: Sparkles,         blurb: "Lawn, hedges, seasonal cleanups.",            cta: "Send request" },
-  auto:            { label: "Mobile mechanic",  Icon: Wrench,           blurb: "Mechanic comes to you.",                      cta: "Send request" },
-  pet_care:        { label: "Pet care",         Icon: PawPrint,         blurb: "Walking, sitting, grooming, boarding.",       cta: "Send request" },
-  medical:         { label: "In-home care",     Icon: ShieldCheck,      blurb: "Elder care, nursing, PT visits.",             cta: "Send request" },
-  events:          { label: "Events",           Icon: Camera,           blurb: "Photographers, catering, staff.",             cta: "Send request" },
-  notary:          { label: "Notary",           Icon: Building2,        blurb: "Mobile notary anywhere.",                     cta: "Send request" },
-  it_support:      { label: "IT & tech support",Icon: Laptop,           blurb: "Wi-Fi, printers, smart home.",                cta: "Send request" },
-  errand:          { label: "Errands",          Icon: Truck,            blurb: "Pickup, drop-off, waiting in line.",          cta: "Send request" },
-  appliance_repair:{ label: "Appliance repair", Icon: Wrench,           blurb: "Fridge, washer, dryer, HVAC.",                cta: "Send request" },
-  locksmith:       { label: "Locksmith",        Icon: KeyRound,         blurb: "Locked out? Rekey? Emergency.",               cta: "Send request" },
-  security:        { label: "Security",         Icon: ShieldCheck,      blurb: "Event / personal security.",                  cta: "Send request" },
-  auto_detailing:  { label: "Auto detailing",   Icon: Car,              blurb: "Mobile interior + exterior detail.",          cta: "Send request" },
-  digital_tech:    { label: "Tech freelance",   Icon: Laptop,           blurb: "Website, app, script — hire a builder.",      cta: "Send request" },
-  legal:           { label: "Legal help",       Icon: ShieldCheck,      blurb: "Consult, notarize, or document help.",        cta: "Send request" },
-  other:           { label: "Custom request",   Icon: Zap,              blurb: "Not on the list? Describe what you need.",    cta: "Send request" },
+  delivery:        { label: "Delivery",         Icon: Truck,            color: "text-orange-500",   blurb: "Move a package across town, same day.",       cta: "Send request" },
+  courier:         { label: "Same-day courier", Icon: Truck,            color: "text-orange-600",   blurb: "Sensitive or urgent — hand-carried A → B.",   cta: "Send request" },
+  moving:          { label: "Moving help",      Icon: HardHat,          color: "text-yellow-500",   blurb: "Load, drive, unload. Furniture-friendly.",    cta: "Send request" },
+  towing:          { label: "Towing",           Icon: Truck,            color: "text-slate-600",    blurb: "Full tows, breakdowns, long-distance.",       cta: "Send request" },
+  roadside:        { label: "Roadside",         Icon: Zap,              color: "text-yellow-600",   blurb: "Jump-starts, tires, lockouts, fuel.",         cta: "Send request" },
+  handyman:        { label: "Handyman",         Icon: Wrench,           color: "text-blue-500",     blurb: "Repairs, mounting, assembly.",                cta: "Send request" },
+  cleaning:        { label: "Cleaning",         Icon: Sparkles,         color: "text-cyan-500",     blurb: "House, apartment, or deep clean.",            cta: "Send request" },
+  landscaping:     { label: "Landscaping",      Icon: Sparkles,         color: "text-green-600",    blurb: "Lawn, hedges, seasonal cleanups.",            cta: "Send request" },
+  auto:            { label: "Mobile mechanic",  Icon: Wrench,           color: "text-red-500",      blurb: "Mechanic comes to you.",                      cta: "Send request" },
+  pet_care:        { label: "Pet care",         Icon: PawPrint,         color: "text-amber-600",    blurb: "Walking, sitting, grooming, boarding.",       cta: "Send request" },
+  medical:         { label: "In-home care",     Icon: ShieldCheck,      color: "text-rose-500",     blurb: "Elder care, nursing, PT visits.",             cta: "Send request" },
+  events:          { label: "Events",           Icon: Camera,           color: "text-pink-500",     blurb: "Photographers, catering, staff.",             cta: "Send request" },
+  notary:          { label: "Notary",           Icon: Building2,        color: "text-indigo-500",   blurb: "Mobile notary anywhere.",                     cta: "Send request" },
+  it_support:      { label: "IT & tech support",Icon: Laptop,           color: "text-violet-500",   blurb: "Wi-Fi, printers, smart home.",                cta: "Send request" },
+  errand:          { label: "Errands",          Icon: Truck,            color: "text-teal-500",     blurb: "Pickup, drop-off, waiting in line.",          cta: "Send request" },
+  appliance_repair:{ label: "Appliance repair", Icon: Wrench,           color: "text-sky-600",      blurb: "Fridge, washer, dryer, HVAC.",                cta: "Send request" },
+  locksmith:       { label: "Locksmith",        Icon: KeyRound,         color: "text-yellow-700",   blurb: "Locked out? Rekey? Emergency.",               cta: "Send request" },
+  security:        { label: "Security",         Icon: ShieldCheck,      color: "text-emerald-600",  blurb: "Event / personal security.",                  cta: "Send request" },
+  auto_detailing:  { label: "Auto detailing",   Icon: Car,              color: "text-blue-600",     blurb: "Mobile interior + exterior detail.",          cta: "Send request" },
+  digital_tech:    { label: "Tech freelance",   Icon: Laptop,           color: "text-purple-600",   blurb: "Website, app, script — hire a builder.",      cta: "Send request" },
+  legal:           { label: "Legal help",       Icon: ShieldCheck,      color: "text-neutral-700",  blurb: "Consult, notarize, or document help.",        cta: "Send request" },
+  other:           { label: "Custom request",   Icon: Zap,              color: "text-fuchsia-500",  blurb: "Not on the list? Describe what you need.",    cta: "Send request" },
 };
 
 function metaFor(service) {
-  return SERVICE_META[service] || { label: "Service request", Icon: Zap, blurb: "Tell us what you need — we'll dispatch.", cta: "Send request" };
+  return SERVICE_META[service] || { label: "Service request", Icon: Zap, color: "text-neutral-700", blurb: "Tell us what you need — we'll dispatch.", cta: "Send request" };
 }
 
 const POPULAR_CATEGORIES = [
@@ -404,8 +404,8 @@ function Step1Category({ onPick }) {
               className="group text-left border border-neutral-200 rounded-xl p-4 hover:border-black hover:shadow-lg transition-all bg-white"
               data-testid={`order-category-${it.value}`}
             >
-              <div className="w-10 h-10 rounded-full bg-neutral-100 group-hover:bg-black group-hover:text-white transition-colors flex items-center justify-center">
-                <Icon className="w-5 h-5" strokeWidth={2} />
+              <div className="w-10 h-10 rounded-full bg-neutral-100 group-hover:bg-black transition-colors flex items-center justify-center">
+                <Icon className={`w-5 h-5 ${it.color || "text-black"} group-hover:text-white transition-colors`} strokeWidth={2.25} />
               </div>
               <div className="font-display font-semibold text-base mt-3">{it.label}</div>
               <div className="text-xs text-neutral-500 mt-1 leading-snug line-clamp-2">{it.blurb}</div>

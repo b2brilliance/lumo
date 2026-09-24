@@ -26,14 +26,14 @@ import AdSense from "@/components/AdSense";
  * No gradients. Pill-shaped CTAs. Space Grotesk display type.        */
 
 const SERVICES = [
-  { key: "delivery",     label: "Delivery",       tagline: "Under 30 min",        Icon: Truck,       to: "/order/delivery" },
-  { key: "cleaning",     label: "Cleaning",       tagline: "Same-day pros",       Icon: Sparkles,    to: "/order/cleaning" },
-  { key: "moving",       label: "Moving",         tagline: "Hourly / haul",       Icon: HardHat,     to: "/order/moving" },
-  { key: "handyman",     label: "Handyman",       tagline: "Fix anything",        Icon: Wrench,      to: "/order/handyman" },
-  { key: "auto",         label: "Mechanic",       tagline: "Mobile repair",       Icon: Car,         to: "/order/auto" },
-  { key: "pet_care",     label: "Pet care",       tagline: "Walks + boards",      Icon: PawPrint,    to: "/order/pet_care" },
-  { key: "digital_tech", label: "Tech help",      tagline: "In-person or remote", Icon: Laptop,      to: "/order/digital_tech" },
-  { key: "events",       label: "Events",         tagline: "Staff + catering",    Icon: Camera,      to: "/order/events" },
+  { key: "delivery",     label: "Delivery",       tagline: "Under 30 min",        Icon: Truck,       to: "/order/delivery",     color: "text-orange-500" },
+  { key: "cleaning",     label: "Cleaning",       tagline: "Same-day pros",       Icon: Sparkles,    to: "/order/cleaning",     color: "text-cyan-500" },
+  { key: "moving",       label: "Moving",         tagline: "Hourly / haul",       Icon: HardHat,     to: "/order/moving",       color: "text-yellow-500" },
+  { key: "handyman",     label: "Handyman",       tagline: "Fix anything",        Icon: Wrench,      to: "/order/handyman",     color: "text-blue-500" },
+  { key: "auto",         label: "Mechanic",       tagline: "Mobile repair",       Icon: Car,         to: "/order/auto",         color: "text-red-500" },
+  { key: "pet_care",     label: "Pet care",       tagline: "Walks + boards",      Icon: PawPrint,    to: "/order/pet_care",     color: "text-amber-600" },
+  { key: "digital_tech", label: "Tech help",      tagline: "In-person or remote", Icon: Laptop,      to: "/order/digital_tech", color: "text-violet-500" },
+  { key: "events",       label: "Events",         tagline: "Staff + catering",    Icon: Camera,      to: "/order/events",       color: "text-pink-500" },
 ];
 
 const HOW_IT_WORKS = [
@@ -131,8 +131,8 @@ export default function Landing() {
                   className="group card-lumo card-lumo-hoverable flex flex-col justify-between h-full"
                   data-testid={`service-tile-${s.key}`}
                 >
-                  <div className="w-11 h-11 rounded-full bg-neutral-100 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                    <Icon className="w-5 h-5" strokeWidth={2} />
+                  <div className="w-11 h-11 rounded-full bg-neutral-100 flex items-center justify-center group-hover:bg-black transition-colors">
+                    <Icon className={`w-5 h-5 ${s.color || "text-black"} group-hover:text-white transition-colors`} strokeWidth={2.25} />
                   </div>
                   <div className="mt-8">
                     <div className="font-display font-semibold text-lg text-black leading-tight">{s.label}</div>

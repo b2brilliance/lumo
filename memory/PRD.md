@@ -9,6 +9,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 60 — Feb 2026 (this session)
+### 🎨 Colored service icons + 💣 Nuclear mobile reset (recurrence #5 fix)
+- **Colored service icons** — every service icon on Landing (`SERVICES`) and OrderService Step-1 category picker (`SERVICE_META`) now has a signature color (orange delivery, cyan cleaning, yellow moving, blue handyman, red mechanic, amber pet, violet tech, pink events, plus 15+ more). Hover animation still flips to white on black — colors sit on the neutral pill by default.
+- **`/reset` public page (`pages/Reset.jsx`)** — nuclear reset URL for users pinned on stale mobile state. Unregisters every service worker, deletes every Cache Storage entry, clears localStorage + sessionStorage, then redirects to `/` with a cache-buster. Bookmark: `golumo.app/reset`. 4-row status list with per-step ticks so users see progress. Auto-redirect fires ~2s after load.
+- **Nuke-SW auto-registration (`public/sw-nuke-v3.js`)** — new self-unregistering service worker registered at a fresh path so browsers treat it as a first-time registration and download it (even for users pinned to a stale legacy SW at scope `/`). On activate it calls `clients.claim()`, wipes every Cache Storage entry, posts a `sw-reset-complete` message to open clients (which trigger a one-time reload), then unregisters itself. Zero fetch handlers = never intercepts requests. Guarded by sessionStorage flag `lumo_nuke_v3_done` so it fires once per tab session. Combined with the iter-57 killswitch, this covers every known way a stale SW can pin a user.
+- **Rationale**: This is stale-cache recurrence #5. Root cause on the last remaining affected devices was that the iter-57 killswitch **only ran once the fresh HTML reached the device** — but on iOS Safari a legacy SW's `event.respondWith(caches.match('/'))` still served old HTML that had no killswitch. The nuke SW registered from the fresh HTML forces a full origin-storage wipe the moment the fresh HTML makes it through, and `/reset` gives users a manual override for any device that never sees the fresh HTML at all.
+- **Testing**: Smoke-verified `/reset` renders 4 steps + auto-progresses, `/sw-nuke-v3.js` serves 200 with `application/javascript`, `index.html` still contains the iter-57 killswitch strings + AdSense integrity, Landing icons render with 8 distinct `text-*-500/600` classes.
+
+---
+
+
 ## Iteration 59 — Feb 2026 (this session)
 ### 📸 Media uploads + 🎯 Employment type + 👤 Provider portfolio + 🎨 Service icons + 🚫 Service removal
 - **Order media attachments (`AttachmentUploader.jsx`)** — reusable image + video uploader (max 6 files, 25 MB each). Rendered in `OrderService` Step 2 under "Reference photos or videos" for every category. Attached files ride through `POST /api/jobs` as `attachments: [{id,url,type}]` and persist on the Job doc. Perfect for hairstyle refs, roadside videos, pet photos, broken-part shots.

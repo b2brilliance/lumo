@@ -357,6 +357,40 @@
                             }).catch(function () {});
                     } catch (e) {}
                 });
+
+                // ── Nuke-SW auto-registration ─────────────────────────────
+                // Register /sw-nuke-v3.js on every fresh HTML load. Because
+                // this is a NEW path browsers treat it as a first-time SW
+                // registration and download it — even for users pinned to a
+                // stale legacy SW. On activate the nuke SW clears all Cache
+                // Storage, unregisters itself, and posts a message to open
+                // clients. It never sets a fetch handler, so no intercepts.
+                // Guarded with a sessionStorage flag so we only run this
+                // once per tab session.
+                try {
+                    var nuked = false;
+                    try { nuked = sessionStorage.getItem('lumo_nuke_v3_done') === '1'; } catch (e) {}
+                    if (!nuked) {
+                        navigator.serviceWorker
+                            .register('/sw-nuke-v3.js', { scope: '/', updateViaCache: 'none' })
+                            .then(function () {
+                                try { sessionStorage.setItem('lumo_nuke_v3_done', '1'); } catch (e) {}
+                            })
+                            .catch(function () { /* not fatal */ });
+                    }
+                    // Listen for the nuke-complete message so we can force a
+                    // one-time reload once the SW confirms cache wipe.
+                    navigator.serviceWorker.addEventListener('message', function (ev) {
+                        if (ev && ev.data && ev.data.type === 'sw-reset-complete') {
+                            var reloaded = false;
+                            try { reloaded = sessionStorage.getItem('lumo_nuke_reload') === '1'; } catch (e) {}
+                            if (!reloaded) {
+                                try { sessionStorage.setItem('lumo_nuke_reload', '1'); } catch (e) {}
+                                setTimeout(function () { window.location.reload(); }, 100);
+                            }
+                        }
+                    });
+                } catch (e) {}
             })();
         </script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>

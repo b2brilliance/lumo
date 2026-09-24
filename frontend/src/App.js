@@ -37,6 +37,7 @@ import Marketplace from "@/pages/Marketplace";
 import Shop from "@/pages/Shop";
 import CityRecruit from "@/pages/CityRecruit";
 import CityRecruitIndex from "@/pages/CityRecruitIndex";
+import Reset from "@/pages/Reset";
 import MapPage from "@/pages/MapPage";
 import JobDetail from "@/pages/JobDetail";
 import LiveTrack from "@/pages/LiveTrack";
@@ -189,6 +190,7 @@ function App() {
             <Route path="/shop" element={<Shop />} />
             <Route path="/join" element={<CityRecruitIndex />} />
             <Route path="/join/:slug" element={<CityRecruit />} />
+            <Route path="/reset" element={<Reset />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/jobs/:id/track" element={<Protected><LiveTrack /></Protected>} />
