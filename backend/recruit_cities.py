@@ -241,18 +241,44 @@ async def credit_city_milestone(db, *, provider_id: str) -> Optional[dict]:
 
 async def seed_recruit_cities(db) -> int:
     """Idempotent: only insert cities whose slug doesn't already exist,
-    plus a one-time migration bumping legacy $500 rows down to $100."""
+    plus a one-time migration bumping legacy $500 rows down to $100.
+
+    Seeds:
+      1. The original 6 hand-authored priority cities (LA, SF, Seattle,
+         Tacoma, Chicago, Portland-OR) — kept first for stable priority.
+      2. Every top-100 US metro from `recruit_cities_us_seed.US_SEED_CITIES`
+         so `/join/{slug}` works for every major American city out of the
+         box. Admin can edit copy or set is_active=False anytime.
+    """
+    from recruit_cities_us_seed import US_SEED_CITIES  # local import to avoid boot-time cost when unused
     await _reseed_bonus_amounts(db)
     inserted = 0
+    seen_slugs: set = set()
+
+    # Priority cities first (preserves existing rows exactly)
     for c in SEED_CITIES:
+        seen_slugs.add(c["slug"])
         exists = await db.recruit_cities.find_one({"slug": c["slug"]})
         if exists:
             continue
         doc = RecruitCity(**c)
         await db.recruit_cities.insert_one(doc.model_dump())
         inserted += 1
+
+    # Nationwide fill — every top-100 metro
+    for c in US_SEED_CITIES:
+        if c["slug"] in seen_slugs:
+            continue
+        seen_slugs.add(c["slug"])
+        exists = await db.recruit_cities.find_one({"slug": c["slug"]})
+        if exists:
+            continue
+        doc = RecruitCity(**c)
+        await db.recruit_cities.insert_one(doc.model_dump())
+        inserted += 1
+
     if inserted:
-        logger.info(f"[recruit] Seeded {inserted} target cities")
+        logger.info(f"[recruit] Seeded {inserted} recruit cities (priority + US metros)")
     return inserted
 
 
@@ -299,7 +325,7 @@ def create_router(
     @r.get("/recruit/cities")
     async def list_cities():
         cursor = db.recruit_cities.find({"is_active": True}, {"_id": 0}).sort("city", 1)
-        docs = await cursor.to_list(length=100)
+        docs = await cursor.to_list(length=500)
         # Attach signup progress
         return {"items": [await _stats_for_city(db, d) for d in docs]}
 

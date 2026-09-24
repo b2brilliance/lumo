@@ -4114,6 +4114,19 @@ async def sitemap_xml(request: Request):
     for cat_slug in _REC_CATEGORIES:
         lines.append(f"  <url><loc>{origin}/careers/{cat_slug}</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>")
 
+    # Nationwide recruit-city landing pages (/join/{slug}) — every top-100
+    # US metro seeded by `recruit_cities_us_seed.py`. Index page /join
+    # links to them all so Google's crawler indexes every metro.
+    lines.append(f"  <url><loc>{origin}/join</loc><changefreq>daily</changefreq><priority>1.0</priority></url>")
+    try:
+        async for c in db.recruit_cities.find({"is_active": True}, {"_id": 0, "slug": 1}).sort("slug", 1).limit(500):
+            slug = (c.get("slug") or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if not slug:
+                continue
+            lines.append(f"  <url><loc>{origin}/join/{slug}</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>")
+    except Exception:
+        pass
+
     # Auto-generated blog posts
     try:
         async for p in db.blog_posts.find({"status": "published"}, {"_id": 0, "slug": 1, "published_at": 1, "updated_at": 1}).sort("published_at", -1).limit(5000):

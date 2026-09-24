@@ -44,6 +44,9 @@ class SocialLinksBody(BaseModel):
     adsense_client: Optional[str] = Field(
         None, description="Google AdSense publisher ID (e.g. 'ca-pub-1234567890123456'). Empty string disables ads."
     )
+    ads_enabled: Optional[bool] = Field(
+        None, description="Master kill-switch for AdSense. When False, ads are hidden across the site even if a publisher ID is configured."
+    )
 
 
 def _validate_url(url: str) -> str:
@@ -90,6 +93,7 @@ def create_router(*, db, require_admin) -> APIRouter:
             "links": active,
             "tagline": doc.get("tagline"),
             "adsense_client": doc.get("adsense_client") or "",
+            "ads_enabled": bool(doc.get("ads_enabled", True)),
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
         }
@@ -103,6 +107,7 @@ def create_router(*, db, require_admin) -> APIRouter:
             "links": doc.get("links") or {},
             "tagline": doc.get("tagline"),
             "adsense_client": doc.get("adsense_client") or "",
+            "ads_enabled": bool(doc.get("ads_enabled", True)),
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
         }
@@ -129,6 +134,8 @@ def create_router(*, db, require_admin) -> APIRouter:
             if ad and not re.match(r"^ca-pub-\d{10,20}$", ad):
                 raise HTTPException(400, "AdSense client must look like 'ca-pub-1234567890123456' (empty to disable).")
             update_doc["adsense_client"] = ad
+        if body.ads_enabled is not None:
+            update_doc["ads_enabled"] = bool(body.ads_enabled)
 
         await db.site_settings.update_one(
             {"_id": "social"}, {"$set": update_doc}, upsert=True
@@ -138,6 +145,7 @@ def create_router(*, db, require_admin) -> APIRouter:
             "links": doc.get("links") or {},
             "tagline": doc.get("tagline"),
             "adsense_client": doc.get("adsense_client") or "",
+            "ads_enabled": bool(doc.get("ads_enabled", True)),
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
             "ok": True,

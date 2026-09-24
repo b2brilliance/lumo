@@ -94,7 +94,7 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Lumo — On-demand jobs, delivery, rentals worldwide</title>
-        <meta name="lumo-build" content="2026-09-20T14:19:47.353Z" />
+        <meta name="lumo-build" content="2026-09-20T16:50:56.054Z" />
         <script>
             // ── Asset-failure hard-reload guard ────────────────────────────
             // The frontend static host falls back to serving index.html for
@@ -263,34 +263,100 @@
             })();
         </script>
         <script>
-            // ── Service Worker killswitch ────────────────────────────────────
-            // Some users (mainly iOS Safari) have a Service Worker cached from
-            // an earlier deploy that intercepts every fetch and never times
-            // out, causing the homepage to "not be reachable" outside of
-            // Private/Incognito mode. This block proactively unregisters any
-            // SW the browser may have left behind, and clears all caches.
-            // Once executed, a single reload puts the user on a clean state.
+            // ── Service Worker killswitch (surgical, permanent) ──────────────
+            // The persistent "site only loads in Incognito" bug on production
+            // has recurred repeatedly. Root cause on the vast majority of
+            // affected devices is a Service Worker registered at scope "/"
+            // by an earlier build that intercepts fetches OR keeps the tab
+            // pinned to a stale HTML shell. This block runs BEFORE React
+            // mounts and:
+            //   1. Unregisters ANY legacy SW at scope "/" whose script URL
+            //      is NOT /push-sw.js (the legitimate push notification SW
+            //      the user explicitly opted into). This means push
+            //      subscribers keep their notifications, but every stale /
+            //      abandoned SW is killed.
+            //   2. Clears every Cache Storage entry the browser created
+            //      (safe — none of our SWs cache app assets on purpose).
+            //   3. If any legacy SW was actually found and this session
+            //      hasn't yet reloaded, hard-reloads once with a cache
+            //      buster so the fresh HTML replaces whatever was pinned.
+            //   4. Also listens for the bfcache `pageshow` restore event
+            //      (mobile Safari / Chrome) and re-runs the buildTime
+            //      check — restored bfcache pages are the #1 source of
+            //      "why is she showing me a page from three deploys ago".
             (function () {
                 if (!('serviceWorker' in navigator)) return;
+                var LEGIT_SW_PATH = '/push-sw.js';
+
+                function isLegitPushSw(reg) {
+                    try {
+                        var w = reg.active || reg.waiting || reg.installing;
+                        if (!w || !w.scriptURL) return false;
+                        var u = new URL(w.scriptURL);
+                        return u.pathname === LEGIT_SW_PATH;
+                    } catch (e) { return false; }
+                }
+
+                function nukeStaleSws() {
+                    return navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        var killed = 0;
+                        var promises = (regs || []).map(function (r) {
+                            if (isLegitPushSw(r)) return null;
+                            killed += 1;
+                            try { return r.unregister(); } catch (e) { return null; }
+                        });
+                        return Promise.all(promises).then(function () {
+                            if (window.caches && caches.keys) {
+                                return caches.keys().then(function (keys) {
+                                    return Promise.all((keys || []).map(function (k) {
+                                        try { return caches.delete(k); } catch (e) { return null; }
+                                    }));
+                                }).then(function () { return killed; });
+                            }
+                            return killed;
+                        });
+                    }).catch(function () { return 0; });
+                }
+
                 try {
                     var alreadyReloaded = false;
-                    try { alreadyReloaded = sessionStorage.getItem('lumo_sw_killswitch') === '1'; } catch (e) {}
-                    navigator.serviceWorker.getRegistrations().then(function (regs) {
-                        if (!regs || regs.length === 0) return;
-                        var hadSw = regs.length > 0;
-                        regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
-                        if (window.caches && caches.keys) {
-                            caches.keys().then(function (keys) { keys.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); });
+                    try { alreadyReloaded = sessionStorage.getItem('lumo_sw_killswitch_v2') === '1'; } catch (e) {}
+                    nukeStaleSws().then(function (killed) {
+                        if (killed > 0 && !alreadyReloaded) {
+                            try { sessionStorage.setItem('lumo_sw_killswitch_v2', '1'); } catch (e) {}
+                            // Cache-bust query string forces every intermediate
+                            // CDN / edge cache to fetch a fresh HTML shell.
+                            var loc = new URL(window.location.href);
+                            loc.searchParams.set('_sw', String(Date.now()));
+                            setTimeout(function () { window.location.replace(loc.toString()); }, 50);
                         }
-                        // Hard-reload once so the freshly-unregistered worker
-                        // doesn't keep intercepting THIS page load. Guard with
-                        // sessionStorage so we never loop forever.
-                        if (hadSw && !alreadyReloaded) {
-                            try { sessionStorage.setItem('lumo_sw_killswitch', '1'); } catch (e) {}
-                            setTimeout(function () { window.location.reload(); }, 50);
-                        }
-                    }).catch(function () {});
+                    });
                 } catch (e) {}
+
+                // bfcache restore recovery — the killer of "stale-page-only
+                // on my phone" bugs. When the user navigates back and the
+                // browser resurrects a page from bfcache, `pageshow` fires
+                // with `event.persisted === true` and none of our scripts
+                // have re-executed. Force a reload if the build has moved.
+                window.addEventListener('pageshow', function (ev) {
+                    if (!ev || !ev.persisted) return;
+                    // Compare stored buildTime with what the server currently
+                    // says. If different → hard-reload to pick up latest.
+                    try {
+                        var m = document.querySelector('meta[name="lumo-build"]');
+                        var htmlBuild = m ? (m.getAttribute('content') || '') : '';
+                        if (!htmlBuild || htmlBuild === '__LUMO_BUILD_TIME__') return;
+                        fetch('/api/meta?t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
+                            .then(function (r) { return r.ok ? r.json() : null; })
+                            .then(function (data) {
+                                if (data && data.buildTime && data.buildTime !== htmlBuild) {
+                                    var loc = new URL(window.location.href);
+                                    loc.searchParams.set('_bfcache', data.buildTime);
+                                    window.location.replace(loc.toString());
+                                }
+                            }).catch(function () {});
+                    } catch (e) {}
+                });
             })();
         </script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>

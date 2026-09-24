@@ -225,8 +225,11 @@ export default function Landing() {
               <Link to={user ? "/provider" : "/register?role=provider"} className="btn-lumo btn-lumo-lg bg-white text-black hover:bg-neutral-100" data-testid="provider-signup">
                 Start earning today <ArrowRight className="w-4 h-4" />
               </Link>
+              <Link to="/join" className="btn-lumo btn-lumo-lg bg-transparent border-white/40 text-white hover:bg-white/10 border" data-testid="provider-city-picker">
+                Pick your city
+              </Link>
               <Link to="/for-providers" className="btn-lumo btn-lumo-lg bg-transparent border-white/40 text-white hover:bg-white/10 border" data-testid="provider-learn">
-                How it works for providers
+                How it works
               </Link>
             </div>
           </div>
