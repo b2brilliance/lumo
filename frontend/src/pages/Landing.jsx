@@ -26,7 +26,7 @@ import AdSense from "@/components/AdSense";
  * No gradients. Pill-shaped CTAs. Space Grotesk display type.        */
 
 const SERVICES = [
-  { key: "delivery",     label: "Delivery",       tagline: "Under 30 min",        Icon: Truck,       to: "/order/delivery",     color: "text-orange-500" },
+  { key: "delivery",     label: "Delivery",       tagline: "On-demand, any distance", Icon: Truck,       to: "/order/delivery",     color: "text-orange-500" },
   { key: "cleaning",     label: "Cleaning",       tagline: "Same-day pros",       Icon: Sparkles,    to: "/order/cleaning",     color: "text-cyan-500" },
   { key: "moving",       label: "Moving",         tagline: "Hourly / haul",       Icon: HardHat,     to: "/order/moving",       color: "text-yellow-500" },
   { key: "handyman",     label: "Handyman",       tagline: "Fix anything",        Icon: Wrench,      to: "/order/handyman",     color: "text-blue-500" },
@@ -37,9 +37,9 @@ const SERVICES = [
 ];
 
 const HOW_IT_WORKS = [
-  { n: "01", t: "Pick + describe", b: "Choose a service, tell us what you need. Category-specific fields — no forms bloat." },
-  { n: "02", t: "Instant match",   b: "Nearby providers see your request within seconds. Watch the map fill up. Compare & accept." },
-  { n: "03", t: "Track + rate",    b: "Live GPS the whole way. 10% deposit locks the booking, balance releases only when you confirm." },
+  { n: "01", t: "Tell us what you need", b: "Pick a category, describe the job, drop in reference photos or a short video if it helps." },
+  { n: "02", t: "Meet your pro",         b: "Nearby providers respond in minutes. Compare profiles, ratings and prices, then pick the one you want." },
+  { n: "03", t: "Track it live",         b: "Watch your pro on the map from arrival to done. Message, tip, and rate — all in the app." },
 ];
 
 const TRUST_STATS = [
@@ -63,8 +63,8 @@ export default function Landing() {
   return (
     <div className="bg-white" data-testid="page-landing">
       <Helmet>
-        <title>Lumo — Post a request. Get matched in minutes.</title>
-        <meta name="description" content="Lumo is the on-demand marketplace for real-world help. Delivery, cleaning, moving, mechanics, tutors, pet care and 30+ more services. Providers keep 90%." />
+        <title>Lumo — Real help. Real people. Right now.</title>
+        <meta name="description" content="Lumo is the on-demand marketplace for real-world help. Delivery, cleaning, moving, mechanics, tutors, pet care and 30+ more services from vetted local pros. Providers keep 90%." />
       </Helmet>
 
       {/* ═════════════ HERO + SERVICES (unified) ══════════════════════ */}
@@ -73,10 +73,10 @@ export default function Landing() {
           <div>
             <div className="overline mb-4" data-testid="hero-overline">On-demand marketplace</div>
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-black leading-[1.02] tracking-tight">
-              Get almost anything, done today.
+              Real help. Real people. <span className="text-neutral-500">Right now.</span>
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-neutral-600 leading-relaxed max-w-xl">
-              Delivery, cleaning, moving, mechanics, tutors, pet care — 30+ services from vetted local providers. One tap to book. Live GPS the whole way.
+              Tap once for delivery, cleaning, moving, a mechanic, a tutor, a pet sitter — 30+ services from vetted local pros. Match in minutes, track them live.
             </p>
 
             {/* Search / picker card */}
