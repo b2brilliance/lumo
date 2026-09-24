@@ -9,6 +9,29 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 59 — Feb 2026 (this session)
+### 📸 Media uploads + 🎯 Employment type + 👤 Provider portfolio + 🎨 Service icons + 🚫 Service removal
+- **Order media attachments (`AttachmentUploader.jsx`)** — reusable image + video uploader (max 6 files, 25 MB each). Rendered in `OrderService` Step 2 under "Reference photos or videos" for every category. Attached files ride through `POST /api/jobs` as `attachments: [{id,url,type}]` and persist on the Job doc. Perfect for hairstyle refs, roadside videos, pet photos, broken-part shots.
+- **Employment type per request** — new picker in `OrderService` Step 3 with 3 pill options: **On-demand / Temp / Employee**. Persists as `job.employment_type` (validated as `Literal['on_demand','temp','employee']` on the backend — typos rejected with 422). Defaults to `on_demand`.
+- **Removed services** — `ride_share`, `personal_care`, and the "home_security" label (kept generic `security` category) purged from: `serviceSchemas.js`, `providerQualifications.js`, `credentialKinds.js`, `serviceQuotes.js`, `api.js` ALL_CATEGORIES, `Landing.jsx`, `Register.jsx`, `Services.jsx`, `RegionHub.jsx`, `OrderService.jsx`, `ProviderProfileSection.jsx`, `DeliveryActions.jsx`. `/order/personal_care` and `/order/ride_share` now gracefully fall back to Step-1 category picker instead of crashing.
+- **Provider portfolio (`ProviderMediaSection.jsx`)** — new Settings block for role=provider only. Wires up: avatar upload (5 MB image cap), résumé upload (10 MB PDF/DOCX cap), portfolio manager (mixed images + videos + external URLs), and 5 social profile fields (X, Facebook, Instagram, TikTok, YouTube). Persists via extended `UserUpdate` model — new fields `resume_url`, `portfolio: List[dict]`, `social_links: Dict`.
+- **Service icons on every list** — Landing page grid now shows 8 icon-tagged cards (Truck / Sparkles / HardHat / Wrench / Car / PawPrint / Laptop / Camera). Order wizard Step-1 category picker + Services page were already icon-tagged. Beauty replaced with Events on the Landing grid.
+- **Testing**: iter_59 → **100% backend (5/5 pytest) + 100% frontend**. Zero regressions on iter-57 SW killswitch, iter-58 city enrichment, or AdSense integrity.
+
+---
+
+
+## Iteration 58 — Feb 2026 (this session, city photo + neighborhoods enrichment)
+### 🖼 Per-city curated photos + 📍 hand-authored neighborhoods for local SEO
+- **`recruit_cities_local.py`** — new module with two hand-curated dicts: `CITY_PHOTO_IDS` (~110 unique Unsplash photo IDs, one per major metro so /join grid stops repeating the same photo across state siblings) and `CITY_NEIGHBORHOODS` (3–5 real neighborhoods per major city like Miami → Brickell / Wynwood / Coral Gables). Fallback to a generic Unsplash photo when a city isn't in the curated map.
+- **`RecruitCity` schema extended** — new `neighborhoods: List[str]` field on model, `RecruitCityIn`, and `RecruitCityPatch` (admin can edit in the RecruitTab).
+- **`_backfill_local_enrichment` migration** — idempotent one-shot on every boot: only backfills a row where `neighborhoods` is empty OR `hero_image` is empty/legacy fallback. Never clobbers admin-edited values.
+- **CityRecruit page renders neighborhoods as chips** + bakes them into the meta description ("Deliver in Brickell, Wynwood, Coral Gables — same-day pay") for local SEO wins.
+- **Testing**: iter_58 → **100% backend (19/19 pytest) + 100% frontend**. Two known nits: (1) double `<meta name="description">` on /join/{slug} because index.html's default meta lacks the `data-react-helmet` sentinel — Helmet appends rather than replaces; (2) Miami's chosen photo ID (photo-1508009603885) is a neon-signage shot that doesn't visually represent Miami. Both non-blocking, tracked for iter-60.
+
+---
+
+
 ## Iteration 57 — Feb 2026 (this session, Nationwide seed + Permanent SW fix)
 ### 🌎 122-city nationwide recruit expansion + 🛡 permanent stale-cache fix
 - **Nationwide recruit seed (`recruit_cities_us_seed.py`)** — top-100 US metros seeded on boot. Covers all 50 states + DC + AK + HI. Combined with the original 6 priority cities, `db.recruit_cities` now has **122 active landing pages** (`/join/{slug}`). Every city gets rotating hero copy (5 headline + 5 subhead templates) and a real Unsplash city photo. Admin can override any field in the RecruitTab.

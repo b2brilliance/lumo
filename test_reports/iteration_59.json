@@ -1,0 +1,28 @@
+{
+  "summary": "Iter-59 5-part batch verified end-to-end. Backend pytest 5/5 passed: job attachments + employment_type persist through POST /api/jobs and GET /api/jobs/{id}; default employment_type is 'on_demand' when omitted; provider media (resume_url, portfolio, social_links x/facebook/instagram/tiktok/youtube) round-trip via PATCH /api/auth/me + GET /api/auth/me; portfolio array is replaced (not merged) per UserUpdate contract. Frontend verified: (a) Landing has no 'Beauty'; 8 service cards with icons + Events (Camera) present; (b) /order/personal_care and /order/ride_share gracefully render Step-1 category picker (NO beauty/ride subforms); /order/security still works; (c) Order Step 2 renders data-testid=order-attachments and order-attachments-add on /order/cleaning; (d) Order Step 3 renders data-testid=order-employment-type-block with all 3 pills (on_demand default active black bg-black text-white; clicking temp/employee toggles active class correctly); (e) Provider @ /settings renders data-testid=section-provider-media with all 10 required testids (ppm-avatar-btn, ppm-resume-btn, ppm-portfolio-uploader, ppm-link-input, ppm-link-add, ppm-social-x/facebook/instagram/tiktok/youtube); customer @ /settings does NOT render provider-media section; (f) /order Step-1 picker has 26 SVGs, no ride/personal-care entries; (g) Register + Services pages contain no ride-share / personal-care strings. Regressions all pass: /join/miami-fl chips (Brickell/Wynwood/Coral Gables/Little Havana/South Beach), index.html <head> contains isLegitPushSw + lumo_sw_killswitch_v2 + ca-pub-6859971059816782.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter59_media_employment.py",
+    "/app/test_reports/pytest/iter59.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AttachmentUploader posts multipart via api.post with an explicit 'Content-Type: multipart/form-data' header — normally axios should let the browser set boundary automatically. If /api/media/upload ever rejects because the boundary isn't attached, remove the manual header. Currently works, so cosmetic only.",
+    "server.py UserOut declares 'portfolio: List[dict] = []' but UserUpdate uses Optional[List[dict]] and stores whatever the client sends — there is no server-side validation of {type in image|video|link}. A malicious client could store arbitrary dict shapes. Consider a small Pydantic sub-model.",
+    "JobCreate.employment_type is a free-form str; recommend Literal['on_demand','temp','employee'] to reject typos at the API boundary (frontend currently sends only the 3 valid values, but any direct API call could store garbage).",
+    "OrderService.jsx now nears 775 lines with SERVICE_META + POPULAR_CATEGORIES + EMPLOYMENT_TYPES + step validators + JSX. Extraction of constants into /lib/orderMeta.js would help readability and enable reuse (Landing already duplicates icon meta).",
+    "ProviderMediaSection: portfolio is stored as {type: 'image'|'video'|'link', url, title?} but AttachmentUploader emits raw MIME types ('image/jpeg', 'video/mp4'). The reshape happens in onChange callback (line 214) — correct, but fragile: if AttachmentUploader ever stores files without a MIME (e.g. from URL import) they'll be classified as 'image'. Consider explicit kind detection."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter59_media_employment.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% (all required flows verified)"},
+  "test_credentials": "customer@lumo.test / password123, provider@lumo.test / password123 (both work; role-select tile required on /login screen)",
+  "seed_data_creation": "None persistent. Created a few TEST_iter59-titled jobs via authorized POST /api/jobs (customer account). Provider media PATCH was reset to empty in the cleanup test at end of pytest run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-59 shipped media attachments per order + employment_type per order + provider portfolio/resume/socials. Backend fields are all additive on Job and User. UI has data-testids: order-attachments, order-attachments-add, order-employment-type-block, order-employment-{on_demand|temp|employee}, section-provider-media (only for role=provider), ppm-* series. /order/{removed_service} gracefully falls back to Step-1 picker. Prior iter-58 SEO nits (double meta description on /join/{slug}, Miami photo mislabel) still apply — unchanged this iteration."
+}

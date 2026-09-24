@@ -240,7 +240,7 @@ class JobCreate(BaseModel):
     media_url: Optional[str] = None
     media_type: Optional[str] = None  # image/jpeg, video/mp4
     attachments: Optional[List[dict]] = None   # [{url, type, id}] — customer's reference photos/videos
-    employment_type: Optional[str] = None      # 'on_demand' | 'temp' | 'employee' (customer's hire intent)
+    employment_type: Optional[Literal["on_demand", "temp", "employee"]] = None      # customer's hire intent
     is_remote: Optional[bool] = None
     payment_terms: Optional[str] = None  # free text terms
     allowed_payment_methods: Optional[List[PaymentMethod]] = None
