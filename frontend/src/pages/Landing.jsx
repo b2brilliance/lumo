@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React from "react";
+import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import {
-  Search, MapPin, ShoppingBag, Car, Wrench, Sparkles, Truck, PawPrint,
+  MapPin, ShoppingBag, Car, Wrench, Sparkles, Truck, PawPrint,
   Laptop, HardHat, ArrowRight, Zap, ShieldCheck, Star, Wallet,
   Clock, DollarSign, Camera,
 } from "lucide-react";
@@ -50,15 +50,7 @@ const TRUST_STATS = [
 ];
 
 export default function Landing() {
-  const [q, setQ] = useState("");
   const { user } = useAuth();
-  const nav = useNavigate();
-
-  const submit = (e) => {
-    e?.preventDefault?.();
-    const query = q.trim();
-    nav(query ? `/services?q=${encodeURIComponent(query)}` : "/services");
-  };
 
   return (
     <div className="bg-white" data-testid="page-landing">
@@ -79,23 +71,23 @@ export default function Landing() {
               Tap once for delivery, cleaning, moving, a mechanic, a tutor, a pet sitter — 30+ services from vetted local pros. Match in minutes, track them live.
             </p>
 
-            {/* Search / picker card */}
-            <form onSubmit={submit} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-2xl" data-testid="hero-search-form">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
-                <input
-                  type="search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="What do you need help with?"
-                  className="w-full bg-neutral-50 border border-neutral-300 focus:border-black focus:bg-white focus:ring-2 focus:ring-black rounded-full pl-12 pr-4 h-14 text-base text-black placeholder:text-neutral-500 transition-all outline-none"
-                  data-testid="hero-search-input"
-                />
-              </div>
-              <button type="submit" className="btn-lumo btn-lumo-primary btn-lumo-lg" data-testid="hero-search-submit">
-                Find help <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
+            {/* Primary CTAs — the service tiles below act as the picker */}
+            <div className="mt-8 flex flex-wrap gap-3" data-testid="hero-ctas">
+              <Link
+                to="/order"
+                className="btn-lumo btn-lumo-primary btn-lumo-lg"
+                data-testid="hero-cta-order"
+              >
+                Book a service <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/services"
+                className="btn-lumo btn-lumo-lg bg-white text-black border border-neutral-300 hover:bg-neutral-50"
+                data-testid="hero-cta-browse"
+              >
+                Browse all
+              </Link>
+            </div>
           </div>
 
           {/* Right — photograph with vignette */}
