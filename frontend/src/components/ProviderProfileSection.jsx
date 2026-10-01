@@ -108,10 +108,61 @@ export default function ProviderProfileSection() {
         </div>
       </div>
 
-      {/* Categories + sub-checkboxes */}
+      {/* Specific services per selected category — prominent, auto-expanded
+       *  block mirroring the registration flow. Each category gets its own
+       *  mini-form with its real sub-services as checkboxes. */}
+      {state.categories.length > 0 && (
+        <div className="mt-6" data-testid="pp-primary-subcategories">
+          <div className="overline mb-2">Specific services you perform</div>
+          <p className="text-xs text-slate-500 mb-4">
+            One form per category. Only jobs matching these picks appear in your feed.
+          </p>
+          <div className="space-y-4">
+            {state.categories.map((catKey) => {
+              const cat = PROVIDER_CATEGORIES.find((c) => c.key === catKey);
+              const schema = SERVICE_SCHEMAS[catKey];
+              const subs = schema?.subcategories || {};
+              const subEntries = Object.entries(subs);
+              if (subEntries.length === 0) return null;
+              const label = cat?.label || catKey;
+              const subLabel = schema?.subcategoryLabel || "Services";
+              const checkedCount = subEntries.filter(([k]) => state.subcategories.includes(k)).length;
+              return (
+                <div key={catKey} className="border-2 border-teal-200 bg-white" data-testid={`pp-primary-cat-${catKey}`}>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-teal-100 bg-teal-50/40">
+                    <div className="flex items-center gap-2">
+                      <span className="font-display font-bold text-sm text-teal-900">{label}</span>
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-teal-700/70">· {subLabel}</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-teal-700">{checkedCount}/{subEntries.length} selected</span>
+                  </div>
+                  <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
+                    {subEntries.map(([subKey, sub]) => {
+                      const subActive = state.subcategories.includes(subKey);
+                      return (
+                        <label key={subKey} className="flex items-start gap-2 text-sm cursor-pointer hover:text-teal-900">
+                          <Checkbox
+                            checked={subActive}
+                            onCheckedChange={() => toggle("subcategories", subKey)}
+                            className="mt-0.5"
+                            data-testid={`pp-primary-sub-${subKey}`}
+                          />
+                          <span className="leading-tight">{sub.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Categories + sub-checkboxes (compact — for ADDING new categories) */}
       <div className="mt-6">
-        <div className="overline mb-2">Services you offer</div>
-        <p className="text-xs text-slate-500 mb-3">Only jobs matching your picks appear in your feed.</p>
+        <div className="overline mb-2">Add another category</div>
+        <p className="text-xs text-slate-500 mb-3">Tap to add a category. Its sub-services appear in the block above.</p>
         <div className="border border-slate-200 divide-y divide-slate-100 max-h-96 overflow-y-auto" data-testid="pp-categories">
           {PROVIDER_CATEGORIES.map((cat) => {
             const active = state.categories.includes(cat.key);

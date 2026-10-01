@@ -317,9 +317,77 @@ export default function Register() {
             </div>
           )}
 
+          {/* 2. Specific services per selected category — prominent, auto-
+           *    expanded block for every category the provider committed to.
+           *    This replaces the buried "accordion of 20 collapsed rows" UX
+           *    with a dedicated "application form per category" (delivery
+           *    drivers see parcel/furniture/food/liquor checkboxes right
+           *    here; auto techs see brake/oil/battery/roadside, etc.). */}
+          {form.categories.length > 0 && (
+            <div data-testid="register-primary-subcategories">
+              <div className="overline mb-3">
+                2. Specific services you perform <span className="text-red-600">*</span>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                Tick every sub-service you&apos;ll accept for each category you offer.
+                You&apos;ll only see jobs matching these picks in your feed.
+              </p>
+              <div className="space-y-4">
+                {[...(form.primary_category ? [form.primary_category] : []), ...form.categories.filter((c) => c !== form.primary_category)]
+                  .filter((catKey, i, arr) => arr.indexOf(catKey) === i)
+                  .map((catKey) => {
+                    const cat = PROVIDER_CATEGORIES.find((c) => c.key === catKey);
+                    const schema = SERVICE_SCHEMAS[catKey];
+                    const subs = schema?.subcategories || {};
+                    const subEntries = Object.entries(subs);
+                    if (subEntries.length === 0) return null;
+                    const label = cat?.label || catKey;
+                    const subLabel = schema?.subcategoryLabel || "Services";
+                    const checkedCount = subEntries.filter(([k]) => form.subcategories.includes(k)).length;
+                    return (
+                      <div
+                        key={catKey}
+                        className="border-2 border-teal-200 bg-white"
+                        data-testid={`register-primary-cat-${catKey}`}
+                      >
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-teal-100 bg-teal-50/40">
+                          <div className="flex items-center gap-2">
+                            <span className="font-display font-bold text-sm text-teal-900">{label}</span>
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-teal-700/70">· {subLabel}</span>
+                          </div>
+                          <span className="text-[11px] font-mono text-teal-700">
+                            {checkedCount}/{subEntries.length} selected
+                          </span>
+                        </div>
+                        <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
+                          {subEntries.map(([subKey, sub]) => {
+                            const subActive = form.subcategories.includes(subKey);
+                            return (
+                              <label
+                                key={subKey}
+                                className="flex items-start gap-2 text-sm cursor-pointer hover:text-teal-900"
+                              >
+                                <Checkbox
+                                  checked={subActive}
+                                  onCheckedChange={() => toggle("subcategories", subKey)}
+                                  className="mt-0.5"
+                                  data-testid={`register-primary-sub-${subKey}`}
+                                />
+                                <span className="leading-tight">{sub.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {/* Employment types */}
           <div>
-            <div className="overline mb-3">2. What kind of work are you open to? <span className="text-red-600">*</span></div>
+            <div className="overline mb-3">3. What kind of work are you open to? <span className="text-red-600">*</span></div>
             <div className="grid sm:grid-cols-2 gap-2">
               {EMP_TYPES.map((e) => {
                 const Icon = e.icon;
@@ -346,8 +414,8 @@ export default function Register() {
 
           {/* Service categories with conditional sub-category checkboxes */}
           <div>
-            <div className="overline mb-3">3. Add other services (optional)</div>
-            <p className="text-xs text-slate-500 mb-3">Tick the categories you&apos;ll also accept jobs in. For each, drill into the specific sub-services. <strong>Only jobs matching your picks will appear in your feed.</strong></p>
+            <div className="overline mb-3">4. Add other categories (optional)</div>
+            <p className="text-xs text-slate-500 mb-3">Tick any ADDITIONAL categories you&apos;d accept jobs in. Picking a new one here reveals its sub-service checkboxes above.</p>
             <div className="border border-slate-200 divide-y divide-slate-100">
               {PROVIDER_CATEGORIES.map((cat) => {
                 const active = form.categories.includes(cat.key);

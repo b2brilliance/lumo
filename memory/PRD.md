@@ -9,6 +9,18 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 61 — Feb 2026 (this session)
+### 📋 Per-category provider application forms
+- **Promoted subcategory checklists** — the per-category "specific services you perform" checkbox grid (parcels/furniture/food/liquor for Delivery; brakes/oil/battery/roadside for Auto; walking/sitting/grooming for Pet care, etc.) was already defined in `serviceSchemas.js` and wired into `Register.jsx` + `ProviderProfileSection.jsx`, but **buried inside a collapsed 20-row accordion**. New prominent "**Specific services you perform**" block renders one bordered card per selected category with the sub-services expanded as checkboxes — essentially a mini-application form per category.
+- **Register step 3 layout** — now reads: (1) pick primary job type → (2) **specific services per category** (NEW prominent block, auto-expanded per picked category, shows `n/m selected` counter) → (3) employment types → (4) add other categories (compact accordion for extras).
+- **Settings mirror** — `ProviderProfileSection.jsx` renders the identical "Specific services you perform" block above the compact "Add another category" list so post-signup editing matches the registration experience.
+- **Data model** — zero schema changes. The existing `user.subcategories: List[str]` field persists both the primary-category checkboxes and any secondary ones.
+- **New test-ids** — `register-primary-subcategories`, `register-primary-cat-<key>`, `register-primary-sub-<key>` + mirror `pp-primary-*` series.
+- **Testing**: smoke verified — Register.jsx & ProviderProfileSection.jsx both ship the 3 new testid prefixes; frontend has zero compile errors.
+
+---
+
+
 ## Iteration 60 — Feb 2026 (this session)
 ### 🎨 Colored service icons + 💣 Nuclear mobile reset (recurrence #5 fix)
 - **Colored service icons** — every service icon on Landing (`SERVICES`) and OrderService Step-1 category picker (`SERVICE_META`) now has a signature color (orange delivery, cyan cleaning, yellow moving, blue handyman, red mechanic, amber pet, violet tech, pink events, plus 15+ more). Hover animation still flips to white on black — colors sit on the neutral pill by default.
