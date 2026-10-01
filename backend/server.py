@@ -7421,6 +7421,11 @@ app.include_router(_create_social_router(db=db, require_admin=_require_admin()))
 from ai_copy_rotator import create_router as _create_ai_copy_router  # noqa: E402
 app.include_router(_create_ai_copy_router(db=db, require_admin=_require_admin()))
 
+# Recruit city weather badge — proxies Open-Meteo (free, no API key) and
+# caches results in Mongo for 30 min to keep page loads fast.
+from recruit_weather import create_router as _create_recruit_weather_router  # noqa: E402
+app.include_router(_create_recruit_weather_router(db=db))
+
 # Public base URL — used by recruit auto-broadcasts to build /join/{slug} URLs
 REACT_APP_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 

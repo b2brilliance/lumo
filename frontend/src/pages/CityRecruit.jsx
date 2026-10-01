@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import AdSense from "@/components/AdSense";
+import WeatherBadge from "@/components/WeatherBadge";
 
 /* CityRecruit — /join/:slug
  *
@@ -82,8 +83,14 @@ export default function CityRecruit() {
           </div>
         )}
         <div className="relative max-w-6xl mx-auto px-4 sm:px-8 py-16 sm:py-28">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-xs font-mono uppercase tracking-widest mb-6" data-testid="city-hero-tag">
-            <MapPin className="w-3.5 h-3.5" /> {displayName}
+          <div className="inline-flex flex-wrap items-center gap-2 mb-6">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20 text-xs font-mono uppercase tracking-widest"
+              data-testid="city-hero-tag"
+            >
+              <MapPin className="w-3.5 h-3.5" /> {displayName}
+            </div>
+            <WeatherBadge slug={slug} testId="city-hero-weather" />
           </div>
           <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight max-w-3xl" data-testid="city-hero-headline">
             {city.hero_headline || `Drive with Lumo in ${city.city}.`}
