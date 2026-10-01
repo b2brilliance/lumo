@@ -9,6 +9,19 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 62 — Feb 2026 (this session)
+### 🖼 Real city skyline photos for all 122 metros (Wikipedia-sourced)
+- **New module `recruit_cities_wiki.py`** — pulls each city's canonical infobox photo from Wikipedia's REST summary API (`GET /api/rest_v1/page/summary/{City},_{State}`). Prefers the full-resolution `originalimage.source` from Wikimedia Commons; falls back to the thumbnail upscaled by swapping the `/330px-` prefix for `/1600px-`.
+- **`backfill_wiki_photos(db)`** — one-shot migration that iterates every active `recruit_cities` row and backfills `hero_image` where either (a) `wiki_photo_fetched_at` is missing, or (b) was last checked > 90 days ago. Idempotent, resilient to 404/429, 100ms stagger between cities so Wikipedia doesn't rate-limit.
+- **Fire-and-forget on boot** — hooked into the existing `_seed_recruit_cities_on_boot` startup handler. ~12 seconds for all 122 cities; runs in background so FastAPI boot isn't delayed. Confirmed 70 cities updated in the first run (the other 52 were already matched); result: **all 122 cities now source=`wikipedia`** with real skyline/landmark photos.
+- **Washington DC special case** — mapped slug `washington-dc` to Wikipedia title `Washington,_D.C.` since the generic "{City}, {State}" pattern wouldn't resolve.
+- **Verified live** — Miami now shows **Villa Vizcaya** (iconic landmark) at 3310×1838 instead of the previous mislabeled neon-signage shot; Boise shows the real Boise skyline with capitol dome and foothills; sample of 15 random cities all show authentic city-specific landmarks (Yankee Stadium for Bronx, Carolina Theatre for Durham, Market Square for Knoxville, Old Port for Portland ME, LSU view for Baton Rouge).
+- **Schema additions on `recruit_cities`**: `wiki_photo_fetched_at` (ISO ts), `hero_image_source` (`wikipedia` | `unsplash-fallback`). No breaking changes.
+- **Testing**: smoke verified end-to-end — `/api/recruit/cities/miami-fl` returns Villa Vizcaya URL, image renders at 3310×1838 with `loaded=true`, neighborhoods chips still intact.
+
+---
+
+
 ## Iteration 61 — Feb 2026 (this session)
 ### 📋 Per-category provider application forms
 - **Promoted subcategory checklists** — the per-category "specific services you perform" checkbox grid (parcels/furniture/food/liquor for Delivery; brakes/oil/battery/roadside for Auto; walking/sitting/grooming for Pet care, etc.) was already defined in `serviceSchemas.js` and wired into `Register.jsx` + `ProviderProfileSection.jsx`, but **buried inside a collapsed 20-row accordion**. New prominent "**Specific services you perform**" block renders one bordered card per selected category with the sub-services expanded as checkboxes — essentially a mini-application form per category.

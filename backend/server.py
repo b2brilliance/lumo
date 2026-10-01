@@ -7437,6 +7437,18 @@ async def _seed_recruit_cities_on_boot():
     except Exception as e:
         logger.warning(f"[recruit] seed skipped: {e}")
 
+    # Fire-and-forget: pull real city skyline photos from Wikipedia and
+    # backfill `hero_image` on every row that's never been checked (or
+    # was last checked > 90 days ago). ~12 seconds for all 122 cities,
+    # runs in background so boot isn't blocked.
+    async def _wiki_bg():
+        try:
+            from recruit_cities_wiki import backfill_wiki_photos
+            await backfill_wiki_photos(db)
+        except Exception as e:
+            logger.warning(f"[wiki] backfill failed: {e}")
+    asyncio.create_task(_wiki_bg())
+
 @app.on_event("startup")
 async def _push_subscriptions_index():
     try:
