@@ -9,6 +9,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 64 — Feb 2026 (this session)
+### 🔑 Publishing tokens panel inside Ad Studio
+- **New component `AdStudioTokens.jsx`** — collapsible card at the top of Admin → Ad Studio with input fields for every social platform (Facebook: page_id + access_token · Instagram: ig_user_id + access_token · X: bearer_token · Reddit: client_id/secret/username/password/subreddit/user_agent · LinkedIn: access_token + author_urn). Secret fields render as `type="password"`.
+- **Reuses existing `/api/admin/social/config` endpoints** — fetches current config on mount, saves with `PUT /api/admin/social/config/{platform}`, "Send test" calls `POST /api/admin/social/test`. Shares the same credentials as the Auto-post tab (edit either place, both update).
+- **Admin-only** — rendered inside AdminConsole which is already role-gated. Never shown to customers/providers/retailers.
+- **Verified live** — admin login → Admin → Ad Studio shows "Publishing tokens" panel at top with all 5 platforms, Save/Send-test buttons, existing values pre-populated.
+
+---
+
+
+
 ## Iteration 63 — Feb 2026 (this session)
 ### 💼 LinkedIn auto-posting + 🌤 City weather badge
 - **LinkedIn adapter (`_post_linkedin`)** — POSTs to `https://api.linkedin.com/v2/ugcPosts` using the UGC Posts API. Required cfg: `access_token` (OAuth with `w_member_social` or `w_organization_social` scope) + `author_urn` (`urn:li:person:<id>` or `urn:li:organization:<id>`). Composes a 3000-char caption, attaches the blog URL as an ARTICLE media card, publishes PUBLIC. Returns the resulting post URL.
