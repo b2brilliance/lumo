@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Facebook, Instagram, Twitter, MessageSquare, CheckCircle2, XCircle, Send, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { Facebook, Instagram, Twitter, Linkedin, MessageSquare, CheckCircle2, XCircle, Send, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 
 /* SocialTab — configure Facebook / Instagram / X / Reddit auto-publishing
  * for blog posts + city recruit broadcasts. */
@@ -14,6 +14,7 @@ const ICONS = {
   instagram: Instagram,
   twitter:   Twitter,
   reddit:    MessageSquare,
+  linkedin:  Linkedin,
 };
 
 const FIELD_HINTS = {
@@ -21,6 +22,7 @@ const FIELD_HINTS = {
   instagram: ["ig_user_id", "access_token"],
   twitter:   ["bearer_token"],
   reddit:    ["client_id", "client_secret", "username", "password", "subreddit", "user_agent"],
+  linkedin:  ["access_token", "author_urn"],
 };
 
 const TONE_LABELS = {

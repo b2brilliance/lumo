@@ -38,12 +38,13 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-PLATFORMS = ["facebook", "instagram", "twitter", "reddit"]
+PLATFORMS = ["facebook", "instagram", "twitter", "reddit", "linkedin"]
 PLATFORM_LABELS = {
     "facebook":  "Facebook Page",
     "instagram": "Instagram Business",
     "twitter":   "X / Twitter",
     "reddit":    "Reddit",
+    "linkedin":  "LinkedIn",
 }
 
 
@@ -163,11 +164,64 @@ async def _post_reddit(cfg: dict, content: dict) -> dict:
         return {"ok": True, "external_id": r2.json().get("json", {}).get("data", {}).get("id", "")}
 
 
+async def _post_linkedin(cfg: dict, content: dict) -> dict:
+    """Post to a LinkedIn Page or personal profile via LinkedIn UGC API.
+
+    Required cfg keys:
+      - `access_token`  — OAuth2 token with `w_member_social` (profile) or
+                          `w_organization_social` (page) scope.
+      - `author_urn`    — URN of the posting entity. For a profile:
+                          `urn:li:person:<memberId>`. For a company page:
+                          `urn:li:organization:<orgId>`.
+
+    LinkedIn API docs: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/ugc-post-api
+    """
+    token = cfg.get("access_token")
+    author = cfg.get("author_urn")
+    if not (token and author):
+        return {"ok": False, "skipped": True, "error": "missing access_token or author_urn"}
+
+    text = _compose_caption(content, max_len=3000)  # LinkedIn post text cap
+    link = (content.get("url") or "").strip()
+
+    body: dict = {
+        "author": author,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": text},
+                "shareMediaCategory": "ARTICLE" if link else "NONE",
+            }
+        },
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+    }
+    if link:
+        body["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = [{
+            "status": "READY",
+            "originalUrl": link,
+            "title": {"text": (content.get("title") or "")[:200]},
+        }]
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Restli-Protocol-Version": "2.0.0",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.post("https://api.linkedin.com/v2/ugcPosts", json=body, headers=headers)
+        if r.status_code >= 300:
+            return {"ok": False, "error": f"LinkedIn {r.status_code}: {r.text[:200]}"}
+        # LinkedIn returns the created post ID in the `x-restli-id` header
+        post_id = r.headers.get("x-restli-id") or (r.json() or {}).get("id", "")
+        return {"ok": True, "external_id": post_id, "url": f"https://www.linkedin.com/feed/update/{post_id}"}
+
+
 ADAPTERS: Dict[str, Callable[[dict, dict], Any]] = {
     "facebook":  _post_facebook,
     "instagram": _post_instagram,
     "twitter":   _post_twitter,
     "reddit":    _post_reddit,
+    "linkedin":  _post_linkedin,
 }
 
 

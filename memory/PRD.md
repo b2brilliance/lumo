@@ -9,6 +9,17 @@ Continue building Lumo. Originally requested 5 features (toast / media / remote 
 - Multi-store cart with per-store checkout
 - Per-state US sales tax engine (50 states + DC)
 
+## Iteration 63 — Feb 2026 (this session)
+### 💼 LinkedIn auto-posting + 🌤 City weather badge
+- **LinkedIn adapter (`_post_linkedin`)** — POSTs to `https://api.linkedin.com/v2/ugcPosts` using the UGC Posts API. Required cfg: `access_token` (OAuth with `w_member_social` or `w_organization_social` scope) + `author_urn` (`urn:li:person:<id>` or `urn:li:organization:<id>`). Composes a 3000-char caption, attaches the blog URL as an ARTICLE media card, publishes PUBLIC. Returns the resulting post URL.
+- **Wired into fan-out loop** — `PLATFORMS` now includes `"linkedin"` so every blog publish, daily recruit broadcast and manual admin broadcast automatically fans to LinkedIn whenever the admin flips `enabled=true` in the Auto-post tab. Zero changes to the auto-share loop in `blog.py` or `recruit_cities.py` — they both iterate `PLATFORMS` dynamically.
+- **Admin SocialTab UI** — LinkedIn tile with `Linkedin` icon renders automatically with the 2 required fields. Tested: PUT /config/linkedin round-trips, LinkedIn now shows in /config alongside FB/IG/X/Reddit.
+- **Weather badge (`recruit_weather.py` + `<WeatherBadge />`)** — new endpoint `GET /api/recruit/cities/{slug}/weather` proxies Open-Meteo (free, no API key), geocodes each city lazily on first request, persists lat/lng on the row, caches full weather response in Mongo for 30 min per city. Frontend renders a glass-morphism pill next to each `/join/{slug}` location pill: "☁️ **78°F · Overcast**". Hides silently on upstream failure.
+- **Verified live**: Miami 78°F ☁️, Boise 56°F 🌤️, Seattle 50°F ☁️. Image loads at full res.
+
+---
+
+
 ## Iteration 62 — Feb 2026 (this session)
 ### 🖼 Real city skyline photos for all 122 metros (Wikipedia-sourced)
 - **New module `recruit_cities_wiki.py`** — pulls each city's canonical infobox photo from Wikipedia's REST summary API (`GET /api/rest_v1/page/summary/{City},_{State}`). Prefers the full-resolution `originalimage.source` from Wikimedia Commons; falls back to the thumbnail upscaled by swapping the `/330px-` prefix for `/1600px-`.
