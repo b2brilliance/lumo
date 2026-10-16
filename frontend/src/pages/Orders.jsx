@@ -12,7 +12,11 @@ const TABS = [
   { key: "inquiry", label: "Inquiries" },
 ];
 const ICON = { service: Briefcase, purchase: ShoppingBag, rental: CalendarDays, inquiry: MessageSquare };
-const money = (n) => (n == null ? "" : `$${Number(n).toFixed(2)}`);
+const money = (n, cur = "USD") => {
+  if (n == null) return "";
+  try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: Number(n) >= 1000 ? 0 : 2 }).format(n); }
+  catch { return `${cur} ${Number(n).toLocaleString()}`; }
+};
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "");
 
 async function loadAll(user) {
@@ -28,7 +32,7 @@ async function loadAll(user) {
     ...jobs.map((j) => ({ id: `s-${j.id}`, kind: "service", title: j.title, status: j.status, amount: j.final_price ?? (j.pay_rate && j.estimated_units ? j.pay_rate * j.estimated_units : null), at: j.created_at, to: `/jobs/${j.id}` })),
     ...orders.map((o) => ({ id: `p-${o.id}`, kind: "purchase", title: o.item_title || o.listing_title || "Order", status: o.status, amount: (o.item_total || 0) + (o.delivery_fee || 0), at: o.created_at, to: ["deposit_paid", "in_progress", "accepted"].includes(o.status) ? `/orders/${o.id}/pay` : null })),
     ...[...rentals, ...owned].map((b) => ({ id: `r-${b.id}`, kind: "rental", title: b.rental?.title || "Rental", status: b.status, amount: b.subtotal, at: b.created_at, sub: `${b.start_date} → ${b.end_date}`, to: `/rentals/${b.rental_id}` })),
-    ...inq.map((q) => ({ id: `i-${q.id}`, kind: "inquiry", title: q.listing_title || "Inquiry", status: q.listing_kind?.replace("_", " "), amount: q.listing_price, at: q.last_message_at || q.created_at, to: `/inquiries/${q.id}` })),
+    ...inq.map((q) => ({ id: `i-${q.id}`, kind: "inquiry", title: q.listing_title || "Inquiry", status: q.listing_kind?.replace("_", " "), amount: q.listing_price, currency: q.listing_currency, at: q.last_message_at || q.created_at, to: `/inquiries/${q.id}` })),
   ].sort((a, b) => (b.at || "").localeCompare(a.at || ""));
 }
 
@@ -42,7 +46,7 @@ function OrderRow({ o }) {
         <div className="text-xs font-mono text-slate-500 truncate">{o.sub || day(o.at)}</div>
       </div>
       <div className="text-right">
-        {o.amount != null && <div className="font-display font-bold">{money(o.amount)}</div>}
+        {o.amount != null && <div className="font-display font-bold">{money(o.amount, o.currency)}</div>}
         <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">{(o.status || "").replace(/_/g, " ")}</div>
       </div>
     </div>
@@ -68,7 +72,7 @@ export default function Orders() {
           <button key={t.key} onClick={() => setTab(t.key)}
                   className={`shrink-0 px-3 py-2 text-xs font-mono uppercase tracking-widest border transition-colors ${tab === t.key ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 hover:border-slate-900"}`}
                   data-testid={`orders-tab-${t.key}`}>
-            {t.label}{items && t.key !== "all" ? ` · ${items.filter((o) => o.kind === t.key).length}` : ""}
+            {t.label}{items ? ` · ${t.key === "all" ? items.length : items.filter((o) => o.kind === t.key).length}` : ""}
           </button>
         ))}
       </div>

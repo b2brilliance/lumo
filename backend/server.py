@@ -256,7 +256,7 @@ class JobAccept(BaseModel):
 class MarketplaceListingCreate(BaseModel):
     title: str
     description: str
-    price: float
+    price: float = Field(gt=0, le=1_000_000_000)
     category: str = "other"
     location: Optional[dict] = None
     media_url: Optional[str] = None
@@ -4910,7 +4910,7 @@ GUIDE_ALLOWED_PREFIXES = (
 GUIDE_SYSTEM_PROMPT = """You are Lumi, the site guide for Lumo — a global marketplace with four lanes:
 1. Book a service (local): /for-you — delivery, moving, home repair & cleaning, auto, pet/personal care, business & creative pros, errands.
 2. Work & earn: /become-a-provider (sign up to do gigs), /map (jobs near you), /remote-jobs, /careers (full-time roles), /join (city recruiting).
-3. Products & rentals: /marketplace (community listings), /shop (curated products), /rentals (rent tools, gear, vehicles, spaces), /autos (cars for sale), /list-your-stuff.
+3. Products & rentals: /marketplace (community listings; /marketplace/new to sell an item), /shop (curated products), /rentals (rent tools, gear, vehicles, spaces; /rentals/host to list a rental), /autos (cars for sale; /autos/list to sell a car), /list-your-stuff.
 4. Real estate & rentals worldwide: /real-estate. Supports query params: kind=sale|rent|short_stay|room|commercial|land, q=<text>, min_price, max_price, min_beds, min_baths, type=house|condo|apartment|villa|cabin|studio|townhouse. /real-estate/list to list a property, /real-estate/saved for saved homes & alerts.
 Account pages: /orders (all bookings, purchases, rentals, inquiries), /chats (messages), /inquiries, /settings (profile), /wallet, /cart, /signin, /register.
 
@@ -4931,11 +4931,13 @@ class GuideChat(BaseModel):
 def _parse_guide_links(reply: str):
     links, lines = [], []
     for line in reply.splitlines():
-        m = re.match(r"^\s*LINK:\s*(.+?)\s*\|\s*(/\S*)\s*$", line)
-        if m:
-            label, path = m.group(1)[:40], m.group(2)
-            if path.split("?")[0].rstrip("/").startswith(GUIDE_ALLOWED_PREFIXES) and len(links) < 3:
-                links.append({"label": label, "path": path})
+        if re.match(r"^\s*LINK:", line):
+            m = re.match(r"^\s*LINK:\s*(.+?)\s*\|\s*(\S+)\s*$", line)
+            if m and len(links) < 3:
+                label, path = m.group(1)[:40], m.group(2)
+                base = path.split("?")[0].split("#")[0].rstrip("/") or "/"
+                if path.startswith("/") and not path.startswith("//") and any(base == p or base.startswith(p + "/") for p in GUIDE_ALLOWED_PREFIXES):
+                    links.append({"label": label, "path": path})
             continue
         lines.append(line)
     return "\n".join(lines).strip(), links

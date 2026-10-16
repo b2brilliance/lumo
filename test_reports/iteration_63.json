@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the iter63 features end to end: AI guide (backend + UI, anonymous and logged-in), exit intent, price history and price-drop alerts for real estate, listings and autos (backend + UI), the mobile tab bar and badge, /orders, /messages, the copy sweep and the cache/reload fix. Backend: 20 of 21 pytest cases pass. The one failure: a LINK: line with an external URL is left in the reply text. Frontend: everything passes except one gap. The /autos/:id detail page imports PriceHistory but never renders it, so autos have no price-history timeline.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/guide/chat (_parse_guide_links)", "issue": "The LINK regex only matches paths that start with '/'. A line like 'LINK: X | https://evil.com' is not matched, so it stays in the reply text shown to the user. It is not turned into a chip, so nothing navigates, but the raw text shows. Fix: match any 'LINK:' line with a regex like ^\\s*LINK:\\s*(.+?)\\s*\\|\\s*(\\S+)\\s*$, always drop the line, and add a chip only if it is on the whitelist."},
+      {"endpoint": "GUIDE_ALLOWED_PREFIXES", "issue": "The whitelist uses a plain startswith, so '/shopping' or '/providerxyz' pass and give dead links. Compare against exact path or prefix + '/'."},
+      {"endpoint": "Guide prompt", "issue": "'I want to sell my old car' returned /autos and /list-your-stuff. /autos/list (the 'Sell my car' form) is not in GUIDE_SYSTEM_PROMPT, so the model never offers it."},
+      {"endpoint": "DELETE /api/admin/users/{id} and DELETE /api/admin/content/{type}/{id}", "issue": "Deletes leave orphan rows: watchlist rows for deleted autos/listings, and notifications for deleted users. Add these to the delete cascade."},
+      {"endpoint": "POST /api/marketplace/listings", "issue": "MarketplaceListingCreate.price has no gt=0 check, so a 0 or negative price is accepted on create. PATCH already rejects price <= 0 with 422."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "pages/AutoDetail.jsx", "issue": "PriceHistory is imported (line 9) but never rendered, so /autos/:id never shows data-testid=price-history, even with 2+ entries. The API returns price_history correctly. Add <PriceHistory item={listing} /> as in RealEstateDetail.", "selector": "[data-testid=price-history]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/orders", "issues": ["The 'ALL' tab shows no count; the other tabs show counts.", "Money uses toFixed(2) with no thousands separators and is always '$' ('$1095000.00' for a real-estate inquiry). Use Intl.NumberFormat with the item's currency."]},
+      {"screen": "/messages", "issues": ["207 threads render in one list with no pagination or lazy loading (customer test account)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter63_guide_price_watch.py", "/app/backend/tests/seed_iter63_ui.py", "/app/test_reports/pytest/iter63.xml"],
+  "action_items": [
+    "Render <PriceHistory item={listing} /> in pages/AutoDetail.jsx",
+    "Always strip every 'LINK:' line in _parse_guide_links, including non-whitelisted or external ones",
+    "Make the guide whitelist check exact path or prefix + '/'; add /autos/list to GUIDE_SYSTEM_PROMPT",
+    "Add a count to the Orders 'All' tab and format money with currency and thousands separators",
+    "Add watchlist and notifications cleanup to the delete cascades; validate price > 0 on marketplace listing create"
+  ],
+  "critical_code_review_comments": [
+    "price_watch._owner_edit writes price after record_price_change, which works. The 'listed' history entry is backfilled for legacy docs that have no price_history.",
+    "useExitIntent restarts its 15s arm timer each time `enabled` changes (prompt/panel open or close). This is acceptable; the once-per-session sessionStorage guard holds.",
+    "GuidePanel: for anonymous users the GREETING restored from sessionStorage is a new object, so `m !== GREETING` no longer filters it and the greeting is sent in history. Harmless.",
+    "/me/badges counts unread inquiries in addition to notifications, so POST /me/messages/seen does not zero the badge while inquiries stay unread (seen 4 -> 2). This is by design, but confirm it is the intended UX."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter63_guide_price_watch.py", "/app/backend/tests/seed_iter63_ui.py"],
+  "success_rate": {"backend": "95% (20/21)", "frontend": "~95% (only the autos detail price-history timeline is missing)"},
+  "seed_data_creation": "Created fresh qa_*@gmail.com owner and watcher users with one QA_ real estate listing, auto and marketplace listing, each with a price drop. All deleted via admin endpoints afterwards, plus manual cleanup of orphan watchlist rows and notifications. Inserted 2 new_message notifications for customer@lumo.test to test the badge; deleted afterwards.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified: copy sweep (no 'Pick a lane', no for-you walkthrough paragraph, no marketplace subtitle, short earn copy). First-visit guide card with Yes/No remembered in localStorage and hidden on /signin, /reset, /admin. Guide chat links are correct and the page never auto-navigates; a chip click navigates and closes the panel; starters and clear work; anonymous history uses sessionStorage, logged-in history uses /api/assistant/history. Exit intent fires after 15s, once per session (not before 15s). Price badges and was-price show on /real-estate, /marketplace and /autos cards. RE detail shows the timeline. Owner edit-price works on autos and RE; watch hearts toggle and persist; watcher gets the price_drop notification and the owner does not; a price increase clears the drop flags and sends no alert. Mobile tab bar hrefs are correct for anon, customer, provider and admin; badge 4 -> 2 after /messages (inquiry unread remains); Ask Lumi sits above the tab bar. /orders tabs, counts and inquiry filter work; /messages and /chats show threads plus inquiries. index.html has no /api/meta or sw-nuke-v3; no reload loop (window marker survived), no SWs, no console errors. Not tested: real push delivery, orders-empty and messages-empty states (test accounts have data).",
+  "test_credentials": "Admin julius.a.mason@gmail.com / Mason0123; customer@lumo.test, provider@lumo.test / password123 (all logins work)"
+}

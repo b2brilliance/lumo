@@ -110,6 +110,7 @@ export default function AutoDetail() {
               <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{listing.description}</p>
             </div>
           )}
+          <PriceHistory item={listing} />
         </div>
 
         <aside className="lg:col-span-1">

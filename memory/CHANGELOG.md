@@ -22,3 +22,11 @@
 - One-click "Purge demo data" (preview counts, type PURGE) deletes demo content + all test accounts and their data; seed() stops re-creating test users afterwards.
 - Home tile renamed: "Real estate & rentals — Buy, rent or stay."
 - Tested: iteration_61 + iteration_62 (all pass), pin-stacking fix verified by screenshot.
+
+## 2026-06 — Guide, price history, mobile tabs, incognito fix
+- Copy sweep: removed how-to sentences on home, For You, Marketplace, Earn, Shop, Rentals, Autos heroes.
+- AI site guide (AssistantWidget + components/guide/*): first-visit "Want a guide?" card (choice in localStorage lumo_guide_choice), exit-intent card once per session (desktop top-edge mouseout, mobile fast flick to top), suggests whitelisted link chips only (never auto-navigates). POST /api/guide/chat (anon + auth; history persisted for signed-in users).
+- Price history + price-drop alerts for real estate, marketplace listings, autos (backend/price_watch.py): price_history, previous_price, price_drop_pct; watchers (re_favorites / watchlist) get in-app + push alerts. Owner PATCH /api/marketplace/listings/{id}, /api/autos/{id}; UI badges, was-price, history timeline, owner price editor, hearts. /autos routes re-enabled.
+- Mobile tab bar: Home (role-aware) / Orders (/orders unified) / Messages (/messages unified chats + inquiries, unread badge via GET /api/me/badges) / Profile (/settings).
+- INCOGNITO BUG ROOT CAUSE (deployer RCA): inline boot script compared HTML build stamp vs /api/meta (backend stamp never matches) → every normal session nuked SWs + reloaded; sw-nuke-v3 registered each session at scope "/". Fixed: removed boot /api/meta check, bfcache check and sw-nuke registration; kept asset-failure reload guard + one-time legacy SW cleanup; CacheBuster compares meta tag vs static /meta.json only. DO NOT reintroduce /api/meta comparisons. Requires redeploy.
+- Tested: iteration_63 (20/21 backend, frontend pass) + fixes self-verified (guide link sanitizing, autos price history, cascades, listing price >0, orders money format, messages pagination).

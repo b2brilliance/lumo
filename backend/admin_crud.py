@@ -107,6 +107,9 @@ CONTENT_TYPES = {
 async def _after_write(db, type: str, item_id: str, created: bool = False) -> None:
     """Keep the rental→real-estate mirror fresh and fire saved-search alerts for admin-created homes."""
     from real_estate_plus import sync_property_rentals, notify_matching_searches
+    if type in ("listing", "auto", "real_estate") and not await db[CONTENT_TYPES[type]["collection"]].find_one({"id": item_id}):
+        await db.watchlist.delete_many({"kind": type, "item_id": item_id})
+        await db.re_favorites.delete_many({"listing_id": item_id})
     if type == "rental":
         await sync_property_rentals(db, item_id)
         if not await db.rentals.find_one({"id": item_id}):
@@ -245,6 +248,8 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         res = await db.users.delete_one({"id": user_id})
         await db.re_saved_searches.delete_many({"user_id": user_id})
         await db.re_favorites.delete_many({"user_id": user_id})
+        await db.watchlist.delete_many({"user_id": user_id})
+        await db.notifications.delete_many({"user_id": user_id})
         if res.deleted_count == 0:
             raise HTTPException(404, "User not found")
         return {"ok": True, "deleted": user_id}
@@ -259,6 +264,8 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         res = await db.users.delete_many({"id": {"$in": target_ids}})
         await db.re_saved_searches.delete_many({"user_id": {"$in": target_ids}})
         await db.re_favorites.delete_many({"user_id": {"$in": target_ids}})
+        await db.watchlist.delete_many({"user_id": {"$in": target_ids}})
+        await db.notifications.delete_many({"user_id": {"$in": target_ids}})
         return {"ok": True, "deleted_count": res.deleted_count, "skipped_self": len(body.ids) - len(target_ids)}
 
     @router.post("/users/bulk-patch")
@@ -348,6 +355,8 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         res = await coll.delete_many({"id": {"$in": body.ids}})
         if body.type == "rental":
             await db.real_estate.delete_many({"source_rental_id": {"$in": body.ids}})
+        await db.watchlist.delete_many({"item_id": {"$in": body.ids}})
+        await db.re_favorites.delete_many({"listing_id": {"$in": body.ids}})
         return {"ok": True, "deleted_count": res.deleted_count, "type": body.type}
 
     @router.post("/content/{type}")

@@ -26,6 +26,7 @@ export default function ChatsInbox() {
   const { user } = useAuth();
   const [threads, setThreads] = useState(null);
   const [inquiries, setInquiries] = useState(null);
+  const [limit, setLimit] = useState(30);
 
   useEffect(() => {
     api.get("/chats/inbox").then(({ data }) => setThreads(data)).catch(() => setThreads([]));
@@ -59,8 +60,13 @@ export default function ChatsInbox() {
         {!loading && rows.length === 0 && (
           <div className="p-8 text-sm text-slate-500 flex items-center gap-2" data-testid="messages-empty"><MessageSquare className="w-4 h-4" /> No conversations yet.</div>
         )}
-        {rows.map(({ key, ...r }) => <Row key={key} {...r} />)}
+        {rows.slice(0, limit).map(({ key, ...r }) => <Row key={key} {...r} />)}
       </div>
+      {rows.length > limit && (
+        <button onClick={() => setLimit((l) => l + 30)} className="mt-3 w-full border border-slate-200 py-2 text-xs font-mono uppercase tracking-widest hover:border-slate-900" data-testid="messages-show-more">
+          Show more ({rows.length - limit})
+        </button>
+      )}
     </div>
   );
 }
