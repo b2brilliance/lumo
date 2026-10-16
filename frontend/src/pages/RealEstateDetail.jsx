@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { MapPin, BedDouble, Bath, Maximize, Calendar, Trash2, MessageSquare, Mail, Phone, Heart, CalendarCheck, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import ReLocation from "@/components/realestate/ReLocation";
+import { PriceDropBadge, WasPrice, PriceHistory, OwnerPriceEditor } from "@/components/price/PriceBits";
 import { fmtPrice, KIND_LABEL, UNIT_LABEL, useReFavorites } from "@/components/realestate/reUtils";
 
 export default function RealEstateDetail() {
@@ -116,6 +117,9 @@ export default function RealEstateDetail() {
           <div className="mt-6 flex items-baseline gap-3">
             <div className="font-display text-4xl font-black">{fmtUsd(listing.price)}</div>
             {UNIT_LABEL[listing.price_unit] && <div className="text-sm font-mono text-slate-500">{UNIT_LABEL[listing.price_unit]}</div>}
+            <WasPrice item={listing} />
+            <PriceDropBadge item={listing} className="ml-2" />
+            {isOwner && <span className="ml-3"><OwnerPriceEditor item={listing} endpoint={`/real-estate/${listing.id}`} onSaved={(d) => setListing({ ...listing, ...d })} /></span>}
           </div>
 
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
@@ -140,6 +144,7 @@ export default function RealEstateDetail() {
               <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{listing.description}</p>
             </div>
           )}
+          <PriceHistory item={listing} />
           <ReLocation listing={listing} />
         </div>
 

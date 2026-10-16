@@ -104,7 +104,7 @@ export default function Shop() {
             Everyday gear from the retailers you already trust.
           </h1>
           <p className="mt-5 text-lg text-neutral-600 leading-relaxed max-w-2xl">
-            Hand-picked products from Amazon, Best Buy, Wayfair, Target and Walmart. Tap any card to shop on the retailer's site. Lumo earns a small commission — no extra cost to you.
+            From Amazon, Best Buy, Wayfair, Target and Walmart. Lumo may earn a commission.
           </p>
 
           <form onSubmit={onSearch} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-2xl" data-testid="shop-search-form">

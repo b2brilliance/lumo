@@ -184,6 +184,10 @@ async def sync_property_rentals(db, rental_id: Optional[str] = None) -> int:
     n = 0
     async for r in db.rentals.find(q):
         fields = _rental_to_re(r)
+        existing = await db.real_estate.find_one({"source_rental_id": r["id"]})
+        if existing and existing.get("price") is not None and float(existing["price"]) != fields["price"]:
+            from price_watch import record_price_change
+            await record_price_change(db, "real_estate", existing, fields["price"])
         res = await db.real_estate.update_one(
             {"source_rental_id": r["id"]},
             {"$set": fields, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": r.get("created_at") or _now()}},

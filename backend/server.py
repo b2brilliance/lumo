@@ -560,6 +560,7 @@ async def get_optional_user(creds: Optional[HTTPAuthorizationCredentials] = Depe
         return None
 
 from demo_filter import hide_demo, is_hidden  # noqa: E402
+from price_watch import init_history as _init_price_history  # noqa: E402
 
 def require_role(*roles: str):
     async def checker(user: dict = Depends(get_current_user)) -> dict:
@@ -1414,6 +1415,7 @@ async def create_listing(body: MarketplaceListingCreate, user: dict = Depends(ge
         "status": "active",
         "created_at": now_iso(),
     }
+    _init_price_history(doc)
     await db.listings.insert_one(doc)
     return clean_doc(doc)
 
@@ -4898,6 +4900,96 @@ async def assistant_chat(body: AssistantChat, user: dict = Depends(get_current_u
     )
     return {"reply": reply}
 
+GUIDE_ALLOWED_PREFIXES = (
+    "/for-you", "/order", "/become-a-provider", "/earn", "/marketplace", "/shop", "/real-estate", "/rentals",
+    "/autos", "/map", "/remote-jobs", "/careers", "/join", "/cities", "/orders", "/chats", "/inquiries",
+    "/settings", "/signin", "/register", "/wallet", "/cart", "/blog", "/how-it-works", "/contact", "/list-your-stuff",
+    "/insurance", "/training", "/providers", "/provider", "/credentials",
+)
+
+GUIDE_SYSTEM_PROMPT = """You are Lumi, the site guide for Lumo — a global marketplace with four lanes:
+1. Book a service (local): /for-you — delivery, moving, home repair & cleaning, auto, pet/personal care, business & creative pros, errands.
+2. Work & earn: /become-a-provider (sign up to do gigs), /map (jobs near you), /remote-jobs, /careers (full-time roles), /join (city recruiting).
+3. Products & rentals: /marketplace (community listings), /shop (curated products), /rentals (rent tools, gear, vehicles, spaces), /autos (cars for sale), /list-your-stuff.
+4. Real estate & rentals worldwide: /real-estate. Supports query params: kind=sale|rent|short_stay|room|commercial|land, q=<text>, min_price, max_price, min_beds, min_baths, type=house|condo|apartment|villa|cabin|studio|townhouse. /real-estate/list to list a property, /real-estate/saved for saved homes & alerts.
+Account pages: /orders (all bookings, purchases, rentals, inquiries), /chats (messages), /inquiries, /settings (profile), /wallet, /cart, /signin, /register.
+
+Your job: understand what the visitor wants in 1-2 short sentences, then point them to the best page(s). You NEVER navigate for them — you only suggest links.
+At the end of every reply add 1-3 lines in this exact format (no other formatting):
+LINK: <short button label> | <path starting with / and optional ?query>
+Ask at most one clarifying question when the need is truly unclear. Warm, plain, concise (under 80 words before the links). No emojis. Never ask for contact details.
+"""
+
+
+class GuideChat(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+    history: List[dict] = []
+    path: Optional[str] = None
+
+
+def _parse_guide_links(reply: str):
+    links, lines = [], []
+    for line in reply.splitlines():
+        m = re.match(r"^\s*LINK:\s*(.+?)\s*\|\s*(/\S*)\s*$", line)
+        if m:
+            label, path = m.group(1)[:40], m.group(2)
+            if path.split("?")[0].rstrip("/").startswith(GUIDE_ALLOWED_PREFIXES) and len(links) < 3:
+                links.append({"label": label, "path": path})
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip(), links
+
+
+@api.post("/guide/chat")
+async def guide_chat(body: GuideChat, user: Optional[dict] = Depends(get_optional_user)):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "Guide unavailable")
+    text = (body.message or "").strip()
+    if not text or len(text) > 1500:
+        raise HTTPException(400, "Message must be 1-1500 characters")
+    history = body.history
+    if user:
+        doc = await db.assistant_chats.find_one({"user_id": user["id"]}) or {}
+        history = doc.get("messages", [])
+    turns = [f"{'Visitor' if m.get('role') == 'user' else 'Lumi'}: {str(m.get('content'))[:800]}"
+             for m in history[-10:] if m.get("role") in ("user", "assistant")]
+    ctx = f"(Visitor is on page {body.path[:120]}{', signed in as ' + user['role'] if user else ', not signed in'}.)\n"
+    prompt = ctx + ("Conversation so far:\n" + "\n".join(turns) + "\n\n" if turns else "") + f"Visitor: {text}"
+    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=body.session_id or str(uuid.uuid4()),
+                   system_message=GUIDE_SYSTEM_PROMPT).with_model("anthropic", "claude-sonnet-4-6")
+    try:
+        raw = await chat.send_message(UserMessage(text=prompt))
+    except Exception as e:
+        logger.error(f"Guide error: {e}")
+        raise HTTPException(502, "Guide temporarily unavailable")
+    reply, links = _parse_guide_links(raw)
+    if user:
+        msgs = history + [{"role": "user", "content": text, "ts": now_iso()},
+                          {"role": "assistant", "content": reply, "links": links, "ts": now_iso()}]
+        await db.assistant_chats.update_one({"user_id": user["id"]},
+                                            {"$set": {"user_id": user["id"], "messages": msgs[-40:], "updated_at": now_iso()}},
+                                            upsert=True)
+    return {"reply": reply, "links": links}
+
+
+@api.get("/me/badges")
+async def my_badges(user: dict = Depends(get_current_user)):
+    msg_notifs = await db.notifications.count_documents({"user_id": user["id"], "read": False, "type": {"$in": ["message", "chat_message", "new_message"]}})
+    inq = 0
+    async for d in db.inquiries.find({"$or": [{"buyer_id": user["id"]}, {"seller_id": user["id"]}]},
+                                     {"buyer_id": 1, "buyer_unread_count": 1, "seller_unread_count": 1}):
+        inq += (d.get("buyer_unread_count") or 0) if d.get("buyer_id") == user["id"] else (d.get("seller_unread_count") or 0)
+    return {"messages": msg_notifs + inq}
+
+
+@api.post("/me/messages/seen")
+async def my_messages_seen(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["id"], "read": False, "type": {"$in": ["message", "chat_message", "new_message"]}},
+                                       {"$set": {"read": True}})
+    return {"ok": True}
+
+
 @api.get("/assistant/history")
 async def assistant_history(user: dict = Depends(get_current_user)):
     doc = await db.assistant_chats.find_one({"user_id": user["id"]})
@@ -7241,6 +7333,8 @@ async def on_shutdown():
 app.include_router(api)
 
 # Real Estate + Auto Sales classifieds (separate module to keep server.py reasonable)
+from price_watch import create_router as _create_price_watch_router  # noqa: E402
+app.include_router(_create_price_watch_router(db=db, get_current_user=get_current_user))
 from real_estate_plus import create_router as _create_re_plus_router, sync_property_rentals as _sync_property_rentals  # noqa: E402
 app.include_router(_create_re_plus_router(db=db, get_current_user=get_current_user))
 from classifieds import create_router as _create_classifieds_router  # noqa: E402

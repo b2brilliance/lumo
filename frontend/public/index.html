@@ -94,7 +94,7 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Lumo — On-demand jobs, delivery, rentals worldwide</title>
-        <meta name="lumo-build" content="2026-10-02T01:13:14.496Z" />
+        <meta name="lumo-build" content="2026-10-16T10:48:58.252Z" />
         <script>
             // ── Asset-failure hard-reload guard ────────────────────────────
             // The frontend static host falls back to serving index.html for
@@ -189,207 +189,29 @@
         </script>
 
         <script>
-            // ── Inline cache-buster bootstrap ─────────────────────────────
-            // This runs BEFORE any React bundle loads, so it catches the
-            // "app doesn't load unless in incognito" bug even when
-            // Cloudflare has cached a stale index.html referencing dead
-            // JS bundles. Steps:
-            //   1. Read the build timestamp baked into this HTML (see
-            //      scripts/write-meta.js — the placeholder is swapped at
-            //      build time so every fresh deploy carries a fresh value).
-            //   2. Fetch /api/meta with `no-store` — that endpoint is
-            //      served straight from FastAPI with `Cache-Control:
-            //      no-store, no-cache, must-revalidate` so it's ALWAYS
-            //      the live build timestamp, even through Cloudflare.
-            //   3. If server says a NEWER build exists → nuke Service
-            //      Worker + Cache Storage + hard-reload with a cache-
-            //      buster query string. sessionStorage guards against
-            //      infinite loops.
-            (function () {
-                var htmlBuild = "";
-                try {
-                    var m = document.querySelector('meta[name="lumo-build"]');
-                    htmlBuild = m ? (m.getAttribute("content") || "") : "";
-                } catch (e) {}
-                // If the placeholder was never substituted (dev server /
-                // very first deploy), skip the check — nothing to compare.
-                if (!htmlBuild || htmlBuild === "__LUMO_BUILD_TIME__") return;
-
-                var loopKey = "lumo_boot_cachebuster_last";
-                var last = 0;
-                try { last = parseInt(sessionStorage.getItem(loopKey) || "0", 10); } catch (e) {}
-                if (Date.now() - last < 15000) return; // never loop faster than 15s
-
-                // /api/meta is same-origin on production (ingress proxies
-                // /api/* to the backend). In preview it's also same-origin.
-                // Always use a relative URL so we never accidentally hit a
-                // stale REACT_APP_BACKEND_URL value.
-                var url = "/api/meta?t=" + Date.now();
-                fetch(url, { cache: "no-store", credentials: "omit" })
-                    .then(function (r) { return r.ok ? r.json() : null; })
-                    .then(function (data) {
-                        if (!data || !data.buildTime) return;
-                        if (data.buildTime === htmlBuild) return;
-                        // Newer deploy exists — nuke everything and reload.
-                        try { sessionStorage.setItem(loopKey, String(Date.now())); } catch (e) {}
-                        var chain = Promise.resolve();
-                        if ("serviceWorker" in navigator) {
-                            chain = chain
-                                .then(function () { return navigator.serviceWorker.getRegistrations(); })
-                                .then(function (regs) {
-                                    return Promise.all((regs || []).map(function (rr) {
-                                        try { return rr.unregister(); } catch (e) { return null; }
-                                    }));
-                                })
-                                .catch(function () {});
-                        }
-                        if (window.caches && caches.keys) {
-                            chain = chain
-                                .then(function () { return caches.keys(); })
-                                .then(function (keys) {
-                                    return Promise.all((keys || []).map(function (k) {
-                                        try { return caches.delete(k); } catch (e) { return null; }
-                                    }));
-                                })
-                                .catch(function () {});
-                        }
-                        chain.finally(function () {
-                            var loc = new URL(window.location.href);
-                            loc.searchParams.set("_cb", data.buildTime);
-                            window.location.replace(loc.toString());
-                        });
-                    })
-                    .catch(function () { /* silent — network is optional */ });
-            })();
-        </script>
-        <script>
-            // ── Service Worker killswitch (surgical, permanent) ──────────────
-            // The persistent "site only loads in Incognito" bug on production
-            // has recurred repeatedly. Root cause on the vast majority of
-            // affected devices is a Service Worker registered at scope "/"
-            // by an earlier build that intercepts fetches OR keeps the tab
-            // pinned to a stale HTML shell. This block runs BEFORE React
-            // mounts and:
-            //   1. Unregisters ANY legacy SW at scope "/" whose script URL
-            //      is NOT /push-sw.js (the legitimate push notification SW
-            //      the user explicitly opted into). This means push
-            //      subscribers keep their notifications, but every stale /
-            //      abandoned SW is killed.
-            //   2. Clears every Cache Storage entry the browser created
-            //      (safe — none of our SWs cache app assets on purpose).
-            //   3. If any legacy SW was actually found and this session
-            //      hasn't yet reloaded, hard-reloads once with a cache
-            //      buster so the fresh HTML replaces whatever was pinned.
-            //   4. Also listens for the bfcache `pageshow` restore event
-            //      (mobile Safari / Chrome) and re-runs the buildTime
-            //      check — restored bfcache pages are the #1 source of
-            //      "why is she showing me a page from three deploys ago".
+            // ── Legacy Service Worker cleanup (one strategy, no build-stamp checks) ──
+            // HTML is served no-store and bundles are content-hashed, so the only
+            // thing that can pin a browser to an old build is a legacy SW from an
+            // earlier deploy. Unregister any SW that isn't the opt-in push worker;
+            // reload once ONLY if one was actually removed. Nothing else runs here.
             (function () {
                 if (!('serviceWorker' in navigator)) return;
-                var LEGIT_SW_PATH = '/push-sw.js';
-
-                function isLegitPushSw(reg) {
-                    try {
-                        var w = reg.active || reg.waiting || reg.installing;
-                        if (!w || !w.scriptURL) return false;
-                        var u = new URL(w.scriptURL);
-                        return u.pathname === LEGIT_SW_PATH;
-                    } catch (e) { return false; }
-                }
-
-                function nukeStaleSws() {
-                    return navigator.serviceWorker.getRegistrations().then(function (regs) {
-                        var killed = 0;
-                        var promises = (regs || []).map(function (r) {
-                            if (isLegitPushSw(r)) return null;
-                            killed += 1;
-                            try { return r.unregister(); } catch (e) { return null; }
-                        });
-                        return Promise.all(promises).then(function () {
-                            if (window.caches && caches.keys) {
-                                return caches.keys().then(function (keys) {
-                                    return Promise.all((keys || []).map(function (k) {
-                                        try { return caches.delete(k); } catch (e) { return null; }
-                                    }));
-                                }).then(function () { return killed; });
-                            }
-                            return killed;
-                        });
-                    }).catch(function () { return 0; });
-                }
-
                 try {
-                    var alreadyReloaded = false;
-                    try { alreadyReloaded = sessionStorage.getItem('lumo_sw_killswitch_v2') === '1'; } catch (e) {}
-                    nukeStaleSws().then(function (killed) {
-                        if (killed > 0 && !alreadyReloaded) {
-                            try { sessionStorage.setItem('lumo_sw_killswitch_v2', '1'); } catch (e) {}
-                            // Cache-bust query string forces every intermediate
-                            // CDN / edge cache to fetch a fresh HTML shell.
-                            var loc = new URL(window.location.href);
-                            loc.searchParams.set('_sw', String(Date.now()));
-                            setTimeout(function () { window.location.replace(loc.toString()); }, 50);
-                        }
-                    });
-                } catch (e) {}
-
-                // bfcache restore recovery — the killer of "stale-page-only
-                // on my phone" bugs. When the user navigates back and the
-                // browser resurrects a page from bfcache, `pageshow` fires
-                // with `event.persisted === true` and none of our scripts
-                // have re-executed. Force a reload if the build has moved.
-                window.addEventListener('pageshow', function (ev) {
-                    if (!ev || !ev.persisted) return;
-                    // Compare stored buildTime with what the server currently
-                    // says. If different → hard-reload to pick up latest.
-                    try {
-                        var m = document.querySelector('meta[name="lumo-build"]');
-                        var htmlBuild = m ? (m.getAttribute('content') || '') : '';
-                        if (!htmlBuild || htmlBuild === '__LUMO_BUILD_TIME__') return;
-                        fetch('/api/meta?t=' + Date.now(), { cache: 'no-store', credentials: 'omit' })
-                            .then(function (r) { return r.ok ? r.json() : null; })
-                            .then(function (data) {
-                                if (data && data.buildTime && data.buildTime !== htmlBuild) {
-                                    var loc = new URL(window.location.href);
-                                    loc.searchParams.set('_bfcache', data.buildTime);
-                                    window.location.replace(loc.toString());
-                                }
-                            }).catch(function () {});
-                    } catch (e) {}
-                });
-
-                // ── Nuke-SW auto-registration ─────────────────────────────
-                // Register /sw-nuke-v3.js on every fresh HTML load. Because
-                // this is a NEW path browsers treat it as a first-time SW
-                // registration and download it — even for users pinned to a
-                // stale legacy SW. On activate the nuke SW clears all Cache
-                // Storage, unregisters itself, and posts a message to open
-                // clients. It never sets a fetch handler, so no intercepts.
-                // Guarded with a sessionStorage flag so we only run this
-                // once per tab session.
-                try {
-                    var nuked = false;
-                    try { nuked = sessionStorage.getItem('lumo_nuke_v3_done') === '1'; } catch (e) {}
-                    if (!nuked) {
-                        navigator.serviceWorker
-                            .register('/sw-nuke-v3.js', { scope: '/', updateViaCache: 'none' })
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        var stale = (regs || []).filter(function (r) {
+                            var w = r.active || r.waiting || r.installing;
+                            try { return !w || new URL(w.scriptURL).pathname !== '/push-sw.js'; } catch (e) { return true; }
+                        });
+                        if (!stale.length) return;
+                        return Promise.all(stale.map(function (r) { return r.unregister().catch(function () {}); }))
+                            .then(function () { return window.caches && caches.keys ? caches.keys() : []; })
+                            .then(function (keys) { return Promise.all((keys || []).map(function (k) { return caches.delete(k); })); })
                             .then(function () {
-                                try { sessionStorage.setItem('lumo_nuke_v3_done', '1'); } catch (e) {}
-                            })
-                            .catch(function () { /* not fatal */ });
-                    }
-                    // Listen for the nuke-complete message so we can force a
-                    // one-time reload once the SW confirms cache wipe.
-                    navigator.serviceWorker.addEventListener('message', function (ev) {
-                        if (ev && ev.data && ev.data.type === 'sw-reset-complete') {
-                            var reloaded = false;
-                            try { reloaded = sessionStorage.getItem('lumo_nuke_reload') === '1'; } catch (e) {}
-                            if (!reloaded) {
-                                try { sessionStorage.setItem('lumo_nuke_reload', '1'); } catch (e) {}
-                                setTimeout(function () { window.location.reload(); }, 100);
-                            }
-                        }
-                    });
+                                var done = false;
+                                try { done = sessionStorage.getItem('lumo_sw_cleanup') === '1'; sessionStorage.setItem('lumo_sw_cleanup', '1'); } catch (e) {}
+                                if (!done) window.location.reload();
+                            });
+                    }).catch(function () {});
                 } catch (e) {}
             })();
         </script>

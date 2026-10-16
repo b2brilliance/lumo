@@ -182,9 +182,6 @@ export default function ForYou() {
           <h1 className="font-display text-3xl sm:text-5xl font-black tracking-tighter mt-1">
             What do you need done?
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-            Pick a category — we'll walk you through the exact details so your pro shows up ready. Not sure? Let the assistant guide you.
-          </p>
 
           {/* Search + AI copilot CTA */}
           <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -193,7 +190,7 @@ export default function ForYou() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Describe it in your own words — e.g. 'notary at my house Sunday'"
+                placeholder="e.g. notary at my house Sunday"
                 className="pl-9 h-12 text-sm"
                 data-testid="fy-search"
               />

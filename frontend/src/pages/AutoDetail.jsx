@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { PriceDropBadge, WasPrice, PriceHistory, OwnerPriceEditor, useWatch, WatchButton } from "@/components/price/PriceBits";
 import { MapPin, Gauge, Fuel, Calendar, Settings2, Palette, MessageSquare, Mail, Phone, Trash2, Car } from "lucide-react";
 
 const fmtUsd = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n || 0);
@@ -19,6 +20,7 @@ export default function AutoDetail() {
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const watch = useWatch("auto");
 
   useEffect(() => {
     api.get(`/autos/${id}`).then(({ data }) => setListing(data)).catch(() => setListing(false));
@@ -78,7 +80,12 @@ export default function AutoDetail() {
             <div className="flex items-center gap-1 text-sm text-slate-600 mt-2"><MapPin className="w-4 h-4" />{listing.city}{listing.state ? `, ${listing.state}` : ""}</div>
           )}
 
-          <div className="mt-6 font-display text-4xl font-black">{fmtUsd(listing.price)}</div>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <span className="font-display text-4xl font-black">{fmtUsd(listing.price)}</span>
+            <WasPrice item={listing} />
+            <PriceDropBadge item={listing} />
+            {isOwner ? <OwnerPriceEditor item={listing} endpoint={`/autos/${listing.id}`} onSaved={(d) => setListing({ ...listing, ...d })} /> : <WatchButton watch={watch} id={listing.id} />}
+          </div>
 
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div className="border border-slate-200 p-3"><div className="flex items-center gap-1 text-slate-500 text-xs"><Calendar className="w-3 h-3" />Year</div><div className="font-display text-xl font-bold">{listing.year}</div></div>

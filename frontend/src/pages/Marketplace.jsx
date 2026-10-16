@@ -18,6 +18,7 @@ import { useLocale } from "@/lib/locale";
 import { computeStoreDeliveryQuote, milesBetween } from "@/lib/deliveryPricing";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapPin, Search, X, SlidersHorizontal } from "lucide-react";
+import { PriceDropBadge, WasPrice, OwnerPriceEditor, useWatch, WatchButton } from "@/components/price/PriceBits";
 
 // Default fallback fee when seller hasn't provided a pickup location yet.
 const FALLBACK_DELIVERY_FEE = 9.99;
@@ -27,6 +28,8 @@ export default function Marketplace() {
   const { country, taxLabel, computeBreakdown } = useLocale();
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   const [items, setItems] = useState([]);
+  const watch = useWatch("listing");
+  const focusId = new URLSearchParams(window.location.search).get("item");
   const [openCreate, setOpenCreate] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -263,7 +266,6 @@ export default function Marketplace() {
         image="https://images.pexels.com/photos/994523/pexels-photo-994523.jpeg?auto=compress&cs=tinysrgb&w=1600"
         overline="Community Market"
         title="From your neighbors."
-        subtitle="List anything. Bundled 10% deposit. Delivery wired in."
         action={user && user !== false ? (
           <Button onClick={() => setOpenCreate(true)} className="bg-white text-slate-900 hover:bg-slate-100" data-testid="marketplace-create">+ Create listing</Button>
         ) : null}
@@ -405,8 +407,10 @@ export default function Marketplace() {
         {filteredItems.map((it) => {
           const img = it.media_url ? (it.media_url.startsWith("http") ? it.media_url : `${BACKEND_URL}${it.media_url}`) : null;
           return (
-            <div key={it.id} className="bg-white flex flex-col" data-testid={`marketplace-item-${it.id}`}>
-              <div className="aspect-[4/3] bg-slate-100">
+            <div key={it.id} ref={it.id === focusId ? (el) => el?.scrollIntoView({ block: "center" }) : undefined} className={`bg-white flex flex-col ${it.id === focusId ? "ring-2 ring-slate-900 relative z-10" : ""}`} data-testid={`marketplace-item-${it.id}`}>
+              <div className="aspect-[4/3] bg-slate-100 relative">
+                <PriceDropBadge item={it} className="absolute bottom-2 left-2 z-10" />
+                {user && user.id !== it.seller_id && <WatchButton watch={watch} id={it.id} className="absolute top-2 right-2 z-10" />}
                 {img && (it.media_type?.startsWith("video")
                   ? <video src={img} className="w-full h-full object-cover" muted />
                   : <img src={img} alt="" className="w-full h-full object-cover" />)}
@@ -416,11 +420,14 @@ export default function Marketplace() {
                 <div className="font-display text-lg font-bold mt-1">{it.title}</div>
                 <div className="text-xs text-slate-500 mt-1 flex-1">{it.description}</div>
                 <div className="flex items-center justify-between mt-3">
-                  <div className="font-display text-2xl font-bold">${it.price.toFixed(2)}</div>
+                  <div className="flex items-baseline"><span className="font-display text-2xl font-bold">${it.price.toFixed(2)}</span><WasPrice item={it} /></div>
                   <Button size="sm" onClick={() => openBuy(it)} className="bg-teal-700 hover:bg-teal-800" data-testid={`marketplace-buy-${it.id}`}>Buy</Button>
                 </div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-2 flex justify-between">
                   <span>{it.seller_name}</span>
+                  {user && user.id === it.seller_id && (
+                    <OwnerPriceEditor item={it} endpoint={`/marketplace/listings/${it.id}`} onSaved={(d) => setItems((all) => all.map((x) => (x.id === d.id ? { ...x, ...d } : x)))} />
+                  )}
                   {it._distance != null && (
                     <span className="text-teal-700 flex items-center gap-0.5">
                       <MapPin className="w-2.5 h-2.5" /> {it._distance < 10 ? it._distance.toFixed(1) : Math.round(it._distance)} mi

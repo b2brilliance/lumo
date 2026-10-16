@@ -115,7 +115,7 @@ export default function Rentals() {
         image="https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=1600"
         overline="Rentals"
         title={activeCat ? activeCat.label : "Rent anything, anywhere."}
-        subtitle={activeCat ? activeCat.blurb : "Homes, cars, tools, gear, venues — hourly / daily / weekly. Book in a tap."}
+        subtitle={activeCat ? activeCat.blurb : "Homes, cars, tools, gear, venues — hourly, daily, weekly."}
         action={<Link to="/rentals/host"><Button className="bg-white text-slate-900 hover:bg-slate-100 whitespace-nowrap" data-testid="rentals-host-cta"><Sparkles className="w-4 h-4 mr-1.5" />List a rental</Button></Link>}
       />
       <div className="px-4 sm:px-6 pb-10">

@@ -26,6 +26,7 @@ import re
 
 from demo_filter import hide_demo, is_hidden
 from real_estate_plus import geocode_listing, notify_matching_searches
+from price_watch import init_history, record_price_change
 
 try:
     import resend  # type: ignore
@@ -209,6 +210,7 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         if doc.get("country"):
             doc["country"] = doc["country"].strip().upper() if len(doc["country"].strip()) == 2 else doc["country"].strip()
         await geocode_listing(doc)
+        init_history(doc)
         await db.real_estate.insert_one(doc)
         asyncio.create_task(notify_matching_searches(db, doc, send_email=_send_resend_email))
         return _clean(doc)
@@ -235,6 +237,8 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
             upd = {k: checked[k] for k in upd}
         if status:
             upd["status"] = status
+        if "price" in upd:
+            await record_price_change(db, "real_estate", d, upd["price"])
         if any(k in upd for k in ("address", "city", "country")) and "lat" not in upd:
             probe = {**d, **upd, "lat": None, "lng": None}
             await geocode_listing(probe)
@@ -360,6 +364,7 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
             "is_demo": False,
             "created_at": _now_iso(),
         })
+        init_history(doc)
         await db.autos.insert_one(doc)
         return _clean(doc)
 

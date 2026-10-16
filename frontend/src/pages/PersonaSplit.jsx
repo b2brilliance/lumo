@@ -80,9 +80,6 @@ export default function PersonaSplit() {
           <h1 className="font-display text-4xl sm:text-6xl font-black tracking-tighter mt-2 leading-[0.95]">
             What brings you<br className="hidden sm:block" /> here today?
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 mt-3 max-w-xl">
-            Pick a lane. Each one is its own full app — tuned for exactly what you came to do.
-          </p>
         </div>
 
         {/* 4 tiles — 1col mobile, 2col desktop */}

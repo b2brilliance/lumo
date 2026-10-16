@@ -55,6 +55,7 @@ import Wallet from "@/pages/Wallet";
 import Settings from "@/pages/Settings";
 import OrderFinalPay from "@/pages/OrderFinalPay";
 import ChatsInbox from "@/pages/ChatsInbox";
+import Orders from "@/pages/Orders";
 import CredentialsPage from "@/pages/CredentialsPage";
 import Cart from "@/pages/Cart";
 import Rentals from "@/pages/Rentals";
@@ -184,9 +185,9 @@ function App() {
             <Route path="/rentals/host" element={<Protected><RentalHost /></Protected>} />
             <Route path="/rentals/inbox" element={<Protected><RentalInbox /></Protected>} />
             <Route path="/rentals/:id" element={<RentalDetail />} />
-            <Route path="/autos" element={<Navigate to="/services" replace />} />
-            <Route path="/autos/list" element={<Navigate to="/services" replace />} />
-            <Route path="/autos/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/autos" element={<Autos />} />
+            <Route path="/autos/list" element={<Protected><AutoList /></Protected>} />
+            <Route path="/autos/:id" element={<AutoDetail />} />
             <Route path="/real-estate" element={<RealEstate />} />
             <Route path="/real-estate/list" element={<Protected><RealEstateList /></Protected>} />
             <Route path="/real-estate/saved" element={<RealEstateSaved />} />
@@ -231,6 +232,8 @@ function App() {
 
             <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />
+            <Route path="/messages" element={<Protected><ChatsInbox /></Protected>} />
+            <Route path="/orders" element={<Protected><Orders /></Protected>} />
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
             <Route path="/cart" element={<Protected roles={["customer"]}><Cart /></Protected>} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />

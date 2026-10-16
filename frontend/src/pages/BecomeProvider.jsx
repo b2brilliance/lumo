@@ -48,7 +48,7 @@ export default function BecomeProvider() {
             Earn more. Keep more. Work on your terms.
           </h1>
           <p className="text-lg text-slate-600 mt-6 max-w-2xl leading-relaxed">
-            Lumo connects you with paying customers in your area within minutes. Keep <span className="font-bold text-slate-900">90%</span> of every dollar — half the commission of Uber, DoorDash, or TaskRabbit. Same-day payouts. 27 job categories. No license required for most of them.
+            Keep <span className="font-bold text-slate-900">90%</span> of every dollar. Same-day payouts. 27 job categories.
           </p>
           <div className="mt-8 flex items-center gap-3 flex-wrap">
             <Link to="/register?role=provider" className="inline-flex items-center gap-2 bg-teal-700 text-white px-6 py-3 font-mono uppercase tracking-wider text-sm hover:bg-teal-800" data-testid="become-provider-cta">

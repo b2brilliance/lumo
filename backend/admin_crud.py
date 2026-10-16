@@ -326,6 +326,11 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if not update:
             raise HTTPException(400, f"No editable fields in payload. Allowed: {sorted(spec['fields'])}")
         update["updated_at"] = datetime.now(timezone.utc).isoformat()
+        if type in ("real_estate", "listing", "auto") and update.get("price") is not None:
+            from price_watch import record_price_change
+            existing = await coll.find_one({"id": item_id})
+            if existing:
+                await record_price_change(db, type, existing, update["price"])
         await coll.update_one({"id": item_id}, {"$set": update})
         await _after_write(db, type, item_id)
         fresh = await coll.find_one({"id": item_id}, {"_id": 0})

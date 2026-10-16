@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Home, BedDouble, Bath, Maximize, MapPin, Heart, Users } from "lucide-react";
 import { fmtPrice, KIND_LABEL, UNIT_LABEL } from "./reUtils";
+import { PriceDropBadge, WasPrice } from "@/components/price/PriceBits";
 
 export default function ReCard({ r, active, favorited, onFavorite, onHover, compact }) {
   const photo = (r.photos && r.photos[0]) || null;
@@ -22,11 +23,13 @@ export default function ReCard({ r, active, favorited, onFavorite, onHover, comp
           <div className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-widest bg-white/95 px-2 py-1 border border-slate-200">
             {KIND_LABEL[r.listing_kind] || "Listing"}
           </div>
+          <PriceDropBadge item={r} className="absolute bottom-3 left-3" />
         </div>
         <div className="p-4">
           <div className="flex items-baseline gap-1">
             <span className="font-display text-xl font-bold">{fmtPrice(r.price, r.currency)}</span>
             <span className="text-xs font-mono text-slate-500">{UNIT_LABEL[r.price_unit] || ""}</span>
+            <WasPrice item={r} />
           </div>
           <div className="flex items-center gap-3 text-xs font-mono text-slate-600 mt-1">
             {r.bedrooms != null && <span className="inline-flex items-center gap-1"><BedDouble className="w-3 h-3" />{r.bedrooms} bd</span>}

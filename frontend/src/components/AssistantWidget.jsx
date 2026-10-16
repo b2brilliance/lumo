@@ -1,107 +1,63 @@
-import React, { useEffect, useRef, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import React, { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Sparkles, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { Sparkles, X, RotateCcw, Send } from "lucide-react";
+import GuidePanel from "@/components/guide/GuidePanel";
+import useExitIntent from "@/components/guide/useExitIntent";
 
-const INITIAL_PROMPT = "Hi! I'm Lumi — your Lumo assistant. Ask me anything about posting a request, getting quotes, payment terms, deliveries, or how to use any part of the app.";
+const CHOICE_KEY = "lumo_guide_choice";
+const EXIT_KEY = "lumo_guide_exit_shown";
+const HIDDEN_ON = ["/admin", "/reset", "/signin", "/login", "/register", "/checkout"];
+
+function GuidePrompt({ variant, onYes, onNo }) {
+  return (
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[1200] w-[320px] max-w-[calc(100vw-2rem)] bg-white border border-slate-900 shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-300" data-testid="guide-prompt" data-variant={variant}>
+      <button onClick={onNo} className="absolute top-2 right-2 text-slate-400 hover:text-slate-900" aria-label="Close" data-testid="guide-prompt-close"><X className="w-4 h-4" /></button>
+      <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-600" /><span className="font-display font-bold">{variant === "exit" ? "Before you go…" : "Want a guide?"}</span></div>
+      <p className="text-sm text-slate-600 mt-1">{variant === "exit" ? "Tell Lumi what you were looking for." : "Lumi can point you to the right place."}</p>
+      <div className="flex gap-2 mt-3">
+        <button onClick={onYes} className="flex-1 bg-slate-900 text-white text-sm font-medium py-2 hover:bg-slate-800 transition-colors" data-testid="guide-prompt-yes">Yes, guide me</button>
+        <button onClick={onNo} className="flex-1 border border-slate-200 text-sm py-2 hover:border-slate-900 transition-colors" data-testid="guide-prompt-no">No thanks</button>
+      </div>
+    </div>
+  );
+}
 
 export default function AssistantWidget() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([{ role: "assistant", content: INITIAL_PROMPT }]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const scrollRef = useRef(null);
+  const [prompt, setPrompt] = useState(null);
+  const hidden = HIDDEN_ON.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
-    if (!user || user === false) return;
-    api.get("/assistant/history").then(({ data }) => {
-      if (data.messages && data.messages.length > 0) {
-        setMessages([{ role: "assistant", content: INITIAL_PROMPT }, ...data.messages]);
-      }
-    }).catch(() => {});
-  }, [user]);
+    if (loading || hidden || localStorage.getItem(CHOICE_KEY)) return undefined;
+    const t = setTimeout(() => setPrompt((p) => p || "first"), 2500);
+    return () => clearTimeout(t);
+  }, [loading, hidden]);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, open]);
+  const onExit = useCallback(() => {
+    if (sessionStorage.getItem(EXIT_KEY)) return;
+    sessionStorage.setItem(EXIT_KEY, "1");
+    setPrompt("exit");
+  }, []);
+  useExitIntent(onExit, { enabled: !hidden && !open && !prompt });
 
-  if (!user || user === false) return null;
+  if (hidden) return null;
 
-  const send = async (e) => {
-    e?.preventDefault();
-    if (!input.trim() || busy) return;
-    const userMsg = { role: "user", content: input };
-    setMessages((m) => [...m, userMsg]);
-    setInput("");
-    setBusy(true);
-    try {
-      const { data } = await api.post("/assistant/chat", { message: userMsg.content });
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
-    } catch (e) {
-      setMessages((m) => [...m, { role: "assistant", content: `Sorry — ${formatApiError(e)}` }]);
-    } finally { setBusy(false); }
-  };
+  const yes = () => { localStorage.setItem(CHOICE_KEY, "yes"); setPrompt(null); setOpen(true); };
+  const no = () => { if (!localStorage.getItem(CHOICE_KEY)) localStorage.setItem(CHOICE_KEY, "no"); setPrompt(null); };
 
-  const clear = async () => {
-    try { await api.post("/assistant/clear"); } catch {}
-    setMessages([{ role: "assistant", content: INITIAL_PROMPT }]);
-  };
-
+  if (open) return <GuidePanel user={user || null} path={pathname} onClose={() => setOpen(false)} />;
+  if (prompt) return <GuidePrompt variant={prompt} onYes={yes} onNo={no} />;
   return (
-    <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-40 h-14 px-5 bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg"
-          data-testid="assistant-open"
-        >
-          <Sparkles className="w-4 h-4 text-teal-300" />
-          <span className="font-display font-bold">Ask Lumi</span>
-        </button>
-      )}
-      {open && (
-        <div className="fixed bottom-6 right-6 z-40 w-[380px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-3rem)] bg-white border border-slate-200 shadow-2xl flex flex-col" data-testid="assistant-panel">
-          <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2 bg-slate-900 text-white">
-            <Sparkles className="w-4 h-4 text-teal-300" />
-            <div className="font-display font-bold">Lumi · AI assistant</div>
-            <button onClick={clear} className="ml-auto text-slate-400 hover:text-white" title="Clear conversation" data-testid="assistant-clear">
-              <RotateCcw className="w-4 h-4" />
-            </button>
-            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white" data-testid="assistant-close">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin" data-testid="assistant-messages">
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] px-3 py-2 text-sm leading-snug whitespace-pre-wrap ${m.role === "user" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-900"}`}>
-                  {m.content}
-                </div>
-              </div>
-            ))}
-            {busy && (
-              <div className="flex justify-start">
-                <div className="bg-slate-100 text-slate-500 px-3 py-2 text-sm font-mono">Lumi is typing…</div>
-              </div>
-            )}
-          </div>
-          <form onSubmit={send} className="border-t border-slate-200 p-3 flex gap-2" data-testid="assistant-form">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about Lumo…"
-              disabled={busy}
-              data-testid="assistant-input"
-            />
-            <Button type="submit" disabled={busy || !input.trim()} className="bg-teal-700 hover:bg-teal-800" data-testid="assistant-send">
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
-        </div>
-      )}
-    </>
+    <button
+      onClick={() => setOpen(true)}
+      className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[1200] h-12 md:h-14 px-4 md:px-5 bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg"
+      data-testid="assistant-open"
+    >
+      <Sparkles className="w-4 h-4 text-teal-300" />
+      <span className="font-display font-bold">Ask Lumi</span>
+    </button>
   );
 }

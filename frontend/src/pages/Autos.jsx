@@ -7,13 +7,14 @@ import AffiliateBlock from "@/components/AffiliateBlock";
 import PageHero from "@/components/PageHero";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Car, Gauge, Fuel, MapPin } from "lucide-react";
+import { PriceDropBadge, WasPrice, useWatch, WatchButton } from "@/components/price/PriceBits";
 
 function PriceTag({ price }) {
   const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   return <div className="font-display text-2xl font-bold">{fmt.format(price)}</div>;
 }
 
-function ListingCard({ r }) {
+function ListingCard({ r, watch }) {
   const photo = (r.photos && r.photos[0]) || null;
   return (
     <Link to={`/autos/${r.id}`} className="block border border-slate-200 hover:border-slate-900 transition-colors group" data-testid={`auto-card-${r.id}`}>
@@ -26,6 +27,8 @@ function ListingCard({ r }) {
         <div className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-widest bg-white/90 px-2 py-1 border border-slate-200">
           {r.year} {r.condition || ""}
         </div>
+        <PriceDropBadge item={r} className="absolute bottom-3 left-3" />
+        {watch && <WatchButton watch={watch} id={r.id} className="absolute top-3 right-3" />}
       </div>
       <div className="p-4">
         <div className="font-display font-bold text-base truncate group-hover:underline">{r.title}</div>
@@ -35,7 +38,7 @@ function ListingCard({ r }) {
           </div>
         )}
         <div className="flex items-center justify-between mt-3">
-          <PriceTag price={r.price} />
+          <div className="flex items-baseline"><PriceTag price={r.price} /><WasPrice item={r} /></div>
           <div className="flex items-center gap-3 text-xs font-mono text-slate-500">
             {r.mileage != null && <span className="inline-flex items-center gap-1"><Gauge className="w-3 h-3" />{Math.round(r.mileage).toLocaleString()}</span>}
             {r.fuel && <span className="inline-flex items-center gap-1"><Fuel className="w-3 h-3" />{r.fuel === "Electric" ? "EV" : r.fuel.slice(0, 3)}</span>}
@@ -49,6 +52,7 @@ function ListingCard({ r }) {
 export default function Autos() {
   const [params, setParams] = useSearchParams();
   const [items, setItems] = useState([]);
+  const watch = useWatch("auto");
   const [constants, setConstants] = useState({ auto_makes: [], auto_body_styles: [], auto_transmissions: [], auto_fuels: [], auto_conditions: [] });
   const [loading, setLoading] = useState(true);
 
@@ -94,7 +98,7 @@ export default function Autos() {
         image="https://images.pexels.com/photos/3849554/pexels-photo-3849554.jpeg?auto=compress&cs=tinysrgb&w=1600"
         overline="Lumo · Marketplace"
         title="Auto Sales"
-        subtitle="Cars, trucks, SUVs and EVs — buy direct from sellers. Message owners privately through Lumo."
+        subtitle="Cars, trucks, SUVs and EVs from private sellers."
         action={<Link to="/autos/list"><Button className="bg-white text-slate-900 hover:bg-slate-100" data-testid="auto-list-btn">Sell my car</Button></Link>}
       />
       <div className="px-4 sm:px-6 pb-8">
@@ -138,7 +142,7 @@ export default function Autos() {
         <div className="py-24 text-center text-slate-500 font-mono text-sm">No cars match those filters.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="auto-grid">
-          {items.map((r) => <ListingCard key={r.id} r={r} />)}
+          {items.map((r) => <ListingCard key={r.id} r={r} watch={watch} />)}
         </div>
       )}
       <div className="mt-12 -mx-4 sm:-mx-6">

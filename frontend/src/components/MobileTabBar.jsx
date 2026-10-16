@@ -1,62 +1,60 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Search, Briefcase, ShoppingBag, User, Store, UtensilsCrossed, ShieldCheck } from "lucide-react";
+import { Home, ClipboardList, MessageCircle, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 
-/* Uber-style persistent bottom bar on mobile — always visible so the four
- * primary actions are one tap away. Hidden on desktop (md+) where the
- * top NavBar covers everything.                                          */
-const TABS = [
-  { key: "search",     label: "Search",    to: "/",           Icon: Search },
-  { key: "jobs",       label: "Jobs",      to: "/map",        Icon: Briefcase },
-  { key: "market",     label: "Market",    to: "/stores",     Icon: ShoppingBag },
-  { key: "account",    label: "Account",   to: "/customer",   Icon: User },
-];
+const HOME_FOR_ROLE = { provider: "/provider", admin: "/admin", retailer: "/retailer", restaurant: "/restaurant" };
 
-// Role-aware account tab: restricted roles (retailer/restaurant/admin) get a
-// direct link + label to their own hub instead of the generic Customer icon.
-const ROLE_META = {
-  provider:   { label: "Provider",   Icon: Briefcase,   to: "/provider" },
-  retailer:   { label: "Retailer",   Icon: Store,       to: "/retailer" },
-  restaurant: { label: "Restaurant", Icon: UtensilsCrossed, to: "/restaurant" },
-  admin:      { label: "Admin",      Icon: ShieldCheck, to: "/admin" },
-};
+function useUnreadMessages(user, pathname) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!user) { setN(0); return undefined; }
+    let alive = true;
+    const load = () => api.get("/me/badges").then(({ data }) => alive && setN(data.messages || 0)).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [user, pathname]);
+  return n;
+}
 
 export default function MobileTabBar() {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  const roleMeta = user && ROLE_META[user.role];
-  const meTarget = roleMeta ? roleMeta.to : (user ? "/customer" : "/signin");
+  const unread = useUnreadMessages(user, pathname);
+  const home = (user && HOME_FOR_ROLE[user.role]) || "/";
+  const gate = (to) => (user ? to : "/signin");
+
+  const tabs = [
+    { key: "home", label: "Home", to: home, Icon: Home, active: pathname === "/" || pathname === home },
+    { key: "orders", label: "Orders", to: gate("/orders"), Icon: ClipboardList, active: pathname.startsWith("/orders") },
+    { key: "messages", label: "Messages", to: gate("/messages"), Icon: MessageCircle, active: ["/messages", "/chats", "/inquiries"].some((p) => pathname.startsWith(p)), badge: unread },
+    { key: "profile", label: "Profile", to: gate("/settings"), Icon: User, active: pathname.startsWith("/settings") },
+  ];
 
   return (
-    <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom)]"
-      data-testid="mobile-tab-bar"
-    >
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white/95 backdrop-blur border-t border-slate-200 pb-[env(safe-area-inset-bottom)]" data-testid="mobile-tab-bar">
       <div className="grid grid-cols-4">
-        {TABS.map((t) => {
-          const isAccount = t.key === "account";
-          const to = isAccount ? meTarget : t.to;
-          const Icon = isAccount && roleMeta ? roleMeta.Icon : t.Icon;
-          const label = isAccount && roleMeta ? roleMeta.label : t.label;
-          const isActive =
-            (t.to === "/" && pathname === "/") ||
-            (t.to !== "/" && pathname.startsWith(t.to)) ||
-            (isAccount && pathname.startsWith(meTarget));
-          return (
-            <Link
-              key={t.key}
-              to={to}
-              className={`flex flex-col items-center justify-center py-2 text-[10px] font-mono uppercase tracking-wider ${
-                isActive ? "text-teal-700" : "text-slate-500"
-              } active:bg-slate-100`}
-              data-testid={`tabbar-${t.key}`}
-            >
-              <Icon className={`w-5 h-5 ${isActive ? "text-teal-700" : "text-slate-500"}`} />
-              <span className="mt-0.5">{label}</span>
-            </Link>
-          );
-        })}
+        {tabs.map(({ key, label, to, Icon, active, badge }) => (
+          <Link
+            key={key}
+            to={to}
+            className={`relative flex flex-col items-center justify-center py-2 text-[10px] font-mono uppercase tracking-wider transition-colors active:bg-slate-100 ${active ? "text-slate-900" : "text-slate-500"}`}
+            data-testid={`tabbar-${key}`}
+          >
+            <span className="relative">
+              <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
+              {badge > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center" data-testid="tabbar-messages-badge">
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
+            </span>
+            <span className="mt-0.5">{label}</span>
+            {active && <span className="absolute top-0 inset-x-6 h-0.5 bg-slate-900" />}
+          </Link>
+        ))}
       </div>
     </nav>
   );
