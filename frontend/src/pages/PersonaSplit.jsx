@@ -99,7 +99,7 @@ export default function PersonaSplit() {
                 >
                   <div className="flex items-start justify-between">
                     <Icon className="w-8 h-8 sm:w-10 sm:h-10 opacity-90" strokeWidth={1.5} />
-                    <div className="opacity-60 group-hover:opacity-100 transition-opacity text-[10px] font-mono uppercase tracking-widest">
+                    <div className="opacity-80 group-hover:opacity-100 transition-opacity text-[11px] font-mono uppercase tracking-widest text-white">
                       Enter →
                     </div>
                   </div>

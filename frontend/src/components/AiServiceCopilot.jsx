@@ -55,7 +55,7 @@ export default function AiServiceCopilot({ onClose, onPick }) {
       const { data } = await api.post("/service-copilot", {
         session_id: sessionId,
         message,
-        history: messages.filter((m) => m.role === "user"),
+        history: messages,
       });
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "" }]);
       if (data.pick) setPick({ ...data.pick, prefill: message });

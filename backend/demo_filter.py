@@ -42,3 +42,12 @@ async def hide_demo(db, query: dict, owner_field: Optional[str] = None, viewer: 
     if not clauses:
         return query
     return {**query, "$and": query.get("$and", []) + clauses}
+
+
+async def is_hidden(db, doc: dict, owner_field: str, viewer: Optional[dict]) -> bool:
+    """True when a single demo / test-owned doc must 404 for this viewer."""
+    if bypass(viewer, doc.get(owner_field)):
+        return False
+    if any(doc.get(k) for k in ("is_demo", "is_global_demo", "is_career_demo", "seeded")):
+        return True
+    return doc.get(owner_field) in await test_owner_ids(db)

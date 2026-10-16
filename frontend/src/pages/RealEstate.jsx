@@ -136,7 +136,16 @@ export default function RealEstate() {
       {loading ? (
         <div className="py-24 text-center text-slate-500 font-mono text-sm">Loading…</div>
       ) : items.length === 0 ? (
-        <div className="py-24 text-center text-slate-500 font-mono text-sm">No listings match those filters.</div>
+        params.toString() ? (
+          <div className="py-24 text-center text-slate-500 font-mono text-sm" data-testid="re-empty-filtered">No listings match those filters.</div>
+        ) : (
+          <div className="py-20 text-center border border-dashed border-slate-300" data-testid="re-empty">
+            <Home className="w-10 h-10 mx-auto opacity-40" />
+            <div className="font-display text-2xl font-bold mt-4">No listings yet — be the first.</div>
+            <p className="text-sm text-slate-500 mt-2">List a home, condo, land or rental and reach buyers worldwide.</p>
+            <Link to="/real-estate/list"><Button className="mt-6" data-testid="re-empty-list-btn">List a property</Button></Link>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="re-grid">
           {items.map((r) => <ListingCard key={r.id} r={r} />)}

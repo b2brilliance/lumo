@@ -559,7 +559,7 @@ async def get_optional_user(creds: Optional[HTTPAuthorizationCredentials] = Depe
     except HTTPException:
         return None
 
-from demo_filter import hide_demo  # noqa: E402
+from demo_filter import hide_demo, is_hidden  # noqa: E402
 
 def require_role(*roles: str):
     async def checker(user: dict = Depends(get_current_user)) -> dict:
@@ -1427,9 +1427,9 @@ async def list_listings(seller_id: Optional[str] = None, viewer: Optional[dict] 
     return [clean_doc(d) for d in docs]
 
 @api.get("/marketplace/listings/{listing_id}")
-async def get_listing(listing_id: str):
+async def get_listing(listing_id: str, viewer: Optional[dict] = Depends(get_optional_user)):
     d = await db.listings.find_one({"id": listing_id})
-    if not d:
+    if not d or await is_hidden(db, d, "seller_id", viewer):
         raise HTTPException(404, "Listing not found")
     return clean_doc(d)
 
@@ -2267,9 +2267,9 @@ async def list_rentals(
     return out
 
 @api.get("/rentals/{rental_id}")
-async def get_rental(rental_id: str):
+async def get_rental(rental_id: str, viewer: Optional[dict] = Depends(get_optional_user)):
     r = await db.rentals.find_one({"id": rental_id})
-    if not r:
+    if not r or await is_hidden(db, r, "owner_id", viewer):
         raise HTTPException(404, "Rental not found")
     return clean_doc(r)
 
@@ -4933,6 +4933,7 @@ Rules:
 - Never ask for phone, email or off-platform contact.
 - If the user asks something unrelated to picking a service, politely redirect.
 - Only emit PICK: once you're reasonably confident. Otherwise ask the next clarifying question.
+- Never ask a question in the same reply that contains PICK:. A PICK reply is a short confirmation only.
 """
 
 @api.post("/service-copilot")
@@ -4957,15 +4958,16 @@ async def service_copilot(body: dict):
         session_id=session_id,
         system_message=SERVICE_COPILOT_SYSTEM_PROMPT,
     ).with_model("anthropic", "claude-sonnet-4-6")
-    # Replay recent turns (user side only — the LLM instance remembers its own replies).
-    for m in history[-10:]:
-        if m.get("role") == "user" and isinstance(m.get("content"), str):
-            try:
-                await chat.send_message(UserMessage(text=m["content"][:1500]))
-            except Exception:
-                break
+    turns = [
+        f"{'User' if m.get('role') == 'user' else 'Lumi'}: {m['content'][:1500]}"
+        for m in history[-10:]
+        if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)
+    ]
+    prompt = text if not turns else (
+        "Conversation so far:\n" + "\n".join(turns) + f"\n\nUser's new message: {text}"
+    )
     try:
-        reply = await chat.send_message(UserMessage(text=text))
+        reply = await chat.send_message(UserMessage(text=prompt))
     except Exception as e:
         logger.error(f"Service copilot error: {e}")
         raise HTTPException(502, "Copilot temporarily unavailable")

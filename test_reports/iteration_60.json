@@ -1,0 +1,37 @@
+{
+  "summary": "Tested demo/test-data hiding, admin/owner bypass, seeding disabled, service copilot (backend: 29/29 pytest pass) and the persona home, /for-you + AI copilot, empty states on /real-estate, /rentals and /marketplace, admin view, role redirects and legacy aliases (frontend: all flows pass). No critical issues. Found a few minor leaks and UX items.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/real-estate/{id}, GET /api/marketplace/listings/{id} (and probably /autos/{id}, /rentals/{id})", "issue": "The detail endpoints do not call hide_demo. An anonymous user who has a demo row's id gets 200 with the full row, so demo data is only hidden from the lists, not from direct links."},
+      {"endpoint": "POST /api/service-copilot", "issue": "On every request the code builds a new LlmChat and replays each earlier user message through send_message. That is one LLM call per past user turn (up to 10), so latency and cost grow with every turn. The LLM can also put PICK in the same reply as a follow-up question (seen: 'are you looking for someone on-site...?' plus pick home/handyman)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global footer (public)", "issues": ["The footer tagline shows the leftover test value 'E2E iter20 tagline ✓' from the DB site settings. Test data is visible to every visitor."]},
+      {"screen": "/real-estate anonymous empty state", "issues": ["It says 'No listings match those filters.' when no filters are set. Show a 'No listings yet, be the first to list' message with a call to action, as /marketplace does."]},
+      {"screen": "PersonaSplit tiles", "issues": ["The small 'ENTER →' labels are very faint on the dark tiles (Real Estate, Market). The overline text is readable."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter60_demo_hide_persona.py", "/app/test_reports/pytest/pytest_iter60.xml"],
+  "action_items": [
+    "Apply hide_demo (with admin/owner bypass) to the detail endpoints for real-estate, autos, rentals and marketplace listings, or return 404 for demo rows to non-admins",
+    "Reset the footer tagline in site settings; it currently reads 'E2E iter20 tagline ✓'",
+    "Change the /real-estate empty-state text when no filters are set",
+    "Optional: stop replaying the history as separate LLM calls in /api/service-copilot. Pass the history as context in one message, or reuse a chat per session_id"
+  ],
+  "critical_code_review_comments": [
+    "demo_filter.test_owner_ids uses a 60s module-level cache. If an existing user is renamed to or from a test email, there is up to 60s of stale visibility. Acceptable.",
+    "server.py is 7663 lines; it should be split into modules.",
+    "In list_jobs the owner bypass uses customer_id or provider_id. This is correct, because bypass requires owner_value == viewer.id."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter60_demo_hide_persona.py"],
+  "success_rate": {"backend": "100% (29/29)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "A fresh user qa_<random>@gmail.com was registered. Its test real-estate listing was created and then deleted. The user account remains.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Anonymous counts on all public listing endpoints are 0. Admin counts: real-estate 21, autos 24, rentals 23, listings 16, map/jobs 72. customer@lumo.test owns all demo RE and listings and has 78 jobs. Anonymous /api/jobs?status=open returns 44 rows: aggregator jobs plus 1 real admin-posted job ('Haircut like reference photo'). Backend restart re-seeded nothing (DB counts unchanged). The UI tests injected lumo_token into localStorage to avoid the login rate limit."
+}

@@ -22,7 +22,7 @@ from typing import List, Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, EmailStr
 
-from demo_filter import hide_demo
+from demo_filter import hide_demo, is_hidden
 
 try:
     import resend  # type: ignore
@@ -258,9 +258,9 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         return [_clean(d) for d in docs]
 
     @router.get("/real-estate/{listing_id}")
-    async def get_real_estate(listing_id: str):
+    async def get_real_estate(listing_id: str, viewer: Optional[dict] = Depends(get_optional_user)):
         d = await db.real_estate.find_one({"id": listing_id})
-        if not d:
+        if not d or await is_hidden(db, d, "owner_id", viewer):
             raise HTTPException(404, "Listing not found")
         d = _clean(d)
         # Mask seller contact for browse
@@ -368,9 +368,9 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         return {"makes": AUTO_MAKES}
 
     @router.get("/autos/{listing_id}")
-    async def get_auto(listing_id: str):
+    async def get_auto(listing_id: str, viewer: Optional[dict] = Depends(get_optional_user)):
         d = await db.autos.find_one({"id": listing_id})
-        if not d:
+        if not d or await is_hidden(db, d, "owner_id", viewer):
             raise HTTPException(404, "Listing not found")
         d = _clean(d)
         d["seller_email_masked"] = _masked_email(d.get("contact_email") or d.get("owner_email"))
