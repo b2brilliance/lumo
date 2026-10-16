@@ -166,7 +166,9 @@ export default function LandingPage({ pageType }) {
             <h3 className="font-display text-2xl font-bold tracking-tight mt-2">A marketplace, not a middleman.</h3>
             <div className="grid grid-cols-2 gap-4 mt-5">
               <Stat label="Platform fee" value="10%" sub="industry-low" />
-              <Stat label="Worker keeps" value="90%" sub="every job" />
+              {isCustomer
+                ? <Stat label="Escrow" value="Safe" sub="refund if unmet" />
+                : <Stat label="Worker keeps" value="90%" sub="every job" />}
               <Stat label="Cities" value="500+" sub="and growing" />
               <Stat label="Response time" value="< 5m" sub="median" />
             </div>

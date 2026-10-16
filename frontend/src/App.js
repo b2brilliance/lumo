@@ -22,7 +22,8 @@ import InstallPrompt from "@/components/InstallPrompt";
 import AccessibilityApplier from "@/components/AccessibilityApplier";
 import { Toaster } from "@/components/ui/sonner";
 
-import Landing from "@/pages/Landing";
+import PersonaSplit from "@/pages/PersonaSplit";
+import ForYou from "@/pages/ForYou";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import CustomerHub from "@/pages/CustomerHub";
@@ -126,7 +127,7 @@ function RoleAwareLanding() {
   if (user && user !== false && user.role !== "customer") {
     return <Navigate to={homeFor(user)} replace />;
   }
-  return <Landing />;
+  return <PersonaSplit />;
 }
 
 function App() {
@@ -159,7 +160,11 @@ function App() {
 
             {/* /customer → redirect to homepage. Customers now start on the
                 service grid (no separate hub page). */}
-            <Route path="/customer" element={<Navigate to="/" replace />} />
+            <Route path="/customer" element={<Navigate to="/for-you" replace />} />
+            <Route path="/for-you" element={<ForYou />} />
+            <Route path="/for-work" element={<Navigate to="/become-a-provider" replace />} />
+            <Route path="/market" element={<Navigate to="/marketplace" replace />} />
+            <Route path="/estate" element={<Navigate to="/real-estate" replace />} />
             <Route path="/insurance" element={<Insurance />} />
             <Route path="/training" element={<Training />} />
             <Route path="/services" element={<Services />} />
@@ -174,16 +179,16 @@ function App() {
             <Route path="/restaurants" element={<Navigate to="/services" replace />} />
             <Route path="/restaurants/:id" element={<Navigate to="/services" replace />} />
             <Route path="/marketplaces" element={<Navigate to="/marketplace" replace />} />
-            <Route path="/rentals" element={<Navigate to="/services" replace />} />
-            <Route path="/rentals/host" element={<Navigate to="/services" replace />} />
-            <Route path="/rentals/inbox" element={<Navigate to="/services" replace />} />
-            <Route path="/rentals/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/rentals" element={<Rentals />} />
+            <Route path="/rentals/host" element={<Protected><RentalHost /></Protected>} />
+            <Route path="/rentals/inbox" element={<Protected><RentalInbox /></Protected>} />
+            <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/autos" element={<Navigate to="/services" replace />} />
             <Route path="/autos/list" element={<Navigate to="/services" replace />} />
             <Route path="/autos/:id" element={<Navigate to="/services" replace />} />
-            <Route path="/real-estate" element={<Navigate to="/services" replace />} />
-            <Route path="/real-estate/list" element={<Navigate to="/services" replace />} />
-            <Route path="/real-estate/:id" element={<Navigate to="/services" replace />} />
+            <Route path="/real-estate" element={<RealEstate />} />
+            <Route path="/real-estate/list" element={<Protected><RealEstateList /></Protected>} />
+            <Route path="/real-estate/:id" element={<RealEstateDetail />} />
 
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/marketplace/new" element={<Marketplace />} />

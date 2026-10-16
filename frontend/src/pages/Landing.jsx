@@ -56,7 +56,7 @@ export default function Landing() {
     <div className="bg-white" data-testid="page-landing">
       <Helmet>
         <title>Lumo — Real help. Real people. Right now.</title>
-        <meta name="description" content="Lumo is the on-demand marketplace for real-world help. Delivery, cleaning, moving, mechanics, tutors, pet care and 30+ more services from vetted local pros. Providers keep 90%." />
+        <meta name="description" content="Lumo is the on-demand marketplace for real-world help. Delivery, cleaning, moving, mechanics, tutors, pet care and 30+ more services from vetted local pros." />
       </Helmet>
 
       {/* ═════════════ HERO + SERVICES (unified) ══════════════════════ */}
@@ -209,9 +209,9 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-20 sm:py-28 grid lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="overline text-[#276EF1] mb-3">Earn on Lumo</div>
-            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">Keep 90%.<br/>Get paid in 24 hours.</h2>
+            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">Work on your<br/>own schedule.</h2>
             <p className="mt-5 text-lg text-white/80 leading-relaxed max-w-xl">
-              We take 10% flat. No lead fees, no boost fees, no monthly minimum. Same-day payouts via Stripe. Pick the jobs you want; skip the ones you don&apos;t.
+              Same-day payouts via Stripe. No lead fees, no boost fees, no monthly minimum. Pick the jobs you want; skip the ones you don&apos;t.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to={user ? "/provider" : "/register?role=provider"} className="btn-lumo btn-lumo-lg bg-white text-black hover:bg-neutral-100" data-testid="provider-signup">
@@ -227,7 +227,7 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-2 gap-3" data-testid="provider-benefits">
             {[
-              { Icon: DollarSign,  t: "10% flat fee",     b: "Half of TaskRabbit's cut" },
+              { Icon: DollarSign,  t: "Low platform fee", b: "Half of TaskRabbit's cut" },
               { Icon: Clock,       t: "24h payouts",      b: "Stripe Connect same-day" },
               { Icon: ShieldCheck, t: "Escrow protected", b: "Money already secured" },
               { Icon: Zap,         t: "No lead fees",     b: "Only pay when you earn" },

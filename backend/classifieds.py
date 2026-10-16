@@ -22,6 +22,8 @@ from typing import List, Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, EmailStr
 
+from demo_filter import hide_demo
+
 try:
     import resend  # type: ignore
 except Exception:  # pragma: no cover
@@ -161,7 +163,7 @@ async def _send_resend_email(*, to_email: str, subject: str, html: str) -> Optio
 
 
 # ── Factory ──────────────────────────────────────────────────────────────────
-def create_router(*, db, get_current_user) -> APIRouter:
+def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
     """Build the classifieds API router. Caller provides the shared `db` (Motor)
     and the auth dependency `get_current_user`."""
     router = APIRouter(prefix="/api")
@@ -211,6 +213,7 @@ def create_router(*, db, get_current_user) -> APIRouter:
         min_year_built: Optional[int] = None,
         owner_id: Optional[str] = None,
         limit: int = 60,
+        viewer: Optional[dict] = Depends(get_optional_user),
     ):
         f: dict = {"status": "active"}
         if owner_id:
@@ -250,6 +253,7 @@ def create_router(*, db, get_current_user) -> APIRouter:
                 {"address": {"$regex": q, "$options": "i"}},
                 {"city": {"$regex": q, "$options": "i"}},
             ]
+        f = await hide_demo(db, f, "owner_id", viewer, owner_id)
         docs = await db.real_estate.find(f).sort("created_at", -1).to_list(min(limit, 200))
         return [_clean(d) for d in docs]
 
@@ -311,6 +315,7 @@ def create_router(*, db, get_current_user) -> APIRouter:
         state: Optional[str] = None,
         owner_id: Optional[str] = None,
         limit: int = 60,
+        viewer: Optional[dict] = Depends(get_optional_user),
     ):
         f: dict = {"status": "active"}
         if owner_id:
@@ -354,6 +359,7 @@ def create_router(*, db, get_current_user) -> APIRouter:
                 {"make": {"$regex": q, "$options": "i"}},
                 {"model": {"$regex": q, "$options": "i"}},
             ]
+        f = await hide_demo(db, f, "owner_id", viewer, owner_id)
         docs = await db.autos.find(f).sort("created_at", -1).to_list(min(limit, 200))
         return [_clean(d) for d in docs]
 

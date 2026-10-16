@@ -49,6 +49,7 @@ APP_NAME = os.environ.get('APP_NAME', 'lumo')
 STRIPE_API_KEY = os.environ['STRIPE_API_KEY']
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+SEED_DEMO_CONTENT = os.environ.get("SEED_DEMO_CONTENT") == "1"
 
 REMOTE_FRIENDLY_CATEGORIES = {
     "digital_tech", "marketing", "business_admin", "education",
@@ -550,6 +551,16 @@ async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depen
     user.pop("password_hash", None)
     return user
 
+async def get_optional_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
+    if not creds:
+        return None
+    try:
+        return await get_current_user(creds)
+    except HTTPException:
+        return None
+
+from demo_filter import hide_demo  # noqa: E402
+
 def require_role(*roles: str):
     async def checker(user: dict = Depends(get_current_user)) -> dict:
         if user.get("role") not in roles:
@@ -838,6 +849,7 @@ async def list_jobs(
     remote_only: bool = False,
     customer_id: Optional[str] = None,
     provider_id: Optional[str] = None,
+    viewer: Optional[dict] = Depends(get_optional_user),
 ):
     q: dict = {}
     if status:
@@ -850,6 +862,7 @@ async def list_jobs(
         q["customer_id"] = customer_id
     if provider_id:
         q["provider_id"] = provider_id
+    q = await hide_demo(db, q, "customer_id", viewer, customer_id or provider_id)
     docs = await db.jobs.find(q).sort("created_at", -1).to_list(500)
     return [clean_doc(d) for d in docs]
 
@@ -1317,6 +1330,7 @@ async def provider_opportunities(
     q: dict = {"status": "open"}
     if since:
         q["created_at"] = {"$gt": since}
+    q = await hide_demo(db, q, "customer_id", user)
     docs = await db.jobs.find(q).sort("created_at", -1).to_list(500)
     results = []
     provider_loc = user.get("location") or {}
@@ -1404,10 +1418,11 @@ async def create_listing(body: MarketplaceListingCreate, user: dict = Depends(ge
     return clean_doc(doc)
 
 @api.get("/marketplace/listings")
-async def list_listings(seller_id: Optional[str] = None):
+async def list_listings(seller_id: Optional[str] = None, viewer: Optional[dict] = Depends(get_optional_user)):
     q = {"status": "active"}
     if seller_id:
         q["seller_id"] = seller_id
+    q = await hide_demo(db, q, "seller_id", viewer, seller_id)
     docs = await db.listings.find(q).sort("created_at", -1).to_list(500)
     return [clean_doc(d) for d in docs]
 
@@ -1431,8 +1446,9 @@ async def upsert_storefront(body: StorefrontUpsert, user: dict = Depends(require
     return sf
 
 @api.get("/stores")
-async def list_stores():
-    docs = await db.users.find({"role": "retailer", "storefront": {"$ne": None}}).to_list(500)
+async def list_stores(viewer: Optional[dict] = Depends(get_optional_user)):
+    q = await hide_demo(db, {"role": "retailer", "storefront": {"$ne": None}}, "id", viewer, flags=False)
+    docs = await db.users.find(q).to_list(500)
     out = []
     for d in docs:
         d = clean_doc(d)
@@ -1441,8 +1457,9 @@ async def list_stores():
     return out
 
 @api.get("/restaurants")
-async def list_restaurants():
-    docs = await db.users.find({"role": "restaurant", "storefront": {"$ne": None}}).to_list(500)
+async def list_restaurants(viewer: Optional[dict] = Depends(get_optional_user)):
+    q = await hide_demo(db, {"role": "restaurant", "storefront": {"$ne": None}}, "id", viewer, flags=False)
+    docs = await db.users.find(q).to_list(500)
     out = []
     for d in docs:
         d = clean_doc(d)
@@ -1460,6 +1477,7 @@ async def search_marketplaces(
     q: str = "",
     types: str = "stores,restaurants,rentals,autos,marketplace",
     limit: int = 30,
+    viewer: Optional[dict] = Depends(get_optional_user),
 ):
     types_set = {t.strip() for t in types.split(",") if t.strip()}
     q_norm = (q or "").strip()
@@ -1475,6 +1493,7 @@ async def search_marketplaces(
                 {"storefront.category": rx}, {"storefront.address": rx},
                 {"storefront.description": rx},
             ]
+        filt = await hide_demo(db, filt, "id", viewer, flags=False)
         async for d in db.users.find(filt).limit(limit):
             d = clean_doc(d)
             sf = d.get("storefront") or {}
@@ -1496,6 +1515,7 @@ async def search_marketplaces(
                 {"storefront.cuisine": rx}, {"storefront.address": rx},
                 {"storefront.description": rx},
             ]
+        filt = await hide_demo(db, filt, "id", viewer, flags=False)
         async for d in db.users.find(filt).limit(limit):
             d = clean_doc(d)
             sf = d.get("storefront") or {}
@@ -1516,6 +1536,7 @@ async def search_marketplaces(
                 {"title": rx}, {"description": rx},
                 {"category": rx}, {"city": rx},
             ]
+        filt = await hide_demo(db, filt, "owner_id", viewer)
         async for d in db.rentals.find(filt).limit(limit):
             d = clean_doc(d)
             imgs = d.get("photos") or d.get("images") or []
@@ -1535,6 +1556,7 @@ async def search_marketplaces(
         filt = {"status": "active"}
         if rx:
             filt["$or"] = [{"make": rx}, {"model": rx}, {"title": rx}, {"description": rx}]
+        filt = await hide_demo(db, filt, "owner_id", viewer)
         async for d in db.autos.find(filt).limit(limit):
             d = clean_doc(d)
             imgs = d.get("photos") or d.get("images") or []
@@ -1554,6 +1576,7 @@ async def search_marketplaces(
         filt = {"status": "active"}
         if rx:
             filt["$or"] = [{"title": rx}, {"description": rx}, {"category": rx}]
+        filt = await hide_demo(db, filt, "seller_id", viewer)
         async for d in db.listings.find(filt).limit(limit):
             d = clean_doc(d)
             imgs = d.get("photos") or d.get("images") or []
@@ -1604,10 +1627,11 @@ async def create_inventory(body: InventoryItemCreate, user: dict = Depends(requi
     return clean_doc(doc)
 
 @api.get("/inventory")
-async def list_inventory(owner_id: Optional[str] = None, user: Optional[dict] = None):
+async def list_inventory(owner_id: Optional[str] = None, viewer: Optional[dict] = Depends(get_optional_user)):
     q = {"status": "active"}
     if owner_id:
         q["owner_id"] = owner_id
+    q = await hide_demo(db, q, "owner_id", viewer, owner_id)
     docs = await db.inventory.find(q).sort("created_at", -1).to_list(1000)
     return [clean_doc(d) for d in docs]
 
@@ -2214,6 +2238,7 @@ async def list_rentals(
     max_price: Optional[float] = None,
     booking_mode: Optional[str] = None,
     limit: int = 60,
+    viewer: Optional[dict] = Depends(get_optional_user),
 ):
     """Browse / search rentals."""
     f: dict = {"status": "active"}
@@ -2225,6 +2250,7 @@ async def list_rentals(
         f["booking_mode"] = booking_mode
     if q:
         f["$or"] = [{"title": {"$regex": q, "$options": "i"}}, {"description": {"$regex": q, "$options": "i"}}]
+    f = await hide_demo(db, f, "owner_id", viewer)
     docs = await db.rentals.find(f).sort("created_at", -1).to_list(min(limit, 200))
     out = []
     for d in docs:
@@ -4533,7 +4559,7 @@ async def withdraw(body: WithdrawRequest, user: dict = Depends(get_current_user)
 # Map data
 # ────────────────────────────────────────────────────────────────────────────
 @api.get("/map/jobs")
-async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None, employment_type: Optional[str] = None, include_external: bool = False):
+async def map_jobs(remote_only: bool = False, category_group_filter: Optional[str] = None, employment_type: Optional[str] = None, include_external: bool = False, viewer: Optional[dict] = Depends(get_optional_user)):
     """Live job feed for /map. By default we hide external aggregator rows
     (source is set) so on-demand + staffing agencies + local salaried
     stay together and uncluttered. The dedicated /remote-jobs page passes
@@ -4556,6 +4582,7 @@ async def map_jobs(remote_only: bool = False, category_group_filter: Optional[st
             q["employment_type"] = employment_type
     if not include_external:
         q["$and"] = q.get("$and", []) + [{"$or": [{"source": None}, {"source": {"$exists": False}}]}]
+    q = await hide_demo(db, q, "customer_id", viewer)
     docs = await db.jobs.find(q).to_list(2000)
     pins = []
     for d in docs:
@@ -4878,6 +4905,81 @@ async def assistant_history(user: dict = Depends(get_current_user)):
 async def assistant_clear(user: dict = Depends(get_current_user)):
     await db.assistant_chats.delete_one({"user_id": user["id"]})
     return {"ok": True}
+
+# ────────────────────────────────────────────────────────────────────────────
+# Service Copilot — PUBLIC endpoint. Helps guests + customers describe what
+# they need in plain English and routes them to the right of the 7 top-level
+# service categories. No auth; sessions are keyed by a browser-generated id.
+# ────────────────────────────────────────────────────────────────────────────
+SERVICE_COPILOT_SYSTEM_PROMPT = """You are Lumi, the Lumo service copilot. Your job is to help a user describe what service they actually need in plain language and pick the right category.
+
+Lumo has 7 top-level service buckets. Each maps to a service key:
+  - transport  → delivery, courier, moving, towing, CDL driver hiring
+  - home       → cleaning/housekeeping, handyman, landscaping, appliance repair, locksmith, home security
+  - auto       → mobile mechanic, auto detailing, roadside assistance
+  - care       → pet care, medical house-calls, visiting nurse, beauty, fitness, elder care
+  - business   → IT support, web/apps/design/data, marketing, legal, licensed notary, bookkeeping/tax, tutoring, business admin/VA, remote work
+  - creative   → event staff, photo/video/cinematic production, performers, DJs
+  - errands    → personal shopping, waiting in line, pickups, anything else
+
+The user may describe something vague. Ask ONE short clarifying question at a time to narrow it down. Once you have enough to classify, finish your reply with a single line in this exact format:
+PICK: <bucket>/<service_key>
+
+Where <bucket> is one of the 7 above AND <service_key> is a specific service slug (e.g. "home/cleaning", "business/notary", "auto/roadside", "transport/moving", "errands/errand", "creative/events", "care/pet_care").
+
+Rules:
+- Keep every reply under 60 words.
+- Warm, plain-spoken, no emojis.
+- Never ask for phone, email or off-platform contact.
+- If the user asks something unrelated to picking a service, politely redirect.
+- Only emit PICK: once you're reasonably confident. Otherwise ask the next clarifying question.
+"""
+
+@api.post("/service-copilot")
+async def service_copilot(body: dict):
+    """Public — guided service-selection chat.
+    Request body: { session_id: str, message: str, history?: [{role, content}] }
+    Returns: { reply: str, pick: {bucket, service_key} | null }
+    """
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "Copilot unavailable")
+    session_id = (body.get("session_id") or "").strip()[:80]
+    text = (body.get("message") or "").strip()
+    history = body.get("history") or []
+    if not text:
+        raise HTTPException(400, "Empty message")
+    if len(text) > 1500:
+        raise HTTPException(400, "Message too long")
+    if not session_id:
+        session_id = f"copilot-{uuid.uuid4()}"
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=session_id,
+        system_message=SERVICE_COPILOT_SYSTEM_PROMPT,
+    ).with_model("anthropic", "claude-sonnet-4-6")
+    # Replay recent turns (user side only — the LLM instance remembers its own replies).
+    for m in history[-10:]:
+        if m.get("role") == "user" and isinstance(m.get("content"), str):
+            try:
+                await chat.send_message(UserMessage(text=m["content"][:1500]))
+            except Exception:
+                break
+    try:
+        reply = await chat.send_message(UserMessage(text=text))
+    except Exception as e:
+        logger.error(f"Service copilot error: {e}")
+        raise HTTPException(502, "Copilot temporarily unavailable")
+    # Parse "PICK: bucket/key" out of the reply, if present.
+    pick = None
+    import re as _re
+    m = _re.search(r"PICK:\s*([a-z_]+)\s*/\s*([a-z_]+)", reply or "", _re.IGNORECASE)
+    if m:
+        pick = {"bucket": m.group(1).lower(), "service_key": m.group(2).lower()}
+        # Strip the PICK line out of the user-visible reply.
+        reply = _re.sub(r"\n?PICK:\s*[a-z_]+\s*/\s*[a-z_]+\s*$", "", reply, flags=_re.IGNORECASE).strip()
+    return {"reply": reply, "pick": pick, "session_id": session_id}
+
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # Credentials — licenses / certifications / insurance for providers
@@ -6040,7 +6142,11 @@ async def seed():
             })
         await db.users.insert_one(doc)
         logger.info(f"Seeded {s['role']}: {s['email']}")
-    # Seed a few sample inventory + jobs once
+    for coll, field in ((db.real_estate, "city"), (db.real_estate, "price"), (db.real_estate, "status"),
+                        (db.autos, "make"), (db.autos, "price"), (db.autos, "year"), (db.autos, "status")):
+        await coll.create_index(field)
+    if not SEED_DEMO_CONTENT:
+        return
     retailer = await db.users.find_one({"email": "retailer@lumo.test"})
     if retailer and await db.inventory.count_documents({"owner_id": retailer["id"]}) == 0:
         for it in [
@@ -7121,7 +7227,7 @@ app.include_router(api)
 
 # Real Estate + Auto Sales classifieds (separate module to keep server.py reasonable)
 from classifieds import create_router as _create_classifieds_router  # noqa: E402
-app.include_router(_create_classifieds_router(db=db, get_current_user=get_current_user))
+app.include_router(_create_classifieds_router(db=db, get_current_user=get_current_user, get_optional_user=get_optional_user))
 
 # Passwordless SMS sign-in / sign-up via Twilio Verify
 from auth_sms import create_router as _create_sms_auth_router  # noqa: E402
@@ -7260,6 +7366,8 @@ from remote_w2_seed import seed_remote_w2_jobs as _seed_remote_w2_jobs  # noqa: 
 
 @app.on_event("startup")
 async def _start_remote_w2_seed():
+    if not SEED_DEMO_CONTENT:
+        return
     try:
         await _seed_remote_w2_jobs(db)
     except Exception as e:

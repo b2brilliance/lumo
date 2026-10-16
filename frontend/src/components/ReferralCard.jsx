@@ -52,7 +52,7 @@ export default function ReferralCard() {
       try {
         await navigator.share({
           title: "Join me on Lumo",
-          text: "Get paid jobs, delivery, rentals — workers keep 90%.",
+          text: "Get paid jobs, delivery, rentals — join me on Lumo.",
           url: data.share_url,
         });
       } catch { /* user cancelled */ }

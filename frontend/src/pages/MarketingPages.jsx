@@ -286,7 +286,7 @@ export function HowItWorks() {
       <Hero
         eyebrow="How Lumo works"
         title="Post a job. Get bids in minutes. Pay when it's done."
-        subtitle="Lumo is an Uber-style, chronological, distance-based marketplace for every service you need — from moving a couch to fixing a leak to walking your dog. Customers pay a 10% deposit to lock in a provider; providers keep 90% of the total."
+        subtitle="Lumo is an Uber-style, chronological, distance-based marketplace for every service you need — from moving a couch to fixing a leak to walking your dog. Customers pay a small deposit to lock in a provider; the rest releases to the provider the moment the work is confirmed done."
       />
       <section className="border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 py-16 grid gap-8 sm:grid-cols-3">
@@ -631,7 +631,7 @@ export function About() {
     <div data-testid="page-about">
       <Seo
         title="About Lumo — the Uber-style marketplace for every service"
-        description="Lumo is a chronological, distance-based, mobile-first marketplace for local jobs, delivery, rentals, and everything in between. We take 10%; providers keep 90%."
+        description="Lumo is a chronological, distance-based, mobile-first marketplace for local jobs, delivery, rentals, and everything in between. Low flat fee, same-day payouts, escrow-protected."
         canonical="https://golumo.app/about"
       />
       <Hero
