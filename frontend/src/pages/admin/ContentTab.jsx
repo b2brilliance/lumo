@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Search, Save, Trash2, Package, Home, Car, Store, Briefcase, Building2, ShoppingBag, BookOpen, MapPin, Plus } from "lucide-react";
+import { Search, Save, Trash2, Package, Home, Car, Store, Briefcase, Building2, ShoppingBag, BookOpen, MapPin, Plus, HelpCircle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import DemoPurgeCard from "@/components/admin/DemoPurgeCard";
 import { useLocale } from "@/lib/locale";
@@ -29,8 +29,9 @@ const TYPE_ICONS = {
   shop_product: { Icon: ShoppingBag, label: "Shop products" },
   blog_post:    { Icon: BookOpen,    label: "Blog posts" },
   recruit_city: { Icon: MapPin,      label: "Recruit cities" },
+  faq:          { Icon: HelpCircle,  label: "Help FAQs" },
 };
-const TYPE_ORDER = ["real_estate", "listing", "rental", "auto", "inventory", "job", "shop_product", "blog_post", "recruit_city"];
+const TYPE_ORDER = ["real_estate", "listing", "rental", "auto", "inventory", "job", "shop_product", "blog_post", "recruit_city", "faq"];
 
 export default function ContentTab() {
   const [type, setType] = useState("real_estate");
@@ -198,8 +199,8 @@ export default function ContentTab() {
                 <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggleOne(it.id)} data-testid={`admin-content-check-${it.id}`} />
               </div>
               <div className="col-span-11 sm:col-span-5">
-                <div className="font-display font-bold text-slate-900 truncate">{it.title || it.name || it.city || "(untitled)"}{it.is_demo && <span className="ml-2 text-[9px] font-mono uppercase bg-amber-100 text-amber-800 px-1">demo</span>}</div>
-                <div className="text-xs text-slate-500 font-mono truncate">{it.seller_name || it.host_name || it.owner_name || it.customer_name || it.retailer_label || it.slug || it.category || it.id.slice(0, 8)}</div>
+                <div className="font-display font-bold text-slate-900 truncate">{it.title || it.name || it.question || it.city || "(untitled)"}{it.is_demo && <span className="ml-2 text-[9px] font-mono uppercase bg-amber-100 text-amber-800 px-1">demo</span>}</div>
+                <div className="text-xs text-slate-500 font-mono truncate">{it.seller_name || it.host_name || it.owner_name || it.customer_name || it.retailer_label || it.slug || it.category || (it.topic && `${it.topic} · #${it.position}`) || it.id.slice(0, 8)}</div>
               </div>
               <div className="col-span-4 sm:col-span-2 text-right font-mono">
                 {priceVal != null ? `${formatPrice(priceVal)}${priceSuffix}` : "—"}

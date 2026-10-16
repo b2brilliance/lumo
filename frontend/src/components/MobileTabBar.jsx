@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, ClipboardList, MessageCircle, User } from "lucide-react";
+import { Home, ClipboardList, MessageCircle, User, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 
@@ -30,12 +30,13 @@ export default function MobileTabBar() {
     { key: "home", label: "Home", to: home, Icon: Home, active: pathname === "/" || pathname === home },
     { key: "orders", label: "Orders", to: gate("/orders"), Icon: ClipboardList, active: pathname.startsWith("/orders") },
     { key: "messages", label: "Messages", to: gate("/messages"), Icon: MessageCircle, active: ["/messages", "/chats", "/inquiries"].some((p) => pathname.startsWith(p)), badge: unread },
+    { key: "help", label: "Help", to: "/help", Icon: LifeBuoy, active: pathname.startsWith("/help") },
     { key: "profile", label: "Profile", to: gate("/settings"), Icon: User, active: pathname.startsWith("/settings") },
   ];
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white/95 backdrop-blur border-t border-slate-200 pb-[env(safe-area-inset-bottom)]" data-testid="mobile-tab-bar">
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {tabs.map(({ key, label, to, Icon, active, badge }) => (
           <Link
             key={key}

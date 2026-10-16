@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Globe, User as UserIcon, MapPin, Bell, Accessibility, Lock,
-  Save, Loader2, LogOut, AlertCircle,
+  Save, Loader2, LogOut, AlertCircle, LifeBuoy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocale, COUNTRY_PROFILES } from "@/lib/locale";
@@ -161,7 +161,9 @@ export default function Settings() {
     <div className="max-w-screen-md mx-auto px-6 py-10" data-testid="settings-page">
       <div className="overline">Settings</div>
       <h1 className="font-display text-4xl font-black tracking-tighter mt-2">Your preferences.</h1>
-      <p className="text-slate-600 mt-3">Tweak how Lumo looks, talks to you, and pre-fills your checkout.</p>
+      <Link to="/help" className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium hover:border-slate-900 transition-colors" data-testid="settings-help-link">
+        <LifeBuoy className="w-4 h-4" />Help Center
+      </Link>
 
       {/* ── Profile ─────────────────────────────────────────────────────────── */}
       <SettingsSection icon={UserIcon} title="Profile" testid="section-profile" data-no-i18n="true">

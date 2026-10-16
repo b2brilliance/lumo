@@ -5,8 +5,9 @@ import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import {
   LogOut, MapPin, Sparkles, ShoppingBag, Briefcase, User,
-  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store,
+  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy,
 } from "lucide-react";
+const HELP_LINK = { to: "/help", label: "Help", icon: LifeBuoy, testId: "nav-help" };
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 /* NavBar — role-siloed navigation.
@@ -29,19 +30,23 @@ const NAV_BY_ROLE = {
     { to: "/marketplace",label: "Marketplace",icon: ShoppingBag, testId: "nav-marketplace" },
     { to: "/shop",       label: "Shop",       icon: Store, testId: "nav-shop" },
     { to: "/for-providers", label: "Earn",    icon: HardHat, testId: "nav-earn" },
+    HELP_LINK,
   ],
   customer: [
     { to: "/services",   label: "Services",   icon: Sparkles, testId: "nav-services" },
     { to: "/marketplace",label: "Marketplace",icon: ShoppingBag, testId: "nav-marketplace" },
     { to: "/shop",       label: "Shop",       icon: Store, testId: "nav-shop" },
-    { to: "/customer",   label: "My orders",  icon: User,     testId: "nav-customer" },
+    { to: "/orders",     label: "My orders",  icon: User,     testId: "nav-customer" },
+    HELP_LINK,
   ],
   provider: [
     { to: "/map",        label: "Jobs near you", icon: MapPin, testId: "nav-map" },
     { to: "/provider",   label: "My dashboard",  icon: Briefcase, testId: "nav-provider" },
+    HELP_LINK,
   ],
   admin: [
     { to: "/admin",      label: "Admin",      icon: ShieldCheck, testId: "nav-admin" },
+    HELP_LINK,
   ],
 };
 

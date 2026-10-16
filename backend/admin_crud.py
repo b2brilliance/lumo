@@ -95,6 +95,12 @@ CONTENT_TYPES = {
         "fields": {"title": "text", "slug": "text", "excerpt": "textarea", "body_md": "textarea", "tags": "list",
                    "hero_image_url": "text", "author": "text", "status": "select:published|draft"},
     },
+    "faq": {
+        "collection": "faqs", "title_field": "question", "label": "Help FAQ",
+        "fields": {"question": "text", "answer": "textarea",
+                   "topic": "select:getting_started|booking|payments|earning|buying_selling|rentals|real_estate|account|troubleshooting",
+                   "position": "int", "is_active": "bool"},
+    },
     "recruit_city": {
         "collection": "recruit_cities", "title_field": "city", "label": "Recruit city",
         "fields": {"city": "text", "slug": "text", "state": "text", "state_full": "text", "goal_workers": "int",
@@ -312,7 +318,8 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
             filt["$or"] = [{title_field: rx}, {"description": rx}, {"category": rx}, {"city": rx}, {"slug": rx}]
             if spec.get("owner_name"):
                 filt["$or"].append({spec["owner_name"]: rx})
-        cursor = coll.find(filt, {"_id": 0}).sort("created_at", -1).skip(int(skip)).limit(min(int(limit), 500))
+        sort = [("topic", 1), ("position", 1)] if type == "faq" else [("created_at", -1)]
+        cursor = coll.find(filt, {"_id": 0}).sort(sort).skip(int(skip)).limit(min(int(limit), 500))
         docs = await cursor.to_list(length=min(int(limit), 500))
         total = await coll.count_documents(filt)
         return {"items": docs, "total": total, "type": type, "label": spec["label"]}
@@ -382,6 +389,12 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if type == "recruit_city":
             doc["slug"] = doc.get("slug") or _slugify(f"{doc['city']}-{doc.get('state') or ''}")
             doc.setdefault("is_active", True)
+        if type == "faq":
+            doc.setdefault("is_active", True)
+            doc.setdefault("topic", "getting_started")
+            if doc.get("position") is None:
+                last = await db.faqs.find_one({"topic": doc["topic"]}, sort=[("position", -1)])
+                doc["position"] = (last or {}).get("position", 0) + 1
         if type == "shop_product":
             doc.setdefault("is_active", True)
             doc.setdefault("click_count", 0)

@@ -31,6 +31,12 @@ export default function AssistantWidget() {
   const hidden = HIDDEN_ON.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
+    const onOpen = () => { setPrompt(null); setOpen(true); };
+    window.addEventListener("lumo:open-guide", onOpen);
+    return () => window.removeEventListener("lumo:open-guide", onOpen);
+  }, []);
+
+  useEffect(() => {
     if (loading || hidden || localStorage.getItem(CHOICE_KEY)) return undefined;
     const t = setTimeout(() => setPrompt((p) => p || "first"), 2500);
     return () => clearTimeout(t);

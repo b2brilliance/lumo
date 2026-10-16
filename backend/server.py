@@ -4975,6 +4975,13 @@ async def guide_chat(body: GuideChat, user: Optional[dict] = Depends(get_optiona
     return {"reply": reply, "links": links}
 
 
+@api.get("/help/faqs")
+async def help_faqs():
+    from faq_seed import TOPICS
+    docs = await db.faqs.find({"is_active": {"$ne": False}}, {"_id": 0}).sort("position", 1).to_list(1000)
+    return {"topics": [{"key": k, "label": v} for k, v in TOPICS], "faqs": docs}
+
+
 @api.get("/me/badges")
 async def my_badges(user: dict = Depends(get_current_user)):
     msg_notifs = await db.notifications.count_documents({"user_id": user["id"], "read": False, "type": {"$in": ["message", "chat_message", "new_message"]}})
@@ -7310,6 +7317,12 @@ async def on_startup():
             logger.info(f"Seeded {inserted} new affiliate offers")
     except Exception as e:
         logger.warning(f"Affiliate seed could not run: {e}")
+    try:
+        from faq_seed import seed_faqs
+        await seed_faqs(db)
+        await db.faqs.create_index("position")
+    except Exception as e:
+        logger.warning(f"FAQ seed failed: {e}")
     try:
         await _sync_property_rentals(db)
         from real_estate_plus import backfill_units
