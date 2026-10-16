@@ -11,13 +11,13 @@ const HIDDEN_ON = ["/admin", "/reset", "/signin", "/login", "/register", "/check
 
 function GuidePrompt({ variant, onYes, onNo }) {
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[1200] w-[320px] max-w-[calc(100vw-2rem)] bg-white border border-slate-900 shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-300" data-testid="guide-prompt" data-variant={variant}>
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[1200] w-[320px] max-w-[calc(100vw-2rem)] bg-white rounded-3xl border border-slate-200 shadow-2xl p-5 animate-in fade-in slide-in-from-bottom-4 duration-300" data-testid="guide-prompt" data-variant={variant}>
       <button onClick={onNo} className="absolute top-2 right-2 text-slate-400 hover:text-slate-900" aria-label="Close" data-testid="guide-prompt-close"><X className="w-4 h-4" /></button>
       <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal-600" /><span className="font-display font-bold">{variant === "exit" ? "Before you go…" : "Want a guide?"}</span></div>
       <p className="text-sm text-slate-600 mt-1">{variant === "exit" ? "Tell Lumi what you were looking for." : "Lumi can point you to the right place."}</p>
       <div className="flex gap-2 mt-3">
-        <button onClick={onYes} className="flex-1 bg-slate-900 text-white text-sm font-medium py-2 hover:bg-slate-800 transition-colors" data-testid="guide-prompt-yes">Yes, guide me</button>
-        <button onClick={onNo} className="flex-1 border border-slate-200 text-sm py-2 hover:border-slate-900 transition-colors" data-testid="guide-prompt-no">No thanks</button>
+        <button onClick={onYes} className="flex-1 rounded-full bg-slate-900 text-white text-sm font-medium py-2 hover:bg-slate-800 transition-colors" data-testid="guide-prompt-yes">Yes, guide me</button>
+        <button onClick={onNo} className="flex-1 rounded-full border border-slate-200 text-sm py-2 hover:border-slate-900 transition-colors" data-testid="guide-prompt-no">No thanks</button>
       </div>
     </div>
   );
@@ -53,7 +53,7 @@ export default function AssistantWidget() {
   return (
     <button
       onClick={() => setOpen(true)}
-      className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[1200] h-12 md:h-14 px-4 md:px-5 bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg"
+      className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[1200] h-12 md:h-14 px-5 md:px-6 rounded-full bg-slate-900 text-white hover:bg-slate-800 hover:scale-[1.03] transition-[transform,background-color] flex items-center gap-2 shadow-lg"
       data-testid="assistant-open"
     >
       <Sparkles className="w-4 h-4 text-teal-300" />
