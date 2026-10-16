@@ -1,0 +1,32 @@
+{
+  "summary": "Retest of the iteration_61 fixes. Backend: 15/15 new pytest tests pass (test_iter62_re_fixes.py). They cover saved-search filter validation (422), a malformed saved-search row inserted straight into the DB no longer blocking alerts, PATCH price/status validation, the legacy price_unit/currency backfill, alerts firing on admin real_estate create, the rental mirror staying in sync on admin create/patch/delete and bulk delete, and saved searches + favorites being removed when a user is deleted (single and bulk). Frontend: home tile copy and link are correct. Mobile map renders tiles and 23 pins; filters collapse; Saved/List buttons show icons only with no horizontal overflow. Pressing Enter on 'Los Angeles' flies the map and filters to 2 homes; dragging the map changes the label to 'in this map area'. Min/max price apply on Enter. The sort select is not truncated. The detail page address adds city/state/country, single-photo listings show no thumbnail column, rent shows '/mo', short stay shows '/night' and EUR shows '€'. Admin Content create dialog: title reads 'New recruit city', is_active defaults ON and both items show ACTIVE. One fix only partly works: the 2 Echo Park listings that share coordinates are nudged apart by only 0.0012/0.0016 degrees, so at city zoom the pins are 1px apart and the $185 pin is completely hidden under the $1.3M pin.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ReMap duplicate-coordinate nudge", "issue": "The nudge is a fixed geographic offset (~130m). After fitting to Los Angeles, the two Echo Park pins render at (623,588) and (624,587), fully overlapping, so the $185 short-stay pin cannot be seen or clicked. Use a pixel-based offset (e.g. a different iconAnchor per duplicate, such as [0, -28*n]) or a spiderfy/cluster approach instead of a lat/lng offset.", "selector": ".leaflet-marker-icon", "priority": "MEDIUM"},
+      {"component": "ContentTab create dialog", "issue": "If an admin switches is_active OFF while creating an item, save() drops false bools for new items (line 276) and the backend setdefault('is_active', True) fills it back in, so the item is still created ACTIVE. Reproduced with recruit_city 'TEST_CityOff62'. Send false bools when the field defaults to true.", "selector": "[data-testid='admin-content-edit-is_active']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/real-estate mobile 390px", "issues": ["The Min/Max price placeholders are cut off ('Min pric').", "The kind tabs are cut off behind the Filters button ('SHORT STAY' clipped, Rooms/Commercial/Land hidden). They likely scroll, but there is no visual cue that they do.", "The floating Ask Lumi button covers the bottom-nav Admin item and sits close to the List/Map toggle."]},
+      {"screen": "/real-estate place input", "issues": ["After the map is dragged or 'Search worldwide' is clicked, the count label clears correctly, but the place input still shows 'Los Angeles'."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter62_re_fixes.py", "/app/test_reports/pytest/pytest_iter62.xml"],
+  "action_items": [
+    "Fix the overlapping pins for duplicate coordinates in ReMap.jsx with a pixel-based offset or spiderfy, not a fixed lat/lng offset.",
+    "ContentTab: let admins create items with is_active=false (send explicit false for bool fields that default to true).",
+    "Minor: clear the PlaceSearch input when the place param is cleared; widen or shorten the price placeholders on mobile; add a scroll cue to the kind tabs on mobile."
+  ],
+  "critical_code_review_comments": [
+    "RealEstateDetail address dedup uses a case-sensitive substring includes(): country 'CA' (Canada) would be dropped for any address that contains the state 'CA'. Compare against comma-separated tokens instead.",
+    "notify_matching_searches catches only TypeError/ValueError/KeyError. That is fine for current data, but a broad except with logging would be safer, since one bad row should never break the alert loop.",
+    "sync_property_rentals(rental_id) still runs a global distinct() plus delete_many orphan sweep on every admin rental write. It works, but it is O(all rentals) per write."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter62_re_fixes.py"],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "~92% (11/12 retested items; duplicate pins only partly fixed)"},
+  "seed_data_creation": "None kept. All TEST_ listings, saved searches, rentals, blog posts, recruit cities, shop products and qa_ users were cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest /app/backend/tests/test_iter62_re_fixes.py. It uses pymongo with backend/.env MONGO_URL to insert malformed saved searches and to check mirrors and cascades. The 2 Echo Park LA listings share coordinates 34.0786,-118.2606 (ids ae6ab279 sale, 08d546f0 short stay). NEVER call purge with confirm=PURGE. Use a single admin login and pass the token through localStorage 'lumo_token'."
+}

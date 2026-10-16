@@ -273,7 +273,7 @@ function ContentEditDialog({ type, item, fieldSpecs, singular, onClose, onSaved 
         const v = form[f.name];
         const orig = toFormValue(f, item[f.name]);
         if (!isNew && v === orig) return;
-        if (isNew && (v === "" || v == null || (f.kind === "bool" && v === false))) return;
+        if (isNew && (v === "" || v == null || (f.kind === "bool" && v === false && f.name !== "is_active"))) return;
         updates[f.name] = v;
       });
       if (isNew) await api.post(`/admin/content/${type}`, { updates });

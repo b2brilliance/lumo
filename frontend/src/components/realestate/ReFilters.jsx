@@ -5,7 +5,8 @@ import { KIND_TABS, PROPERTY_TYPES } from "./reUtils";
 
 export function KindTabs({ value, onChange }) {
   return (
-    <div className="flex gap-1 overflow-x-auto no-scrollbar" data-testid="re-kind-tabs">
+    <div className="relative">
+    <div className="flex gap-1 overflow-x-auto no-scrollbar pr-8" data-testid="re-kind-tabs">
       {KIND_TABS.map((t) => (
         <button
           key={t.key}
@@ -20,6 +21,8 @@ export function KindTabs({ value, onChange }) {
         </button>
       ))}
     </div>
+    <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white to-transparent lg:hidden" />
+    </div>
   );
 }
 
@@ -27,8 +30,8 @@ export function FilterRow({ params, set }) {
   const kind = params.get("kind") || "all";
   return (
     <div className="flex flex-wrap gap-2 text-xs">
-      <Input className="w-24 h-9" type="number" placeholder="Min price" defaultValue={params.get("min_price") || ""} onBlur={(e) => set("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-min-price" />
-      <Input className="w-24 h-9" type="number" placeholder="Max price" defaultValue={params.get("max_price") || ""} onBlur={(e) => set("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-max-price" />
+      <Input className="w-24 h-9" type="number" placeholder="Min $" defaultValue={params.get("min_price") || ""} onBlur={(e) => set("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-min-price" />
+      <Input className="w-24 h-9" type="number" placeholder="Max $" defaultValue={params.get("max_price") || ""} onBlur={(e) => set("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-max-price" />
       <Select value={params.get("min_beds") || "any"} onValueChange={(v) => set("min_beds", v === "any" ? "" : v)}>
         <SelectTrigger className="w-28 h-9" data-testid="re-filter-beds"><SelectValue placeholder="Beds" /></SelectTrigger>
         <SelectContent>

@@ -87,7 +87,7 @@ export default function RealEstate() {
 
       <div className="border-b border-slate-200 px-4 sm:px-6 py-3 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="w-full sm:w-auto sm:flex-1 flex"><PlaceSearch initial={params.get("place") || ""} onPick={onPlace} /></div>
+          <div className="w-full sm:w-auto sm:flex-1 flex"><PlaceSearch key={params.get("place") || "none"} initial={params.get("place") || ""} onPick={onPlace} /></div>
           <SaveSearchButton params={params} />
           <Link to="/real-estate/saved"><Button variant="outline" className="h-11" data-testid="re-saved-link"><Bookmark className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Saved</span></Button></Link>
           <Link to="/real-estate/list"><Button variant="outline" className="h-11" data-testid="re-list-btn"><Plus className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">List a property</span></Button></Link>

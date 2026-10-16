@@ -5,9 +5,10 @@ import "leaflet/dist/leaflet.css";
 import { fmtPrice } from "./reUtils";
 
 function pinIcon(r, active) {
+  const lift = r._dup ? `position:relative;top:-${30 * r._dup}px;` : "";
   return L.divIcon({
     className: "",
-    html: `<div class="re-pin${active ? " re-pin-active" : ""}">${fmtPrice(r.price, r.currency, true)}</div>`,
+    html: `<div style="${lift}"><div class="re-pin${active ? " re-pin-active" : ""}">${fmtPrice(r.price, r.currency, true)}</div></div>`,
     iconSize: null,
     iconAnchor: [0, 0],
   });
@@ -44,13 +45,13 @@ function Fitter({ fitTo, programmatic, resizeKey }) {
 
 export default function ReMap({ items, activeId, onHover, onSelect, onBounds, fitTo, resizeKey }) {
   const programmatic = useRef(false);
-  // Nudge listings that share exact coordinates so every pin stays clickable.
+  // Stack pins that share exact coordinates vertically (pixel offset) so each stays clickable.
   const pins = useMemo(() => {
     const seen = {};
     return items.filter((r) => r.lat != null && r.lng != null).map((r) => {
       const k = `${r.lat.toFixed(5)},${r.lng.toFixed(5)}`;
-      const n = seen[k] = (seen[k] || 0) + 1;
-      return n === 1 ? { ...r, _lat: r.lat, _lng: r.lng } : { ...r, _lat: r.lat + 0.0012 * (n - 1), _lng: r.lng + 0.0016 * (n - 1) };
+      seen[k] = (seen[k] || 0) + 1;
+      return { ...r, _dup: seen[k] - 1 };
     });
   }, [items]);
   return (
@@ -65,7 +66,7 @@ export default function ReMap({ items, activeId, onHover, onSelect, onBounds, fi
         {pins.map((r) => (
           <Marker
             key={r.id}
-            position={[r._lat, r._lng]}
+            position={[r.lat, r.lng]}
             icon={pinIcon(r, r.id === activeId)}
             zIndexOffset={r.id === activeId ? 1000 : 0}
             eventHandlers={{

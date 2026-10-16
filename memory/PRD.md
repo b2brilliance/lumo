@@ -885,8 +885,8 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 ## 2026-06 — Session 2 (see CHANGELOG.md / ROADMAP below)
 - Demo data hidden publicly + seeding stopped; persona routing live; copilot optimized. Details in CHANGELOG.md.
 ### Next (user-approved order)
-1. P1 Admin full create/edit/delete for every item type
-2. P1 Real Estate module (map, inquiry flow, saved searches)
+1. DONE Admin full create/edit/delete + Purge demo data
+2. DONE Real Estate module (OSM map, inquiries/tours, saved searches + alerts, favorites)
 3. P1 Marketplace polish (buy/rent toggle, cart, product images)
 4. P1 Mobile bottom-tab navigation (Home, Orders, Messages, Profile)
 - Note: affiliate_settings still holds placeholder IDs (skimlinks 12345, impact TEST-IMPACT-12345) — admin should replace.
