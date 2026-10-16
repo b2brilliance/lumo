@@ -67,6 +67,7 @@ import JobApply from "@/pages/JobApply";
 import RealEstate from "@/pages/RealEstate";
 import RealEstateDetail from "@/pages/RealEstateDetail";
 import RealEstateList from "@/pages/RealEstateList";
+import RealEstateSaved from "@/pages/RealEstateSaved";
 import Autos from "@/pages/Autos";
 import AutoDetail from "@/pages/AutoDetail";
 import AutoList from "@/pages/AutoList";
@@ -188,6 +189,7 @@ function App() {
             <Route path="/autos/:id" element={<Navigate to="/services" replace />} />
             <Route path="/real-estate" element={<RealEstate />} />
             <Route path="/real-estate/list" element={<Protected><RealEstateList /></Protected>} />
+            <Route path="/real-estate/saved" element={<RealEstateSaved />} />
             <Route path="/real-estate/:id" element={<RealEstateDetail />} />
 
             <Route path="/marketplace" element={<Marketplace />} />

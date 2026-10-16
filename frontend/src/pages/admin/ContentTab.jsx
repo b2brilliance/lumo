@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Search, Save, Trash2, Package, Home, Car, Store, Briefcase } from "lucide-react";
+import { Search, Save, Trash2, Package, Home, Car, Store, Briefcase, Building2, ShoppingBag, BookOpen, MapPin, Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import DemoPurgeCard from "@/components/admin/DemoPurgeCard";
 import { useLocale } from "@/lib/locale";
 
 /* ContentTab — one unified admin surface for every user-generated
@@ -18,16 +20,20 @@ import { useLocale } from "@/lib/locale";
  * `type` values and editable fields are defined in admin_crud.py.
  */
 const TYPE_ICONS = {
-  listing:   { Icon: Package,   label: "Community listings" },
-  rental:    { Icon: Home,      label: "Rentals" },
-  auto:      { Icon: Car,       label: "Auto sales" },
-  inventory: { Icon: Store,     label: "Store items" },
-  job:       { Icon: Briefcase, label: "Jobs / requests" },
+  real_estate:  { Icon: Building2,   label: "Real estate" },
+  listing:      { Icon: Package,     label: "Community listings" },
+  rental:       { Icon: Home,        label: "Rentals" },
+  auto:         { Icon: Car,         label: "Auto sales" },
+  inventory:    { Icon: Store,       label: "Store items" },
+  job:          { Icon: Briefcase,   label: "Jobs / requests" },
+  shop_product: { Icon: ShoppingBag, label: "Shop products" },
+  blog_post:    { Icon: BookOpen,    label: "Blog posts" },
+  recruit_city: { Icon: MapPin,      label: "Recruit cities" },
 };
-const TYPE_ORDER = ["listing", "inventory", "rental", "auto", "job"];
+const TYPE_ORDER = ["real_estate", "listing", "rental", "auto", "inventory", "job", "shop_product", "blog_post", "recruit_city"];
 
 export default function ContentTab() {
-  const [type, setType] = useState("listing");
+  const [type, setType] = useState("real_estate");
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [status, setStatus] = useState("all");
@@ -89,15 +95,20 @@ export default function ContentTab() {
   };
 
   const activeMeta = TYPE_ICONS[type] || { Icon: Package, label: type };
-  const editableFields = (types.find((t) => t.key === type) || {}).editable || [];
+  const typeMeta = types.find((t) => t.key === type) || {};
+  const fieldSpecs = typeMeta.fields || [];
 
   return (
     <div className="space-y-4" data-testid="admin-content-tab">
+      <DemoPurgeCard onPurged={load} />
       <div className="flex items-center gap-2">
         <activeMeta.Icon className="w-4 h-4 text-teal-700" />
         <h3 className="font-display text-xl font-black tracking-tighter flex-1">
           Content <span className="text-slate-400 font-mono text-sm ml-2">{total} {activeMeta.label.toLowerCase()}</span>
         </h3>
+        <Button size="sm" onClick={() => setEditing({})} className="bg-slate-900 hover:bg-slate-800" data-testid="admin-content-new">
+          <Plus className="w-3.5 h-3.5 mr-1" /> New
+        </Button>
         {selected.size > 0 && (
           <Button size="sm" variant="destructive" onClick={bulkDelete} className="bg-red-600 hover:bg-red-700" data-testid="admin-content-bulk-delete">
             <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete {selected.size}
@@ -178,7 +189,8 @@ export default function ContentTab() {
           const priceVal =
             it.price != null ? it.price :
             it.price_per_night != null ? it.price_per_night :
-            it.budget != null ? it.budget : null;
+            it.pay_rate != null ? it.pay_rate :
+            it.bonus_amount != null ? it.bonus_amount : null;
           const priceSuffix = it.price_per_night != null ? " / night" : "";
           return (
             <div key={it.id} className="grid grid-cols-12 gap-2 items-center px-3 py-2.5 text-sm hover:bg-slate-50" data-testid={`admin-content-row-${it.id}`}>
@@ -186,13 +198,13 @@ export default function ContentTab() {
                 <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggleOne(it.id)} data-testid={`admin-content-check-${it.id}`} />
               </div>
               <div className="col-span-11 sm:col-span-5">
-                <div className="font-display font-bold text-slate-900 truncate">{it.title || it.name || "(untitled)"}</div>
-                <div className="text-xs text-slate-500 font-mono truncate">{it.seller_name || it.host_name || it.owner_name || it.category || it.id.slice(0, 8)}</div>
+                <div className="font-display font-bold text-slate-900 truncate">{it.title || it.name || it.city || "(untitled)"}{it.is_demo && <span className="ml-2 text-[9px] font-mono uppercase bg-amber-100 text-amber-800 px-1">demo</span>}</div>
+                <div className="text-xs text-slate-500 font-mono truncate">{it.seller_name || it.host_name || it.owner_name || it.customer_name || it.retailer_label || it.slug || it.category || it.id.slice(0, 8)}</div>
               </div>
               <div className="col-span-4 sm:col-span-2 text-right font-mono">
                 {priceVal != null ? `${formatPrice(priceVal)}${priceSuffix}` : "—"}
               </div>
-              <div className="col-span-4 sm:col-span-2 text-[10px] font-mono uppercase tracking-widest text-slate-600">{it.status || "—"}</div>
+              <div className="col-span-4 sm:col-span-2 text-[10px] font-mono uppercase tracking-widest text-slate-600">{it.status || (it.is_active === false ? "inactive" : it.is_active ? "active" : "—")}</div>
               <div className="col-span-4 sm:col-span-2 text-right flex justify-end gap-1">
                 <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditing(it)} data-testid={`admin-content-edit-${it.id}`}>Edit</Button>
                 <Button size="sm" variant="ghost" className="h-7 px-2 text-red-600 hover:text-red-800 hover:bg-red-50" onClick={() => del(it)} data-testid={`admin-content-del-${it.id}`}>
@@ -208,7 +220,7 @@ export default function ContentTab() {
         <ContentEditDialog
           type={type}
           item={editing}
-          editableFields={editableFields}
+          fieldSpecs={fieldSpecs}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
         />
@@ -217,29 +229,53 @@ export default function ContentTab() {
   );
 }
 
-function ContentEditDialog({ type, item, editableFields, onClose, onSaved }) {
-  // Build initial form state from the item, keyed by editable fields.
-  const [form, setForm] = useState(() => {
-    const initial = {};
-    editableFields.forEach((f) => { initial[f] = item[f] ?? ""; });
-    return initial;
-  });
+function FieldInput({ spec, value, onChange }) {
+  const tid = `admin-content-edit-${spec.name}`;
+  if (spec.kind === "bool") return <div><Switch checked={!!value} onCheckedChange={onChange} data-testid={tid} /></div>;
+  if (spec.kind === "select") {
+    return (
+      <Select value={value || "__none"} onValueChange={(v) => onChange(v === "__none" ? "" : v)}>
+        <SelectTrigger data-testid={tid}><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none">—</SelectItem>
+          {spec.options.map((o) => <SelectItem key={o} value={o}>{o.replace(/_/g, " ")}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    );
+  }
+  if (spec.kind === "textarea" || spec.kind === "json") {
+    return <Textarea rows={spec.name === "body_md" ? 10 : 4} className={spec.kind === "json" ? "font-mono text-xs" : ""} value={value ?? ""} onChange={(e) => onChange(e.target.value)} data-testid={tid} />;
+  }
+  const type = spec.kind === "number" || spec.kind === "int" ? "number" : "text";
+  return <Input type={type} step={spec.kind === "int" ? "1" : "any"} value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={spec.kind === "list" ? "comma, separated, values" : ""} data-testid={tid} />;
+}
+
+function toFormValue(spec, v) {
+  if (v == null) return spec.kind === "bool" ? false : "";
+  if (spec.kind === "list") return Array.isArray(v) ? v.join(", ") : v;
+  if (spec.kind === "json") return typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  return v;
+}
+
+function ContentEditDialog({ type, item, fieldSpecs, onClose, onSaved }) {
+  const isNew = !item.id;
+  const [form, setForm] = useState(() => Object.fromEntries(fieldSpecs.map((f) => [f.name, toFormValue(f, item[f.name])])));
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     setSaving(true);
     try {
-      // Coerce numeric fields where appropriate so the backend Mongo write
-      // doesn't accidentally store "45" as a string when the schema expects a
-      // number for price / mileage / year etc.
-      const numeric = new Set(["price", "price_per_night", "budget", "mileage", "year"]);
       const updates = {};
-      Object.entries(form).forEach(([k, v]) => {
-        if (v === "" || v == null) return;
-        updates[k] = numeric.has(k) ? Number(v) : v;
+      fieldSpecs.forEach((f) => {
+        const v = form[f.name];
+        const orig = toFormValue(f, item[f.name]);
+        if (!isNew && v === orig) return;
+        if (isNew && (v === "" || v == null)) return;
+        updates[f.name] = v;
       });
-      await api.patch(`/admin/content/${type}/${item.id}`, { updates });
-      toast.success("Updated");
+      if (isNew) await api.post(`/admin/content/${type}`, { updates });
+      else await api.patch(`/admin/content/${type}/${item.id}`, { updates });
+      toast.success(isNew ? "Created" : "Updated");
       onSaved();
     } catch (e) {
       toast.error(formatApiError(e));
@@ -248,27 +284,23 @@ function ContentEditDialog({ type, item, editableFields, onClose, onSaved }) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg" data-testid="admin-content-edit-dialog">
+      <DialogContent className="sm:max-w-2xl" data-testid="admin-content-edit-dialog">
         <DialogHeader>
-          <DialogTitle>Edit {TYPE_ICONS[type]?.label?.slice(0, -1) || type}</DialogTitle>
-          <DialogDescription>Only whitelisted fields for this content type can be changed here.</DialogDescription>
+          <DialogTitle>{isNew ? "New" : "Edit"} {(TYPE_ICONS[type]?.label || type).replace(/s$/, "")}</DialogTitle>
+          <DialogDescription>{isNew ? "Fill in the fields you need — blanks are skipped." : "Only changed fields are saved."}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-          {editableFields.map((f) => (
-            <div key={f}>
-              <Label className="overline text-[10px]">{f.replace(/_/g, " ")}</Label>
-              {f === "description" ? (
-                <Textarea rows={4} value={form[f] || ""} onChange={(e) => setForm({ ...form, [f]: e.target.value })} data-testid={`admin-content-edit-${f}`} />
-              ) : (
-                <Input value={form[f] ?? ""} onChange={(e) => setForm({ ...form, [f]: e.target.value })} data-testid={`admin-content-edit-${f}`} />
-              )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[62vh] overflow-y-auto pr-1">
+          {fieldSpecs.map((f) => (
+            <div key={f.name} className={f.kind === "textarea" || f.kind === "json" ? "sm:col-span-2" : ""}>
+              <Label className="overline text-[10px]">{f.name.replace(/_/g, " ")}</Label>
+              <FieldInput spec={f} value={form[f.name]} onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))} />
             </div>
           ))}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={saving} className="bg-slate-900 hover:bg-slate-800" data-testid="admin-content-edit-save">
-            <Save className="w-3.5 h-3.5 mr-1" /> {saving ? "Saving…" : "Save"}
+            <Save className="w-3.5 h-3.5 mr-1" /> {saving ? "Saving…" : isNew ? "Create" : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

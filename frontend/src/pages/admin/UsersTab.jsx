@@ -100,6 +100,7 @@ export default function UsersTab() {
       <div className="flex items-center gap-2">
         <UserCog className="w-4 h-4 text-teal-700" />
         <h3 className="font-display text-xl font-black tracking-tighter flex-1">Users <span className="text-slate-400 font-mono text-sm ml-2">{total} total</span></h3>
+        <Button size="sm" onClick={() => setEditing({})} className="bg-slate-900 hover:bg-slate-800" data-testid="admin-users-new">+ New user</Button>
       </div>
 
       {/* Filters */}
@@ -198,18 +199,29 @@ function UserEditDialog({ user, onClose, onSaved }) {
     role: user.role || "customer",
     wallet_balance: String(user.wallet_balance ?? "0"),
     banned: !!user.banned,
+    phone: user.phone || "",
+    password: "",
   });
   const [saving, setSaving] = useState(false);
+  const isNew = !user.id;
 
   const save = async () => {
     setSaving(true);
     try {
+      if (isNew) {
+        await api.post("/admin/users", { name: form.name, email: form.email, role: form.role, phone: form.phone || null, password: form.password });
+        toast.success("User created");
+        onSaved();
+        return;
+      }
       const patch = {
         name: form.name || null,
         email: form.email || null,
         role: form.role || null,
         wallet_balance: form.wallet_balance === "" ? null : parseFloat(form.wallet_balance),
         banned: form.banned,
+        phone: form.phone || null,
+        password: form.password || null,
       };
       await api.patch(`/admin/users/${user.id}`, patch);
       toast.success("User updated");
@@ -223,7 +235,7 @@ function UserEditDialog({ user, onClose, onSaved }) {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg" data-testid="admin-user-edit-dialog">
         <DialogHeader>
-          <DialogTitle>Edit user</DialogTitle>
+          <DialogTitle>{isNew ? "New user" : "Edit user"}</DialogTitle>
           <DialogDescription>Change the user&apos;s profile, role or wallet. Ban blocks login instantly.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -234,6 +246,16 @@ function UserEditDialog({ user, onClose, onSaved }) {
           <div>
             <Label className="overline text-[10px]">Email</Label>
             <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="admin-user-edit-email" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="overline text-[10px]">Phone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="admin-user-edit-phone" />
+            </div>
+            <div>
+              <Label className="overline text-[10px]">{isNew ? "Password (min 6)" : "New password (optional)"}</Label>
+              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="admin-user-edit-password" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -22,7 +22,10 @@ from typing import List, Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, EmailStr
 
+import re
+
 from demo_filter import hide_demo, is_hidden
+from real_estate_plus import geocode_listing, notify_matching_searches
 
 try:
     import resend  # type: ignore
@@ -32,8 +35,9 @@ except Exception:  # pragma: no cover
 logger = logging.getLogger("lumo.classifieds")
 
 # ── Taxonomies ────────────────────────────────────────────────────────────────
-PROPERTY_TYPES = ["house", "condo", "townhouse", "land", "multi_family", "apartment", "commercial"]
-PROPERTY_LISTING_KINDS = ["sale", "rent"]
+PROPERTY_TYPES = ["house", "condo", "townhouse", "land", "multi_family", "apartment", "commercial", "villa", "cabin", "studio"]
+PROPERTY_LISTING_KINDS = ["sale", "rent", "short_stay", "room"]
+DEFAULT_PRICE_UNIT = {"sale": "total", "rent": "month", "room": "month", "short_stay": "night"}
 
 # Common auto manufacturers — used in filters dropdown
 AUTO_MAKES = [
@@ -52,8 +56,14 @@ AUTO_CONDITIONS = ["New", "Used", "Certified Pre-Owned"]
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
 class RealEstateCreate(BaseModel):
-    listing_kind: Literal["sale", "rent"] = "sale"
-    property_type: Literal["house", "condo", "townhouse", "land", "multi_family", "apartment", "commercial"] = "house"
+    listing_kind: Literal["sale", "rent", "short_stay", "room"] = "sale"
+    property_type: Literal["house", "condo", "townhouse", "land", "multi_family", "apartment", "commercial", "villa", "cabin", "studio"] = "house"
+    price_unit: Optional[Literal["total", "month", "week", "night"]] = None
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    furnished: Optional[bool] = None
+    max_guests: Optional[int] = None
+    available_from: Optional[str] = None
+    amenities: List[str] = []
     title: str = Field(min_length=3, max_length=200)
     description: Optional[str] = None
     price: float = Field(gt=0)
@@ -194,8 +204,33 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
             "is_demo": False,
             "created_at": _now_iso(),
         })
+        doc["price_unit"] = doc.get("price_unit") or DEFAULT_PRICE_UNIT[doc["listing_kind"]]
+        doc["currency"] = doc["currency"].upper()
+        if doc.get("country"):
+            doc["country"] = doc["country"].strip().upper() if len(doc["country"].strip()) == 2 else doc["country"].strip()
+        await geocode_listing(doc)
         await db.real_estate.insert_one(doc)
+        asyncio.create_task(notify_matching_searches(db, doc, send_email=_send_resend_email))
         return _clean(doc)
+
+    @router.patch("/real-estate/{listing_id}")
+    async def update_real_estate(listing_id: str, body: dict, user: dict = Depends(get_current_user)):
+        d = await db.real_estate.find_one({"id": listing_id})
+        if not d:
+            raise HTTPException(404, "Listing not found")
+        if d.get("owner_id") != user["id"] and user.get("role") != "admin":
+            raise HTTPException(403, "Not your listing")
+        allowed = set(RealEstateCreate.model_fields) | {"status"}
+        upd = {k: v for k, v in body.items() if k in allowed}
+        if upd.get("status") and upd["status"] not in ("active", "pending", "sold", "rented", "inactive"):
+            raise HTTPException(400, "Invalid status")
+        if any(k in upd for k in ("address", "city", "country")) and "lat" not in upd:
+            probe = {**d, **upd, "lat": None, "lng": None}
+            await geocode_listing(probe)
+            upd["lat"], upd["lng"] = probe.get("lat"), probe.get("lng")
+        if upd:
+            await db.real_estate.update_one({"id": listing_id}, {"$set": upd})
+        return _clean(await db.real_estate.find_one({"id": listing_id}))
 
     @router.get("/real-estate")
     async def list_real_estate(
@@ -212,6 +247,12 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         max_sqft: Optional[float] = None,
         min_year_built: Optional[int] = None,
         owner_id: Optional[str] = None,
+        country: Optional[str] = None,
+        north: Optional[float] = None,
+        south: Optional[float] = None,
+        east: Optional[float] = None,
+        west: Optional[float] = None,
+        sort: Optional[str] = None,
         limit: int = 60,
         viewer: Optional[dict] = Depends(get_optional_user),
     ):
@@ -219,11 +260,21 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         if owner_id:
             f["owner_id"] = owner_id
         if property_type:
-            f["property_type"] = property_type
+            types = [t for t in property_type.split(",") if t]
+            f["property_type"] = {"$in": types}
         if listing_kind:
-            f["listing_kind"] = listing_kind
+            kinds = [k for k in listing_kind.split(",") if k]
+            f["listing_kind"] = {"$in": kinds}
+        if country:
+            f["country"] = {"$regex": f"^{re.escape(country)}$", "$options": "i"}
+        if None not in (north, south, east, west):
+            f["lat"] = {"$gte": south, "$lte": north}
+            f["lng"] = {"$gte": west, "$lte": east} if west <= east else None
+            if f["lng"] is None:
+                f.pop("lng")
+                f.setdefault("$and", []).append({"$or": [{"lng": {"$gte": west}}, {"lng": {"$lte": east}}]})
         if city:
-            f["city"] = {"$regex": f"^{city}$", "$options": "i"}
+            f["city"] = {"$regex": re.escape(city), "$options": "i"}
         if state:
             f["state"] = {"$regex": f"^{state}$", "$options": "i"}
         price_f = {}
@@ -247,15 +298,19 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         if min_year_built is not None:
             f["year_built"] = {"$gte": min_year_built}
         if q:
+            q = re.escape(q.strip())
             f["$or"] = [
                 {"title": {"$regex": q, "$options": "i"}},
                 {"description": {"$regex": q, "$options": "i"}},
                 {"address": {"$regex": q, "$options": "i"}},
                 {"city": {"$regex": q, "$options": "i"}},
+                {"country": {"$regex": q, "$options": "i"}},
             ]
         f = await hide_demo(db, f, "owner_id", viewer, owner_id)
-        docs = await db.real_estate.find(f).sort("created_at", -1).to_list(min(limit, 200))
-        return [_clean(d) for d in docs]
+        sort_spec = {"price_asc": [("price", 1)], "price_desc": [("price", -1)]}.get(sort or "", [("created_at", -1)])
+        proj = {"_id": 0, "owner_email": 0, "contact_email": 0, "contact_phone": 0}
+        docs = await db.real_estate.find(f, proj).sort(sort_spec).to_list(min(limit, 500))
+        return docs
 
     @router.get("/real-estate/{listing_id}")
     async def get_real_estate(listing_id: str, viewer: Optional[dict] = Depends(get_optional_user)):

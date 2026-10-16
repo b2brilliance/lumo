@@ -2318,6 +2318,8 @@ async def create_rental(body: RentalCreate, user: dict = Depends(get_current_use
         "created_at": now_iso(),
     }
     await db.rentals.insert_one(doc)
+    if doc["category"] == "property":
+        await _sync_property_rentals(db, doc["id"])
     return clean_doc(doc)
 
 @api.delete("/rentals/{rental_id}")
@@ -2328,6 +2330,8 @@ async def delete_rental(rental_id: str, user: dict = Depends(get_current_user)):
     if r.get("owner_id") != user["id"] and user.get("role") != "admin":
         raise HTTPException(403, "Not allowed")
     await db.rentals.update_one({"id": rental_id}, {"$set": {"status": "deleted"}})
+    if r.get("category") == "property":
+        await _sync_property_rentals(db, rental_id)
     return {"deleted": True}
 
 @api.post("/rentals/{rental_id}/book")
@@ -6105,7 +6109,8 @@ async def seed():
     await db.users.create_index("email", unique=True)
     await db.jobs.create_index("created_at")
     await db.jobs.create_index("status")
-    for s in SEED_USERS:
+    demo_purged = await db.site_settings.find_one({"_id": "demo_purge"})
+    for s in ([] if demo_purged else SEED_USERS):
         if await db.users.find_one({"email": s["email"]}):
             # For existing provider seeds, backfill the Stripe onboarding
             # sentinel so the accept-job gate does not block the standard
@@ -7211,6 +7216,12 @@ async def on_startup():
             logger.info(f"Seeded {inserted} new affiliate offers")
     except Exception as e:
         logger.warning(f"Affiliate seed could not run: {e}")
+    try:
+        await _sync_property_rentals(db)
+        await db.re_saved_searches.create_index("user_id")
+        await db.re_favorites.create_index([("user_id", 1), ("listing_id", 1)], unique=True)
+    except Exception as e:
+        logger.warning(f"Property-rental sync failed: {e}")
     # Demo-data photo migration — replaces mismatched stock photos on seeded
     # cars, rentals, and marketplace inventory so listings actually show what
     # they're advertising.
@@ -7228,6 +7239,8 @@ async def on_shutdown():
 app.include_router(api)
 
 # Real Estate + Auto Sales classifieds (separate module to keep server.py reasonable)
+from real_estate_plus import create_router as _create_re_plus_router, sync_property_rentals as _sync_property_rentals  # noqa: E402
+app.include_router(_create_re_plus_router(db=db, get_current_user=get_current_user))
 from classifieds import create_router as _create_classifieds_router  # noqa: E402
 app.include_router(_create_classifieds_router(db=db, get_current_user=get_current_user, get_optional_user=get_optional_user))
 
@@ -7476,6 +7489,8 @@ app.include_router(_create_analytics_router(db=db, require_admin=_require_admin(
 
 # Admin CRUD — users + unified content management
 from admin_crud import build_admin_crud_router  # noqa: E402
+from demo_purge import create_router as _create_demo_purge_router  # noqa: E402
+app.include_router(_create_demo_purge_router(db=db, require_admin=_require_admin()))
 app.include_router(
     build_admin_crud_router(get_current_user=get_current_user, require_admin=_require_admin()),
     prefix="/api",

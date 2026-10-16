@@ -9,7 +9,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
-const PROPERTY_TYPES = ["house", "condo", "townhouse", "multi_family", "apartment", "land", "commercial"];
+const PROPERTY_TYPES = ["house", "condo", "townhouse", "apartment", "multi_family", "villa", "cabin", "studio", "land", "commercial"];
+const KINDS = [["sale", "For sale"], ["rent", "Long-term rent"], ["short_stay", "Short stay / vacation"], ["room", "Room / shared"]];
+const PRICE_HINT = { sale: "Asking price", rent: "Rent per month", room: "Rent per month", short_stay: "Price per night" };
 
 export default function RealEstateList() {
   const { user } = useAuth();
@@ -20,10 +22,27 @@ export default function RealEstateList() {
     title: "", description: "", price: "", address: "", city: "", state: "", country: "US",
     bedrooms: "", bathrooms: "", sqft: "", lot_size_sqft: "", year_built: "", hoa_monthly: "", parking_spots: "",
     photos_text: "", contact_email: user?.email || "", contact_phone: "",
+    currency: "USD", max_guests: "", amenities: "", available_from: "", furnished: "",
   });
+  const [uploading, setUploading] = useState(false);
+  const upload = async (e) => {
+    const files = [...(e.target.files || [])].slice(0, 8);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = [];
+      for (const f of files) {
+        const fd = new FormData(); fd.append("file", f);
+        const { data } = await api.post("/media/upload", fd);
+        urls.push(data.media_url);
+      }
+      setForm((prev) => ({ ...prev, photos_text: [prev.photos_text, ...urls].filter(Boolean).join("\n") }));
+      toast.success(`${urls.length} photo${urls.length > 1 ? "s" : ""} uploaded`);
+    } catch (err) { toast.error(formatApiError(err)); } finally { setUploading(false); e.target.value = ""; }
+  };
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
 
-  if (!user) { nav("/login"); return null; }
+  if (!user) { nav("/signin"); return null; }
 
   const submit = async (e) => {
     e.preventDefault();
@@ -44,7 +63,12 @@ export default function RealEstateList() {
         year_built: form.year_built ? parseInt(form.year_built, 10) : null,
         hoa_monthly: form.hoa_monthly ? parseFloat(form.hoa_monthly) : null,
         parking_spots: form.parking_spots ? parseInt(form.parking_spots, 10) : null,
-        photos: form.photos_text.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
+        photos: form.photos_text.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean).slice(0, 12),
+        currency: (form.currency || "USD").toUpperCase(),
+        max_guests: form.max_guests ? parseInt(form.max_guests, 10) : null,
+        amenities: form.amenities.split(",").map((s) => s.trim()).filter(Boolean),
+        available_from: form.available_from || null,
+        furnished: form.furnished === "" ? null : form.furnished === "yes",
         contact_email: form.contact_email || null,
         contact_phone: form.contact_phone || null,
       };
@@ -64,10 +88,10 @@ export default function RealEstateList() {
       <form onSubmit={submit} className="mt-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label>For sale or rent?</Label>
+            <Label>Listing type</Label>
             <Select value={form.listing_kind} onValueChange={set("listing_kind")}>
               <SelectTrigger data-testid="re-form-kind"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="sale">For sale</SelectItem><SelectItem value="rent">For rent</SelectItem></SelectContent>
+              <SelectContent>{KINDS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div>
@@ -84,20 +108,24 @@ export default function RealEstateList() {
           <Input data-testid="re-form-title" required value={form.title} onChange={set("title")} placeholder="Sunny 2BR with deck" />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Price (USD)</Label>
-            <Input data-testid="re-form-price" required type="number" min="1" value={form.price} onChange={set("price")} placeholder={form.listing_kind === "rent" ? "3250" : "895000"} />
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <Label>{PRICE_HINT[form.listing_kind]}</Label>
+            <Input data-testid="re-form-price" required type="number" min="1" value={form.price} onChange={set("price")} placeholder={form.listing_kind === "sale" ? "895000" : form.listing_kind === "short_stay" ? "120" : "2400"} />
           </div>
           <div>
-            <Label>Address</Label>
-            <Input data-testid="re-form-address" required value={form.address} onChange={set("address")} placeholder="123 Main St, Brooklyn, NY 11215" />
+            <Label>Currency</Label>
+            <Input data-testid="re-form-currency" maxLength={3} value={form.currency} onChange={set("currency")} placeholder="USD, EUR, GBP…" />
           </div>
+        </div>
+        <div>
+          <Label>Street address (we pin it on the map automatically)</Label>
+          <Input data-testid="re-form-address" required value={form.address} onChange={set("address")} placeholder="Rua Augusta 100, Lisbon — or 123 Main St, Brooklyn, NY" />
         </div>
 
         <div className="grid grid-cols-3 gap-3">
           <div><Label>City</Label><Input data-testid="re-form-city" value={form.city} onChange={set("city")} /></div>
-          <div><Label>State</Label><Input data-testid="re-form-state" value={form.state} onChange={set("state")} /></div>
+          <div><Label>State / region</Label><Input data-testid="re-form-state" value={form.state} onChange={set("state")} /></div>
           <div><Label>Country</Label><Input data-testid="re-form-country" value={form.country} onChange={set("country")} /></div>
         </div>
 
@@ -114,13 +142,41 @@ export default function RealEstateList() {
           <div><Label>Parking spots</Label><Input data-testid="re-form-parking" type="number" value={form.parking_spots} onChange={set("parking_spots")} /></div>
         </div>
 
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {(form.listing_kind === "short_stay" || form.listing_kind === "room") && (
+            <div><Label>Max guests</Label><Input data-testid="re-form-guests" type="number" value={form.max_guests} onChange={set("max_guests")} /></div>
+          )}
+          {form.listing_kind !== "sale" && (
+            <div><Label>Available from</Label><Input data-testid="re-form-available" type="date" value={form.available_from} onChange={set("available_from")} /></div>
+          )}
+          {form.listing_kind !== "sale" && (
+            <div>
+              <Label>Furnished?</Label>
+              <Select value={form.furnished || "unset"} onValueChange={(v) => setForm((f) => ({ ...f, furnished: v === "unset" ? "" : v }))}>
+                <SelectTrigger data-testid="re-form-furnished"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="unset">Not specified</SelectItem><SelectItem value="yes">Furnished</SelectItem><SelectItem value="no">Unfurnished</SelectItem></SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <div>
+          <Label>Amenities (comma separated)</Label>
+          <Input data-testid="re-form-amenities" value={form.amenities} onChange={set("amenities")} placeholder="WiFi, Parking, Pool, Washer, Pet friendly" />
+        </div>
+
         <div>
           <Label>Description</Label>
           <Textarea data-testid="re-form-desc" rows={4} value={form.description} onChange={set("description")} placeholder="Highlights, neighborhood, what makes this place special." />
         </div>
 
         <div>
-          <Label>Photo URLs (one per line, max 8)</Label>
+          <div className="flex items-center justify-between">
+            <Label>Photos (upload or paste URLs, one per line)</Label>
+            <label className="text-xs font-mono uppercase tracking-widest border border-slate-300 px-2 py-1 cursor-pointer hover:border-slate-900">
+              {uploading ? "Uploading…" : "Upload photos"}
+              <input type="file" accept="image/*" multiple className="hidden" onChange={upload} data-testid="re-form-upload" />
+            </label>
+          </div>
           <Textarea data-testid="re-form-photos" rows={3} value={form.photos_text} onChange={set("photos_text")} placeholder="https://… (paste hosted image URLs, one per line)" />
         </div>
 

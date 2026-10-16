@@ -17,7 +17,11 @@ Provides two families of endpoints:
 `type` is one of: listing, rental, auto, inventory, job.
 """
 from __future__ import annotations
+import json
 import logging
+import re
+import uuid
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,38 +36,104 @@ logger = logging.getLogger(__name__)
 #   • an "id" field name (always "id" in this app)
 #   • fields that are editable via PATCH
 # Adding a new type = adding one row here.
+STATUS = "select:active|pending|inactive|sold|rented|deleted"
 CONTENT_TYPES = {
     "listing": {
-        "collection": "listings",
-        "title_field": "title",
-        "editable": {"title", "description", "price", "category", "status"},
+        "collection": "listings", "title_field": "title", "owner_field": "seller_id", "owner_name": "seller_name",
         "label": "Community listing",
+        "fields": {"title": "text", "description": "textarea", "price": "number", "category": "text",
+                   "media_url": "text", "status": STATUS},
+    },
+    "real_estate": {
+        "collection": "real_estate", "title_field": "title", "owner_field": "owner_id", "owner_name": "owner_name",
+        "label": "Real estate",
+        "fields": {"title": "text", "description": "textarea",
+                   "listing_kind": "select:sale|rent|short_stay|room",
+                   "property_type": "select:house|condo|townhouse|apartment|multi_family|villa|cabin|studio|land|commercial",
+                   "price": "number", "price_unit": "select:total|month|week|night", "currency": "text",
+                   "address": "text", "city": "text", "state": "text", "country": "text",
+                   "lat": "number", "lng": "number", "bedrooms": "number", "bathrooms": "number",
+                   "sqft": "number", "year_built": "int", "photos": "list", "status": STATUS, "is_demo": "bool"},
     },
     "rental": {
-        "collection": "rentals",
-        "title_field": "title",
-        "editable": {"title", "description", "price_per_night", "category", "status"},
+        "collection": "rentals", "title_field": "title", "owner_field": "owner_id", "owner_name": "owner_name",
         "label": "Rental unit",
+        "fields": {"title": "text", "description": "textarea", "category": "text", "subcategory": "text",
+                   "pricing": "json", "media_url": "text", "booking_mode": "select:instant|request",
+                   "status": STATUS, "is_demo": "bool"},
     },
     "auto": {
-        "collection": "autos",
-        "title_field": "title",
-        "editable": {"title", "description", "price", "make", "model", "year", "mileage", "status"},
+        "collection": "autos", "title_field": "title", "owner_field": "owner_id", "owner_name": "owner_name",
         "label": "Auto sale",
+        "fields": {"title": "text", "description": "textarea", "price": "number", "year": "int", "make": "text",
+                   "model": "text", "trim": "text", "mileage": "number", "body_style": "text",
+                   "transmission": "text", "fuel": "text", "condition": "text", "city": "text", "state": "text",
+                   "country": "text", "photos": "list", "status": STATUS, "is_demo": "bool"},
     },
     "inventory": {
-        "collection": "inventory",
-        "title_field": "title",
-        "editable": {"title", "description", "price", "category", "status"},
+        "collection": "inventory", "title_field": "name", "owner_field": "owner_id", "owner_name": "store_name",
         "label": "Store item",
+        "fields": {"name": "text", "description": "textarea", "price": "number", "stock": "int",
+                   "category": "text", "media_url": "text", "status": STATUS},
     },
     "job": {
-        "collection": "jobs",
-        "title_field": "title",
-        "editable": {"title", "description", "budget", "status"},
-        "label": "Job / service request",
+        "collection": "jobs", "title_field": "title", "owner_field": "customer_id", "owner_name": "customer_name",
+        "label": "Job / service request", "default_status": "open",
+        "fields": {"title": "text", "description": "textarea", "category": "text", "pay_rate": "number",
+                   "pay_unit": "select:hour|day|week|flat", "estimated_units": "number",
+                   "employment_type": "select:on_demand|temp|employee|w2|remote", "is_remote": "bool",
+                   "apply_url": "text", "status": "select:open|accepted|in_progress|completed|cancelled"},
+    },
+    "shop_product": {
+        "collection": "shop_products", "title_field": "title", "label": "Shop product",
+        "fields": {"title": "text", "description": "textarea", "image_url": "text", "price": "number",
+                   "price_display": "text", "retailer": "text", "retailer_label": "text", "affiliate_url": "text",
+                   "category": "text", "rating": "number", "is_active": "bool", "is_featured": "bool"},
+    },
+    "blog_post": {
+        "collection": "blog_posts", "title_field": "title", "label": "Blog post", "default_status": "draft",
+        "fields": {"title": "text", "slug": "text", "excerpt": "textarea", "body_md": "textarea", "tags": "list",
+                   "hero_image_url": "text", "author": "text", "status": "select:published|draft"},
+    },
+    "recruit_city": {
+        "collection": "recruit_cities", "title_field": "city", "label": "Recruit city",
+        "fields": {"city": "text", "slug": "text", "state": "text", "state_full": "text", "goal_workers": "int",
+                   "bonus_amount": "number", "bonus_first_n": "int", "hero_headline": "text",
+                   "hero_subhead": "text", "hero_image": "text", "neighborhoods": "list", "is_active": "bool"},
     },
 }
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")[:80]
+
+
+def _coerce(fields: dict, raw: dict) -> dict:
+    out = {}
+    for k, v in (raw or {}).items():
+        kind = fields.get(k)
+        if kind is None:
+            continue
+        if v == "" and kind not in ("text", "textarea"):
+            out[k] = None
+            continue
+        try:
+            if kind == "number":
+                v = None if v is None else float(v)
+            elif kind == "int":
+                v = None if v is None else int(float(v))
+            elif kind == "bool":
+                v = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")
+            elif kind == "list":
+                v = v if isinstance(v, list) else [x.strip() for x in str(v or "").split(",") if x.strip()]
+            elif kind == "json":
+                v = v if isinstance(v, (dict, list)) else json.loads(v or "{}")
+            elif kind.startswith("select:") and v not in kind[7:].split("|"):
+                raise ValueError(f"must be one of {kind[7:]}")
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, f"Invalid value for {k}: {e}")
+        out[k] = v
+    return out
 
 
 class UserPatch(BaseModel):
@@ -74,6 +144,16 @@ class UserPatch(BaseModel):
     role: Optional[str] = None  # customer / provider / retailer / restaurant / admin
     wallet_balance: Optional[float] = None
     banned: Optional[bool] = None
+    phone: Optional[str] = None
+    password: Optional[str] = None
+
+
+class UserCreateAdmin(BaseModel):
+    email: str
+    name: str
+    password: str = Field(min_length=6)
+    role: str = "customer"
+    phone: Optional[str] = None
 
 
 class ContentPatch(BaseModel):
@@ -115,10 +195,34 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         update = {k: v for k, v in body.model_dump().items() if v is not None}
         if "role" in update and update["role"] not in {"customer", "provider", "retailer", "restaurant", "admin"}:
             raise HTTPException(400, f"Invalid role: {update['role']}")
+        if "password" in update:
+            from server import hash_password
+            if len(update["password"]) < 6:
+                raise HTTPException(400, "Password must be at least 6 characters")
+            update["password_hash"] = hash_password(update.pop("password"))
+        if "email" in update:
+            update["email"] = update["email"].strip().lower()
+            if await db.users.find_one({"email": update["email"], "id": {"$ne": user_id}}):
+                raise HTTPException(400, "Email already in use")
         if update:
             await db.users.update_one({"id": user_id}, {"$set": update})
         fresh = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
         return {"ok": True, "user": fresh}
+
+    @router.post("/users")
+    async def create_user(body: UserCreateAdmin, _: dict = Depends(require_admin)):
+        from server import db, hash_password
+        email = body.email.strip().lower()
+        if body.role not in {"customer", "provider", "admin"}:
+            raise HTTPException(400, f"Invalid role: {body.role}")
+        if await db.users.find_one({"email": email}):
+            raise HTTPException(400, "Email already registered")
+        doc = {"id": str(uuid.uuid4()), "email": email, "name": body.name, "role": body.role,
+               "phone": body.phone, "password_hash": hash_password(body.password), "wallet_balance": 0.0,
+               "location": None, "service_radius_miles": 25.0, "categories": [], "storefront": None,
+               "created_at": datetime.now(timezone.utc).isoformat(), "created_by_admin": True}
+        await db.users.insert_one(doc)
+        return {"ok": True, "user": {k: v for k, v in doc.items() if k not in ("_id", "password_hash")}}
 
     @router.delete("/users/{user_id}")
     async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
@@ -181,12 +285,9 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if q:
             rx = {"$regex": q.strip(), "$options": "i"}
             title_field = spec["title_field"]
-            filt["$or"] = [
-                {title_field: rx},
-                {"description": rx},
-                {"seller_name": rx},
-                {"category": rx},
-            ]
+            filt["$or"] = [{title_field: rx}, {"description": rx}, {"category": rx}, {"city": rx}, {"slug": rx}]
+            if spec.get("owner_name"):
+                filt["$or"].append({spec["owner_name"]: rx})
         cursor = coll.find(filt, {"_id": 0}).sort("created_at", -1).skip(int(skip)).limit(min(int(limit), 500))
         docs = await cursor.to_list(length=min(int(limit), 500))
         total = await coll.count_documents(filt)
@@ -204,13 +305,58 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
             raise HTTPException(404, f"{spec['label']} not found")
         # Whitelist by type — silently drop unknown fields so a rogue payload
         # can't rewrite `owner_id` or wallet-adjacent columns.
-        allowed = spec["editable"]
-        update = {k: v for k, v in (body.updates or {}).items() if k in allowed}
+        update = _coerce(spec["fields"], body.updates)
         if not update:
-            raise HTTPException(400, f"No editable fields in payload. Allowed: {sorted(allowed)}")
+            raise HTTPException(400, f"No editable fields in payload. Allowed: {sorted(spec['fields'])}")
+        update["updated_at"] = datetime.now(timezone.utc).isoformat()
         await coll.update_one({"id": item_id}, {"$set": update})
         fresh = await coll.find_one({"id": item_id}, {"_id": 0})
         return {"ok": True, "item": fresh}
+
+    @router.post("/content/{type}")
+    async def create_content(type: str, body: ContentPatch, admin: dict = Depends(require_admin)):
+        from server import db
+        if type not in CONTENT_TYPES:
+            raise HTTPException(400, f"Unknown content type: {type}")
+        spec = CONTENT_TYPES[type]
+        doc = _coerce(spec["fields"], body.updates)
+        if not doc.get(spec["title_field"]):
+            raise HTTPException(400, f"{spec['title_field']} is required")
+        now = datetime.now(timezone.utc).isoformat()
+        doc.update({"id": str(uuid.uuid4()), "created_at": now, "updated_at": now, "created_by_admin": True})
+        if "status" in spec["fields"] and not doc.get("status"):
+            doc["status"] = spec.get("default_status", "active")
+        if spec.get("owner_field"):
+            doc.setdefault(spec["owner_field"], admin["id"])
+            doc.setdefault(spec["owner_name"], admin.get("name"))
+        if type == "blog_post":
+            doc["slug"] = doc.get("slug") or _slugify(doc["title"])
+            if doc.get("status") == "published":
+                doc["published_at"] = now
+        if type == "recruit_city":
+            doc["slug"] = doc.get("slug") or _slugify(f"{doc['city']}-{doc.get('state') or ''}")
+            doc.setdefault("is_active", True)
+        if type == "shop_product":
+            doc.setdefault("is_active", True)
+            doc.setdefault("click_count", 0)
+        if type == "real_estate":
+            from real_estate_plus import geocode_listing
+            doc.setdefault("listing_kind", "sale")
+            doc.setdefault("property_type", "house")
+            doc.setdefault("currency", "USD")
+            doc["is_demo"] = bool(doc.get("is_demo"))
+            await geocode_listing(doc)
+        if type == "job":
+            from server import category_group
+            doc.setdefault("category", "other")
+            doc["category_group"] = category_group(doc["category"])
+            doc.setdefault("pay_rate", 0.0)
+            doc.setdefault("pay_unit", "flat")
+            doc.setdefault("estimated_units", 1.0)
+        coll = getattr(db, spec["collection"])
+        await coll.insert_one(doc)
+        doc.pop("_id", None)
+        return {"ok": True, "item": doc}
 
     @router.delete("/content/{type}/{item_id}")
     async def delete_content(type: str, item_id: str, _: dict = Depends(require_admin)):
@@ -241,7 +387,11 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         """Metadata for the UI — the frontend uses this to build the type
         picker + know what fields are editable per type."""
         return [
-            {"key": k, "label": v["label"], "editable": sorted(v["editable"])}
+            {"key": k, "label": v["label"], "title_field": v["title_field"],
+             "editable": list(v["fields"]),
+             "fields": [{"name": f, "kind": kind.split(":")[0],
+                         "options": kind[7:].split("|") if kind.startswith("select:") else None}
+                        for f, kind in v["fields"].items()]}
             for k, v in CONTENT_TYPES.items()
         ]
 

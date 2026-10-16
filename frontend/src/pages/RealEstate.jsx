@@ -1,160 +1,149 @@
-import React, { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { api } from "@/lib/api";
-import { Input } from "@/components/ui/input";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
+import { Home, Map as MapIcon, List, Bookmark, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { api, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import AffiliateBlock from "@/components/AffiliateBlock";
-import PageHero from "@/components/PageHero";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Home, BedDouble, Bath, Maximize, MapPin } from "lucide-react";
+import ReMap from "@/components/realestate/ReMap";
+import ReCard from "@/components/realestate/ReCard";
+import PlaceSearch from "@/components/realestate/PlaceSearch";
+import SaveSearchButton from "@/components/realestate/SaveSearchButton";
+import { KindTabs, FilterRow } from "@/components/realestate/ReFilters";
+import { apiParamsFrom, useReFavorites } from "@/components/realestate/reUtils";
 
-const PROPERTY_TYPES = [
-  { v: "", l: "All types" },
-  { v: "house", l: "House" },
-  { v: "condo", l: "Condo" },
-  { v: "townhouse", l: "Townhouse" },
-  { v: "multi_family", l: "Multi-family" },
-  { v: "apartment", l: "Apartment" },
-  { v: "land", l: "Land" },
-  { v: "commercial", l: "Commercial" },
-];
-
-function PriceTag({ price, kind }) {
-  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-  return (
-    <div className="flex items-baseline gap-1">
-      <span className="font-display text-2xl font-bold">{fmt.format(price)}</span>
-      {kind === "rent" && <span className="text-xs font-mono text-slate-500">/mo</span>}
-    </div>
-  );
-}
-
-function ListingCard({ r }) {
-  const photo = (r.photos && r.photos[0]) || null;
-  return (
-    <Link to={`/real-estate/${r.id}`} className="block border border-slate-200 hover:border-slate-900 transition-colors group" data-testid={`re-card-${r.id}`}>
-      <div className="aspect-[4/3] bg-slate-100 relative overflow-hidden">
-        {photo ? (
-          <img src={photo} alt={r.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center"><Home className="w-10 h-10 opacity-30" /></div>
-        )}
-        <div className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-widest bg-white/90 px-2 py-1 border border-slate-200">
-          {r.listing_kind === "rent" ? "For rent" : "For sale"}
-        </div>
-      </div>
-      <div className="p-4">
-        <div className="font-display font-bold text-base truncate group-hover:underline">{r.title}</div>
-        {r.address && (
-          <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
-            <MapPin className="w-3 h-3" /><span className="truncate">{r.address}</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between mt-3">
-          <PriceTag price={r.price} kind={r.listing_kind} />
-          <div className="flex items-center gap-3 text-xs font-mono text-slate-500">
-            {r.bedrooms != null && <span className="inline-flex items-center gap-1"><BedDouble className="w-3 h-3" />{r.bedrooms}</span>}
-            {r.bathrooms != null && <span className="inline-flex items-center gap-1"><Bath className="w-3 h-3" />{r.bathrooms}</span>}
-            {r.sqft != null && <span className="inline-flex items-center gap-1"><Maximize className="w-3 h-3" />{Math.round(r.sqft)}</span>}
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
+const BOUND_KEYS = ["north", "south", "east", "west"];
 
 export default function RealEstate() {
   const [params, setParams] = useSearchParams();
+  const nav = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState(null);
+  const [fitTo, setFitTo] = useState(null);
+  const [mobileView, setMobileView] = useState("list");
+  const [followMap, setFollowMap] = useState(true);
+  const firstFit = useRef(false);
+  const fav = useReFavorites();
 
-  const f = {
-    q: params.get("q") || "",
-    listing_kind: params.get("listing_kind") || "",
-    property_type: params.get("property_type") || "",
-    city: params.get("city") || "",
-    min_price: params.get("min_price") || "",
-    max_price: params.get("max_price") || "",
-    min_beds: params.get("min_beds") || "",
-    min_baths: params.get("min_baths") || "",
+  const update = (changes) => {
+    const next = new URLSearchParams(params);
+    Object.entries(changes).forEach(([k, v]) => { if (v === "" || v == null) next.delete(k); else next.set(k, String(v)); });
+    setParams(next, { replace: true });
   };
+  const set = (k, v) => update({ [k]: v });
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const url = new URLSearchParams();
-    Object.entries(f).forEach(([k, v]) => { if (v) url.set(k, v); });
-    url.set("limit", "60");
-    api.get(`/real-estate?${url}`).then(({ data }) => {
-      if (!cancelled) { setItems(data); setLoading(false); }
-    });
-    return () => { cancelled = true; };
+    const t = setTimeout(() => {
+      const q = apiParamsFrom(params);
+      q.set("limit", "300");
+      api.get(`/real-estate?${q}`).then(({ data }) => {
+        if (cancelled) return;
+        setItems(data);
+        setLoading(false);
+        if (!firstFit.current) {
+          firstFit.current = true;
+          if (params.get("north")) {
+            setFitTo({ bbox: Object.fromEntries(BOUND_KEYS.map((k) => [k, +params.get(k)])) });
+          } else {
+            const pts = data.filter((r) => r.lat != null).map((r) => [r.lat, r.lng]);
+            if (pts.length) setFitTo({ points: pts });
+          }
+        }
+      }).catch(() => { if (!cancelled) { setItems([]); setLoading(false); } });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [params]);
 
-  const set = (k, v) => {
-    const next = new URLSearchParams(params);
-    if (v) next.set(k, v); else next.delete(k);
-    setParams(next);
+  const onBounds = (b) => {
+    if (!followMap) return;
+    update(Object.fromEntries(BOUND_KEYS.map((k) => [k, b[k].toFixed(4)])));
   };
 
+  const onPlace = (p) => {
+    const bbox = p.bbox || { north: p.lat + 0.1, south: p.lat - 0.1, east: p.lng + 0.1, west: p.lng - 0.1 };
+    update({ place: p.label.split(",").slice(0, 2).join(","), ...Object.fromEntries(BOUND_KEYS.map((k) => [k, bbox[k].toFixed(4)])) });
+    setFitTo({ bbox });
+    setMobileView("map");
+  };
+
+  const toggleFav = async (id) => {
+    if (!fav.signedIn) { nav("/signin", { state: { from: "/real-estate" } }); return; }
+    try {
+      const on = await fav.toggle(id);
+      toast.success(on ? "Saved to your homes" : "Removed from saved homes");
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const clearArea = () => { update({ north: "", south: "", east: "", west: "", place: "" }); setFitTo({ bbox: { north: 70, south: -50, east: 170, west: -170 } }); };
+  const hasFilters = [...params.keys()].length > 0;
+
   return (
-    <div className="max-w-screen-2xl mx-auto py-0" data-testid="real-estate-page">
-      <PageHero
-        image="https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=1600"
-        overline="Lumo · Marketplace"
-        title="Real Estate"
-        subtitle="Homes for sale and for rent — direct from sellers and landlords. Message owners privately through Lumo."
-        action={<Link to="/real-estate/list"><Button className="bg-white text-slate-900 hover:bg-slate-100" data-testid="re-list-btn">List a property</Button></Link>}
-      />
-      <div className="px-4 sm:px-6 pb-8">
+    <div className="bg-white" data-testid="real-estate-page">
+      <Helmet><title>Homes for sale, rent & short stays worldwide · Lumo Real Estate</title></Helmet>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-6 text-xs">
-        <Input data-testid="re-filter-q" placeholder="Search title, city…" defaultValue={f.q} onBlur={(e) => set("q", e.target.value)} />
-        <Select value={f.listing_kind || "any"} onValueChange={(v) => set("listing_kind", v === "any" ? "" : v)}>
-          <SelectTrigger data-testid="re-filter-kind"><SelectValue placeholder="Sale / Rent" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="any">Sale + Rent</SelectItem>
-            <SelectItem value="sale">For sale</SelectItem>
-            <SelectItem value="rent">For rent</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={f.property_type || "any"} onValueChange={(v) => set("property_type", v === "any" ? "" : v)}>
-          <SelectTrigger data-testid="re-filter-type"><SelectValue placeholder="Property type" /></SelectTrigger>
-          <SelectContent>
-            {PROPERTY_TYPES.map((p) => <SelectItem key={p.v || "any"} value={p.v || "any"}>{p.l}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Input data-testid="re-filter-city" placeholder="City" defaultValue={f.city} onBlur={(e) => set("city", e.target.value)} />
-        <Input data-testid="re-filter-min-price" placeholder="Min $" type="number" defaultValue={f.min_price} onBlur={(e) => set("min_price", e.target.value)} />
-        <Input data-testid="re-filter-max-price" placeholder="Max $" type="number" defaultValue={f.max_price} onBlur={(e) => set("max_price", e.target.value)} />
-        <div className="flex gap-2">
-          <Input data-testid="re-filter-min-beds" placeholder="Beds+" type="number" defaultValue={f.min_beds} onBlur={(e) => set("min_beds", e.target.value)} />
-          <Input data-testid="re-filter-min-baths" placeholder="Baths+" type="number" defaultValue={f.min_baths} onBlur={(e) => set("min_baths", e.target.value)} />
+      <div className="border-b border-slate-200 px-4 sm:px-6 py-3 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <PlaceSearch initial={params.get("place") || ""} onPick={onPlace} />
+          <SaveSearchButton params={params} />
+          <Link to="/real-estate/saved"><Button variant="outline" className="h-11" data-testid="re-saved-link"><Bookmark className="w-4 h-4 mr-2" />Saved</Button></Link>
+          <Link to="/real-estate/list"><Button variant="outline" className="h-11" data-testid="re-list-btn"><Plus className="w-4 h-4 mr-2" />List a property</Button></Link>
         </div>
+        <KindTabs value={params.get("kind") || "all"} onChange={(k) => set("kind", k === "all" ? "" : k)} />
+        <FilterRow key={params.get("kind") || "all"} params={params} set={set} />
       </div>
 
-      {loading ? (
-        <div className="py-24 text-center text-slate-500 font-mono text-sm">Loading…</div>
-      ) : items.length === 0 ? (
-        params.toString() ? (
-          <div className="py-24 text-center text-slate-500 font-mono text-sm" data-testid="re-empty-filtered">No listings match those filters.</div>
-        ) : (
-          <div className="py-20 text-center border border-dashed border-slate-300" data-testid="re-empty">
-            <Home className="w-10 h-10 mx-auto opacity-40" />
-            <div className="font-display text-2xl font-bold mt-4">No listings yet — be the first.</div>
-            <p className="text-sm text-slate-500 mt-2">List a home, condo, land or rental and reach buyers worldwide.</p>
-            <Link to="/real-estate/list"><Button className="mt-6" data-testid="re-empty-list-btn">List a property</Button></Link>
+      <div className="lg:grid lg:grid-cols-[1.15fr_1fr] lg:h-[calc(100vh-220px)] lg:min-h-[560px]">
+        <div className={`${mobileView === "map" ? "block" : "hidden"} lg:block relative h-[70vh] lg:h-full border-r border-slate-200`}>
+          <ReMap items={items} activeId={activeId} onHover={setActiveId} onSelect={(r) => nav(`/real-estate/${r.id}`)} onBounds={onBounds} fitTo={fitTo} />
+          <label className="absolute top-3 left-14 z-[500] bg-white border border-slate-900 px-3 py-1.5 text-xs font-mono uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow">
+            <input type="checkbox" checked={followMap} onChange={(e) => setFollowMap(e.target.checked)} data-testid="re-follow-map" />
+            Search as I move the map
+          </label>
+        </div>
+
+        <div className={`${mobileView === "list" ? "block" : "hidden"} lg:block lg:h-full lg:overflow-y-auto px-4 sm:px-6 py-4`} data-testid="re-results">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm"><span className="font-display font-bold text-lg" data-testid="re-count">{loading ? "…" : items.length}</span> <span className="text-slate-500">homes{params.get("place") ? ` in ${params.get("place")}` : params.get("north") ? " in this map area" : " worldwide"}</span></div>
+            {params.get("north") && <button onClick={clearArea} className="text-xs font-mono underline text-slate-600" data-testid="re-clear-area">Search worldwide</button>}
           </div>
-        )
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="re-grid">
-          {items.map((r) => <ListingCard key={r.id} r={r} />)}
+          {loading && items.length === 0 ? (
+            <div className="py-24 text-center text-slate-500 font-mono text-sm">Loading…</div>
+          ) : items.length === 0 ? (
+            hasFilters ? (
+              <div className="py-20 text-center border border-dashed border-slate-300" data-testid="re-empty-filtered">
+                <div className="font-display text-xl font-bold">No homes match here.</div>
+                <p className="text-sm text-slate-500 mt-2">Zoom out, move the map or loosen your filters.</p>
+                <Button variant="outline" className="mt-5" onClick={() => { setParams(new URLSearchParams()); clearArea(); }} data-testid="re-reset-filters">Reset all filters</Button>
+              </div>
+            ) : (
+              <div className="py-20 text-center border border-dashed border-slate-300" data-testid="re-empty">
+                <Home className="w-10 h-10 mx-auto opacity-40" />
+                <div className="font-display text-2xl font-bold mt-4">No listings yet — be the first.</div>
+                <p className="text-sm text-slate-500 mt-2">List a home, condo, land, room or short stay and reach people worldwide.</p>
+                <Link to="/real-estate/list"><Button className="mt-6" data-testid="re-empty-list-btn">List a property</Button></Link>
+              </div>
+            )
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-testid="re-grid">
+              {items.map((r) => (
+                <ReCard key={r.id} r={r} active={r.id === activeId} onHover={setActiveId} favorited={fav.ids.has(r.id)} onFavorite={toggleFav} />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-      <div className="mt-12 -mx-4 sm:-mx-6">
-        <AffiliateBlock category="real-estate" title="Mortgage & home services partners" subtitle="Get pre-approved, find a top agent, lock in home insurance." />
       </div>
-      </div>
+
+      <button
+        type="button"
+        onClick={() => setMobileView(mobileView === "map" ? "list" : "map")}
+        className="lg:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-[600] bg-slate-900 text-white px-5 py-3 text-xs font-mono uppercase tracking-widest flex items-center gap-2 shadow-xl"
+        data-testid="re-mobile-toggle"
+      >
+        {mobileView === "map" ? <><List className="w-4 h-4" />List</> : <><MapIcon className="w-4 h-4" />Map</>}
+      </button>
     </div>
   );
 }
