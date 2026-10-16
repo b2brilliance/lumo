@@ -221,6 +221,7 @@ export default function ContentTab() {
           type={type}
           item={editing}
           fieldSpecs={fieldSpecs}
+          singular={typeMeta.label}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
         />
@@ -257,9 +258,11 @@ function toFormValue(spec, v) {
   return v;
 }
 
-function ContentEditDialog({ type, item, fieldSpecs, onClose, onSaved }) {
+function ContentEditDialog({ type, item, fieldSpecs, singular, onClose, onSaved }) {
   const isNew = !item.id;
-  const [form, setForm] = useState(() => Object.fromEntries(fieldSpecs.map((f) => [f.name, toFormValue(f, item[f.name])])));
+  const [form, setForm] = useState(() => Object.fromEntries(fieldSpecs.map((f) => [
+    f.name, isNew && f.name === "is_active" ? true : toFormValue(f, item[f.name]),
+  ])));
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -270,7 +273,7 @@ function ContentEditDialog({ type, item, fieldSpecs, onClose, onSaved }) {
         const v = form[f.name];
         const orig = toFormValue(f, item[f.name]);
         if (!isNew && v === orig) return;
-        if (isNew && (v === "" || v == null)) return;
+        if (isNew && (v === "" || v == null || (f.kind === "bool" && v === false))) return;
         updates[f.name] = v;
       });
       if (isNew) await api.post(`/admin/content/${type}`, { updates });
@@ -286,7 +289,7 @@ function ContentEditDialog({ type, item, fieldSpecs, onClose, onSaved }) {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl" data-testid="admin-content-edit-dialog">
         <DialogHeader>
-          <DialogTitle>{isNew ? "New" : "Edit"} {(TYPE_ICONS[type]?.label || type).replace(/s$/, "")}</DialogTitle>
+          <DialogTitle>{isNew ? "New" : "Edit"} {(singular || type).toLowerCase()}</DialogTitle>
           <DialogDescription>{isNew ? "Fill in the fields you need — blanks are skipped." : "Only changed fields are saved."}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[62vh] overflow-y-auto pr-1">

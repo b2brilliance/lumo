@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Literal
 
 from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ValidationError
 
 import re
 
@@ -220,10 +220,21 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
             raise HTTPException(404, "Listing not found")
         if d.get("owner_id") != user["id"] and user.get("role") != "admin":
             raise HTTPException(403, "Not your listing")
-        allowed = set(RealEstateCreate.model_fields) | {"status"}
+        allowed = set(RealEstateCreate.model_fields)
         upd = {k: v for k, v in body.items() if k in allowed}
-        if upd.get("status") and upd["status"] not in ("active", "pending", "sold", "rented", "inactive"):
+        status = body.get("status")
+        if status is not None and status not in ("active", "pending", "sold", "rented", "inactive"):
             raise HTTPException(400, "Invalid status")
+        if upd:
+            base = {k: d.get(k) for k in allowed if d.get(k) is not None}
+            base.pop("contact_email", None)
+            try:
+                checked = RealEstateCreate.model_validate({**base, **upd}).model_dump()
+            except ValidationError as e:
+                raise HTTPException(400, f"Invalid listing data: {e.errors()[0].get('loc')} {e.errors()[0].get('msg')}")
+            upd = {k: checked[k] for k in upd}
+        if status:
+            upd["status"] = status
         if any(k in upd for k in ("address", "city", "country")) and "lat" not in upd:
             probe = {**d, **upd, "lat": None, "lng": None}
             await geocode_listing(probe)
@@ -276,7 +287,7 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         if city:
             f["city"] = {"$regex": re.escape(city), "$options": "i"}
         if state:
-            f["state"] = {"$regex": f"^{state}$", "$options": "i"}
+            f["state"] = {"$regex": f"^{re.escape(state)}$", "$options": "i"}
         price_f = {}
         if min_price is not None:
             price_f["$gte"] = min_price
@@ -388,9 +399,9 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         if condition:
             f["condition"] = condition
         if city:
-            f["city"] = {"$regex": f"^{city}$", "$options": "i"}
+            f["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
         if state:
-            f["state"] = {"$regex": f"^{state}$", "$options": "i"}
+            f["state"] = {"$regex": f"^{re.escape(state)}$", "$options": "i"}
         year_f = {}
         if min_year is not None:
             year_f["$gte"] = min_year

@@ -7218,6 +7218,8 @@ async def on_startup():
         logger.warning(f"Affiliate seed could not run: {e}")
     try:
         await _sync_property_rentals(db)
+        from real_estate_plus import backfill_units
+        await backfill_units(db)
         await db.re_saved_searches.create_index("user_id")
         await db.re_favorites.create_index([("user_id", 1), ("listing_id", 1)], unique=True)
     except Exception as e:

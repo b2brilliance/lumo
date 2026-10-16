@@ -12,7 +12,7 @@ import {
  *   1. I need something done   → /for-you   (customers)
  *   2. I want to work / earn   → /for-work  (providers, jobseekers)
  *   3. Buy or rent stuff       → /marketplace(products + rentals, global)
- *   4. Property                → /real-estate(real estate, global)
+ *   4. Buy / rent / stay       → /real-estate(real estate, global)
  *
  * Mobile-first: 1 column, big tap targets. Desktop: 2×2 grid.
  */
@@ -55,9 +55,9 @@ const TILES = [
     key: "estate",
     to: "/real-estate",
     icon: Building2,
-    overline: "Property",
-    title: "Homes & land.",
-    subtitle: "For sale, for rent, short-stay, commercial — list yours or find your next one.",
+    overline: "Real estate & rentals",
+    title: "Buy, rent or stay.",
+    subtitle: "Homes for sale, long-term rentals and short stays worldwide — plus rooms, commercial space and land.",
     tint: "bg-gradient-to-br from-slate-900 via-stone-900 to-amber-900",
     textOnTint: "text-white",
     testid: "persona-estate",

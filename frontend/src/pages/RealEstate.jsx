@@ -23,6 +23,7 @@ export default function RealEstate() {
   const [fitTo, setFitTo] = useState(null);
   const [mobileView, setMobileView] = useState("list");
   const [followMap, setFollowMap] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const firstFit = useRef(false);
   const fav = useReFavorites();
 
@@ -59,7 +60,7 @@ export default function RealEstate() {
 
   const onBounds = (b) => {
     if (!followMap) return;
-    update(Object.fromEntries(BOUND_KEYS.map((k) => [k, b[k].toFixed(4)])));
+    update({ place: "", ...Object.fromEntries(BOUND_KEYS.map((k) => [k, b[k].toFixed(4)])) });
   };
 
   const onPlace = (p) => {
@@ -86,18 +87,25 @@ export default function RealEstate() {
 
       <div className="border-b border-slate-200 px-4 sm:px-6 py-3 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <PlaceSearch initial={params.get("place") || ""} onPick={onPlace} />
+          <div className="w-full sm:w-auto sm:flex-1 flex"><PlaceSearch initial={params.get("place") || ""} onPick={onPlace} /></div>
           <SaveSearchButton params={params} />
-          <Link to="/real-estate/saved"><Button variant="outline" className="h-11" data-testid="re-saved-link"><Bookmark className="w-4 h-4 mr-2" />Saved</Button></Link>
-          <Link to="/real-estate/list"><Button variant="outline" className="h-11" data-testid="re-list-btn"><Plus className="w-4 h-4 mr-2" />List a property</Button></Link>
+          <Link to="/real-estate/saved"><Button variant="outline" className="h-11" data-testid="re-saved-link"><Bookmark className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Saved</span></Button></Link>
+          <Link to="/real-estate/list"><Button variant="outline" className="h-11" data-testid="re-list-btn"><Plus className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">List a property</span></Button></Link>
         </div>
-        <KindTabs value={params.get("kind") || "all"} onChange={(k) => set("kind", k === "all" ? "" : k)} />
-        <FilterRow key={params.get("kind") || "all"} params={params} set={set} />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0"><KindTabs value={params.get("kind") || "all"} onChange={(k) => set("kind", k === "all" ? "" : k)} /></div>
+          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="lg:hidden shrink-0 px-3 py-2 text-xs font-mono uppercase tracking-widest border border-slate-900" data-testid="re-filters-toggle">
+            Filters
+          </button>
+        </div>
+        <div className={`${filtersOpen ? "block" : "hidden"} lg:block`}>
+          <FilterRow key={params.get("kind") || "all"} params={params} set={set} />
+        </div>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1.15fr_1fr] lg:h-[calc(100vh-220px)] lg:min-h-[560px]">
         <div className={`${mobileView === "map" ? "block" : "hidden"} lg:block relative h-[70vh] lg:h-full border-r border-slate-200`}>
-          <ReMap items={items} activeId={activeId} onHover={setActiveId} onSelect={(r) => nav(`/real-estate/${r.id}`)} onBounds={onBounds} fitTo={fitTo} />
+          <ReMap items={items} activeId={activeId} onHover={setActiveId} onSelect={(r) => nav(`/real-estate/${r.id}`)} onBounds={onBounds} fitTo={fitTo} resizeKey={mobileView} />
           <label className="absolute top-3 left-14 z-[500] bg-white border border-slate-900 px-3 py-1.5 text-xs font-mono uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow">
             <input type="checkbox" checked={followMap} onChange={(e) => setFollowMap(e.target.checked)} data-testid="re-follow-map" />
             Search as I move the map

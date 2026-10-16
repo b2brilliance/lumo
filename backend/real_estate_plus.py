@@ -4,7 +4,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Literal, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -108,7 +108,11 @@ async def notify_matching_searches(db, doc: dict, send_email=None) -> int:
         return 0
     sent = 0
     async for s in db.re_saved_searches.find({"notify": True, "user_id": {"$ne": doc.get("owner_id")}}):
-        if not listing_matches(s.get("filters") or {}, doc):
+        try:
+            if not listing_matches(s.get("filters") or {}, doc):
+                continue
+        except (TypeError, ValueError, KeyError) as e:
+            logger.warning(f"Skipping malformed saved search {s.get('id')}: {e}")
             continue
         title = f"New match: {doc.get('title')}"
         body = f"{doc.get('city') or doc.get('address') or ''} — matches your saved search \"{s.get('name')}\""
@@ -166,6 +170,13 @@ def _rental_to_re(r: dict) -> dict:
     }
 
 
+async def backfill_units(db) -> None:
+    units = {"sale": "total", "rent": "month", "room": "month", "short_stay": "night"}
+    for kind, unit in units.items():
+        await db.real_estate.update_many({"listing_kind": kind, "price_unit": None}, {"$set": {"price_unit": unit}})
+    await db.real_estate.update_many({"currency": None}, {"$set": {"currency": "USD"}})
+
+
 async def sync_property_rentals(db, rental_id: Optional[str] = None) -> int:
     q = {"category": "property"}
     if rental_id:
@@ -188,9 +199,30 @@ async def sync_property_rentals(db, rental_id: Optional[str] = None) -> int:
 
 
 # ── Router ───────────────────────────────────────────────────────────────────
+class BBox(BaseModel):
+    north: float
+    south: float
+    east: float
+    west: float
+
+
+class SearchFilters(BaseModel):
+    kinds: Optional[List[Literal["sale", "rent", "short_stay", "room"]]] = None
+    property_types: Optional[List[str]] = None
+    q: Optional[str] = Field(default=None, max_length=200)
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    min_beds: Optional[float] = None
+    min_baths: Optional[float] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    place: Optional[str] = None
+    bbox: Optional[BBox] = None
+
+
 class SavedSearchIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    filters: dict = Field(default_factory=dict)
+    filters: SearchFilters = Field(default_factory=SearchFilters)
     notify: bool = True
 
 
@@ -211,7 +243,8 @@ def create_router(*, db, get_current_user) -> APIRouter:
     async def create_saved(body: SavedSearchIn, user: dict = Depends(get_current_user)):
         if await db.re_saved_searches.count_documents({"user_id": user["id"]}) >= 25:
             raise HTTPException(400, "You can keep up to 25 saved searches")
-        doc = {"id": str(uuid.uuid4()), "user_id": user["id"], **body.model_dump(),
+        doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "name": body.name, "notify": body.notify,
+               "filters": body.filters.model_dump(exclude_none=True),
                "match_count": 0, "created_at": _now()}
         await db.re_saved_searches.insert_one(doc)
         doc.pop("_id", None)

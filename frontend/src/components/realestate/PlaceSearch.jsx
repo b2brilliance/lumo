@@ -15,7 +15,8 @@ export default function PlaceSearch({ initial, onPick }) {
     setBusy(true);
     try {
       const { data } = await api.get(`/geo/search?q=${encodeURIComponent(q.trim())}`);
-      if (data.length === 1) { onPick(data[0]); setResults([]); } else setResults(data);
+      if (data.length) { onPick(data[0]); setQ(data[0].label.split(",")[0]); }
+      setResults([]);
     } finally { setBusy(false); }
   };
 

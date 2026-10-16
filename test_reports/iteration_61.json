@@ -1,0 +1,61 @@
+{
+  "summary": "Tested the Real Estate module (backend + UI) and Admin Full Control from start to finish. Backend: 27 pytest tests, 26 pass after 2 small fixes I made. The remaining failure is a real bug: one saved search with bad filters crashes the alert loop, so nobody else gets alerts. UI works on desktop: the Redfin-style split map/list with 23 price pins for admin, the empty state for anonymous users, kind tabs (sale 15 / rent 6 / short_stay 2 / room 0 / commercial 1 / land 1), all filters, sort, place search (Los Angeles -> 2 results), search-as-I-move the map, Search worldwide, the save-search dialog with toast, the /signin redirect when logged out, the /real-estate/saved page (toggle alerts, delete, saved homes), favorites, the detail page (OSM iframe loads, OSM/Google Maps/Directions links use the correct coordinates), the tour request (goes to /inquiries/<id> and contains TOUR REQUEST), the inquiry flow, the book-stay link to /rentals/<source_rental_id>, owner controls (mark rented / mark active / delete), and publishing from /real-estate/list (short stay, EUR, geocoded Lisbon, photo upload, guests, amenities). Admin: purge dialog shows counts and the confirm button stays disabled until PURGE is typed (I did NOT confirm). All 9 type pills render. Blog post and recruit city create/edit/delete work in the UI. Users tab: creating a user and editing phone/password works, and the new password logs in. Main problems: the mobile map renders grey for logged-in users, the alert loop is fragile, legacy demo rentals show no /mo unit, and the admin create dialog makes new recruit cities and shop products inactive.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "notify_matching_searches (real_estate_plus.py) / POST /api/real-estate/saved-searches", "issue": "SavedSearchIn.filters is an unvalidated dict. listing_matches() calls float() on min_price/max_price etc. One saved search with filters {min_price:'abc'} raises ValueError ('Task exception was never retrieved' in backend.err.log) and kills the whole loop, so NO later saved searches get alerts. Reproduced (test_malformed_saved_search_does_not_block_others). Fix: validate filters with a Pydantic model (numbers, kinds list, bbox floats) AND wrap each saved search in try/except inside the loop.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/admin/content/bulk-delete", "issue": "FIXED BY T1: it was shadowed by POST /content/{type} (registered first) and returned 400 'Unknown content type: bulk-delete', which broke the admin Content bulk delete button. I moved the route above create_content."},
+      {"endpoint": "GET /api/real-estate?state=(, GET /api/autos?city=( / ?state=(, GET /api/admin/content?q=(", "issue": "FIXED BY T1: user input went into $regex without escaping, causing 500s. Added re.escape."},
+      {"endpoint": "POST/PATCH/DELETE /api/admin/content/real_estate and /rental", "issue": "Admin-created real_estate does not call notify_matching_searches. Admin create/patch/delete of a rental (category=property) does not call sync_property_rentals, so the mirror stays stale until the next startup sync. Admin edits to a mirrored real_estate row (source_rental_id) are overwritten on the next sync."},
+      {"endpoint": "PATCH /api/real-estate/{id}", "issue": "Accepts a raw dict with only key whitelisting and no type validation (price/lat could be strings). Use a partial Pydantic model."},
+      {"endpoint": "DELETE /api/admin/users/{id}", "issue": "No cascade: the user's re_saved_searches and re_favorites stay orphaned, keep matching, and trigger push attempts for users that no longer exist."},
+      {"endpoint": "seed data real_estate", "issue": "The 21 legacy demo listings have price_unit=null and currency=null, so the 6 rent listings show '$2,200' with no '/mo' on cards and the detail page. Backfill price_unit by listing_kind, or fall back in the UI (rent->month, short_stay->night)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RealEstate mobile map (ReMap)", "issue": "At 390px with listings (admin), the initial fitBounds runs while the map is hidden (list view is the default). Toggling to Map shows a grey map with tiles only in the top-left corner. Call map.invalidateSize() (then refit) when re-mobile-toggle switches to map.", "selector": "[data-testid='re-mobile-toggle']", "priority": "HIGH"},
+      {"component": "Admin ContentTab create dialog", "issue": "Bool switches default to false and are sent on create, which overrides the backend default is_active=True. A recruit city created in the UI shows INACTIVE (shop products likely the same). Default is_active switches to true for new items.", "selector": "[data-testid='admin-content-edit-is_active']", "priority": "MEDIUM"},
+      {"component": "PlaceSearch", "issue": "Enter with more than one geocode hit (e.g. 'Los Angeles') only opens the suggestion list; the map does not fly until a result is clicked. Spec says Enter flies the map. Auto-pick the first result on Enter.", "selector": "[data-testid='re-place-input']", "priority": "MEDIUM"},
+      {"component": "ReFilters price inputs", "issue": "Min/Max price apply only on blur; pressing Enter does nothing.", "selector": "[data-testid='re-filter-min-price']", "priority": "LOW"},
+      {"component": "RealEstate header", "issue": "After the user drags the map away, the 'homes in Los Angeles, Los Angeles County' label stays because the place param is not cleared on manual move.", "selector": "[data-testid='re-count']", "priority": "LOW"},
+      {"component": "ReMap pins", "issue": "Listings at the same coordinates (e.g. the 2 Echo Park LA listings) stack, so only one pin is visible. Consider clustering or an offset.", "selector": ".re-pin", "priority": "LOW"},
+      {"component": "Admin ContentTab dialog title", "issue": "Typo 'New Recruit citie' (the .replace(/s$/) singularization).", "selector": "[data-testid='admin-content-edit-dialog']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RealEstateDetail tour dialog and RealEstateList 'Available from'", "issues": ["Uses the browser's native date/time pickers (input type=date/time) instead of the shadcn Calendar/Popover."]},
+      {"screen": "/real-estate filters", "issues": ["Sort select is too narrow: 'Price: low → hig' is truncated."]},
+      {"screen": "/real-estate mobile", "issues": ["Header plus filters take about 480px of the 844px viewport, leaving a small map", "Kind tabs overflow (Commercial/Land clipped)", "The Ask Lumi FAB overlaps the bottom of the map/list area next to the Map/List toggle"]},
+      {"screen": "RealEstateDetail", "issues": ["User-created listing shows only the street ('Rua Augusta 100') with no city/country", "A single photo appears as both the main image and the thumbnail", "Demo short stay reuses the same photo as the sale listing"]},
+      {"screen": "Admin Users new-user dialog", "issues": ["Description says 'Change the user's profile, role or wallet' when creating a new user"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter61_real_estate_admin_crud.py", "/app/test_reports/pytest/pytest_iter61.xml"],
+  "action_items": [
+    "HIGH: Make saved-search alerts robust. Validate SavedSearchIn.filters with a typed Pydantic model and wrap each saved search in try/except in notify_matching_searches.",
+    "HIGH: Fix the mobile map going grey. Call invalidateSize and refit when the Map view is shown (re-mobile-toggle).",
+    "Default is_active=true in the admin Content create dialog (recruit_city, shop_product).",
+    "Backfill price_unit/currency on legacy demo real_estate rows, or fall back by listing_kind in ReCard/RealEstateDetail.",
+    "PlaceSearch: Enter should pick the first result and fly the map.",
+    "Admin content: trigger notify_matching_searches on real_estate create, and sync_property_rentals on rental create/patch/delete.",
+    "Cascade-delete re_saved_searches and re_favorites when a user is deleted.",
+    "Minor: apply price filters on Enter, clear the place label on manual map move, fix the 'citie' typo, widen the sort select, use shadcn date pickers."
+  ],
+  "critical_code_review_comments": [
+    "Route order: put static paths (/content/bulk-delete) before parameterized ones (/content/{type}). Fixed here; check the other routers for the same pattern.",
+    "Escape every $regex built from user input (re.escape). Fixed for state/city/admin q; the autos/real_estate city filters now escape too.",
+    "notify_matching_searches runs in asyncio.create_task with no exception handling; one failure silently drops all remaining alerts.",
+    "PATCH /real-estate/{id} takes body: dict; replace it with a partial Pydantic model.",
+    "Purge plan counts look sane (123 test users, ~1087 records). It also deletes credentials/media/messages linked to test users, which is intended. NOT executed."
+  ],
+  "updated_files": ["/app/backend/admin_crud.py (bulk-delete route moved above /content/{type}; admin content q re.escape)", "/app/backend/classifieds.py (re.escape for state/city regex filters)", "/app/backend/tests/test_iter61_real_estate_admin_crud.py"],
+  "success_rate": {"backend": "96% (26/27; the 1 failure is the real alert-loop bug)", "frontend": "~85% (desktop flows all pass; mobile map rendering broken; admin create bool defaults wrong)"},
+  "test_credentials": "Admin julius.a.mason@gmail.com / Mason0123 works. customer@lumo.test / password123 works (used for non-admin 403 checks). Fresh qa_<rand>@gmail.com users are registered and deleted by the test file.",
+  "seed_data_creation": "None left behind. Cleaned up: test users, listings, saved searches, favorites, blog post, recruit city, admin-created user, 2 inquiries made from the UI, and TEST_ notifications. 3 orphaned saved searches from an aborted run were deleted from Mongo. An existing 'Lisbon flats' saved search owned by a real (non-test) user was left untouched; that user may have received 1-2 alerts from the TEST_ Lisbon listings.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest /app/backend/tests/test_iter61_real_estate_admin_crud.py. test_malformed_saved_search_does_not_block_others should pass once the alert loop is hardened. NEVER call POST /api/admin/demo/purge with confirm=PURGE. Login limit is 10/15min: get one admin token and set localStorage 'lumo_token' in Playwright. Admin sees 23 real_estate rows (21 demo + 2 mirrored short stays); anonymous sees 0. The UI uses URL param 'kind' (not listing_kind). Admin content field testids are admin-content-edit-<field>. Leftover users from earlier agents are visible in the admin users list: qa_seller_29631@gmail.com, qa_buyer_29631@gmail.com, qa_5a573900@gmail.com.",
+  "rca of the issue": "Alert loop: real_estate_plus.listing_matches does float(f['min_price']) on unvalidated user input; the ValueError propagates out of the `async for` in notify_matching_searches, which runs as a fire-and-forget task, so later saved searches are never evaluated. Repro: POST a saved search with filters {min_price:'abc'}, then POST a saved search with filters {property_types:['land']}; another user POSTs a matching land listing; the second search's match_count stays 0. Mobile map: RealEstate.jsx sets fitTo after the first fetch while the map container is display:none (mobileView='list'); Leaflet computes bounds on a 0x0 size and is never told the size changed when the container is shown."
+}

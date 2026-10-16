@@ -87,13 +87,13 @@ export default function RealEstateDetail() {
       <div className="mb-4 text-xs font-mono text-slate-500"><Link to="/real-estate" className="hover:underline">← Back to Real Estate</Link></div>
 
       {/* Photo gallery */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-6">
-        <div className="md:col-span-3 aspect-[16/10] bg-slate-100 overflow-hidden">
+      <div className={`grid grid-cols-1 ${photos.length > 1 ? "md:grid-cols-4" : ""} gap-2 mb-6`}>
+        <div className={`${photos.length > 1 ? "md:col-span-3" : ""} aspect-[16/10] max-h-[560px] w-full bg-slate-100 overflow-hidden`}>
           {photos[activePhoto] ? (
             <img src={photos[activePhoto]} alt={listing.title} className="w-full h-full object-cover" />
           ) : <div className="w-full h-full flex items-center justify-center text-slate-400 font-mono">no photo</div>}
         </div>
-        <div className="grid grid-cols-3 md:grid-cols-1 gap-2">
+        <div className={`${photos.length > 1 ? "grid" : "hidden"} grid-cols-3 md:grid-cols-1 gap-2`}>
           {photos.slice(0, 4).map((p, idx) => (
             <button key={idx} onClick={() => setActivePhoto(idx)} className={`aspect-[4/3] overflow-hidden border-2 ${idx === activePhoto ? "border-slate-900" : "border-transparent"}`}>
               <img src={p} alt="" className="w-full h-full object-cover" />
@@ -111,7 +111,7 @@ export default function RealEstateDetail() {
             </button>
           </div>
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mt-1">{listing.title}</h1>
-          <div className="flex items-center gap-1 text-sm text-slate-600 mt-2"><MapPin className="w-4 h-4" />{listing.address}</div>
+          <div className="flex items-center gap-1 text-sm text-slate-600 mt-2" data-testid="re-detail-address"><MapPin className="w-4 h-4" />{[listing.address, ...[listing.city, listing.state, listing.country].filter((x) => x && !(listing.address || "").includes(x))].filter(Boolean).join(", ")}</div>
 
           <div className="mt-6 flex items-baseline gap-3">
             <div className="font-display text-4xl font-black">{fmtUsd(listing.price)}</div>

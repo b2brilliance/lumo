@@ -104,6 +104,19 @@ CONTENT_TYPES = {
 }
 
 
+async def _after_write(db, type: str, item_id: str, created: bool = False) -> None:
+    """Keep the rental→real-estate mirror fresh and fire saved-search alerts for admin-created homes."""
+    from real_estate_plus import sync_property_rentals, notify_matching_searches
+    if type == "rental":
+        await sync_property_rentals(db, item_id)
+        if not await db.rentals.find_one({"id": item_id}):
+            await db.real_estate.delete_many({"source_rental_id": item_id})
+    elif type == "real_estate" and created:
+        doc = await db.real_estate.find_one({"id": item_id})
+        if doc:
+            await notify_matching_searches(db, doc)
+
+
 def _slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")[:80]
 
@@ -230,6 +243,8 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if user_id == admin.get("id"):
             raise HTTPException(400, "You cannot delete your own admin account")
         res = await db.users.delete_one({"id": user_id})
+        await db.re_saved_searches.delete_many({"user_id": user_id})
+        await db.re_favorites.delete_many({"user_id": user_id})
         if res.deleted_count == 0:
             raise HTTPException(404, "User not found")
         return {"ok": True, "deleted": user_id}
@@ -242,6 +257,8 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if not target_ids:
             return {"ok": True, "deleted_count": 0}
         res = await db.users.delete_many({"id": {"$in": target_ids}})
+        await db.re_saved_searches.delete_many({"user_id": {"$in": target_ids}})
+        await db.re_favorites.delete_many({"user_id": {"$in": target_ids}})
         return {"ok": True, "deleted_count": res.deleted_count, "skipped_self": len(body.ids) - len(target_ids)}
 
     @router.post("/users/bulk-patch")
@@ -283,7 +300,7 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         if status and status != "all":
             filt["status"] = status
         if q:
-            rx = {"$regex": q.strip(), "$options": "i"}
+            rx = {"$regex": re.escape(q.strip()), "$options": "i"}
             title_field = spec["title_field"]
             filt["$or"] = [{title_field: rx}, {"description": rx}, {"category": rx}, {"city": rx}, {"slug": rx}]
             if spec.get("owner_name"):
@@ -310,8 +327,23 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
             raise HTTPException(400, f"No editable fields in payload. Allowed: {sorted(spec['fields'])}")
         update["updated_at"] = datetime.now(timezone.utc).isoformat()
         await coll.update_one({"id": item_id}, {"$set": update})
+        await _after_write(db, type, item_id)
         fresh = await coll.find_one({"id": item_id}, {"_id": 0})
         return {"ok": True, "item": fresh}
+
+    @router.post("/content/bulk-delete")
+    async def bulk_delete(body: BulkDeleteBody, _: dict = Depends(require_admin)):
+        from server import db
+        if body.type not in CONTENT_TYPES:
+            raise HTTPException(400, f"Unknown content type: {body.type}")
+        if not body.ids:
+            return {"ok": True, "deleted_count": 0}
+        spec = CONTENT_TYPES[body.type]
+        coll = getattr(db, spec["collection"])
+        res = await coll.delete_many({"id": {"$in": body.ids}})
+        if body.type == "rental":
+            await db.real_estate.delete_many({"source_rental_id": {"$in": body.ids}})
+        return {"ok": True, "deleted_count": res.deleted_count, "type": body.type}
 
     @router.post("/content/{type}")
     async def create_content(type: str, body: ContentPatch, admin: dict = Depends(require_admin)):
@@ -355,6 +387,7 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
             doc.setdefault("estimated_units", 1.0)
         coll = getattr(db, spec["collection"])
         await coll.insert_one(doc)
+        await _after_write(db, type, doc["id"], created=True)
         doc.pop("_id", None)
         return {"ok": True, "item": doc}
 
@@ -366,21 +399,10 @@ def build_admin_crud_router(*, get_current_user, require_admin) -> APIRouter:
         spec = CONTENT_TYPES[type]
         coll = getattr(db, spec["collection"])
         res = await coll.delete_one({"id": item_id})
+        await _after_write(db, type, item_id)
         if res.deleted_count == 0:
             raise HTTPException(404, f"{spec['label']} not found")
         return {"ok": True, "deleted": item_id, "type": type}
-
-    @router.post("/content/bulk-delete")
-    async def bulk_delete(body: BulkDeleteBody, _: dict = Depends(require_admin)):
-        from server import db
-        if body.type not in CONTENT_TYPES:
-            raise HTTPException(400, f"Unknown content type: {body.type}")
-        if not body.ids:
-            return {"ok": True, "deleted_count": 0}
-        spec = CONTENT_TYPES[body.type]
-        coll = getattr(db, spec["collection"])
-        res = await coll.delete_many({"id": {"$in": body.ids}})
-        return {"ok": True, "deleted_count": res.deleted_count, "type": body.type}
 
     @router.get("/content/types")
     async def content_types(_: dict = Depends(require_admin)):
