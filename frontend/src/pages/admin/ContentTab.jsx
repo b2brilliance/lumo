@@ -105,7 +105,7 @@ export default function ContentTab() {
       <div className="flex items-center gap-2">
         <activeMeta.Icon className="w-4 h-4 text-teal-700" />
         <h3 className="font-display text-xl font-black tracking-tighter flex-1">
-          Content <span className="text-slate-400 font-mono text-sm ml-2">{total} {activeMeta.label.toLowerCase()}</span>
+          Content <span className="text-slate-400 font-mono text-sm ml-2">{total} {total === 1 ? (typeMeta.label || activeMeta.label).toLowerCase() : activeMeta.label.toLowerCase()}</span>
         </h3>
         <Button size="sm" onClick={() => setEditing({})} className="bg-slate-900 hover:bg-slate-800" data-testid="admin-content-new">
           <Plus className="w-3.5 h-3.5 mr-1" /> New
@@ -176,7 +176,7 @@ export default function ContentTab() {
             <input type="checkbox" checked={selected.size > 0 && selected.size === items.length} onChange={toggleAll} data-testid="admin-content-select-all" />
           </div>
           <div className="col-span-5">Title</div>
-          <div className="col-span-2 text-right">Price</div>
+          <div className="col-span-2 text-right">{type === "faq" ? "Position" : "Price"}</div>
           <div className="col-span-2">Status</div>
           <div className="col-span-2 text-right">Actions</div>
         </div>
@@ -203,7 +203,7 @@ export default function ContentTab() {
                 <div className="text-xs text-slate-500 font-mono truncate">{it.seller_name || it.host_name || it.owner_name || it.customer_name || it.retailer_label || it.slug || it.category || (it.topic && `${it.topic} · #${it.position}`) || it.id.slice(0, 8)}</div>
               </div>
               <div className="col-span-4 sm:col-span-2 text-right font-mono">
-                {priceVal != null ? `${formatPrice(priceVal)}${priceSuffix}` : "—"}
+                {type === "faq" ? `#${it.position ?? "—"}` : priceVal != null ? `${formatPrice(priceVal)}${priceSuffix}` : "—"}
               </div>
               <div className="col-span-4 sm:col-span-2 text-[10px] font-mono uppercase tracking-widest text-slate-600">{it.status || (it.is_active === false ? "inactive" : it.is_active ? "active" : "—")}</div>
               <div className="col-span-4 sm:col-span-2 text-right flex justify-end gap-1">

@@ -81,7 +81,7 @@ export default function NavBar() {
         <div className="flex-shrink-0 hidden lg:block" data-testid="nav-locale-left"><LocaleSwitcher /></div>
 
         {/* Role-siloed primary nav */}
-        <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden" data-testid={`nav-${roleForNav}`}>
+        <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden" data-testid={`nav-links-${roleForNav}`}>
           {links.map((l) => {
             const Icon = l.icon;
             return (

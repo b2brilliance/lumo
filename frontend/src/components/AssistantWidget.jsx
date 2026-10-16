@@ -37,17 +37,17 @@ export default function AssistantWidget() {
   }, []);
 
   useEffect(() => {
-    if (loading || hidden || localStorage.getItem(CHOICE_KEY)) return undefined;
+    if (loading || hidden || pathname.startsWith("/help") || localStorage.getItem(CHOICE_KEY)) return undefined;
     const t = setTimeout(() => setPrompt((p) => p || "first"), 2500);
     return () => clearTimeout(t);
-  }, [loading, hidden]);
+  }, [loading, hidden, pathname]);
 
   const onExit = useCallback(() => {
     if (sessionStorage.getItem(EXIT_KEY)) return;
     sessionStorage.setItem(EXIT_KEY, "1");
     setPrompt("exit");
   }, []);
-  useExitIntent(onExit, { enabled: !hidden && !open && !prompt });
+  useExitIntent(onExit, { enabled: !hidden && !open && !prompt && !pathname.startsWith("/help") });
 
   if (hidden) return null;
 

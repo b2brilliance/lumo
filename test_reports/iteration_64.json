@@ -1,0 +1,31 @@
+{
+  "summary": "Tested the Help Center end to end. Backend (pytest, 10/10 pass): the public GET /api/help/faqs returns 9 topics and 56 FAQs, sorted by position with no _id. Admin can create, edit, reorder, hide and delete FAQs; customers and guests get 401/403; the admin list is sorted by topic then position. Restarting the backend did not re-seed (still 56). Frontend: /help works. It has the heading, live search ('deposit' gives 4 results in 3 topics; nonsense shows the no-results message), 9 topic tiles that filter and unfilter (Real estate shows 7), expanding Q&As, the four fix buttons going to the right pages, Ask Lumi opening the chat panel, and Contact support going to /contact. The Help link shows in the desktop menu for guest, customer, provider and admin, and in the footer. My orders goes to /orders. Settings has the Help link. At 390px the mobile bottom bar has 5 tabs, labels fit without overflow, and the Help tab works logged in and logged out. In Admin → Content, Help FAQs lists items; I created an FAQ in the UI (it showed first under Payments on /help), edited it to inactive with position 999 (gone from /help), then deleted it. Lumi restyle: the open button is a pill, the panel is rounded (24px), and a live chat reply came back with guide-link chips (/rentals, /rentals/host).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NavBar", "issue": "The desktop menu container <nav> uses data-testid={`nav-${roleForNav}`}, which for a customer becomes 'nav-customer', the same testid as the 'My orders' link. A selector for nav-customer matches 2 elements, and .first() hits the container instead of the link. The same clash can happen for nav-provider and nav-admin. Suggest renaming the container to nav-links-${role}.", "selector": "[data-testid='nav-customer']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/help 'Still stuck?' banner", "issues": ["Has only the heading; a short helper line would read better"]},
+      {"screen": "Admin Content → Help FAQs", "issues": ["Column header still says 'PRICE STATUS' for FAQs", "Count label reads '1 help faqs' (plural is wrong)"]},
+      {"screen": "/help desktop", "issues": ["The 'Want a guide?' prompt pops up on /help too, which is redundant next to the in-page Ask Lumi button"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter64_help_faqs.py", "/app/test_reports/pytest/pytest_iter64.xml"],
+  "action_items": [
+    "Optional: rename the NavBar container testid so it no longer clashes with the nav-customer link",
+    "Optional: suppress the auto 'Want a guide?' prompt on /help; fix the FAQ column header and the plural count label in the admin list"
+  ],
+  "critical_code_review_comments": [
+    "Seeded positions are topic_index*100+i, but auto-position for a new FAQ in an empty topic becomes 1. That is fine because the UI groups by topic, but the global sort in /api/help/faqs mixes topics. Sorting by (topic order, position) would be clearer.",
+    "faq create: if the admin form sends is_active as '' it becomes None, and setdefault keeps None. The public filter uses $ne False, so the FAQ is still visible; this is harmless but inconsistent.",
+    "Help.jsx silently swallows the fetch error (catch(() => {})): there is no loading or error state, so if the API fails users see only the tiles and fixes, with no message."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter64_help_faqs.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None kept. All TEST_ FAQs were cleaned up; there are still 56 FAQs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "FAQ regression: pytest /app/backend/tests/test_iter64_help_faqs.py. Admin login is julius.a.mason@gmail.com / Mason0123. The backend was restarted once to confirm FAQs are not re-seeded. Never call the demo purge endpoint."
+}

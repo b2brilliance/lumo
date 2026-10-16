@@ -101,6 +101,7 @@ export default function Help() {
       <section className="mt-12 rounded-3xl bg-slate-900 text-white p-8 flex flex-col sm:flex-row sm:items-center gap-4" data-testid="help-contact">
         <div className="flex-1">
           <div className="font-display text-2xl font-black">Still stuck?</div>
+          <div className="text-sm text-white/70 mt-1">Lumi answers instantly. Support replies within a day.</div>
         </div>
         <button onClick={openGuide} className="inline-flex items-center justify-center gap-2 rounded-full bg-white text-slate-900 px-5 py-3 font-medium hover:scale-[1.03] transition-transform" data-testid="help-ask-lumi">
           <Sparkles className="w-4 h-4" />Ask Lumi

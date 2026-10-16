@@ -30,3 +30,10 @@
 - Mobile tab bar: Home (role-aware) / Orders (/orders unified) / Messages (/messages unified chats + inquiries, unread badge via GET /api/me/badges) / Profile (/settings).
 - INCOGNITO BUG ROOT CAUSE (deployer RCA): inline boot script compared HTML build stamp vs /api/meta (backend stamp never matches) → every normal session nuked SWs + reloaded; sw-nuke-v3 registered each session at scope "/". Fixed: removed boot /api/meta check, bfcache check and sw-nuke registration; kept asset-failure reload guard + one-time legacy SW cleanup; CacheBuster compares meta tag vs static /meta.json only. DO NOT reintroduce /api/meta comparisons. Requires redeploy.
 - Tested: iteration_63 (20/21 backend, frontend pass) + fixes self-verified (guide link sanitizing, autos price history, cascades, listing price >0, orders money format, messages pagination).
+
+## 2026-06 — Help Center + Lumi restyle
+- Lumi chat restyled: rounded-3xl card, pill "Ask Lumi" button, iMessage-style bubbles, rounded input/send/chips; guide prompt matches.
+- Help Center at /help: search, 9 topic tiles, accordions of 56 seeded FAQs (backend/faq_seed.py, seeded once via site_settings faq_seeded), Fix common problems (/reset, /signin, /orders, /settings), Ask Lumi (window event "lumo:open-guide") + Contact support. GET /api/help/faqs public.
+- Admin Content → "Help FAQs" type (question, answer, topic, position, is_active) for add/edit/reorder/hide/delete.
+- Help links: desktop nav (all roles), footer, Settings, 5th mobile tab. Customer "My orders" → /orders. Nav container testid renamed nav-links-<role>.
+- Tested: iteration_64 (backend 10/10, frontend all pass); minor polish fixed after.
