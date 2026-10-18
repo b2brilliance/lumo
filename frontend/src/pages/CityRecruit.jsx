@@ -78,7 +78,7 @@ export default function CityRecruit() {
   const bonus = formatPrice(Number(city.bonus_amount || 0), { currency: city.currency || "USD" });
   const hoods = Array.isArray(city.neighborhoods) ? city.neighborhoods : [];
   const localSeoBlurb = hoods.length
-    ? `Drive with Lumo in ${city.city} — serving ${hoods.slice(0, 4).join(", ")}. Keep 90%, same-day payouts, $${bonus} bonus after your 100th job.`
+    ? `Drive with Lumo in ${city.city} — serving ${hoods.slice(0, 4).join(", ")}. Keep 90%, same-day payouts, ${bonus} bonus after your 100th job.`
     : city.hero_subhead || `Lumo is hiring ${city.goal_workers} providers in ${displayName}. Keep 90% of every job, same-day payouts, ${bonus} bonus.`;
 
   return (

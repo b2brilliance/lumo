@@ -10,10 +10,18 @@ export default function JoinCountry() {
   const [cities, setCities] = useState(null);
   useEffect(() => {
     setCities(null);
-    api.get(`/recruit/cities?country=${cc}`).then((r) => setCities(r.data.items || [])).catch(() => setCities([]));
+    api.get(`/recruit/cities?country=${cc}&limit=500`).then((r) => setCities(r.data.items || [])).catch(() => setCities([]));
   }, [cc]);
   const name = cities?.[0]?.country_name || cc.toUpperCase();
   const isUS = cc.toLowerCase() === "us";
+  if (cities && cities.length === 0) {
+    return (
+      <div className="max-w-lg mx-auto px-6 py-24 text-center" data-testid="join-country-not-found">
+        <h1 className="font-display text-2xl font-bold">We're not hiring there yet.</h1>
+        <Link to="/join" className="btn-lumo btn-lumo-primary btn-lumo-sm mt-6" data-testid="join-country-browse">Browse all countries</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white" data-testid="join-country-page">

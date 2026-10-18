@@ -91,7 +91,6 @@ export default function CityRecruitIndex() {
             </Link>
           ))}
         </div>
-        <AdSense testid="adsense-join-index" />
       </section>
       <section className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pb-20" data-testid="join-index-grid">
         {!world && <div className="flex items-center gap-2 text-sm text-neutral-500"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>}
@@ -106,6 +105,7 @@ export default function CityRecruitIndex() {
             </div>
           </div>
         ))}
+        <AdSense testid="adsense-join-index" />
       </section>
     </div>
   );

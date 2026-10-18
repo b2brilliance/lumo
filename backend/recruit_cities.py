@@ -82,6 +82,11 @@ class RecruitCityIn(BaseModel):
     hero_subhead: Optional[str] = None
     hero_image: Optional[str] = None
     neighborhoods: List[str] = Field(default_factory=list)
+    country: str = "US"
+    country_name: Optional[str] = None
+    continent: str = "NA"
+    currency: str = "USD"
+    lang: str = "en"
     is_active: bool = True
 
 
@@ -97,6 +102,11 @@ class RecruitCityPatch(BaseModel):
     hero_subhead: Optional[str] = None
     hero_image: Optional[str] = None
     neighborhoods: Optional[List[str]] = None
+    country: Optional[str] = None
+    country_name: Optional[str] = None
+    continent: Optional[str] = None
+    currency: Optional[str] = None
+    lang: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -149,6 +159,9 @@ async def _reseed_bonus_amounts(db) -> int:
         {"bonus_amount": {"$in": [500, 500.0]}},
         {"$set": {"bonus_amount": 100.0, "bonus_job_count": 100}},
     )
+    async for d in db.recruit_cities.find({"hero_subhead": {"$regex": r"\$500"}}, {"_id": 0, "slug": 1, "hero_subhead": 1}):
+        fixed = d["hero_subhead"].replace("$500 sign-on for the first 100", "$100 bonus after job #100").replace("$500", "$100")
+        await db.recruit_cities.update_one({"slug": d["slug"]}, {"$set": {"hero_subhead": fixed}})
     # Any row missing bonus_job_count → set default
     await db.recruit_cities.update_many(
         {"bonus_job_count": {"$exists": False}},
@@ -468,7 +481,7 @@ def create_router(
 
     @r.get("/recruit/cities")
     async def list_cities(country: Optional[str] = None, continent: Optional[str] = None,
-                          q: Optional[str] = None, limit: int = 2000):
+                          q: Optional[str] = None, limit: int = 200):
         mq: Dict[str, Any] = {"is_active": True}
         if country:
             mq["country"] = country.upper()
@@ -555,7 +568,12 @@ def create_router(
         exists = await db.recruit_cities.find_one({"slug": payload.slug})
         if exists:
             raise HTTPException(409, f"City '{payload.slug}' already exists")
-        doc = RecruitCity(**payload.model_dump())
+        data = payload.model_dump()
+        peer = await db.recruit_cities.find_one({"country": data["country"]}, {"_id": 0, "continent": 1, "country_name": 1})
+        if peer:
+            data["continent"] = peer.get("continent") or data["continent"]
+            data["country_name"] = data.get("country_name") or peer.get("country_name")
+        doc = RecruitCity(**data)
         await db.recruit_cities.insert_one(doc.model_dump())
         return doc.model_dump()
 

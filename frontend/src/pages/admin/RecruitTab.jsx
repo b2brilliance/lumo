@@ -17,7 +17,7 @@ import {
  * admin can add new markets or tweak headlines without a developer. */
 
 const EMPTY_DRAFT = {
-  slug: "", city: "", state: "", state_full: "",
+  slug: "", city: "", state: "", state_full: "", country: "US", country_name: "", currency: "USD", lang: "en",
   goal_workers: 300, bonus_amount: 500, bonus_first_n: 100,
   hero_headline: "", hero_subhead: "", hero_image: "", is_active: true,
 };
@@ -72,11 +72,11 @@ export default function RecruitTab() {
   const close = () => setEditing(null);
 
   const save = async () => {
-    if (!editing.slug || !editing.city || !editing.state) {
-      toast.error("Slug, city and state are required");
+    if (!editing.slug || !editing.city || !editing.country) {
+      toast.error("Slug, city and country are required");
       return;
     }
-    const payload = { ...editing };
+    const payload = { ...editing, state: editing.state || editing.country };
     delete payload._isNew;
     delete payload.id;
     delete payload.signups_total;
@@ -150,9 +150,9 @@ export default function RecruitTab() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="admin-recruit-kpis">
         <Kpi label="Cities" value={total} />
-        <Kpi label="Total signups" value={totals.signups} icon={Users} />
-        <Kpi label="Goal" value={totals.goal} />
-        <Kpi label="This week" value={`+${totals.this_week}`} icon={TrendingUp} />
+        <Kpi label="Signups (listed)" value={totals.signups} icon={Users} />
+        <Kpi label="Goal (listed)" value={totals.goal} />
+        <Kpi label="This week (listed)" value={`+${totals.this_week}`} icon={TrendingUp} />
       </div>
 
       <form
@@ -289,11 +289,17 @@ export default function RecruitTab() {
                   />
                 </Field>
                 <Field label="City *"><Input value={editing.city} onChange={(e) => setEditing({ ...editing, city: e.target.value })} placeholder="Los Angeles" data-testid="admin-recruit-field-city" /></Field>
-                <Field label="State (2-letter) *"><Input value={editing.state} onChange={(e) => setEditing({ ...editing, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="CA" data-testid="admin-recruit-field-state" /></Field>
+                <Field label="State (2-letter, US)"><Input value={editing.state} onChange={(e) => setEditing({ ...editing, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="CA" data-testid="admin-recruit-field-state" /></Field>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <Field label="Country (ISO) *"><Input value={editing.country || ""} onChange={(e) => setEditing({ ...editing, country: e.target.value.toUpperCase().slice(0, 2) })} placeholder="JP" data-testid="admin-recruit-field-country" /></Field>
+                <Field label="Country name"><Input value={editing.country_name || ""} onChange={(e) => setEditing({ ...editing, country_name: e.target.value })} placeholder="Japan" data-testid="admin-recruit-field-country-name" /></Field>
+                <Field label="Currency"><Input value={editing.currency || ""} onChange={(e) => setEditing({ ...editing, currency: e.target.value.toUpperCase().slice(0, 3) })} placeholder="JPY" data-testid="admin-recruit-field-currency" /></Field>
+                <Field label="Language"><Input value={editing.lang || ""} onChange={(e) => setEditing({ ...editing, lang: e.target.value })} placeholder="ja" data-testid="admin-recruit-field-lang" /></Field>
               </div>
               <Field label="State full name"><Input value={editing.state_full || ""} onChange={(e) => setEditing({ ...editing, state_full: e.target.value })} placeholder="California" /></Field>
               <Field label="Hero headline"><Input value={editing.hero_headline || ""} onChange={(e) => setEditing({ ...editing, hero_headline: e.target.value })} placeholder="Drive with Lumo in Los Angeles." /></Field>
-              <Field label="Hero subhead"><Textarea rows={2} value={editing.hero_subhead || ""} onChange={(e) => setEditing({ ...editing, hero_subhead: e.target.value })} placeholder="300 spots. $500 sign-on for the first 100. Keep 90%." /></Field>
+              <Field label="Hero subhead"><Textarea rows={2} value={editing.hero_subhead || ""} onChange={(e) => setEditing({ ...editing, hero_subhead: e.target.value })} placeholder="300 spots. $100 bonus after job #100. Keep 90%." /></Field>
               <Field label="Hero image URL"><Input value={editing.hero_image || ""} onChange={(e) => setEditing({ ...editing, hero_image: e.target.value })} placeholder="https://images.unsplash.com/…" /></Field>
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Goal workers"><Input type="number" value={editing.goal_workers} onChange={(e) => setEditing({ ...editing, goal_workers: parseInt(e.target.value || "0", 10) })} data-testid="admin-recruit-field-goal" /></Field>

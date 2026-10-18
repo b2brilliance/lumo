@@ -211,7 +211,7 @@ export function LocaleProvider({ children }) {
       const r = rates[opts.currency];
       if (!r) return `$${usd.toFixed(0)}`;
       try {
-        return new Intl.NumberFormat(undefined, { style: "currency", currency: opts.currency, maximumFractionDigits: 0 }).format(usd * r);
+        return new Intl.NumberFormat(undefined, { style: "currency", currency: opts.currency, currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(usd * r);
       } catch { return `${opts.currency} ${Math.round(usd * r).toLocaleString()}`; }
     }
     const converted = convert(usd);

@@ -897,3 +897,11 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Frontend: /recruiter (public explainer + dashboard), RecruiterTier in ReferralCard (/wallet), Admin → Recruiters tab, /available-jobs (provider-only one-tap Accept, deliveries filter by default).
 - Tested: iteration_66 (backend 15/16, then the minor validation issues were fixed; frontend 100%).
 - Global redeploy was dispatched before this feature, so a redeploy is needed to push the recruiter program live.
+
+## 2026-06 — Global recruiting (1,725 cities / 244 countries)
+- Data: backend/data/world_recruit_cities.json (GeoNames cities15000, CC-BY): top 1,000 by population + top 5 per country. Seeded idempotently by `seed_world_cities()` in recruit_cities.py. Wikipedia hero photos backfill automatically.
+- New fields on recruit_cities: country, country_name, continent, currency, lang, local_name, lat, lng, population, last_broadcast_at.
+- API: GET /api/recruit/world, /api/recruit/cities?country&continent&q&limit (default 200), /api/recruit/cities/{slug} (page_lang, nearby), admin stats filters. Register stores recruit_country.
+- Daily social recruit broadcast now rotates 25 cities per run (BROADCAST_BATCH).
+- Frontend: /join (world index + search + continent tabs), /join/continent/:c, /join/country/:cc, city page in local language (transient `pageLang` in LocaleContext) + English toggle, bonus in local currency, nearby cities, recruiter share bar (?ref=). CTAs: persona home, footer, Become a provider, CountryHub, /recruiter. Admin Recruit tab filters + country fields.
+- Tested: iteration_67 (backend 100%, frontend 95%). All minor issues it found are fixed.

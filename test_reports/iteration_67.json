@@ -1,0 +1,41 @@
+{
+  "summary": "Tested the world recruit-city feature end to end. Backend: 16/16 pytest pass. Checked: 1,725 cities seeded across 244 countries; /recruit/world totals; /recruit/cities filters (country, continent, q, limit), sorted by population, all 1,725 rows returned in 0.15s; city detail page_lang/currency/nearby for tokyo-jp, lagos-ng, sao-paulo-br, paris-fr and los-angeles-ca; 404 for unknown city; admin stats filters plus auth guard; sitemap join URLs; register with recruit_city_slug=tokyo-jp sets recruit_country=JP. Frontend: /join index stats, search and continent tabs work, and country tiles link to the right pages. /join/continent/europe shows only Europe. /join/country/fr, /jp and /us list their cities. Tokyo auto-translates to Japanese (html lang=ja, ¥15,800). The English toggle works, persists in localStorage and survives a reload, and leaving the page restores lang=en. Paris shows French and €89, São Paulo shows pt-BR and R$509. LA has no toggle and shows $100. A logged-in provider sees a share bar with /join/lagos-ng?ref=CODE. All CTAs are present: persona-join-world, footer-link-join-world, become-provider-find-city, country-work-cta on /in/japan, recruiter-world-link. Admin Recruit tab filters work, and non-US rows show the country name. No page errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/recruit/stats", "issue": "Admin total is 1726 but the public total is 1725. The extra row is a leftover inactive test city 'test-city-1789909634' from an earlier test run; it should be removed."},
+      {"endpoint": "/api/recruit/cities (no limit)", "issue": "Default limit=2000 returns about 515KB. It is fast, but the frontend never needs the full list, so a smaller default (e.g. 200) would be safer."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CityRecruit hero subhead (US seeded cities)", "issue": "Los Angeles subhead says '300 spots. $500 sign-on for the first 100.' while the actual bonus is $100. The old seeded US copy contradicts the $100 bonus.", "selector": "[data-testid='city-hero-subhead']", "priority": "MEDIUM"},
+      {"component": "CityRecruit localSeoBlurb (line 81)", "issue": "The text puts a literal '$' in front of the already-formatted bonus, giving '$$100' or '$¥15,800'. On the LA page the meta description is the generic site one, so Helmet's description seems to be overridden as well.", "selector": "meta[name=description]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/join/lagos-ng and other non-major currencies", "issues": ["formatPrice uses the default currencyDisplay, so the bonus shows as 'NGN 133,235' instead of '₦133,235'. Consider currencyDisplay:'narrowSymbol'."]},
+      {"screen": "/join index", "issues": ["Roughly 250px empty gap between the continent tabs and the first continent section, caused by the empty AdSense slot (adsense-join-index)."]},
+      {"screen": "/join/country/zz (invalid code)", "issues": ["Shows a '?' flag and 'Earn with Lumo in ZZ' instead of a not-found state."]},
+      {"screen": "Admin Recruit KPIs", "issues": ["'Total signups', 'Goal' and 'This week' only add up the 300 loaded rows, while 'Cities' shows the full total. Mixed meanings."]},
+      {"screen": "Admin Recruit Add city dialog", "issues": ["Has no country/currency/lang fields and requires a 2-letter State, so admins can only create US cities manually."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter67_world_recruit.py", "/app/test_reports/pytest/iter67.xml"],
+  "action_items": [
+    "Fix the stale '$500 sign-on' hero_subhead copy on US seeded cities (it should match bonus_amount, $100).",
+    "Fix the '$${bonus}' double currency symbol in CityRecruit.jsx localSeoBlurb.",
+    "Optional: use the narrowSymbol currency display, delete the leftover test-city-1789909634, add a not-found state for unknown country codes, and add country fields to the admin Add city dialog."
+  ],
+  "critical_code_review_comments": [
+    "recruit_cities.py is 701 lines, just over the 700-line split threshold.",
+    "seed_world_cities runs update_one on every startup for 94 US rows that have no population and are in the world file. This is harmless but repeats work.",
+    "First-time LLM translation of a city page takes about 5-15s; until then the page shows English (São Paulo stayed English for the first 10s, and later loads were translated)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter67_world_recruit.py"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "Created one provider test_iter67_*@example.com with recruit_city_slug=tokyo-jp during pytest, then deleted it from the DB. Re-running the test creates the user again.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "World recruit-city feature verified. The test file test_iter67_world_recruit.py covers the APIs; register needs avatar_url for the provider role. Do not call /api/admin/recruit/broadcast-now. /in/{country} uses the country name slug (/in/japan), not the ISO code."
+}
