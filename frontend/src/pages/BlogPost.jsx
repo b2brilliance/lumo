@@ -8,7 +8,7 @@ const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefin
 
 // Minimal-but-safe markdown → HTML. We strip raw HTML and only render
 // headings, bold/italic, lists, paragraphs, links, and code.
-function renderMarkdown(md = "") {
+export function renderMarkdown(md = "") {
   // Strip raw HTML tags as a safety measure
   const safe = md.replace(/<\/?[^>]+(>|$)/g, "");
   const blocks = safe.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);

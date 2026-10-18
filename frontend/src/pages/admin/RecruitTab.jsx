@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import {
   Plus, Edit3, Trash2, Copy, ExternalLink, MapPin, Eye, EyeOff, Users, TrendingUp, Share2,
 } from "lucide-react";
+import CityBlogPanel from "@/pages/admin/CityBlogPanel";
 
 /* RecruitTab — per-city hiring dashboard.
  *
@@ -154,6 +155,8 @@ export default function RecruitTab() {
         <Kpi label="Goal (listed)" value={totals.goal} />
         <Kpi label="This week (listed)" value={`+${totals.this_week}`} icon={TrendingUp} />
       </div>
+
+      <CityBlogPanel />
 
       <form
         className="flex flex-wrap gap-2 items-center"

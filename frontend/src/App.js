@@ -59,6 +59,7 @@ import Orders from "@/pages/Orders";
 import Help from "@/pages/Help";
 import Recruiter from "@/pages/Recruiter";
 import JoinCountry from "@/pages/JoinCountry";
+import { CityBlogList, CityBlogPost } from "@/pages/CityBlog";
 import AvailableJobs from "@/pages/AvailableJobs";
 import GlobalHub from "@/pages/GlobalHub";
 import CountryHub from "@/pages/CountryHub";
@@ -207,6 +208,8 @@ function App() {
             <Route path="/join/continent/:continent" element={<CityRecruitIndex />} />
             <Route path="/join/country/:cc" element={<JoinCountry />} />
             <Route path="/join/:slug" element={<CityRecruit />} />
+            <Route path="/join/:slug/blog" element={<CityBlogList />} />
+            <Route path="/join/:slug/blog/:postSlug" element={<CityBlogPost />} />
             <Route path="/reset" element={<Reset />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />

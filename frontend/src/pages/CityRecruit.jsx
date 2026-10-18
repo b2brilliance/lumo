@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import AdSense from "@/components/AdSense";
 import WeatherBadge from "@/components/WeatherBadge";
 import { useLocale } from "@/lib/locale";
+import { CityBlogTeaser } from "@/pages/CityBlog";
 import { RecruitLangToggle, NearbyRecruitCities, RecruitShareBar } from "@/components/recruit/RecruitExtras";
 
 /* CityRecruit — /join/:slug
@@ -246,6 +247,7 @@ export default function CityRecruit() {
       </section>
 
       <RecruitShareBar slug={slug} cityName={city.city} />
+      <CityBlogTeaser citySlug={slug} cityName={city.city} />
       <NearbyRecruitCities city={city} />
 
       {/* Final CTA */}

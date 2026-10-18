@@ -4174,6 +4174,12 @@ async def sitemap_xml(request: Request):
     except Exception:
         pass
 
+    try:
+        async for p in db.city_blog_posts.find({}, {"_id": 0, "slug": 1, "city_slug": 1}).sort("created_at", -1).limit(20000):
+            lines.append(f"  <url><loc>{origin}/join/{p['city_slug']}/blog/{p['slug']}</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>")
+    except Exception:
+        pass
+
     # Auto-generated blog posts
     try:
         async for p in db.blog_posts.find({"status": "published"}, {"_id": 0, "slug": 1, "published_at": 1, "updated_at": 1}).sort("published_at", -1).limit(5000):
@@ -7728,6 +7734,10 @@ from email_subs import create_router as _create_email_router, start_email_loop  
 app.include_router(_create_blog_router(db=db, require_admin=_require_admin()))
 app.include_router(_create_email_router(db=db, require_admin=_require_admin()))
 start_blog_loop(app, db)
+
+# Daily city recruiting blog — triggered by platform cron (/api/cron/city-blogs)
+from city_blog import create_router as _create_city_blog_router  # noqa: E402
+app.include_router(_create_city_blog_router(db=db, require_admin=_require_admin(), llm_key=EMERGENT_LLM_KEY))
 start_email_loop(app, db)
 
 

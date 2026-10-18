@@ -1,0 +1,8 @@
+crons:
+  - name: city-blogs
+    description: "Publishes the next batch of daily/weekly city recruiting blog posts every 30 minutes"
+    cron: "*/30 * * * *"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/city-blogs"
+    method: POST
+    enabled: true
