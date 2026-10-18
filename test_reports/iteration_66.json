@@ -1,0 +1,39 @@
+{
+  "summary": "Tested the tiered Recruiter program (backend + UI) and the Available Jobs board for providers. Backend: 15 API tests, 14 passed, plus 1 credit_referrer unit test against local Mongo, which passed. Rates step correctly 0.1 -> 0.11 at 1000 prior jobs, gross = provider_amount/0.9, rate_pct and gross_amount are stored, the cap at 0.99 works, and tier_info is correct. Frontend: /recruiter works logged out (ladder-0..5000, signup CTA) and logged in (ReferralCard + recruiter-tier, rate 0.10%, next 0.11%). /wallet shows recruiter-tier. Admin Recruiters tab saves and persists config, shows the backend error toast for invalid values and renders the leaderboard (4 rows). /available-jobs defaults to the deliveries filter (handyman job hidden, shown under 'All jobs'). Accept goes to /jobs/{id}/track with a success toast. The empty state shows, and a customer visiting the page is redirected to /. The ProviderHub links and the footer recruiter link are present. Recruiter config was restored to defaults (0.1/0.01/1000/0.99) and verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/referrals/admin/program", "issue": "A non-numeric value (e.g. base_pct='abc') returns 500. float()/int() raise ValueError and nothing catches it. It should return 400/422. Use a Pydantic model with Field(ge=0, lt=1) instead of a raw dict."},
+      {"endpoint": "PUT /api/referrals/admin/program", "issue": "No check that base_pct <= max_pct. step_jobs=1.5 is silently cut to 1 by int()."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "admin/RecruitersTab", "issue": "Clearing an input and pressing Save sends Number('')=0, so the backend saves base_pct=0 with a success toast (reproduced). An admin can zero the recruiter rate by accident. Block empty values on the client.", "selector": "[data-testid='recruiter-config-save']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/available-jobs (short list)", "issues": ["When the list is short, the footer stops above the bottom of the viewport and leaves a white band below it at 1920x1080. Use a min-h-screen/flex layout."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter66_recruiter_program.py", "/app/backend/tests/test_iter66_credit_referrer_unit.py", "/app/test_reports/pytest/iter66.xml"],
+  "action_items": [
+    "Validate the PUT /referrals/admin/program body with a Pydantic model so bad input returns 400/422 instead of 500, and enforce base_pct <= max_pct",
+    "In RecruitersTab, block Save when a field is empty or not a number",
+    "Update the stale referrals.py docstrings ('1% of commission', 'amount/900', PROVIDER_TAKE_TO_REFERRER_RATIO is unused) to describe the tiered program"
+  ],
+  "critical_code_review_comments": [
+    "The tier is counted from db.referral_earnings.count_documents, so every payout event counts as one 'recruit job'. A job paid in two parts (deposit + final, or escrow release) would count twice. Check that this matches the business meaning of 'jobs completed'.",
+    "credit_referrer counts then inserts without atomicity, so concurrent payouts can use the same rate. This only matters at the boundary and is acceptable.",
+    "The leaderboard runs 2 queries per row (N+1). Fine for 100 rows.",
+    "accept_job uses get_current_user rather than require_role('provider'). It was not changed in this iteration, but a non-provider can call it.",
+    "The admin tab trigger testid is 'admin-tab-recruiters'; 'admin-recruiters-tab' is on the tab content container."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter66_recruiter_program.py", "/app/backend/tests/test_iter66_credit_referrer_unit.py"],
+  "success_rate": {"backend": "94% (15/16 incl. unit test; the one failure is the minor 500 on non-numeric input)", "frontend": "100% of requested flows"},
+  "test_credentials": "Admin julius.a.mason@gmail.com/Mason0123, customer@lumo.test, provider@lumo.test (password123) all work",
+  "seed_data_creation": "Registered non-test customers qa_cust_*@lumoqa.io and qa_ui_*@lumoqa.io and created TEST_-titled jobs (2 delivery, now accepted by provider@lumo.test; 1 handyman, still open). These are needed because jobs from *.test owners are demo-hidden from /provider/opportunities. The unit test cleans up its own users and earnings.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use non-.test customer emails when creating jobs that a provider should see. provider@lumo.test accepts jobs without a Stripe 402. Restore the recruiter config after testing with PUT /api/referrals/admin/program {0.1,0.01,1000,0.99}."
+}

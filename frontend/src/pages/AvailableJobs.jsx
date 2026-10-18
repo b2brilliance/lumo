@@ -70,7 +70,7 @@ export default function AvailableJobs() {
   const shown = filter === "all" ? jobs : jobs.filter((j) => j.category_group === filter);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-12" data-testid="available-jobs-page">
+    <div className="max-w-5xl mx-auto px-6 py-12 min-h-screen" data-testid="available-jobs-page">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <div className="overline flex items-center gap-2"><Truck className="w-4 h-4 text-teal-700" /> Available jobs</div>

@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 
 CODE_ALPHABET = string.ascii_uppercase + string.digits
 # Excluding easily-confused characters keeps referral URLs typable IRL.
@@ -293,6 +294,13 @@ async def credit_referrer_milestone(
     return record
 
 
+class ProgramUpdate(BaseModel):
+    base_pct: Optional[float] = Field(default=None, ge=0, lt=1)
+    step_pct: Optional[float] = Field(default=None, ge=0, lt=1)
+    max_pct: Optional[float] = Field(default=None, ge=0, lt=1)
+    step_jobs: Optional[int] = Field(default=None, ge=1, strict=True)
+
+
 # ── Router ─────────────────────────────────────────────────────────────
 def create_router(*, db, get_current_user, require_admin=None):
     r = APIRouter(prefix="/referrals", tags=["referrals"])
@@ -307,19 +315,11 @@ def create_router(*, db, get_current_user, require_admin=None):
 
     if require_admin is not None:
         @r.put("/admin/program")
-        async def update_program(body: dict, _admin: dict = Depends(require_admin)):
-            upd = {}
-            for k in ("base_pct", "step_pct", "max_pct"):
-                if k in body:
-                    v = float(body[k])
-                    if not 0 <= v < 1:
-                        raise HTTPException(400, f"{k} must be between 0 and 1 (percent, under 1%)")
-                    upd[k] = v
-            if "step_jobs" in body:
-                v = int(body["step_jobs"])
-                if v < 1:
-                    raise HTTPException(400, "step_jobs must be >= 1")
-                upd["step_jobs"] = v
+        async def update_program(body: ProgramUpdate, _admin: dict = Depends(require_admin)):
+            upd = body.model_dump(exclude_none=True)
+            merged = {**(await get_program(db)), **upd}
+            if merged["base_pct"] > merged["max_pct"]:
+                raise HTTPException(400, "Starting rate can't exceed max rate")
             await db.recruiter_program.update_one({"id": "config"}, {"$set": upd}, upsert=True)
             return await get_program(db)
 

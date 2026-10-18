@@ -22,6 +22,10 @@ export default function RecruitersTab() {
   }, []);
 
   const save = async () => {
+    if (FIELDS.some((f) => String(cfg[f.key]).trim() === "")) {
+      toast.error("Fill in every field before saving");
+      return;
+    }
     try {
       const body = Object.fromEntries(FIELDS.map((f) => [f.key, Number(cfg[f.key])]));
       const { data } = await api.put("/referrals/admin/program", body);

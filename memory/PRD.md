@@ -890,3 +890,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 3. P1 Marketplace polish (buy/rent toggle, cart, product images)
 4. P1 Mobile bottom-tab navigation (Home, Orders, Messages, Profile)
 - Note: affiliate_settings still holds placeholder IDs (skimlinks 12345, impact TEST-IMPACT-12345) — admin should replace.
+
+## 2026-06 — Recruiter Program + Available Jobs board
+- Tiered recruiter commission (backend/referrals.py): 0.10% of job gross, +0.01% per 1,000 lifetime recruit jobs, cap 0.99%. Direct recruits only. Paid from Lumo's 10% commission. $25 bonus at recruit's 10th job kept.
+- Endpoints: GET /api/referrals/program, GET /api/referrals/me (tier), PUT /api/referrals/admin/program, GET /api/referrals/admin/leaderboard. Config lives in `recruiter_program` collection.
+- Frontend: /recruiter (public explainer + dashboard), RecruiterTier in ReferralCard (/wallet), Admin → Recruiters tab, /available-jobs (provider-only one-tap Accept, deliveries filter by default).
+- Tested: iteration_66 (backend 15/16, then the minor validation issues were fixed; frontend 100%).
+- Global redeploy was dispatched before this feature, so a redeploy is needed to push the recruiter program live.
