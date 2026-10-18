@@ -4,11 +4,26 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Newspaper, Trash2, ExternalLink } from "lucide-react";
+import { Newspaper, Trash2, ExternalLink, Facebook, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 export default function CityBlogPanel() {
   const [cfg, setCfg] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [fbJob, setFbJob] = useState(null);
+  const pollFb = () => api.get("/admin/city-blog/publish-facebook").then((r) => setFbJob(r.data)).catch(() => {});
+  useEffect(() => {
+    pollFb();
+  }, []);
+  useEffect(() => {
+    if (fbJob?.state !== "running") return undefined;
+    const t = setInterval(pollFb, 4000);
+    return () => clearInterval(t);
+  }, [fbJob?.state]);
+  const publishFb = async () => {
+    if (!window.confirm("Publish the first 10 recruiting posts to your Facebook Page?")) return;
+    try { await api.post("/admin/city-blog/publish-facebook?count=10"); setFbJob({ state: "running", results: [] }); toast.success("Publishing to Facebook…"); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   const load = () => {
     api.get("/admin/city-blog/config").then((r) => setCfg(r.data)).catch(() => {});
     api.get("/admin/city-blog/posts?limit=20").then((r) => setPosts(r.data || [])).catch(() => {});
@@ -57,7 +72,28 @@ export default function CityBlogPanel() {
         </label>
         <Button size="sm" variant="outline" onClick={() => save({ daily_top_n: Number(cfg.daily_top_n) })} data-testid="admin-city-blog-save">Save</Button>
         <Button size="sm" onClick={runNow} className="bg-slate-900" data-testid="admin-city-blog-run">Write 3 posts now</Button>
+        <Button size="sm" onClick={publishFb} disabled={fbJob?.state === "running"} className="bg-[#1877F2] hover:bg-[#166FE5]" data-testid="admin-city-blog-fb-publish">
+          {fbJob?.state === "running" ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Facebook className="w-4 h-4 mr-1" />}
+          Publish first 10 to Facebook
+        </Button>
       </div>
+      {fbJob && fbJob.state !== "idle" && (
+        <div className="p-4 border-b border-slate-200 text-sm" data-testid="admin-city-blog-fb-status">
+          <div className="font-semibold">
+            {fbJob.state === "running" ? `Publishing… ${(fbJob.results || []).length}/${fbJob.count || 10}` :
+              fbJob.state === "error" ? `Failed: ${fbJob.error}` : `Done: ${fbJob.published} of ${(fbJob.results || []).length} posted to Facebook`}
+          </div>
+          <ul className="mt-2 space-y-1">
+            {(fbJob.results || []).map((r) => (
+              <li key={r.slug} className="flex items-center gap-2 text-xs" data-testid={`admin-city-blog-fb-result-${r.slug}`}>
+                {r.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-red-600" />}
+                <span className="font-mono">{r.city}</span>
+                {r.error && <span className="text-red-600 truncate">{r.error}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <ul className="divide-y divide-slate-100 max-h-96 overflow-auto" data-testid="admin-city-blog-posts">
         {posts.map((p) => (
           <li key={p.id} className="p-3 flex items-center gap-3 text-sm" data-testid={`admin-city-blog-post-${p.id}`}>

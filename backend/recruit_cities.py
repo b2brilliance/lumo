@@ -622,16 +622,16 @@ def create_router(
 
 RECRUIT_COPY_TEMPLATES = [
     (
-        "Drive with Lumo in {city} — 90% take-home, same-day pay",
-        "Lumo is hiring {goal} providers in {city}, {state_full}. First {first_n} sign-ups earn a ${bonus:.0f} bonus at job #{jobs}. No lead fees, no monthly subscription, cash out today.",
+        "{city}: your skills are worth more than you're being paid",
+        "Finding good work is hard. But what you already know how to do (driving, moving, fixing, cleaning, errands) is worth real money. On Lumo you keep 90% of every job and get paid the same day. First {first_n} sign-ups earn a ${bonus:.0f} bonus at job #{jobs}.",
     ),
     (
-        "{city}, hiring {goal} gig pros — deliveries, moving, handyman, more",
-        "One app, multi-service. Keep 90%, same-day payouts, no lead fees. First {first_n} in {city} unlock ${bonus:.0f} at their 100th job.",
+        "Can't find a job in {city}? Put your skills to work",
+        "Lumo is signing up {goal} independent pros in {city}. Set your own hours, keep 90% of what customers pay, and cash out the same day. Get paid what your labor is actually worth.",
     ),
     (
-        "Tired of DoorDash rate cuts? Try Lumo in {city}",
-        "Lumo pays 90/10 not 65/35. Deliveries + moving + handyman + cleaning + IT + pet — all in one app. Same-day cash-out. ${bonus:.0f} bonus at job #{jobs}.",
+        "Earn what your work is actually worth in {city}",
+        "No lead fees, no monthly subscription, no 35% cut. Deliveries, moving, handyman, cleaning, pet care and tech help, all in one app. ${bonus:.0f} loyalty bonus at job #{jobs} for the first {first_n} in {city}.",
     ),
 ]
 
@@ -673,6 +673,10 @@ async def broadcast_recruit_post(db, publish_fn, *, base_url: str = "") -> Dict[
                 "city": fmt["city"], "state": fmt["state_full"],
                 "milestone_jobs": fmt["jobs"], "bonus_usd": fmt["bonus"],
                 "first_n_signups": fmt["first_n"], "goal_workers": fmt["goal"],
+                "country": city.get("country_name") or "United States",
+                "local_city_name": city.get("local_name") or city["city"],
+                "neighborhoods": ", ".join((city.get("neighborhoods") or [])[:4]) or "(use well-known districts you're sure exist)",
+                "core_message": "finding work is hard; their skills are worth real money; earn what their labor is actually worth",
             },
         )
         content = {

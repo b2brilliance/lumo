@@ -161,7 +161,10 @@ async def rewrite_copy(
         f"{tone_msg}\n\n"
         "Task: rewrite the given social post so it feels fresh vs recent posts. "
         "Keep every factual detail (city, dollar amounts, milestone counts, URLs). "
-        "Change ONLY the phrasing, hook and angle.\n\n"
+        "Change ONLY the phrasing, hook and angle.\n"
+        "If the context includes local details (neighborhoods, region, local city name, nearby cities), "
+        "weave one in so the post clearly speaks to people in that specific area. Don't invent statistics.\n"
+        "If the context includes a core_message, keep that message.\n\n"
         "Output STRICT JSON only, no prose, no code fences:\n"
         '{"title": "…", "body": "…"}\n'
         "Title: max 100 chars. Body: max 260 chars. No hashtags — the caller adds them."

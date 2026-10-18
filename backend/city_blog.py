@@ -23,12 +23,20 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger("lumo.city_blog")
 
 DEFAULT_CFG = {"enabled": True, "daily_top_n": 300, "batch_size": 15, "share_social": True}
+COPY_VERSION = 2
+CORE_MESSAGE = (
+    "Core message (every post): finding good work is hard right now, and too many people are underpaid for what "
+    "they can do. The skills readers already have (driving, lifting, fixing things, cleaning, errands, caring for "
+    "pets, tech help) are worth real money. On Lumo they set their own hours, keep 90% of every job, get paid the "
+    "same day, and finally earn what their labor is actually worth. Be empathetic and respectful, never preachy; "
+    "don't attack other companies by name."
+)
 ANGLES = [
-    "new job openings this week (deliveries, rides, moving, errands, handyman)",
-    "the loyalty bonus and how few bonus spots are left",
-    "how fast it is to apply and get approved as an independent contractor",
-    "keeping 90% of every job and same-day payouts",
-    "why signing up now means being first in line when jobs go live",
+    "it's hard to find a job, but your existing skills can start earning now",
+    "you're worth more than you're being paid: keep 90% of what customers pay",
+    "turn what you already know how to do into extra income on your own schedule",
+    "get paid what your work is actually worth, the same day you do it",
+    "sign up now so you're first in line when local customers post jobs, plus the loyalty bonus",
 ]
 LANG_NAMES = {
     "es": "Spanish", "fr": "French", "fr-CA": "Canadian French", "de": "German", "pt-BR": "Brazilian Portuguese",
@@ -52,7 +60,7 @@ async def get_cfg(db) -> Dict[str, Any]:
 async def _due_cities(db, cfg: Dict[str, Any], limit: int) -> List[Dict[str, Any]]:
     fields = {"_id": 0, "slug": 1, "city": 1, "country": 1, "country_name": 1, "state_full": 1, "lang": 1,
               "currency": 1, "bonus_amount": 1, "bonus_first_n": 1, "bonus_job_count": 1, "goal_workers": 1,
-              "hero_image": 1, "population": 1, "last_blog_at": 1}
+              "hero_image": 1, "population": 1, "last_blog_at": 1, "neighborhoods": 1, "local_name": 1}
     top = await db.recruit_cities.find({"is_active": True}, {"_id": 0, "slug": 1}).sort("population", -1) \
         .limit(int(cfg["daily_top_n"])).to_list(None)
     top_slugs = [t["slug"] for t in top]
@@ -72,6 +80,22 @@ async def _signups(db, slug: str) -> int:
     return await db.users.count_documents({"role": "provider", "recruit_city_slug": slug})
 
 
+async def _nearby(db, city: Dict[str, Any], km: float = 150) -> List[str]:
+    import math
+    lat, lng = city.get("lat"), city.get("lng")
+    if lat is None or lng is None:
+        return []
+    rows = await db.recruit_cities.find(
+        {"country": city.get("country") or "US", "slug": {"$ne": city["slug"]}, "lat": {"$ne": None}},
+        {"_id": 0, "city": 1, "lat": 1, "lng": 1}).to_list(None)
+
+    def dist(r):
+        p1, p2 = math.radians(lat), math.radians(r["lat"])
+        a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(r["lng"] - lng) / 2) ** 2
+        return 6371 * 2 * math.asin(math.sqrt(a))
+    return [r["city"] for r in sorted(rows, key=dist) if dist(r) <= km][:4]
+
+
 def _bonus_local(city: Dict[str, Any], fx: Dict[str, float]) -> str:
     usd = float(city.get("bonus_amount") or 100)
     cur = city.get("currency") or "USD"
@@ -86,7 +110,8 @@ def _page_lang(city: Dict[str, Any]) -> str:
     return pl(city.get("lang"), city.get("country"))
 
 
-async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx: Dict[str, float]) -> Dict[str, Any]:
+async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx: Dict[str, float],
+                 nearby: List[str]) -> Dict[str, Any]:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     first_n = int(city.get("bonus_first_n") or 100)
     facts = {
@@ -95,6 +120,10 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx
         "bonus_after_jobs": int(city.get("bonus_job_count") or 100), "bonus_spots_left": max(0, first_n - signups),
         "workers_wanted": int(city.get("goal_workers") or 300), "signed_up_so_far": signups,
         "date": _now().strftime("%B %d, %Y"), "angle": random.choice(ANGLES),
+        "region": city.get("state_full") if (city.get("country") or "US") == "US" else city.get("country_name"),
+        "local_city_name": city.get("local_name") or city["city"],
+        "neighborhoods": (city.get("neighborhoods") or [])[:5],
+        "nearby_cities": nearby,
     }
     local = LANG_NAMES.get(lang)
     want = (f'Return JSON: {{"local": {{"title","excerpt","body_md"}}, "en": {{"title","excerpt","body_md"}}}} '
@@ -103,7 +132,12 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx
     sys_msg = (
         "You write short recruiting blog posts for Lumo, a marketplace that pays independent contractors to do "
         "local jobs (deliveries, rides, moving, errands, handyman). Goal: get people in the given city to sign up "
-        "now as contractors so they're ready when jobs open. Focus only on job openings and the loyalty bonus. "
+        "now as contractors so they're ready when jobs open. Focus on job openings and the loyalty bonus. "
+        + CORE_MESSAGE + " Today's angle is in the facts. "
+        "Personalize it to the area: speak directly to people who live there, use the city's name (and local name), "
+        "you MUST name 2-3 real neighborhoods or districts of the city (use the given list, or well-known ones you "
+        "are certain exist), mention nearby_cities only if given, and local everyday realities (commutes, seasons, the kind of "
+        "help neighbors need) in general terms. It must read as written for this city, not a template. "
         "Never claim a specific number of open jobs; workers_wanted is how many contractors Lumo is recruiting, and jobs open as local customers post them. "
         "250-400 words, markdown with 2-3 ## headings and one bullet list, warm and direct, no invented statistics "
         "beyond the facts given. Use bonus_local exactly as the bonus amount. Do not say jobs are opening this week, "
@@ -129,7 +163,8 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool,
         return None
     lang = _page_lang(city)
     signups = await _signups(db, city["slug"])
-    out = await _write(city, lang, signups, llm_key, fx)
+    nearby = await _nearby(db, city)
+    out = await _write(city, lang, signups, llm_key, fx, nearby)
     post = {
         "id": str(uuid.uuid4()), "slug": slug, "city_slug": city["slug"], "city": city["city"],
         "country": city.get("country") or "US", "country_name": city.get("country_name"), "lang": lang,
@@ -138,6 +173,7 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool,
         "title_en": (out["en"].get("title") or "")[:180], "excerpt_en": (out["en"].get("excerpt") or "")[:400],
         "body_md_en": out["en"].get("body_md") or "",
         "hero_image": city.get("hero_image"), "view_count": 0, "created_at": _now().isoformat(),
+        "copy_version": COPY_VERSION,
     }
     res = await db.city_blog_posts.update_one({"slug": slug}, {"$setOnInsert": post}, upsert=True)
     await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"last_blog_at": post["created_at"]}})
@@ -146,15 +182,22 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool,
     post.pop("_id", None)
     if share:
         try:
-            from social_publisher import publish_to_all
-            await publish_to_all(db, {
-                "title": post["title"], "body": post["excerpt"], "url": f"{base_url}/join/{city['slug']}/blog/{slug}",
-                "image_url": post["hero_image"], "hashtags": ["lumo", "hiring", city["city"].replace(" ", "")],
-                "source_type": "city_blog", "source_id": post["id"],
-            })
+            res = await share_post(db, post, base_url)
+            if (res.get("facebook") or {}).get("ok"):
+                await db.city_blog_posts.update_one({"id": post["id"]}, {"$set": {"fb_shared_at": _now().isoformat()}})
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[city_blog] share failed for {slug}: {e}")
     return post
+
+
+async def share_post(db, post: Dict[str, Any], base_url: str, platforms: Optional[List[str]] = None) -> Dict[str, Any]:
+    from social_publisher import publish_to_all
+    return await publish_to_all(db, {
+        "title": post["title"], "body": post["excerpt"],
+        "url": f"{base_url}/join/{post['city_slug']}/blog/{post['slug']}",
+        "image_url": post.get("hero_image"), "hashtags": ["lumo", "hiring", post["city"].replace(" ", "")],
+        "source_type": "city_blog", "source_id": post["id"],
+    }, platforms=platforms)
 
 
 async def run_batch(db, llm_key: str, get_fx, base_url: str, limit: Optional[int] = None) -> int:
@@ -269,6 +312,57 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
             raise HTTPException(503, "LLM key missing")
         spawn(count)
         return {"ok": True, "queued": count}
+
+    async def _fb_job(count: int):
+        job = {"id": "fb_publish_job"}
+        try:
+            q = {"copy_version": COPY_VERSION, "fb_shared_at": {"$exists": False}}
+            posts = await db.city_blog_posts.find(q, {"_id": 0}).sort("created_at", 1).limit(count).to_list(None)
+            if len(posts) < count and llm_key:
+                fx = await get_fx()
+                sem = asyncio.Semaphore(5)
+
+                async def write(c):
+                    async with sem:
+                        try:
+                            return await publish_for_city(db, c, llm_key, False, fx, base_url)
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning(f"[city_blog] fb pre-write {c['slug']} failed: {e}")
+                cities = await _due_cities(db, await get_cfg(db), count - len(posts))
+                posts += [p for p in await asyncio.gather(*(write(c) for c in cities)) if p]
+            out = []
+            for p in posts[:count]:
+                res = (await share_post(db, p, base_url, ["facebook"])).get("facebook") or {}
+                if res.get("ok"):
+                    await db.city_blog_posts.update_one({"id": p["id"]}, {"$set": {"fb_shared_at": _now().isoformat()}})
+                out.append({"slug": p["slug"], "city_slug": p["city_slug"], "city": p["city"],
+                            "ok": bool(res.get("ok")), "error": res.get("error")})
+                await db.city_blog_config.update_one(job, {"$set": {"results": out}})
+            await db.city_blog_config.update_one(job, {"$set": {
+                "state": "done", "published": sum(1 for o in out if o["ok"]), "finished_at": _now().isoformat()}})
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[city_blog] fb publish job failed")
+            await db.city_blog_config.update_one(job, {"$set": {"state": "error", "error": str(e)[:300]}})
+
+    @r.post("/admin/city-blog/publish-facebook")
+    async def publish_facebook(count: int = Query(10, ge=1, le=25), _a: dict = Depends(require_admin)):
+        fb = await db.social_channels.find_one({"platform": "facebook"}, {"_id": 0}) or {}
+        if not (fb.get("enabled") and fb.get("access_token") and fb.get("page_id")):
+            raise HTTPException(400, "Connect Facebook first (Admin → Auto-post → Connect Facebook)")
+        cur = await db.city_blog_config.find_one({"id": "fb_publish_job"}, {"_id": 0}) or {}
+        if cur.get("state") == "running" and cur.get("started_at", "") > (_now() - timedelta(minutes=10)).isoformat():
+            raise HTTPException(409, "A Facebook publish is already running")
+        await db.city_blog_config.update_one({"id": "fb_publish_job"}, {"$set": {
+            "state": "running", "count": count, "results": [], "published": 0, "error": None,
+            "started_at": _now().isoformat()}}, upsert=True)
+        t = asyncio.create_task(_fb_job(count))
+        _TASKS.add(t)
+        t.add_done_callback(_TASKS.discard)
+        return {"ok": True, "state": "running"}
+
+    @r.get("/admin/city-blog/publish-facebook")
+    async def publish_facebook_status(_a: dict = Depends(require_admin)):
+        return await db.city_blog_config.find_one({"id": "fb_publish_job"}, {"_id": 0}) or {"state": "idle"}
 
     @r.get("/admin/city-blog/posts")
     async def admin_posts(limit: int = Query(50, ge=1, le=200), _a: dict = Depends(require_admin)):

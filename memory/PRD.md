@@ -918,3 +918,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Env: META_APP_ID, META_APP_SECRET, META_GRAPH_VERSION=v24.0, META_REDIRECT_URI, PUBLIC_BASE_URL. social_publisher uses META_GRAPH_VERSION.
 - UI: FacebookConnectCard at top of Admin → Auto-post tab (/admin?tab=autopost). The OAuth return lands there.
 - Tested: iteration_69 (backend 11/11). Its tab-routing bug and minor issues are fixed. A real login can only be completed on production golumo.app.
+
+## 2026-06 — Recruitment messaging + local personalization + FB first-10
+- City blog prompt (COPY_VERSION=2): the core message is "finding work is hard; your skills are worth real money; earn what your labor is actually worth". Posts must name 2-3 real neighborhoods and use nearby cities within 150 km (haversine on lat/lng), the region and the local city name.
+- The recruit broadcast templates were rewritten with the same message. The AI copy rotator now weaves in local details (neighborhoods, country, local name).
+- publish_to_all(db, content, platforms=None) can now target specific platforms.
+- POST/GET /api/admin/city-blog/publish-facebook?count=10: a background job that shares the 10 oldest unshared v2 posts to Facebook (writing any that are missing first) and records fb_shared_at. Auto-share also sets fb_shared_at, so nothing is posted twice. The button and live status are in Admin → Recruit → City recruiting blog.
+- Self-tested via curl (Delhi post names Connaught Place, Karol Bagh, Dwarka, Rohini). The FB job reached the real Graph API and failed as expected with the preview's fake token.

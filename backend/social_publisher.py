@@ -248,10 +248,10 @@ def _compose_caption(content: dict, *, max_len: int, prefer_short: bool = False)
 
 
 # ── Core publish ─────────────────────────────────────────────────────
-async def publish_to_all(db, content: dict) -> dict:
-    """Fan out to every enabled channel. Returns a per-channel report."""
+async def publish_to_all(db, content: dict, platforms: Optional[List[str]] = None) -> dict:
+    """Fan out to every enabled channel (or only `platforms`). Returns a per-channel report."""
     results: Dict[str, dict] = {}
-    for platform in PLATFORMS:
+    for platform in platforms or PLATFORMS:
         cfg = await db.social_channels.find_one({"platform": platform}) or {}
         if not cfg.get("enabled"):
             continue
