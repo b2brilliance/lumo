@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { BarChart3, MousePointerClick, UserPlus, Share2 } from "lucide-react";
+import { BarChart3, MousePointerClick, UserPlus, Share2, Loader2 } from "lucide-react";
 
 const SOURCES = [["facebook", "Facebook"], ["instagram", "Instagram"], ["all", "All sources"]];
 const DAYS = [7, 30, 90];
@@ -29,8 +29,10 @@ export default function RecruitResultsPanel() {
   const [source, setSource] = useState("facebook");
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
+  const [err, setErr] = useState(false);
   useEffect(() => {
-    api.get(`/admin/attribution/report?source=${source}&days=${days}`).then((r) => setData(r.data)).catch(() => setData(null));
+    setData(null); setErr(false);
+    api.get(`/admin/attribution/report?source=${source}&days=${days}`).then((r) => setData(r.data)).catch(() => setErr(true));
   }, [source, days]);
   const conv = (s, c) => (c ? `${Math.round((s / c) * 100)}%` : "—");
 
@@ -47,12 +49,14 @@ export default function RecruitResultsPanel() {
           </select>
         </div>
       </div>
+      {!data && !err && <div className="text-sm text-slate-500 flex items-center gap-2" data-testid="recruit-results-loading"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>}
+      {err && <div className="text-sm text-red-600" data-testid="recruit-results-error">Couldn't load tracking data. Try again.</div>}
       {data && (
         <>
           <div className="grid grid-cols-3 gap-3">
             <Stat icon={Share2} label="Posts shared to FB" value={data.totals.posts_shared} testid="recruit-results-shared" />
             <Stat icon={MousePointerClick} label="Clicks" value={data.totals.clicks} testid="recruit-results-clicks" />
-            <Stat icon={UserPlus} label="Sign-ups" value={data.totals.signups} testid="recruit-results-signups" />
+            <Stat icon={UserPlus} label="Contractor sign-ups" value={data.totals.signups} testid="recruit-results-signups" />
           </div>
           <div className="grid lg:grid-cols-2 gap-4">
             <Table title="Top posts" testid="recruit-results-posts" head={["Post", "Clicks", "Sign-ups", "Conv."]}

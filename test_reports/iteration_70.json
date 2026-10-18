@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 70: UTM attribution + FB photo posts. Backend pytest 26/26 pass (click endpoint, signup_source sanitising on register, admin report shape/auth for facebook|instagram|all x 7|30|90, share_post __PLATFORM__ replacement via a fake adapter, recruit broadcast URL, _post_facebook /photos then /feed fallback with mocked httpx, and a real Graph call with a fake token returning 400 OAuthException). Frontend e2e passes: a UTM visit stores lumo_attr (first touch is kept when a later instagram visit happens), POSTs /attribution/click once (a reload does not double count), and a customer signup through the Register UI saves user.signup_source with lowercased values. Admin Recruit tab shows admin-recruit-results above the city blog panel; stat cards, post/city tables and selects work, and each select change fires a refetch.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/admin/attribution/report", "issue": "totals.signups and posts[].signups count users of every role (the test customers are counted), but cities[].signups and from_source count only providers. The user's goal is new contractors, so the post numbers overstate contractor signups. Suggest adding role=provider to those counts or returning a separate provider count."},
+      {"endpoint": "GET /api/admin/attribution/report (cities)", "issue": "City from_source needs users.recruit_city_slug, which is only set by the /join apply flow. A provider who lands on /join/{city}/blog/... and then signs up through plain /register gets signup_source.landing_path but no recruit_city_slug, so the city is never credited. Suggest falling back to the city taken from landing_path."},
+      {"endpoint": "GET /api/admin/attribution/report", "issue": "totals.posts_shared counts city_blog_posts.fb_shared_at whatever source is selected, so the 'Posts shared to FB' card shows a Facebook number even when Instagram is picked. Only a labelling issue."},
+      {"endpoint": "POST /api/attribution/click", "issue": "Public and unauthenticated with no rate limit or dedupe, so anyone can inflate click counts with a script. Minor."},
+      {"endpoint": "_post_facebook image_url (risk)", "issue": "5 of 19 city_blog_posts use hero_image on host thumb.wikimedia.org (3840px). Wikimedia returned 403 'bot-traffic' to the facebookexternalhit UA from this container, for both upload.* and thumb.* URLs (a browser UA got 200). If FB's crawler is also blocked, /photos fails and the post silently falls back to a link post, which works but loses the big image. Worth checking the first real prod post, or re-hosting images on our own storage or CDN."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin > Recruit > Sign-up tracking", "issues": ["While the report loads, the panel shows only the header with no loading or error state. If the request fails it is caught and the data silently set to null."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter70_attribution.py", "/app/test_reports/pytest/iter70.xml"],
+  "action_items": [
+    "Optional: limit report signups to role=provider (or add a provider column) so the 'new contractors' numbers are accurate",
+    "Optional: credit cities from signup_source.landing_path when recruit_city_slug is missing",
+    "Check that FB can fetch the wikimedia hero_image URLs (especially thumb.wikimedia.org) on the first prod post; otherwise re-host the images",
+    "Optional: add loading and error states to RecruitResultsPanel"
+  ],
+  "critical_code_review_comments": [
+    "attribution.clean_source keeps only the 4 utm keys plus landing_path and lowercases the utm values: correct",
+    "publish_to_all swaps __PLATFORM__ in both the adapter content and the social_posts history: correct",
+    "The login role-picker has no admin option; the admin logged in after picking the restaurant role (works, but unexpected)",
+    "The review request's example row 'recruit-results-city-lumo-bundle-checkout' does not exist (no such city slug); the actual row is recruit-results-city-delhi-in"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter70_attribution.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Test clicks and users (test_post_*, test_c_*, test_fe_*, other_test_x, test_attr_*@example.com) were all deleted afterwards. The main agent's delhi-in click and attr_9209@lumo.test were left alone. The facebook social_channels doc is still enabled=false.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run test_iter70_attribution.py with REACT_APP_BACKEND_URL exported; the test sets META_GRAPH_VERSION from backend/.env. linkedin social_channel is enabled in preview, so never call publish_to_all against the real DB; use the FakeDB pattern from the test file. Admin login: julius.a.mason@gmail.com / Mason0123 (pick any role on the login role step)."
+}

@@ -17,12 +17,28 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+import io
+import re
+from pathlib import Path
+
+import httpx
+from PIL import Image
+
 from attribution import utm_url
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("lumo.city_blog")
 
+IMG_DIR = Path(__file__).parent / "data" / "img_cache"
+BROWSER_UA = "LumoBot/1.0 (https://golumo.app; julius.a.mason@gmail.com)"  # Wikimedia requires a descriptive UA
+
+
+def _sized(url: str) -> str:
+    m = re.match(r"^https://upload\.wikimedia\.org/wikipedia/(\w+)/([0-9a-f])/([0-9a-f]{2})/([^/]+)$", url)
+    if not m or m.group(4).lower().endswith((".svg", ".tif", ".tiff")):
+        return url
+    return f"https://upload.wikimedia.org/wikipedia/{m.group(1)}/thumb/{m.group(2)}/{m.group(3)}/{m.group(4)}/1280px-{m.group(4)}"
 DEFAULT_CFG = {"enabled": True, "daily_top_n": 300, "batch_size": 15, "share_social": True}
 COPY_VERSION = 2
 CORE_MESSAGE = (
@@ -197,7 +213,7 @@ async def share_post(db, post: Dict[str, Any], base_url: str, platforms: Optiona
         "title": post["title"], "body": post["excerpt"],
         "url": utm_url(f"{base_url}/join/{post['city_slug']}/blog/{post['slug']}",
                        source="__PLATFORM__", campaign="city_blog", content=post["slug"]),
-        "image_url": post.get("hero_image"), "hashtags": ["lumo", "hiring", post["city"].replace(" ", "")],
+        "image_url": f"{base_url}/api/img/city/{post['city_slug']}.jpg", "hashtags": ["lumo", "hiring", post["city"].replace(" ", "")],
         "source_type": "city_blog", "source_id": post["id"],
     }, platforms=platforms)
 
@@ -277,6 +293,27 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
         if queued:
             spawn()
         return {"ok": True, "queued": queued}
+
+    @r.get("/img/city/{slug}.jpg")
+    async def city_image(slug: str):
+        # Self-hosted, resized city photo so Facebook's crawler never hits Wikimedia's bot block.
+        from fastapi.responses import Response
+        path = IMG_DIR / f"{re.sub(r'[^a-z0-9-]', '', slug)}.jpg"
+        if not path.exists():
+            city = await db.recruit_cities.find_one({"slug": slug}, {"_id": 0, "hero_image": 1})
+            if not city or not city.get("hero_image"):
+                raise HTTPException(404, "No image")
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers={"User-Agent": BROWSER_UA}) as c:
+                res = await c.get(_sized(city["hero_image"]))
+                if res.status_code != 200:
+                    res = await c.get(city["hero_image"])
+            if res.status_code != 200:
+                raise HTTPException(502, "Image fetch failed")
+            img = Image.open(io.BytesIO(res.content)).convert("RGB")
+            img.thumbnail((1600, 1600))
+            IMG_DIR.mkdir(parents=True, exist_ok=True)
+            img.save(path, "JPEG", quality=85)
+        return Response(path.read_bytes(), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=604800"})
 
     @r.get("/city-blog/latest")
     async def latest(limit: int = Query(24, ge=1, le=100)):

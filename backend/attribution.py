@@ -4,7 +4,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Query
+import hashlib
+
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
 ATTR_KEYS = ("utm_source", "utm_medium", "utm_campaign", "utm_content")
@@ -41,8 +43,14 @@ def create_router(*, db, require_admin) -> APIRouter:
     r = APIRouter(prefix="/api", tags=["attribution"])
 
     @r.post("/attribution/click")
-    async def click(body: ClickIn):
+    async def click(body: ClickIn, request: Request):
         doc = {k: (getattr(body, k) or "").strip().lower() or None for k in ATTR_KEYS}
+        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0]
+        fp = hashlib.sha256(f"{ip}|{doc['utm_source']}|{doc['utm_content']}".encode()).hexdigest()[:24]
+        cut = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        if await db.attribution_clicks.find_one({"fp": fp, "at": {"$gte": cut}}, {"_id": 1}):
+            return {"ok": True, "dedup": True}
+        doc["fp"] = fp
         doc.update(path=body.path, city_slug=_city_from_path(body.path or ""),
                    at=datetime.now(timezone.utc).isoformat())
         await db.attribution_clicks.insert_one(doc)
@@ -53,7 +61,8 @@ def create_router(*, db, require_admin) -> APIRouter:
                      _a: dict = Depends(require_admin)):
         since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         src: Dict[str, Any] = {} if source == "all" else {"utm_source": source}
-        usrc: Dict[str, Any] = {"signup_source": {"$exists": True}} if source == "all" else {"signup_source.utm_source": source}
+        usrc: Dict[str, Any] = {"role": "provider", **({"signup_source": {"$exists": True}} if source == "all"
+                                                     else {"signup_source.utm_source": source})}
 
         clicks_by_post = {x["_id"]: x["n"] for x in await db.attribution_clicks.aggregate([
             {"$match": {**src, "at": {"$gte": since}, "utm_content": {"$ne": None}}},
@@ -77,8 +86,11 @@ def create_router(*, db, require_admin) -> APIRouter:
             {"$match": {**src, "at": {"$gte": since}, "city_slug": {"$ne": None}}},
             {"$group": {"_id": "$city_slug", "n": {"$sum": 1}}}]).to_list(None)}
         city_rows = await db.users.aggregate([
-            {"$match": {"role": "provider", "recruit_city_slug": {"$exists": True}, "created_at": {"$gte": since}}},
-            {"$group": {"_id": "$recruit_city_slug", "total": {"$sum": 1},
+            {"$match": {"role": "provider", "created_at": {"$gte": since},
+                        "$or": [{"recruit_city_slug": {"$exists": True}}, {"signup_source.landing_path": {"$regex": "^/join/"}}]}},
+            {"$addFields": {"_city": {"$ifNull": ["$recruit_city_slug", {"$arrayElemAt": [
+                {"$split": ["$signup_source.landing_path", "/"]}, 2]}]}}},
+            {"$group": {"_id": "$_city", "total": {"$sum": 1},
                         "from_source": {"$sum": {"$cond": [
                             {"$eq": ["$signup_source.utm_source", source]} if source != "all"
                             else {"$ifNull": ["$signup_source.utm_source", False]}, 1, 0]}}}},

@@ -925,3 +925,9 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - publish_to_all(db, content, platforms=None) can now target specific platforms.
 - POST/GET /api/admin/city-blog/publish-facebook?count=10: a background job that shares the 10 oldest unshared v2 posts to Facebook (writing any that are missing first) and records fb_shared_at. Auto-share also sets fb_shared_at, so nothing is posted twice. The button and live status are in Admin → Recruit → City recruiting blog.
 - Self-tested via curl (Delhi post names Connaught Place, Karol Bagh, Dwarka, Rohini). The FB job reached the real Graph API and failed as expected with the preview's fake token.
+
+## 2026-06 — FB city photos + sign-up tracking
+- Facebook posts with an image now use /{page}/photos (big photo, link in the caption) and fall back to a /feed link post. Images are self-hosted at /api/img/city/{slug}.jpg: fetched from Wikimedia with a descriptive LumoBot UA, using the 1280px thumb, resized and cached in backend/data/img_cache.
+- Attribution: share links carry utm_source={platform} (the __PLATFORM__ token is replaced per channel) plus utm_campaign (city_blog / recruit_broadcast) and utm_content (post slug / city slug). RefCapture stores first-touch lumo_attr (30d) and POSTs /api/attribution/click (deduped per IP/content for 30 min). Register saves user.signup_source.
+- GET /api/admin/attribution/report?source&days counts provider-only sign-ups; a city falls back to the landing_path /join/{city}. The admin panel "Sign-up tracking" sits at the top of the Recruit tab.
+- Tested: iteration_70 (26/26 backend, frontend 100%); all minor issues it found are fixed.
