@@ -72,17 +72,26 @@ async def _signups(db, slug: str) -> int:
     return await db.users.count_documents({"role": "provider", "recruit_city_slug": slug})
 
 
+def _bonus_local(city: Dict[str, Any], fx: Dict[str, float]) -> str:
+    usd = float(city.get("bonus_amount") or 100)
+    cur = city.get("currency") or "USD"
+    rate = fx.get(cur)
+    if cur == "USD" or not rate:
+        return f"${usd:,.0f} USD"
+    return f"{usd * rate:,.0f} {cur} (about ${usd:,.0f} USD)"
+
+
 def _page_lang(city: Dict[str, Any]) -> str:
     from recruit_cities import _page_lang as pl
     return pl(city.get("lang"), city.get("country"))
 
 
-async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str) -> Dict[str, Any]:
+async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx: Dict[str, float]) -> Dict[str, Any]:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     first_n = int(city.get("bonus_first_n") or 100)
     facts = {
         "city": city["city"], "country": city.get("country_name") or "United States",
-        "bonus_usd": float(city.get("bonus_amount") or 100), "bonus_currency": city.get("currency") or "USD",
+        "bonus_local": _bonus_local(city, fx),
         "bonus_after_jobs": int(city.get("bonus_job_count") or 100), "bonus_spots_left": max(0, first_n - signups),
         "workers_wanted": int(city.get("goal_workers") or 300), "signed_up_so_far": signups,
         "date": _now().strftime("%B %d, %Y"), "angle": random.choice(ANGLES),
@@ -97,7 +106,8 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str) ->
         "now as contractors so they're ready when jobs open. Focus only on job openings and the loyalty bonus. "
         "Never claim a specific number of open jobs; workers_wanted is how many contractors Lumo is recruiting, and jobs open as local customers post them. "
         "250-400 words, markdown with 2-3 ## headings and one bullet list, warm and direct, no invented statistics "
-        "beyond the facts given, mention the bonus amount converted to the local currency in words if not USD. "
+        "beyond the facts given. Use bonus_local exactly as the bonus amount. Do not say jobs are opening this week, "
+        "that spots are going fast, or make any urgency claim not in the facts. "
         "End with a call to action to apply on Lumo. Output strict JSON only. " + want
     )
     chat = LlmChat(api_key=llm_key, session_id=f"cityblog-{uuid.uuid4()}", system_message=sys_msg) \
@@ -110,12 +120,16 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str) ->
     return {"local": loc, "en": en, "facts": facts}
 
 
-async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool) -> Optional[Dict[str, Any]]:
-    lang = _page_lang(city)
-    signups = await _signups(db, city["slug"])
-    out = await _write(city, lang, signups, llm_key)
+async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool,
+                           fx: Dict[str, float], base_url: str) -> Optional[Dict[str, Any]]:
     day = _now().strftime("%Y-%m-%d")
     slug = f"{city['slug']}-{day}"
+    if await db.city_blog_posts.find_one({"slug": slug}, {"_id": 1}):
+        await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"last_blog_at": _now().isoformat()}})
+        return None
+    lang = _page_lang(city)
+    signups = await _signups(db, city["slug"])
+    out = await _write(city, lang, signups, llm_key, fx)
     post = {
         "id": str(uuid.uuid4()), "slug": slug, "city_slug": city["slug"], "city": city["city"],
         "country": city.get("country") or "US", "country_name": city.get("country_name"), "lang": lang,
@@ -125,13 +139,16 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool) 
         "body_md_en": out["en"].get("body_md") or "",
         "hero_image": city.get("hero_image"), "view_count": 0, "created_at": _now().isoformat(),
     }
-    await db.city_blog_posts.update_one({"slug": slug}, {"$setOnInsert": post}, upsert=True)
+    res = await db.city_blog_posts.update_one({"slug": slug}, {"$setOnInsert": post}, upsert=True)
     await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"last_blog_at": post["created_at"]}})
+    if res.upserted_id is None:
+        return None
+    post.pop("_id", None)
     if share:
         try:
             from social_publisher import publish_to_all
             await publish_to_all(db, {
-                "title": post["title"], "body": post["excerpt"], "url": f"/join/{city['slug']}/blog/{slug}",
+                "title": post["title"], "body": post["excerpt"], "url": f"{base_url}/join/{city['slug']}/blog/{slug}",
                 "image_url": post["hero_image"], "hashtags": ["lumo", "hiring", city["city"].replace(" ", "")],
                 "source_type": "city_blog", "source_id": post["id"],
             })
@@ -140,8 +157,9 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool) 
     return post
 
 
-async def run_batch(db, llm_key: str, limit: Optional[int] = None) -> int:
+async def run_batch(db, llm_key: str, get_fx, base_url: str, limit: Optional[int] = None) -> int:
     cfg = await get_cfg(db)
+    fx = await get_fx()
     lock = await db.city_blog_config.find_one_and_update(
         {"id": "lock", "$or": [{"until": {"$exists": False}}, {"until": {"$lt": _now().isoformat()}}]},
         {"$set": {"until": (_now() + timedelta(minutes=25)).isoformat()}}, upsert=False,
@@ -158,7 +176,7 @@ async def run_batch(db, llm_key: str, limit: Optional[int] = None) -> int:
         async def one(c):
             async with sem:
                 try:
-                    return await publish_for_city(db, c, llm_key, bool(cfg["share_social"]))
+                    return await publish_for_city(db, c, llm_key, bool(cfg["share_social"]), fx, base_url)
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"[city_blog] {c['slug']} failed: {e}")
                     return None
@@ -179,8 +197,16 @@ class CfgIn(BaseModel):
 PUBLIC_FIELDS = {"_id": 0, "body_md": 0, "body_md_en": 0}
 
 
-def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
+_TASKS: set = set()
+
+
+def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url: str) -> APIRouter:
     r = APIRouter(prefix="/api", tags=["city-blog"])
+
+    def spawn(limit: Optional[int] = None):
+        t = asyncio.create_task(run_batch(db, llm_key, get_fx, base_url, limit=limit))
+        _TASKS.add(t)
+        t.add_done_callback(_TASKS.discard)
 
     @r.post("/cron/city-blogs")
     async def cron_city_blogs(request: Request):
@@ -202,16 +228,17 @@ def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
         except Exception:
             return {"ok": True, "duplicate": True}
         cfg = await get_cfg(db)
-        if cfg["enabled"] and llm_key:
-            asyncio.create_task(run_batch(db, llm_key))
-        return {"ok": True, "queued": bool(cfg["enabled"])}
+        queued = bool(cfg["enabled"] and llm_key)
+        if queued:
+            spawn()
+        return {"ok": True, "queued": queued}
 
     @r.get("/city-blog/latest")
-    async def latest(limit: int = Query(24, le=100)):
+    async def latest(limit: int = Query(24, ge=1, le=100)):
         return await db.city_blog_posts.find({}, PUBLIC_FIELDS).sort("created_at", -1).limit(limit).to_list(None)
 
     @r.get("/city-blog/city/{city_slug}")
-    async def by_city(city_slug: str, limit: int = Query(20, le=100)):
+    async def by_city(city_slug: str, limit: int = Query(20, ge=1, le=100)):
         return await db.city_blog_posts.find({"city_slug": city_slug}, PUBLIC_FIELDS) \
             .sort("created_at", -1).limit(limit).to_list(None)
 
@@ -240,11 +267,11 @@ def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
     async def admin_run(count: int = Query(3, ge=1, le=20), _a: dict = Depends(require_admin)):
         if not llm_key:
             raise HTTPException(503, "LLM key missing")
-        asyncio.create_task(run_batch(db, llm_key, limit=count))
+        spawn(count)
         return {"ok": True, "queued": count}
 
     @r.get("/admin/city-blog/posts")
-    async def admin_posts(limit: int = Query(50, le=200), _a: dict = Depends(require_admin)):
+    async def admin_posts(limit: int = Query(50, ge=1, le=200), _a: dict = Depends(require_admin)):
         return await db.city_blog_posts.find({}, PUBLIC_FIELDS).sort("created_at", -1).limit(limit).to_list(None)
 
     @r.delete("/admin/city-blog/posts/{post_id}")

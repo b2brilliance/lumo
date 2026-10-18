@@ -27,7 +27,8 @@ export default function CityBlogPanel() {
     catch (e) { toast.error(formatApiError(e)); }
   };
   const del = async (p) => {
-    try { await api.delete(`/admin/city-blog/posts/${p.id}`); setPosts((x) => x.filter((y) => y.id !== p.id)); }
+    if (!window.confirm(`Delete "${p.title_en || p.title}"?`)) return;
+    try { await api.delete(`/admin/city-blog/posts/${p.id}`); load(); }
     catch (e) { toast.error(formatApiError(e)); }
   };
 

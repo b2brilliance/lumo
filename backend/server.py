@@ -7737,7 +7737,8 @@ start_blog_loop(app, db)
 
 # Daily city recruiting blog — triggered by platform cron (/api/cron/city-blogs)
 from city_blog import create_router as _create_city_blog_router  # noqa: E402
-app.include_router(_create_city_blog_router(db=db, require_admin=_require_admin(), llm_key=EMERGENT_LLM_KEY))
+app.include_router(_create_city_blog_router(db=db, require_admin=_require_admin(), llm_key=EMERGENT_LLM_KEY,
+                                            get_fx=_fetch_fx_rates, base_url=os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")))
 start_email_loop(app, db)
 
 

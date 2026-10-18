@@ -1,0 +1,43 @@
+{
+  "summary": "Tested the daily city recruiting blog end to end. Backend: 17/17 pytest pass, plus one real admin run with count=1. Cron auth (401), fresh-id ack while disabled (queued:false, no LLM cost) and duplicate X-Webhook-Id all work. Public latest/city/post endpoints work: body fields are excluded from lists, unknown post returns 404, view_count increments. Admin config GET/PUT works with 422 validation, as do run validation, posts list, delete (404 for unknown) and the 401/403 guards for non-admins. The sitemap has the blog URLs, crons.yml is valid, and the _due_cities logic was checked read-only against the real DB. The admin run count=1 published sao-paulo-br-2026-10-18 (pt-BR plus English) in about 60s; I deleted it through the admin UI afterwards. Frontend: the teaser, list, Turkish post with Turkish site UI, the toggle to ?lang=en and back, the apply link, the missing-post state, Lagos having no toggle, and the admin panel switches/top N/delete all work. Found one functional bug (shared links are relative) and one content-accuracy issue (bonus currency conversion is left to the LLM).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "city_blog.publish_for_city -> social_publisher.publish_to_all", "issue": "The social share url is relative ('/join/{city}/blog/{slug}'); confirmed in db.social_posts. Once channels have valid tokens, every post will share a broken link. recruit_cities.py builds the link from base_url (`f\"{base_url.rstrip('/')}/join/...\"`); city_blog should do the same, e.g. pass the REACT_APP_BASE_URL/golumo.app origin into create_router.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "city_blog._write (LLM facts)", "issue": "The LLM converts the USD bonus to local currency itself, and it gets it wrong. Sao Paulo post: 'one hundred reais' (should be about R$550). Istanbul post: 'three thousand Turkish lira', but the city page shows ₺4.953. Compute the local amount server-side, using the same conversion as the CityRecruit page, and pass it as a fact (e.g. bonus_local='₺4.953')."},
+      {"endpoint": "city_blog._write content", "issue": "Some posts say 'jobs opening this week' or that spots are 'going fast'. These are implied claims beyond the given facts; tighten the prompt."},
+      {"endpoint": "GET /api/city-blog/latest, /city/{slug}, /admin/city-blog/posts", "issue": "The limit query param has no ge=1. limit=0 means no limit in Mongo, and a negative limit behaves oddly. Add ge=1."},
+      {"endpoint": "publish_for_city", "issue": "If today's slug already exists, $setOnInsert keeps the old doc. The function still returns and shares a post object with a new id that isn't in the DB. Check upserted_id, and skip the share if nothing was inserted."},
+      {"endpoint": "cron/admin run", "issue": "asyncio.create_task results are not stored, so the tasks can be garbage-collected mid-run. Keep references in a set. Also, the cron returns queued:true even when llm_key is missing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Admin city blog delete", "issue": "Delete has no confirm step, and the stats line (total / 24h) doesn't refresh after a delete. It still showed 16 after deleting.", "affected_selectors": ["admin-city-blog-del-{id}", "admin-city-blog-stats"]}
+    ],
+    "design_issues": [
+      {"screen": "/join/istanbul-tr teaser", "issues": ["The auto-translated heading 'Hiring news from {city}' comes out as 'Şuradan haberler: İstanbul', which is awkward Turkish. Consider a templated string or a data-no-i18n heading with a proper translation."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter68_city_blog.py", "/app/test_reports/pytest/pytest_iter68.xml"],
+  "action_items": [
+    "Use an absolute URL (site origin + /join/{city}/blog/{slug}) in the city_blog social share payload",
+    "Pass a server-computed local-currency bonus amount to the LLM, matching the city page, instead of letting the LLM convert",
+    "Add ge=1 to the city-blog limit params",
+    "Optional: confirm before admin delete, and refresh the stats after delete"
+  ],
+  "critical_code_review_comments": [
+    "city_blog.py:134 relative share URL (see above)",
+    "city_blog.py:85 sends bonus_usd plus bonus_currency and relies on the LLM to convert, which gives inconsistent amounts",
+    "run_batch lock: find_one_and_update with no upsert, then insert_one, can race and create duplicate lock docs. Add a unique index on id, or use upsert with a filter.",
+    "When the admin 'Write 3 posts now' button runs a batch, it ignores the cron's 20h/6.5d rules only by limit, which is fine. Note that the admin run sets last_blog_at, so those cities are skipped by the next cron for the day."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter68_city_blog.py"],
+  "success_rate": {"backend": "100% (17/17); 1 functional bug found in code review and DB check (relative share URL)", "frontend": "100%"},
+  "seed_data_creation": "One admin run with count=1 created sao-paulo-br-2026-10-18; it was deleted via the admin UI. The sao-paulo-br last_blog_at is now set, so it won't be reselected today. Cron run ids recorded: iter68-<uuid> (sent while disabled, no posts generated). Final state: 15 posts, config enabled=true, daily_top_n=300, batch_size=15, share_social=true.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_iter68_city_blog.py does not generate LLM posts: it disables the config before sending a fresh cron id and restores it after. Run it with REACT_APP_BACKEND_URL exported. Existing cron run id 'test-run-1' can be used for duplicate checks. social_posts shows LinkedIn 401 (invalid token) for city_blog shares, which is expected."
+}

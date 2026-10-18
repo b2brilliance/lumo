@@ -24,7 +24,7 @@ export const CityBlogTeaser = ({ citySlug, cityName }) => {
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-8 py-12" data-testid="city-blog-teaser">
       <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-display text-2xl font-bold">Hiring news from {cityName}</h2>
+        <h2 className="font-display text-2xl font-bold">Latest hiring updates <span className="text-neutral-400" data-no-i18n="true">· {cityName}</span></h2>
         <Link to={`/join/${citySlug}/blog`} className="text-sm font-mono hover:underline" data-testid="city-blog-all">All posts →</Link>
       </div>
       <div className="grid sm:grid-cols-3 gap-3">{posts.map((p) => <CityPostCard key={p.slug} p={p} citySlug={citySlug} />)}</div>

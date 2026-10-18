@@ -905,3 +905,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Daily social recruit broadcast now rotates 25 cities per run (BROADCAST_BATCH).
 - Frontend: /join (world index + search + continent tabs), /join/continent/:c, /join/country/:cc, city page in local language (transient `pageLang` in LocaleContext) + English toggle, bonus in local currency, nearby cities, recruiter share bar (?ref=). CTAs: persona home, footer, Become a provider, CountryHub, /recruiter. Admin Recruit tab filters + country fields.
 - Tested: iteration_67 (backend 100%, frontend 95%). All minor issues it found are fixed.
+
+## 2026-06 — Daily city recruiting blog
+- backend/city_blog.py + platform cron `.emergent/crons.yml` (city-blogs, every 30 min → POST /api/cron/city-blogs, Bearer WEBHOOK_CRON_SECRET). Each run writes up to 15 posts (5 at a time). Top 300 cities get a post daily, the rest weekly (~500 posts/day, capacity 720).
+- Posts (collection city_blog_posts) are in the local language with English fields (title_en/body_md_en). Content covers only openings and the bonus; bonus_local is computed server-side from FX. Each post auto-shares to social with an absolute URL (PUBLIC_BASE_URL).
+- Frontend: /join/:slug/blog (list), /join/:slug/blog/:postSlug (local/English toggle via ?lang=en), teaser on the city page, admin panel inside the Recruit tab (enable, share, top N, write-now, delete).
+- PREVIEW DB has city blog auto-publish DISABLED (to avoid double AI cost). Production defaults to enabled.
+- Tested: iteration_68 (backend 17/17, frontend 100%); all its findings are fixed.
