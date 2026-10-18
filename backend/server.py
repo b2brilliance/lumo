@@ -7667,6 +7667,8 @@ from social_publisher import (  # noqa: E402
     PLATFORMS as _SOCIAL_PLATFORMS,
 )
 app.include_router(_create_social_router(db=db, require_admin=_require_admin()))
+from fb_oauth import create_router as _create_fb_oauth_router  # noqa: E402
+app.include_router(_create_fb_oauth_router(db=db, require_admin=_require_admin()))
 
 # AI Copy Rotator — GPT rewrites recruit + blog captions daily so social
 # feeds don't feel repetitive to followers who saw yesterday's posts.

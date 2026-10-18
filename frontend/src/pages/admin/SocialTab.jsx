@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Facebook, Instagram, Twitter, Linkedin, MessageSquare, CheckCircle2, XCircle, Send, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { FacebookConnectCard } from "@/components/admin/FacebookConnectCard";
 
 /* SocialTab — configure Facebook / Instagram / X / Reddit auto-publishing
  * for blog posts + city recruit broadcasts. */
@@ -210,6 +211,8 @@ export default function SocialTab() {
         <h2 className="font-display text-2xl font-black tracking-tight">Blog + recruit broadcasts</h2>
         <p className="text-sm text-slate-500 mt-1">Every published blog post and every daily recruit broadcast fans out to whichever platforms are enabled below.</p>
       </div>
+
+      <FacebookConnectCard onChange={load} />
 
       <AiCopyRotatorCard />
 

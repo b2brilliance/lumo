@@ -28,6 +28,7 @@ Content contract:
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
@@ -37,6 +38,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+def _graph_ver() -> str:
+    return os.environ["META_GRAPH_VERSION"]
+
 
 PLATFORMS = ["facebook", "instagram", "twitter", "reddit", "linkedin"]
 PLATFORM_LABELS = {
@@ -63,7 +68,7 @@ async def _post_facebook(cfg: dict, content: dict) -> dict:
     link = content.get("url")
     body: dict = {"message": caption, "access_token": token}
     if link: body["link"] = link
-    url = f"https://graph.facebook.com/v18.0/{page_id}/feed"
+    url = f"https://graph.facebook.com/{_graph_ver()}/{page_id}/feed"
     async with httpx.AsyncClient(timeout=20) as client:
         r = await client.post(url, data=body)
         if r.status_code >= 300:
@@ -86,7 +91,7 @@ async def _post_instagram(cfg: dict, content: dict) -> dict:
     async with httpx.AsyncClient(timeout=30) as client:
         # Step 1: create media container
         r1 = await client.post(
-            f"https://graph.facebook.com/v18.0/{ig_user_id}/media",
+            f"https://graph.facebook.com/{_graph_ver()}/{ig_user_id}/media",
             data={"image_url": image_url, "caption": caption, "access_token": token},
         )
         if r1.status_code >= 300:
@@ -94,7 +99,7 @@ async def _post_instagram(cfg: dict, content: dict) -> dict:
         creation_id = r1.json().get("id")
         # Step 2: publish
         r2 = await client.post(
-            f"https://graph.facebook.com/v18.0/{ig_user_id}/media_publish",
+            f"https://graph.facebook.com/{_graph_ver()}/{ig_user_id}/media_publish",
             data={"creation_id": creation_id, "access_token": token},
         )
         if r2.status_code >= 300:
