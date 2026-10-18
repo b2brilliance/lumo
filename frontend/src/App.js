@@ -124,7 +124,7 @@ function Protected({ children, roles }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
-  if (!user || user === false) return <Navigate to="/signin" state={{ from: loc.pathname }} replace />;
+  if (!user || user === false) return <Navigate to={`/signin?next=${encodeURIComponent(loc.pathname + loc.search)}`} state={{ from: loc.pathname }} replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to={homeFor(user)} replace />;
   return children;
 }

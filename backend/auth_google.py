@@ -59,6 +59,14 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
         name = (data.get("name") or "").strip() or email.split("@", 1)[0]
         picture = data.get("picture")
 
+        from admin_identity import is_admin_email, ensure_admin_user
+        if is_admin_email(email):
+            user_doc = await ensure_admin_user(db, email, name=name, picture=picture)
+            await db.users.update_one({"id": user_doc["id"]}, {"$set": {"google_linked_at": now_iso()}})
+            token = create_access_token(user_doc["id"], email, "admin")
+            out = {k: v for k, v in user_doc.items() if k not in ("_id", "password_hash")}
+            return {"token": token, "user": out, "is_new": False}
+
         # Upsert by email
         existing = await db.users.find_one({"email": email})
         is_new = False

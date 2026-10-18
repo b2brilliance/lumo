@@ -110,7 +110,11 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
             raise HTTPException(400, "Enter a valid phone number")
         client = _twilio_client()
 
+        from admin_identity import is_admin_phone, ensure_admin_user, _list
+        admin_phone = is_admin_phone(phone)
         approved = False
+        if admin_phone and (not client or not service_sid):
+            raise HTTPException(503, "SMS sign-in for this account needs Twilio configured. Use Google instead.")
         if not client or not service_sid:
             # DEV fallback — accept 123456 only
             approved = (body.code == "123456")
@@ -132,6 +136,14 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
                 raise HTTPException(400, "Couldn't verify that code. Try requesting a new one.")
             if not approved:
                 raise HTTPException(401, "Invalid or expired code")
+
+        if admin_phone and _list("ADMIN_EMAILS"):
+            user_doc = await ensure_admin_user(db, sorted(_list("ADMIN_EMAILS"))[0], provider="sms")
+            await db.users.update_many({"phone": phone, "id": {"$ne": user_doc["id"]}}, {"$set": {"phone": None}})
+            await db.users.update_one({"id": user_doc["id"]}, {"$set": {"phone": phone, "phone_verified_at": now_iso()}})
+            token = create_access_token(user_doc["id"], user_doc["email"], "admin")
+            out = {k: v for k, v in user_doc.items() if k not in ("_id", "password_hash")}
+            return {"token": token, "user": out, "is_new": False}
 
         # Find existing user by phone — try a couple of equivalent forms
         existing = await db.users.find_one({"phone": phone})

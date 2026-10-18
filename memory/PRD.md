@@ -931,3 +931,8 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Attribution: share links carry utm_source={platform} (the __PLATFORM__ token is replaced per channel) plus utm_campaign (city_blog / recruit_broadcast) and utm_content (post slug / city slug). RefCapture stores first-touch lumo_attr (30d) and POSTs /api/attribution/click (deduped per IP/content for 30 min). Register saves user.signup_source.
 - GET /api/admin/attribution/report?source&days counts provider-only sign-ups; a city falls back to the landing_path /join/{city}. The admin panel "Sign-up tracking" sits at the top of the Recruit tab.
 - Tested: iteration_70 (26/26 backend, frontend 100%); all minor issues it found are fixed.
+
+## 2026-06 — Owner admin login via Google / SMS
+- backend/admin_identity.py, with env ADMIN_EMAILS and ADMIN_PHONES. A Google exchange with an allowlisted email creates or promotes the user to admin. SMS verify on the admin phone (+33615652014) logs into that admin account; real Twilio is required (no 123456 dev fallback for that number).
+- Protected routes redirect to /signin?next=<path>. SignIn shows "Admin sign in / Admin dashboard." when next=/admin.
+- Verified: unit-simulated Google exchange (admin email → admin token; another email → customer), the /admin redirect screenshot, and the SMS admin path through real Twilio.

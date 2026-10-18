@@ -162,9 +162,11 @@ export default function SignIn() {
     <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-b from-white via-white to-slate-50 flex items-center justify-center px-4 py-10" data-testid="signin-page">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <p className="text-[11px] font-mono tracking-[0.2em] text-slate-500 uppercase">Lumo · Sign in</p>
+          <p className="text-[11px] font-mono tracking-[0.2em] text-slate-500 uppercase" data-testid="signin-overline">
+            {next.startsWith("/admin") ? "Lumo · Admin sign in" : "Lumo · Sign in"}
+          </p>
           <h1 className="font-display text-4xl font-black tracking-tight mt-1">
-            {mode === "choose" ? "Welcome to Lumo." : "No password.\u00a0Just your phone."}
+            {mode === "choose" ? (next.startsWith("/admin") ? "Admin dashboard." : "Welcome to Lumo.") : "No password.\u00a0Just your phone."}
           </h1>
           <p className="text-slate-600 mt-2 text-sm">
             {mode === "choose" ? "Pick how you'd like to sign in. New here? An account is created automatically." :
