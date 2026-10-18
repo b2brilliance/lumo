@@ -57,6 +57,9 @@ import OrderFinalPay from "@/pages/OrderFinalPay";
 import ChatsInbox from "@/pages/ChatsInbox";
 import Orders from "@/pages/Orders";
 import Help from "@/pages/Help";
+import GlobalHub from "@/pages/GlobalHub";
+import CountryHub from "@/pages/CountryHub";
+import CityVertical from "@/pages/CityVertical";
 import CredentialsPage from "@/pages/CredentialsPage";
 import Cart from "@/pages/Cart";
 import Rentals from "@/pages/Rentals";
@@ -236,6 +239,10 @@ function App() {
             <Route path="/messages" element={<Protected><ChatsInbox /></Protected>} />
             <Route path="/orders" element={<Protected><Orders /></Protected>} />
             <Route path="/help" element={<Help />} />
+            <Route path="/global" element={<GlobalHub />} />
+            <Route path="/in/:country" element={<CountryHub />} />
+            <Route path="/in/:country/:city" element={<CountryHub />} />
+            <Route path="/in/:country/:city/:vertical" element={<CityVertical />} />
             <Route path="/credentials" element={<Protected roles={["provider"]}><CredentialsPage /></Protected>} />
             <Route path="/cart" element={<Protected roles={["customer"]}><Cart /></Protected>} />
             <Route path="/admin" element={<Protected roles={["admin"]}><AdminConsole /></Protected>} />

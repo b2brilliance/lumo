@@ -159,6 +159,7 @@ export default function SiteFooter() {
               <Link to="/press"   className="text-white/80 hover:text-white" data-testid="footer-link-press">Press</Link>
               <Link to="/contact" className="text-white/80 hover:text-white" data-testid="footer-link-contact">Contact</Link>
               <Link to="/help"    className="text-white/80 hover:text-white" data-testid="footer-link-help">Help Center</Link>
+              <Link to="/global"  className="text-white/80 hover:text-white" data-testid="footer-link-global">Lumo worldwide</Link>
               <Link to="/terms"   className="text-white/80 hover:text-white" data-testid="footer-link-terms">Terms of service</Link>
               <Link to="/privacy" className="text-white/80 hover:text-white" data-testid="footer-link-privacy">Privacy policy</Link>
               <Link to="/blog"    className="text-white/80 hover:text-white" data-testid="footer-link-blog">Blog</Link>

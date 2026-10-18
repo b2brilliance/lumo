@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sparkles, Download, Trash2, Loader2, Copy as CopyIcon, RefreshCw, Send, Clock } from "lucide-react";
 import AdStudioTokens from "@/components/AdStudioTokens";
+import GlobalAdKits from "@/components/GlobalAdKits";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -119,6 +120,7 @@ export default function AdStudio() {
     <div className="grid grid-cols-12 gap-6" data-testid="ad-studio">
       {/* Tokens — paste social API keys so publishing works */}
       <AdStudioTokens />
+      <GlobalAdKits />
 
       {/* Composer */}
       <div className="col-span-12 lg:col-span-4 border border-slate-200 p-5 self-start">

@@ -4181,6 +4181,9 @@ async def sitemap_xml(request: Request):
     except Exception:
         pass
 
+    from global_markets import global_urls
+    for gp in global_urls():
+        lines.append(f"  <url><loc>{origin}{gp}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>")
     lines.append("</urlset>")
     return Response(content="\n".join(lines), media_type="application/xml")
 
@@ -7602,6 +7605,8 @@ app.include_router(_create_analytics_router(db=db, require_admin=_require_admin(
 from admin_crud import build_admin_crud_router  # noqa: E402
 from demo_purge import create_router as _create_demo_purge_router  # noqa: E402
 app.include_router(_create_demo_purge_router(db=db, require_admin=_require_admin()))
+from global_growth import create_router as _create_global_router  # noqa: E402
+app.include_router(_create_global_router(db=db, require_admin=_require_admin(), llm_key=EMERGENT_LLM_KEY))
 app.include_router(
     build_admin_crud_router(get_current_user=get_current_user, require_admin=_require_admin()),
     prefix="/api",

@@ -3,7 +3,7 @@ import { useLocale, COUNTRY_PROFILES } from "@/lib/locale";
 import { ChevronDown, Globe, Check } from "lucide-react";
 
 // Display ordering: keep US first, then English-first regions, then alphabetical
-const COUNTRY_ORDER = ["US", "GB", "CA", "AU", "SG", "NG", "ZA", "IN", "AE", "DE", "FR", "ES", "JP", "BR", "MX"];
+const COUNTRY_ORDER = Object.keys(COUNTRY_PROFILES).sort((a, b) => COUNTRY_PROFILES[a].name.localeCompare(COUNTRY_PROFILES[b].name));
 
 export default function LocaleSwitcher() {
   const { country, profile, setCountryOverride, isAutoDetected } = useLocale();

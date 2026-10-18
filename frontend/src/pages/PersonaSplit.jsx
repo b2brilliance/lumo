@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/lib/auth";
+import { useLocale } from "@/lib/locale";
 import {
   Sparkles, Briefcase, ShoppingBag, Building2, ArrowRight,
 } from "lucide-react";
@@ -64,6 +65,15 @@ const TILES = [
   },
 ];
 
+function CountryPill() {
+  const { country, profile } = useLocale();
+  return (
+    <Link to="/global" className="mt-5 inline-flex items-center gap-2 rounded-full border border-slate-200 hover:border-slate-900 px-4 py-2 text-sm font-medium transition-colors" data-testid="persona-country-pill">
+      <span className="text-base">{profile?.flag}</span>Lumo in {profile?.name || country}<span className="text-slate-400">· 50 countries</span>
+    </Link>
+  );
+}
+
 export default function PersonaSplit() {
   const { user } = useAuth();
   const isSignedIn = !!(user && user !== false);
@@ -80,6 +90,7 @@ export default function PersonaSplit() {
           <h1 className="font-display text-4xl sm:text-6xl font-black tracking-tighter mt-2 leading-[0.95]">
             What brings you<br className="hidden sm:block" /> here today?
           </h1>
+          <CountryPill />
         </div>
 
         {/* 4 tiles — 1col mobile, 2col desktop */}

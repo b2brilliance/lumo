@@ -27,6 +27,41 @@ export const COUNTRY_PROFILES = {
   AE: { lang: "ar",    currency: "AED", symbol: "د.إ", name: "United Arab Emirates", flag: "🇦🇪", locale: "ar-AE",  taxRate: 0.05,  taxLabel: "VAT" },
   SG: { lang: "en",    currency: "SGD", symbol: "S$",  name: "Singapore",            flag: "🇸🇬", locale: "en-SG",  taxRate: 0.09,  taxLabel: "GST" },
   ZA: { lang: "en",    currency: "ZAR", symbol: "R",   name: "South Africa",         flag: "🇿🇦", locale: "en-ZA",  taxRate: 0.15,  taxLabel: "VAT" },
+  KE: { lang: "sw", currency: "KES", symbol: "KSh", name: "Kenya", flag: "🇰🇪", locale: "sw-KE", taxRate: 0.16, taxLabel: "VAT" },
+  GH: { lang: "en", currency: "GHS", symbol: "GH₵", name: "Ghana", flag: "🇬🇭", locale: "en-GH", taxRate: 0.15, taxLabel: "VAT" },
+  EG: { lang: "ar", currency: "EGP", symbol: "E£", name: "Egypt", flag: "🇪🇬", locale: "ar-EG", taxRate: 0.14, taxLabel: "VAT" },
+  ET: { lang: "am", currency: "ETB", symbol: "Br", name: "Ethiopia", flag: "🇪🇹", locale: "am-ET", taxRate: 0.15, taxLabel: "VAT" },
+  TZ: { lang: "sw", currency: "TZS", symbol: "TSh", name: "Tanzania", flag: "🇹🇿", locale: "sw-TZ", taxRate: 0.18, taxLabel: "VAT" },
+  UG: { lang: "en", currency: "UGX", symbol: "USh", name: "Uganda", flag: "🇺🇬", locale: "en-UG", taxRate: 0.18, taxLabel: "VAT" },
+  RW: { lang: "en", currency: "RWF", symbol: "FRw", name: "Rwanda", flag: "🇷🇼", locale: "en-RW", taxRate: 0.18, taxLabel: "VAT" },
+  MA: { lang: "fr", currency: "MAD", symbol: "DH", name: "Maroc", flag: "🇲🇦", locale: "fr-MA", taxRate: 0.2, taxLabel: "TVA" },
+  SN: { lang: "fr", currency: "XOF", symbol: "CFA", name: "Sénégal", flag: "🇸🇳", locale: "fr-SN", taxRate: 0.18, taxLabel: "TVA" },
+  CI: { lang: "fr", currency: "XOF", symbol: "CFA", name: "Côte d'Ivoire", flag: "🇨🇮", locale: "fr-CI", taxRate: 0.18, taxLabel: "TVA" },
+  PK: { lang: "ur", currency: "PKR", symbol: "Rs", name: "Pakistan", flag: "🇵🇰", locale: "ur-PK", taxRate: 0.18, taxLabel: "GST" },
+  BD: { lang: "bn", currency: "BDT", symbol: "৳", name: "Bangladesh", flag: "🇧🇩", locale: "bn-BD", taxRate: 0.15, taxLabel: "VAT" },
+  ID: { lang: "id", currency: "IDR", symbol: "Rp", name: "Indonesia", flag: "🇮🇩", locale: "id-ID", taxRate: 0.11, taxLabel: "PPN" },
+  PH: { lang: "tl", currency: "PHP", symbol: "₱", name: "Philippines", flag: "🇵🇭", locale: "en-PH", taxRate: 0.12, taxLabel: "VAT" },
+  VN: { lang: "vi", currency: "VND", symbol: "₫", name: "Việt Nam", flag: "🇻🇳", locale: "vi-VN", taxRate: 0.1, taxLabel: "VAT" },
+  TH: { lang: "th", currency: "THB", symbol: "฿", name: "Thailand", flag: "🇹🇭", locale: "th-TH", taxRate: 0.07, taxLabel: "VAT" },
+  MY: { lang: "ms", currency: "MYR", symbol: "RM", name: "Malaysia", flag: "🇲🇾", locale: "ms-MY", taxRate: 0.08, taxLabel: "SST" },
+  KR: { lang: "ko", currency: "KRW", symbol: "₩", name: "South Korea", flag: "🇰🇷", locale: "ko-KR", taxRate: 0.1, taxLabel: "VAT" },
+  SA: { lang: "ar", currency: "SAR", symbol: "SR", name: "Saudi Arabia", flag: "🇸🇦", locale: "ar-SA", taxRate: 0.15, taxLabel: "VAT" },
+  QA: { lang: "ar", currency: "QAR", symbol: "QR", name: "Qatar", flag: "🇶🇦", locale: "ar-QA", taxRate: 0.0, taxLabel: "Tax" },
+  TR: { lang: "tr", currency: "TRY", symbol: "₺", name: "Türkiye", flag: "🇹🇷", locale: "tr-TR", taxRate: 0.2, taxLabel: "KDV" },
+  IL: { lang: "he", currency: "ILS", symbol: "₪", name: "Israel", flag: "🇮🇱", locale: "he-IL", taxRate: 0.17, taxLabel: "VAT" },
+  JO: { lang: "ar", currency: "JOD", symbol: "JD", name: "Jordan", flag: "🇯🇴", locale: "ar-JO", taxRate: 0.16, taxLabel: "GST" },
+  CO: { lang: "es", currency: "COP", symbol: "COL$", name: "Colombia", flag: "🇨🇴", locale: "es-CO", taxRate: 0.19, taxLabel: "IVA" },
+  AR: { lang: "es", currency: "ARS", symbol: "AR$", name: "Argentina", flag: "🇦🇷", locale: "es-AR", taxRate: 0.21, taxLabel: "IVA" },
+  CL: { lang: "es", currency: "CLP", symbol: "CLP$", name: "Chile", flag: "🇨🇱", locale: "es-CL", taxRate: 0.19, taxLabel: "IVA" },
+  PE: { lang: "es", currency: "PEN", symbol: "S/", name: "Perú", flag: "🇵🇪", locale: "es-PE", taxRate: 0.18, taxLabel: "IGV" },
+  DO: { lang: "es", currency: "DOP", symbol: "RD$", name: "República Dominicana", flag: "🇩🇴", locale: "es-DO", taxRate: 0.18, taxLabel: "ITBIS" },
+  JM: { lang: "en", currency: "JMD", symbol: "J$", name: "Jamaica", flag: "🇯🇲", locale: "en-JM", taxRate: 0.15, taxLabel: "GCT" },
+  IT: { lang: "it", currency: "EUR", symbol: "€", name: "Italia", flag: "🇮🇹", locale: "it-IT", taxRate: 0.22, taxLabel: "IVA" },
+  PT: { lang: "pt", currency: "EUR", symbol: "€", name: "Portugal", flag: "🇵🇹", locale: "pt-PT", taxRate: 0.23, taxLabel: "IVA" },
+  NL: { lang: "nl", currency: "EUR", symbol: "€", name: "Nederland", flag: "🇳🇱", locale: "nl-NL", taxRate: 0.21, taxLabel: "BTW" },
+  PL: { lang: "pl", currency: "PLN", symbol: "zł", name: "Polska", flag: "🇵🇱", locale: "pl-PL", taxRate: 0.23, taxLabel: "VAT" },
+  IE: { lang: "en", currency: "EUR", symbol: "€", name: "Ireland", flag: "🇮🇪", locale: "en-IE", taxRate: 0.23, taxLabel: "VAT" },
+  NZ: { lang: "en", currency: "NZD", symbol: "NZ$", name: "New Zealand", flag: "🇳🇿", locale: "en-NZ", taxRate: 0.15, taxLabel: "GST" },
 };
 
 const TIMEZONE_TO_COUNTRY = {
@@ -45,6 +80,44 @@ const TIMEZONE_TO_COUNTRY = {
   "Asia/Dubai": "AE",
   "Asia/Singapore": "SG",
   "Africa/Johannesburg": "ZA",
+  "Africa/Nairobi": "KE",
+  "Africa/Accra": "GH",
+  "Africa/Cairo": "EG",
+  "Africa/Addis_Ababa": "ET",
+  "Africa/Dar_es_Salaam": "TZ",
+  "Africa/Kampala": "UG",
+  "Africa/Kigali": "RW",
+  "Africa/Casablanca": "MA",
+  "Africa/Dakar": "SN",
+  "Africa/Abidjan": "CI",
+  "Asia/Karachi": "PK",
+  "Asia/Dhaka": "BD",
+  "Asia/Jakarta": "ID",
+  "Asia/Makassar": "ID",
+  "Asia/Manila": "PH",
+  "Asia/Ho_Chi_Minh": "VN",
+  "Asia/Saigon": "VN",
+  "Asia/Bangkok": "TH",
+  "Asia/Kuala_Lumpur": "MY",
+  "Asia/Seoul": "KR",
+  "Asia/Riyadh": "SA",
+  "Asia/Qatar": "QA",
+  "Europe/Istanbul": "TR",
+  "Asia/Jerusalem": "IL",
+  "Asia/Amman": "JO",
+  "America/Bogota": "CO",
+  "America/Argentina/Buenos_Aires": "AR",
+  "America/Buenos_Aires": "AR",
+  "America/Santiago": "CL",
+  "America/Lima": "PE",
+  "America/Santo_Domingo": "DO",
+  "America/Jamaica": "JM",
+  "Europe/Rome": "IT",
+  "Europe/Lisbon": "PT",
+  "Europe/Amsterdam": "NL",
+  "Europe/Warsaw": "PL",
+  "Europe/Dublin": "IE",
+  "Pacific/Auckland": "NZ",
 };
 
 function detectCountry() {
@@ -180,6 +253,11 @@ export function LocaleProvider({ children }) {
     isAutoDetected: !localStorage.getItem("lumo_country_override"),
   }), [country, profile, rates, ratesLoaded, setCountryOverride, convert, formatPrice, langOverride, setLangOverrideValue]);
 
+  useEffect(() => {
+    const l = value.lang || "en";
+    document.documentElement.lang = l;
+    document.documentElement.dir = ["ar", "he", "fa", "ur"].includes(l.split("-")[0]) ? "rtl" : "ltr";
+  }, [value.lang]);
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }
 
