@@ -912,3 +912,9 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Frontend: /join/:slug/blog (list), /join/:slug/blog/:postSlug (local/English toggle via ?lang=en), teaser on the city page, admin panel inside the Recruit tab (enable, share, top N, write-now, delete).
 - PREVIEW DB has city blog auto-publish DISABLED (to avoid double AI cost). Production defaults to enabled.
 - Tested: iteration_68 (backend 17/17, frontend 100%); all its findings are fixed.
+
+## 2026-06 — Facebook/Instagram one-click connect
+- backend/fb_oauth.py: GET /api/admin/social/facebook/authorize, GET /api/social/facebook/callback (Meta redirect, prod: https://golumo.app/api/social/facebook/callback), picks/select for multi-page accounts, status (live token check). Saves a never-expiring Page token flat on social_channels facebook doc (+ instagram if a linked IG Business account exists).
+- Env: META_APP_ID, META_APP_SECRET, META_GRAPH_VERSION=v24.0, META_REDIRECT_URI, PUBLIC_BASE_URL. social_publisher uses META_GRAPH_VERSION.
+- UI: FacebookConnectCard at top of Admin → Auto-post tab (/admin?tab=autopost). The OAuth return lands there.
+- Tested: iteration_69 (backend 11/11). Its tab-routing bug and minor issues are fixed. A real login can only be completed on production golumo.app.

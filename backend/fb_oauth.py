@@ -32,9 +32,12 @@ def _graph(path: str) -> str:
 
 
 async def _get(url: str, **params) -> dict:
-    async with httpx.AsyncClient(timeout=30) as c:
-        r = await c.get(url, params=params)
-    data = r.json()
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get(url, params=params)
+        data = r.json()
+    except (httpx.HTTPError, ValueError) as e:
+        raise HTTPException(502, f"Facebook unreachable: {type(e).__name__}")
     if r.is_error or "error" in data:
         msg = (data.get("error") or {}).get("message") or "Meta request failed"
         raise HTTPException(502, f"Facebook: {msg}")
@@ -42,7 +45,7 @@ async def _get(url: str, **params) -> dict:
 
 
 def _admin_url(**q) -> str:
-    return f"{_env('PUBLIC_BASE_URL')}/admin?{urlencode({'tab': 'social', **q})}"
+    return f"{_env('PUBLIC_BASE_URL')}/admin?{urlencode({'tab': 'autopost', **q})}"
 
 
 async def _save_page(db, page: dict) -> dict:
@@ -53,7 +56,10 @@ async def _save_page(db, page: dict) -> dict:
         "page_id": page["id"], "access_token": token, "page_name": page.get("name"),
     }}, upsert=True)
     ig = (page.get("instagram_business_account") or {}).get("id")
-    if ig:
+    if not ig:
+        await db.social_channels.update_one({"platform": "instagram"},
+                                            {"$set": {"enabled": False, "ig_user_id": None, "access_token": None}})
+    else:
         await db.social_channels.update_one({"platform": "instagram"}, {"$set": {
             "platform": "instagram", "enabled": True, "updated_at": now,
             "ig_user_id": ig, "access_token": token, "page_name": page.get("name"),
@@ -69,6 +75,11 @@ class PickIn(BaseModel):
 def create_router(*, db, require_admin: Callable) -> APIRouter:
     r = APIRouter(prefix="/api", tags=["facebook-oauth"])
 
+    @r.on_event("startup")
+    async def _ttl():
+        await db.fb_page_picks.create_index("created_at_dt", expireAfterSeconds=3600)
+        await db.oauth_states.create_index("created_at_dt", expireAfterSeconds=3600)
+
     @r.get("/admin/social/facebook/authorize")
     async def authorize(admin: dict = Depends(require_admin)):
         if not (_env("META_APP_ID") and _env("META_APP_SECRET")):
@@ -77,6 +88,7 @@ def create_router(*, db, require_admin: Callable) -> APIRouter:
         await db.oauth_states.insert_one({
             "state": state, "user_id": admin.get("id"), "provider": "facebook",
             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+            "created_at_dt": datetime.now(timezone.utc),
         })
         q = urlencode({"client_id": _env("META_APP_ID"), "redirect_uri": _env("META_REDIRECT_URI"),
                        "state": state, "response_type": "code", "scope": SCOPES})
@@ -109,20 +121,21 @@ def create_router(*, db, require_admin: Callable) -> APIRouter:
                                                instagram="1" if res["instagram"] else "0"))
         pick_id = secrets.token_urlsafe(16)
         await db.fb_page_picks.insert_one({"id": pick_id, "user_id": st.get("user_id"), "pages": usable,
-                                           "created_at": datetime.now(timezone.utc).isoformat()})
+                                           "created_at": datetime.now(timezone.utc).isoformat(),
+                                           "created_at_dt": datetime.now(timezone.utc)})
         return RedirectResponse(_admin_url(facebook="pick", pick=pick_id))
 
     @r.get("/admin/social/facebook/picks/{pick_id}")
-    async def pick_options(pick_id: str, _a: dict = Depends(require_admin)):
-        doc = await db.fb_page_picks.find_one({"id": pick_id}, {"_id": 0})
+    async def pick_options(pick_id: str, admin: dict = Depends(require_admin)):
+        doc = await db.fb_page_picks.find_one({"id": pick_id, "user_id": admin.get("id")}, {"_id": 0})
         if not doc:
             raise HTTPException(404, "Selection expired — connect again")
         return [{"id": p["id"], "name": p.get("name"), "instagram": bool(p.get("instagram_business_account"))}
                 for p in doc["pages"]]
 
     @r.post("/admin/social/facebook/select")
-    async def select(body: PickIn, _a: dict = Depends(require_admin)):
-        doc = await db.fb_page_picks.find_one({"id": body.pick_id}, {"_id": 0})
+    async def select(body: PickIn, admin: dict = Depends(require_admin)):
+        doc = await db.fb_page_picks.find_one({"id": body.pick_id, "user_id": admin.get("id")}, {"_id": 0})
         page = next((p for p in (doc or {}).get("pages", []) if p["id"] == body.page_id), None)
         if not page:
             raise HTTPException(404, "Page not found — connect again")

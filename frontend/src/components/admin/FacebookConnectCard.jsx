@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { toast } from "sonner";
@@ -15,9 +15,12 @@ export const FacebookConnectCard = ({ onChange }) => {
   const [status, setStatus] = useState(null);
   const [picks, setPicks] = useState(null);
   const [busy, setBusy] = useState(false);
+  const handled = useRef(false);
   const loadStatus = () => api.get("/admin/social/facebook/status").then((r) => setStatus(r.data)).catch(() => {});
 
   useEffect(() => {
+    if (handled.current) return;
+    handled.current = true;
     const fb = params.get("facebook");
     if (fb === "connected") {
       toast.success(`Facebook connected${params.get("page") ? `: ${params.get("page")}` : ""}${params.get("instagram") === "1" ? " + Instagram" : ""}`);

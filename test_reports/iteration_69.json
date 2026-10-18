@@ -1,0 +1,36 @@
+{
+  "summary": "Tested Facebook OAuth connect end-to-end up to the Meta redirect. Backend: 11/11 pytest pass (authorize URL/state, auth guards, callback error/expired/one-time state with real Graph v24.0 error for fake code, status token_valid=false for fake token, picks/select 404s and a select that saves the page and restores the original doc). Frontend: the card, connect navigation to facebook.com v24.0 dialog, error/success toasts, page picker and select all work, but only under /admin?tab=autopost. CRITICAL: the backend callback redirects to /admin?tab=social, which renders SocialLinksAdmin (footer links) and not SocialTab. The FacebookConnectCard is never mounted there, so after a real Facebook login the user gets no toast and no page picker. With multiple pages, the pick is never completed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "fb_oauth._save_page", "issue": "Selecting a page without an IG business account leaves an existing instagram channel doc enabled, still holding the old page's token and ig_user_id (stale IG target)."},
+      {"endpoint": "fb_oauth._get", "issue": "httpx network errors (RequestError) and non-JSON responses are not caught, so callback/status would return 500 instead of a redirect or token_valid=false."},
+      {"endpoint": "/api/admin/social/facebook/select", "issue": "Pick docs are not checked against the requesting admin's user_id, and oauth_states/fb_page_picks have no TTL index, so expired docs pile up."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminConsole tab routing", "issue": "tab=social renders <SocialLinksAdmin/>. The FacebookConnectCard lives in <SocialTab/>, which only renders for tab=autopost (AdminConsole.jsx lines 467/475). The OAuth return URL ?tab=social&facebook=... therefore shows no card, no toast and no picker.", "selector": "[data-testid=fb-connect-card]", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "OAuth return", "issue": "Fix: change _admin_url in fb_oauth.py to {'tab':'autopost'}, or mount FacebookConnectCard in the tab=social view as well. Verified that every flow works when using tab=autopost.", "affected_selectors": ["fb-connect-card", "fb-page-picker", "fb-page-option-p1"]}
+    ],
+    "design_issues": [
+      {"screen": "Auto-post FB card", "issues": ["Toasts fire twice in dev (React.StrictMode double effect). Prod builds are fine, but a useRef guard would make it robust.", "When connected but the token is expired, the button still says 'Connect Facebook' (fine), and the status reads 'Connection expired' for the disabled test doc."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter69_fb_oauth.py", "/app/test_reports/pytest/pytest_iter69.xml"],
+  "action_items": [
+    "CRITICAL: make the OAuth callback redirect target match the tab that renders FacebookConnectCard (tab=autopost), or render the card on tab=social",
+    "When the selected page has no IG account, disable or clear the instagram channel in _save_page",
+    "Catch httpx.RequestError and ValueError in _get, then map them to HTTPException(502)",
+    "Optional: add TTL indexes on oauth_states/fb_page_picks and guard against StrictMode double toasts"
+  ],
+  "critical_code_review_comments": ["Redirect tab mismatch (see above)", "Stale IG channel after switching pages", "Unhandled network exceptions in _get"],
+  "updated_files": ["/app/backend/tests/test_iter69_fb_oauth.py"],
+  "success_rate": {"backend": "100%", "frontend": "80% (all card flows pass on tab=autopost; the OAuth return path to tab=social is broken)"},
+  "seed_data_creation": "Temporary fb_page_picks docs (tp1, tp_*) were created and deleted. The facebook social_channels doc (page_id test-page-x, TEST_TOKEN_ONLY, enabled:false) was restored exactly. One TEST customer test_fb_*@example.com was registered.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_iter69_fb_oauth.py. For the UI, use /admin?tab=autopost (or tab=social once the fix lands). Insert db.fb_page_picks {id:'tp1',...} to test the picker, and restore the facebook channel doc afterwards."
+}
