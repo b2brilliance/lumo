@@ -82,6 +82,40 @@ async def resolve_ref_code(db, ref_code: Optional[str]) -> Optional[str]:
 # Concrete: a $100 gross job → platform earns $10 commission → referrer
 # gets $1 (= referred provider's $90 take / 90).
 PROVIDER_TAKE_TO_REFERRER_RATIO = 1.0 / 90.0
+PLATFORM_COMMISSION = 0.10
+
+# Tiered recruiter rate: % of each job's gross price, funded from Lumo's cut.
+DEFAULT_PROGRAM = {"base_pct": 0.10, "step_pct": 0.01, "step_jobs": 1000, "max_pct": 0.99}
+
+
+async def get_program(db) -> dict:
+    doc = await db.recruiter_program.find_one({"id": "config"}, {"_id": 0, "id": 0}) or {}
+    return {**DEFAULT_PROGRAM, **doc}
+
+
+def rate_for(total_jobs: int, cfg: dict) -> float:
+    """Return the recruiter rate in PERCENT for a given lifetime recruit-job count."""
+    steps = int(total_jobs) // max(1, int(cfg["step_jobs"]))
+    return round(min(cfg["base_pct"] + steps * cfg["step_pct"], cfg["max_pct"]), 4)
+
+
+def tier_info(total_jobs: int, cfg: dict) -> dict:
+    rate = rate_for(total_jobs, cfg)
+    step = max(1, int(cfg["step_jobs"]))
+    level = total_jobs // step
+    at_max = rate >= cfg["max_pct"]
+    next_at = None if at_max else (level + 1) * step
+    return {
+        "total_recruit_jobs": total_jobs,
+        "level": level + 1,
+        "rate_pct": rate,
+        "next_rate_pct": None if at_max else rate_for(next_at, cfg),
+        "next_at_jobs": next_at,
+        "jobs_to_next": None if at_max else next_at - total_jobs,
+        "progress_pct": 100 if at_max else round((total_jobs - level * step) / step * 100, 1),
+        "at_max": at_max,
+        "program": cfg,
+    }
 
 
 async def credit_referrer(
@@ -111,7 +145,11 @@ async def credit_referrer(
     if not referrer_id:
         return None
 
-    amount = round(provider_amount * PROVIDER_TAKE_TO_REFERRER_RATIO, 4)
+    cfg = await get_program(db)
+    prior_jobs = await db.referral_earnings.count_documents({"referrer_user_id": referrer_id})
+    rate_pct = rate_for(prior_jobs, cfg)
+    gross = provider_amount / (1 - PLATFORM_COMMISSION)
+    amount = round(gross * rate_pct / 100, 4)
     now = _now_iso()
     record = {
         "id": str(uuid.uuid4()),
@@ -120,6 +158,8 @@ async def credit_referrer(
         "source_type": source_type,   # "job" | "order" | "escrow"
         "source_id": source_id,
         "provider_amount": provider_amount,
+        "gross_amount": round(gross, 2),
+        "rate_pct": rate_pct,
         "amount": amount,
         "created_at": now,
     }
@@ -254,8 +294,50 @@ async def credit_referrer_milestone(
 
 
 # ── Router ─────────────────────────────────────────────────────────────
-def create_router(*, db, get_current_user):
+def create_router(*, db, get_current_user, require_admin=None):
     r = APIRouter(prefix="/referrals", tags=["referrals"])
+
+    @r.get("/program")
+    async def program():
+        cfg = await get_program(db)
+        ladder = [{"jobs": i * cfg["step_jobs"], "rate_pct": rate_for(i * cfg["step_jobs"], cfg)} for i in range(6)]
+        return {**cfg, "ladder": ladder,
+                "milestone_bonus_amount": PROVIDER_MILESTONE_BONUS,
+                "milestone_bonus_goal": PROVIDER_MILESTONE_JOBS}
+
+    if require_admin is not None:
+        @r.put("/admin/program")
+        async def update_program(body: dict, _admin: dict = Depends(require_admin)):
+            upd = {}
+            for k in ("base_pct", "step_pct", "max_pct"):
+                if k in body:
+                    v = float(body[k])
+                    if not 0 <= v < 1:
+                        raise HTTPException(400, f"{k} must be between 0 and 1 (percent, under 1%)")
+                    upd[k] = v
+            if "step_jobs" in body:
+                v = int(body["step_jobs"])
+                if v < 1:
+                    raise HTTPException(400, "step_jobs must be >= 1")
+                upd["step_jobs"] = v
+            await db.recruiter_program.update_one({"id": "config"}, {"$set": upd}, upsert=True)
+            return await get_program(db)
+
+        @r.get("/admin/leaderboard")
+        async def leaderboard(_admin: dict = Depends(require_admin)):
+            cfg = await get_program(db)
+            rows = await db.referral_earnings.aggregate([
+                {"$group": {"_id": "$referrer_user_id", "jobs": {"$sum": 1}, "earned": {"$sum": "$amount"}}},
+                {"$sort": {"jobs": -1}}, {"$limit": 100},
+            ]).to_list(100)
+            out = []
+            for row in rows:
+                u = await db.users.find_one({"id": row["_id"]}, {"_id": 0, "name": 1, "email": 1}) or {}
+                recruits = await db.users.count_documents({"referred_by_user_id": row["_id"]})
+                out.append({"user_id": row["_id"], "name": u.get("name"), "email": u.get("email"),
+                            "recruits": recruits, "recruit_jobs": row["jobs"],
+                            "earned": round(row["earned"], 2), "rate_pct": rate_for(row["jobs"], cfg)})
+            return out
 
     @r.get("/me")
     async def me(request: Request, user: dict = Depends(get_current_user)):
@@ -292,6 +374,7 @@ def create_router(*, db, get_current_user):
                 recent.append({
                     "amount": row.get("amount"),
                     "source_type": row.get("source_type"),
+                    "rate_pct": row.get("rate_pct"),
                     "created_at": row.get("created_at"),
                 })
 
@@ -333,9 +416,11 @@ def create_router(*, db, get_current_user):
         # Sort: not-yet-earned with most progress first, then already-paid
         recruits.sort(key=lambda r: (r["milestone_awarded"], -r["jobs_completed"]))
 
+        tier = tier_info(count, await get_program(db))
         return {
             "code": code,
             "share_url": share_url,
+            "tier": tier,
             "referred_users": referred_users,
             "events": count,
             "total_earned": round(total_earned, 2),
@@ -347,8 +432,8 @@ def create_router(*, db, get_current_user):
             "milestone_total_earned": round(milestone_total, 2),
             "reward_copy": (
                 f"Invite a provider — get ${PROVIDER_MILESTONE_BONUS:.0f} when they complete "
-                f"their first {PROVIDER_MILESTONE_JOBS} paid jobs, plus 10% of Lumo's platform "
-                "commission on every job they ever do."
+                f"their first {PROVIDER_MILESTONE_JOBS} paid jobs, plus {tier['rate_pct']}% of every "
+                "job they ever do — your rate grows as your recruits complete more jobs."
             ),
         }
 

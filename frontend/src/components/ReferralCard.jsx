@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Copy, Share2, Gift } from "lucide-react";
 import { toast } from "sonner";
+import { RecruiterTier } from "@/components/RecruiterTier";
 
 /**
  * "Refer & earn" card — surfaces the user's own referral code, share link,
@@ -86,6 +87,7 @@ export default function ReferralCard() {
         </div>
       </div>
 
+      <RecruiterTier tier={data.tier} />
       <div className="p-6 grid gap-3">
         <div>
           <div className="overline text-slate-500 mb-1">Your code</div>

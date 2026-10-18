@@ -261,6 +261,12 @@ export default function ProviderHub() {
             <span className="overline">Wallet</span>
             <span className="font-display font-bold">${walletBalance.toFixed(2)}</span>
           </Link>
+          <Link to="/available-jobs" className="bg-slate-900 text-white px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-800" data-testid="provider-available-jobs-link">
+            <span className="overline text-white">Available jobs</span>
+          </Link>
+          <Link to="/recruiter" className="border border-slate-200 px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50" data-testid="provider-recruiter-link">
+            <span className="overline">Recruit &amp; earn</span>
+          </Link>
           <Link to="/credentials" className="border border-slate-200 px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50" data-testid="provider-credentials-link">
             <span className="overline">Credentials</span>
             <span className="font-display font-bold text-teal-700">↗</span>

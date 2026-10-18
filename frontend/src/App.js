@@ -57,6 +57,8 @@ import OrderFinalPay from "@/pages/OrderFinalPay";
 import ChatsInbox from "@/pages/ChatsInbox";
 import Orders from "@/pages/Orders";
 import Help from "@/pages/Help";
+import Recruiter from "@/pages/Recruiter";
+import AvailableJobs from "@/pages/AvailableJobs";
 import GlobalHub from "@/pages/GlobalHub";
 import CountryHub from "@/pages/CountryHub";
 import CityVertical from "@/pages/CityVertical";
@@ -239,6 +241,8 @@ function App() {
             <Route path="/messages" element={<Protected><ChatsInbox /></Protected>} />
             <Route path="/orders" element={<Protected><Orders /></Protected>} />
             <Route path="/help" element={<Help />} />
+            <Route path="/recruiter" element={<Recruiter />} />
+            <Route path="/available-jobs" element={<Protected roles={["provider"]}><AvailableJobs /></Protected>} />
             <Route path="/global" element={<GlobalHub />} />
             <Route path="/in/:country" element={<CountryHub />} />
             <Route path="/in/:country/:city" element={<CountryHub />} />

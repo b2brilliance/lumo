@@ -18,6 +18,7 @@ import UsersTab from "@/pages/admin/UsersTab";
 import ContentTab from "@/pages/admin/ContentTab";
 import ShopTab from "@/pages/admin/ShopTab";
 import RecruitTab from "@/pages/admin/RecruitTab";
+import RecruitersTab from "@/pages/admin/RecruitersTab";
 import SocialTab from "@/pages/admin/SocialTab";
 import BulkActionsBar, { BulkActionButton, BulkCheckbox } from "@/components/admin/BulkActionsBar";
 import useBulkSelection from "@/components/admin/useBulkSelection";
@@ -28,6 +29,7 @@ const TABS = [
   { key: "content",     label: "Content",     icon: Package },
   { key: "shop",        label: "Shop",        icon: Store },
   { key: "recruit",     label: "Recruit",     icon: MapPin },
+  { key: "recruiters",  label: "Recruiters",  icon: DollarSign },
   { key: "autopost",    label: "Auto-post",   icon: Send },
   { key: "payments",    label: "Payments",    icon: KeyRound },
   { key: "blog",        label: "Blog & email", icon: BookOpen },
@@ -469,6 +471,7 @@ export default function AdminConsole() {
           {tab === "content" && <ContentTab />}
           {tab === "shop" && <ShopTab />}
           {tab === "recruit" && <RecruitTab />}
+          {tab === "recruiters" && <RecruitersTab />}
           {tab === "autopost" && <SocialTab />}
           {tab === "blog" && <BlogAdmin />}
           {tab === "visitors" && <VisitorsTab />}
