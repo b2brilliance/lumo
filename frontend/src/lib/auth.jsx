@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { readAttribution } from "@/components/RefCapture";
 import { api, formatApiError } from "./api";
 
 const AuthContext = createContext(null);
@@ -45,7 +46,8 @@ export function AuthProvider({ children }) {
       // capture-once + 30-day expiry rules.
       let refCode = null;
       try { refCode = localStorage.getItem("lumo_ref_code") || null; } catch { /* private mode */ }
-      const withRef = refCode ? { ...payload, ref_code: refCode } : payload;
+      const attr = readAttribution();
+      const withRef = { ...payload, ...(refCode ? { ref_code: refCode } : {}), ...(attr ? { signup_source: attr } : {}) };
       const { data } = await api.post("/auth/register", withRef);
       localStorage.setItem("lumo_token", data.token);
       setUser(data.user);

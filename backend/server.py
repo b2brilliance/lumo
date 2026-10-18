@@ -186,6 +186,7 @@ class UserCreate(BaseModel):
     qualifications: Optional[dict] = None         # { <category_key>: {answers:{}, documents:{}} }
     ref_code: Optional[str] = None                # Referral code — captured from `?ref=XXX` in frontend
     recruit_city_slug: Optional[str] = None        # City recruitment attribution — /join/{slug}
+    signup_source: Optional[dict] = None           # First-touch UTM attribution {utm_source, utm_campaign, utm_content, landing_path}
 
 class UserLogin(BaseModel):
     email: str
@@ -646,6 +647,10 @@ async def register(body: UserCreate, request: Request):
             user_doc["recruit_city"] = city.get("city")
             user_doc["recruit_state"] = city.get("state")
             user_doc["recruit_country"] = city.get("country") or "US"
+    from attribution import clean_source as _clean_source
+    src = _clean_source(body.signup_source)
+    if src:
+        user_doc["signup_source"] = src
     await db.users.insert_one(user_doc)
     # Auto-generate the new user's OWN referral code so they can share
     # immediately without waiting for a first API call.
@@ -7667,6 +7672,8 @@ from social_publisher import (  # noqa: E402
     PLATFORMS as _SOCIAL_PLATFORMS,
 )
 app.include_router(_create_social_router(db=db, require_admin=_require_admin()))
+from attribution import create_router as _create_attr_router  # noqa: E402
+app.include_router(_create_attr_router(db=db, require_admin=_require_admin()))
 from fb_oauth import create_router as _create_fb_oauth_router  # noqa: E402
 app.include_router(_create_fb_oauth_router(db=db, require_admin=_require_admin()))
 

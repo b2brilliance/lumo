@@ -66,10 +66,20 @@ async def _post_facebook(cfg: dict, content: dict) -> dict:
         return {"ok": False, "skipped": True, "error": "missing page_id or access_token"}
     caption = _compose_caption(content, max_len=63206)  # FB post limit
     link = content.get("url")
-    body: dict = {"message": caption, "access_token": token}
-    if link: body["link"] = link
-    url = f"https://graph.facebook.com/{_graph_ver()}/{page_id}/feed"
-    async with httpx.AsyncClient(timeout=20) as client:
+    image = content.get("image_url")
+    async with httpx.AsyncClient(timeout=30) as client:
+        if image:
+            # Photo post: big image in the feed; link lives in the caption.
+            r = await client.post(f"https://graph.facebook.com/{_graph_ver()}/{page_id}/photos",
+                                  data={"url": image, "caption": caption, "access_token": token})
+            if r.status_code < 300:
+                pid = r.json().get("post_id") or r.json().get("id", "")
+                return {"ok": True, "external_id": pid, "url": f"https://facebook.com/{pid}", "kind": "photo"}
+            logger.warning(f"[social] FB photo post failed, falling back to link post: {r.text[:200]}")
+        body: dict = {"message": caption, "access_token": token}
+        if link:
+            body["link"] = link
+        url = f"https://graph.facebook.com/{_graph_ver()}/{page_id}/feed"
         r = await client.post(url, data=body)
         if r.status_code >= 300:
             return {"ok": False, "error": f"FB {r.status_code}: {r.text[:200]}"}
@@ -259,7 +269,7 @@ async def publish_to_all(db, content: dict, platforms: Optional[List[str]] = Non
             fn = ADAPTERS.get(platform)
             if not fn:
                 continue
-            res = await fn(cfg, content)
+            res = await fn(cfg, {**content, "url": (content.get("url") or "").replace("__PLATFORM__", platform)})
         except Exception as e:  # noqa: BLE001
             logger.exception(f"[social] {platform} failed")
             res = {"ok": False, "error": f"{type(e).__name__}: {e}"[:300]}
@@ -270,7 +280,7 @@ async def publish_to_all(db, content: dict, platforms: Optional[List[str]] = Non
             "platform": platform,
             "source_type": content.get("source_type"),
             "source_id": content.get("source_id"),
-            "url": content.get("url"),
+            "url": (content.get("url") or "").replace("__PLATFORM__", platform),
             "title": content.get("title"),
             "result": res,
             "created_at": _now_iso(),

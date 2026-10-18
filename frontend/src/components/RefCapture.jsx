@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { api } from "@/lib/api";
 
 const REF_KEY = "lumo_ref_code";
 const REF_TS_KEY = "lumo_ref_code_ts";
@@ -24,10 +25,42 @@ const REF_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
  *   - Ref codes are canonicalized to uppercase — matches backend's
  *     lookup, which does the same before querying `referral_code`.
  */
+const ATTR_KEY = "lumo_attr";
+
+// First-touch UTM capture (30 days) + one click event per post per session.
+function captureUtm(search) {
+  try {
+    const p = new URLSearchParams(search || "");
+    const src = p.get("utm_source");
+    if (!src) return;
+    const attr = {
+      utm_source: src, utm_medium: p.get("utm_medium") || undefined,
+      utm_campaign: p.get("utm_campaign") || undefined, utm_content: p.get("utm_content") || undefined,
+      landing_path: window.location.pathname, ts: Date.now(),
+    };
+    const prev = JSON.parse(localStorage.getItem(ATTR_KEY) || "null");
+    if (!prev || Date.now() - (prev.ts || 0) > REF_TTL_MS) localStorage.setItem(ATTR_KEY, JSON.stringify(attr));
+    const seenKey = `lumo_click_${src}_${attr.utm_content || ""}`;
+    if (sessionStorage.getItem(seenKey)) return;
+    sessionStorage.setItem(seenKey, "1");
+    api.post("/attribution/click", { ...attr, ts: undefined, landing_path: undefined, path: attr.landing_path }).catch(() => {});
+  } catch { /* storage disabled */ }
+}
+
+export function readAttribution() {
+  try {
+    const a = JSON.parse(localStorage.getItem(ATTR_KEY) || "null");
+    if (!a || Date.now() - (a.ts || 0) > REF_TTL_MS) return null;
+    const { ts, ...rest } = a;
+    return rest;
+  } catch { return null; }
+}
+
 export default function RefCapture() {
   const { search } = useLocation();
 
   useEffect(() => {
+    captureUtm(search);
     let ref;
     try {
       const params = new URLSearchParams(search || "");

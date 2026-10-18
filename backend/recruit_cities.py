@@ -682,7 +682,8 @@ async def broadcast_recruit_post(db, publish_fn, *, base_url: str = "") -> Dict[
         content = {
             "title": rewritten.get("title") or base_title,
             "body": rewritten.get("body") or base_body,
-            "url": f"{base_url.rstrip('/')}/join/{city['slug']}",
+            "url": f"{base_url.rstrip('/')}/join/{city['slug']}?utm_source=__PLATFORM__&utm_medium=social"
+                   f"&utm_campaign=recruit_broadcast&utm_content={city['slug']}",
             "image_url": city.get("hero_image"),
             "hashtags": ["lumo", "gigwork", city["city"].replace(" ", "")],
             "source_type": "recruit",

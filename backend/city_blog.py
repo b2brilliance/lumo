@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from attribution import utm_url
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
@@ -194,7 +195,8 @@ async def share_post(db, post: Dict[str, Any], base_url: str, platforms: Optiona
     from social_publisher import publish_to_all
     return await publish_to_all(db, {
         "title": post["title"], "body": post["excerpt"],
-        "url": f"{base_url}/join/{post['city_slug']}/blog/{post['slug']}",
+        "url": utm_url(f"{base_url}/join/{post['city_slug']}/blog/{post['slug']}",
+                       source="__PLATFORM__", campaign="city_blog", content=post["slug"]),
         "image_url": post.get("hero_image"), "hashtags": ["lumo", "hiring", post["city"].replace(" ", "")],
         "source_type": "city_blog", "source_id": post["id"],
     }, platforms=platforms)

@@ -10,6 +10,7 @@ import {
   Plus, Edit3, Trash2, Copy, ExternalLink, MapPin, Eye, EyeOff, Users, TrendingUp, Share2,
 } from "lucide-react";
 import CityBlogPanel from "@/pages/admin/CityBlogPanel";
+import RecruitResultsPanel from "@/pages/admin/RecruitResultsPanel";
 
 /* RecruitTab — per-city hiring dashboard.
  *
@@ -155,6 +156,8 @@ export default function RecruitTab() {
         <Kpi label="Goal (listed)" value={totals.goal} />
         <Kpi label="This week (listed)" value={`+${totals.this_week}`} icon={TrendingUp} />
       </div>
+
+      <RecruitResultsPanel />
 
       <CityBlogPanel />
 
