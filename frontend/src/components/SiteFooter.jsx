@@ -131,6 +131,7 @@ export default function SiteFooter() {
             <nav className="flex flex-col gap-1.5 text-sm">
               <Link to="/become-a-provider" className="text-white/80 hover:text-white" data-testid="footer-link-become-provider">Become a provider</Link>
               <Link to="/recruiter" className="text-white/80 hover:text-white" data-testid="footer-link-recruiter">Become a recruiter</Link>
+              <Link to="/join" className="text-white/80 hover:text-white" data-testid="footer-link-join-world">Hiring worldwide</Link>
               <Link to="/for-providers" className="text-white/80 hover:text-white" data-testid="footer-link-for-providers">For providers</Link>
               <Link to="/for-customers" className="text-white/80 hover:text-white" data-testid="footer-link-for-customers">For customers</Link>
               <Link to="/how-it-works" className="text-white/80 hover:text-white" data-testid="footer-link-how-it-works">How Lumo works</Link>

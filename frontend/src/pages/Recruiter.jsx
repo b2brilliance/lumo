@@ -57,6 +57,14 @@ export default function Recruiter() {
         </section>
       )}
 
+      <Link to="/join" className="mt-12 flex items-center justify-between border border-slate-200 hover:border-slate-900 p-5 transition-colors" data-testid="recruiter-world-link">
+        <div>
+          <div className="font-display font-bold">Recruit in any city, in any country</div>
+          <div className="text-sm text-slate-600">1,700+ city hiring pages worldwide. Share any of them with your link.</div>
+        </div>
+        <Users className="w-5 h-5 text-teal-700" />
+      </Link>
+
       <section className="mt-12">
         {user ? (
           <ReferralCard />

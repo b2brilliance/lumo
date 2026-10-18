@@ -155,6 +155,8 @@ export function LocaleProvider({ children }) {
   const [langOverride, setLangOverride] = useState(() => {
     return localStorage.getItem("lumo_lang_override") || null;
   });
+  // Transient, page-scoped language (e.g. a recruit city page in its local language).
+  const [pageLang, setPageLang] = useState(null);
 
   // Fetch live FX rates on mount
   useEffect(() => {
@@ -205,6 +207,13 @@ export function LocaleProvider({ children }) {
   const formatPrice = useCallback((usdAmount, opts = {}) => {
     if (usdAmount == null || !Number.isFinite(Number(usdAmount))) return "";
     const usd = Number(usdAmount);
+    if (opts.currency && opts.currency !== profile.currency) {
+      const r = rates[opts.currency];
+      if (!r) return `$${usd.toFixed(0)}`;
+      try {
+        return new Intl.NumberFormat(undefined, { style: "currency", currency: opts.currency, maximumFractionDigits: 0 }).format(usd * r);
+      } catch { return `${opts.currency} ${Math.round(usd * r).toLocaleString()}`; }
+    }
     const converted = convert(usd);
     if (converted == null) return `$${usd.toFixed(2)}`;
     // JPY/INR/NGN have no decimals in casual display
@@ -219,13 +228,15 @@ export function LocaleProvider({ children }) {
     } catch {
       return `${profile.symbol}${noDecimal ? Math.round(converted) : converted.toFixed(2)}`;
     }
-  }, [convert, profile.currency, profile.locale, profile.symbol]);
+  }, [convert, profile.currency, profile.locale, profile.symbol, rates]);
 
   const value = useMemo(() => ({
     country,
     profile,
-    lang: langOverride || profile.lang,
+    lang: pageLang || langOverride || profile.lang,
     langOverride,
+    pageLang,
+    setPageLang,
     isLangOverridden: !!langOverride,
     setLangOverride: setLangOverrideValue,
     currency: profile.currency,
@@ -254,7 +265,7 @@ export function LocaleProvider({ children }) {
     convert,
     formatPrice,
     isAutoDetected: !localStorage.getItem("lumo_country_override"),
-  }), [country, profile, rates, ratesLoaded, setCountryOverride, convert, formatPrice, langOverride, setLangOverrideValue]);
+  }), [country, profile, rates, ratesLoaded, setCountryOverride, convert, formatPrice, langOverride, setLangOverrideValue, pageLang]);
 
   useEffect(() => {
     const l = value.lang || "en";

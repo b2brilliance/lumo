@@ -645,6 +645,7 @@ async def register(body: UserCreate, request: Request):
             user_doc["recruit_city_slug"] = slug
             user_doc["recruit_city"] = city.get("city")
             user_doc["recruit_state"] = city.get("state")
+            user_doc["recruit_country"] = city.get("country") or "US"
     await db.users.insert_one(user_doc)
     # Auto-generate the new user's OWN referral code so they can share
     # immediately without waiting for a first API call.
@@ -4161,7 +4162,11 @@ async def sitemap_xml(request: Request):
     # links to them all so Google's crawler indexes every metro.
     lines.append(f"  <url><loc>{origin}/join</loc><changefreq>daily</changefreq><priority>1.0</priority></url>")
     try:
-        async for c in db.recruit_cities.find({"is_active": True}, {"_id": 0, "slug": 1}).sort("slug", 1).limit(500):
+        for cc in await db.recruit_cities.distinct("country", {"is_active": True}):
+            lines.append(f"  <url><loc>{origin}/join/country/{(cc or '').lower()}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
+        for ct in ("africa", "asia", "europe", "north-america", "south-america", "oceania"):
+            lines.append(f"  <url><loc>{origin}/join/continent/{ct}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>")
+        async for c in db.recruit_cities.find({"is_active": True}, {"_id": 0, "slug": 1}).sort("slug", 1).limit(3000):
             slug = (c.get("slug") or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             if not slug:
                 continue

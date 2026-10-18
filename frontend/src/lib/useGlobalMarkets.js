@@ -13,7 +13,8 @@ export function useGlobalMarkets() {
   return data;
 }
 
-export const flagOf = (code) => COUNTRY_PROFILES[code]?.flag || "";
+export const flagOf = (code) => COUNTRY_PROFILES[code]?.flag
+  || (/^[A-Z]{2}$/.test(code || "") ? String.fromCodePoint(...[...code].map((ch) => 127397 + ch.charCodeAt(0))) : "");
 
 export const VERTICAL_LINKS = {
   services: (city) => [{ label: "Book a service", to: "/for-you" }, { label: "Browse pros", to: "/providers" }],

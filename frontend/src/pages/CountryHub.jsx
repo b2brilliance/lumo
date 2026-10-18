@@ -49,6 +49,18 @@ export default function CountryHub() {
         })}
       </div>
 
+      <Link
+        to={`/join/country/${c.code.toLowerCase()}`}
+        className="mt-8 flex items-center justify-between gap-4 rounded-2xl border border-slate-900 p-5 hover:bg-slate-900 hover:text-white transition-colors"
+        data-testid="country-work-cta"
+      >
+        <div>
+          <div className="font-display font-bold text-lg">Work with Lumo in {place}</div>
+          <div className="text-sm opacity-70">Deliveries, rides and local jobs. Keep 90%, get paid same day.</div>
+        </div>
+        <Briefcase className="w-6 h-6 shrink-0" />
+      </Link>
+
       {!city && (
         <section className="mt-10" data-testid="country-cities">
           <h2 className="font-display text-xl font-bold mb-3">Cities</h2>

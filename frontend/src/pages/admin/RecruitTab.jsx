@@ -51,11 +51,16 @@ export default function RecruitTab() {
     } catch (err) { toast.error(formatApiError(err)); }
   };
 
-  const load = async () => {
+  const [filters, setFilters] = useState({ continent: "", country: "", q: "" });
+  const [total, setTotal] = useState(0);
+  const load = async (f = filters) => {
     setLoading(true);
     try {
-      const { data } = await api.get("/admin/recruit/stats");
+      const params = new URLSearchParams({ limit: "300" });
+      Object.entries(f).forEach(([k, v]) => { if (v) params.set(k, v); });
+      const { data } = await api.get(`/admin/recruit/stats?${params.toString()}`);
       setCities(data.items || []);
+      setTotal(data.total || 0);
     } catch (err) {
       toast.error(formatApiError(err));
     } finally { setLoading(false); }
@@ -144,11 +149,33 @@ export default function RecruitTab() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="admin-recruit-kpis">
-        <Kpi label="Cities" value={cities.length} />
+        <Kpi label="Cities" value={total} />
         <Kpi label="Total signups" value={totals.signups} icon={Users} />
         <Kpi label="Goal" value={totals.goal} />
         <Kpi label="This week" value={`+${totals.this_week}`} icon={TrendingUp} />
       </div>
+
+      <form
+        className="flex flex-wrap gap-2 items-center"
+        onSubmit={(e) => { e.preventDefault(); load(); }}
+        data-testid="admin-recruit-filters"
+      >
+        <select
+          value={filters.continent}
+          onChange={(e) => { const f = { ...filters, continent: e.target.value }; setFilters(f); load(f); }}
+          className="h-9 border border-slate-300 px-2 text-sm"
+          data-testid="admin-recruit-filter-continent"
+        >
+          <option value="">All continents</option>
+          {[["AF", "Africa"], ["AS", "Asia"], ["EU", "Europe"], ["NA", "North America"], ["SA", "South America"], ["OC", "Oceania"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <Input className="h-9 w-28" placeholder="Country (JP)" value={filters.country}
+          onChange={(e) => setFilters({ ...filters, country: e.target.value })} data-testid="admin-recruit-filter-country" />
+        <Input className="h-9 w-56" placeholder="Search city…" value={filters.q}
+          onChange={(e) => setFilters({ ...filters, q: e.target.value })} data-testid="admin-recruit-filter-q" />
+        <Button type="submit" size="sm" variant="outline" data-testid="admin-recruit-filter-apply">Filter</Button>
+        <span className="text-xs text-slate-500 font-mono">Showing {cities.length} of {total} (largest first)</span>
+      </form>
 
       {/* Cities list */}
       {loading ? (
@@ -161,7 +188,7 @@ export default function RecruitTab() {
               <div key={c.slug} className={`p-4 grid grid-cols-12 gap-3 items-center ${!c.is_active ? "opacity-50" : ""}`} data-testid={`admin-recruit-row-${c.slug}`}>
                 <div className="col-span-12 md:col-span-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-display font-bold text-slate-900">{c.city}, {c.state}</span>
+                    <span className="font-display font-bold text-slate-900">{c.city}, {c.country && c.country !== "US" ? c.country_name : c.state}</span>
                     {!c.is_active && <span className="text-[9px] font-mono uppercase tracking-widest bg-slate-100 text-slate-500 px-1.5 py-0.5">Paused</span>}
                   </div>
                   <div className="text-xs text-slate-500 font-mono">/join/{c.slug}</div>

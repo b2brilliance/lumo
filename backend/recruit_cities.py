@@ -24,6 +24,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
+import json
+import re
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,6 +54,15 @@ class RecruitCity(BaseModel):
     hero_subhead: Optional[str] = None
     hero_image: Optional[str] = None
     neighborhoods: List[str] = Field(default_factory=list)   # 3-5 landmark neighborhoods for local SEO
+    country: str = "US"
+    country_name: Optional[str] = "United States"
+    continent: str = "NA"
+    currency: str = "USD"
+    lang: str = "en"
+    local_name: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    population: int = 0
     is_active: bool = True
     click_count: int = 0
     view_count: int = 0
@@ -334,10 +347,83 @@ async def seed_recruit_cities(db) -> int:
 
     if inserted:
         logger.info(f"[recruit] Seeded {inserted} recruit cities (priority + US metros)")
+    await seed_world_cities(db)
 
     # Backfill enrichment on any rows already in Mongo from earlier boots
     await _backfill_local_enrichment(db)
     return inserted
+
+
+WORLD_FILE = Path(__file__).parent / "data" / "world_recruit_cities.json"
+CONTINENTS = {"AF": "Africa", "AS": "Asia", "EU": "Europe", "NA": "North America",
+              "SA": "South America", "OC": "Oceania", "AN": "Antarctica"}
+FALLBACK_HERO = "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=1600&q=80"
+# GeoNames primary language → Lumo-supported translation code
+LANG_ALIASES = {"pt": "pt", "zh": "zh", "nb": "no", "nn": "no"}
+
+
+async def seed_world_cities(db) -> int:
+    """Idempotent: insert top-1000 world cities + top-5 per country, and
+    backfill geo/country fields on existing rows (incl. US seeds)."""
+    rows = json.loads(WORLD_FILE.read_text(encoding="utf-8"))
+    existing = {d["slug"]: d async for d in db.recruit_cities.find({}, {"_id": 0, "slug": 1, "lat": 1, "population": 1})}
+    new_docs, inserted = [], 0
+    for r in rows:
+        geo = {k: r[k] for k in ("country", "country_name", "continent", "currency", "lang", "local_name", "lat", "lng", "population")}
+        if r["slug"] in existing:
+            if not existing[r["slug"]].get("population"):
+                await db.recruit_cities.update_one({"slug": r["slug"]}, {"$set": geo})
+            continue
+        name = r["city"]
+        new_docs.append(RecruitCity(
+            slug=r["slug"], city=name, state=r["state"], state_full=r["country_name"] if r["country"] != "US" else None,
+            hero_headline=f"Earn with Lumo in {name}.",
+            hero_subhead=f"Lumo is hiring 300 couriers, drivers and local pros in {name}. Keep 90% of every job.",
+            hero_image=FALLBACK_HERO, **geo,
+        ).model_dump())
+    if new_docs:
+        await db.recruit_cities.insert_many(new_docs)
+        inserted = len(new_docs)
+        logger.info(f"[recruit] Seeded {inserted} world recruit cities")
+    await db.recruit_cities.update_many({"country": {"$exists": False}},
+                                        {"$set": {"country": "US", "country_name": "United States", "continent": "NA",
+                                                  "currency": "USD", "lang": "en"}})
+    for k in ("slug", "country", "continent"):
+        await db.recruit_cities.create_index(k)
+    return inserted
+
+
+async def _signup_counts(db, slugs: List[str], since: Optional[str] = None) -> Dict[str, int]:
+    match: Dict[str, Any] = {"role": "provider", "recruit_city_slug": {"$in": slugs}}
+    if since:
+        match["created_at"] = {"$gte": since}
+    rows = await db.users.aggregate([
+        {"$match": match},
+        {"$group": {"_id": "$recruit_city_slug", "n": {"$sum": 1}}},
+    ]).to_list(None)
+    return {r["_id"]: r["n"] for r in rows}
+
+
+LIGHT_FIELDS = {"_id": 0, "slug": 1, "city": 1, "state": 1, "state_full": 1, "country": 1, "country_name": 1,
+                "continent": 1, "population": 1, "goal_workers": 1, "local_name": 1, "is_active": 1,
+                "bonus_amount": 1, "click_count": 1, "view_count": 1, "currency": 1}
+
+
+async def _light_list(db, q: Dict[str, Any], limit: int) -> List[Dict[str, Any]]:
+    docs = await db.recruit_cities.find(q, LIGHT_FIELDS).sort("population", -1).limit(limit).to_list(limit)
+    counts = await _signup_counts(db, [d["slug"] for d in docs])
+    for d in docs:
+        d["signups_total"] = counts.get(d["slug"], 0)
+    return docs
+
+
+SUPPORTED_LANGS = set("en es fr fr-CA de pt-BR pt it nl pl ru uk tr sv ja ko zh zh-TW hi bn ur ar he vi th id ms tl sw ha yo am el fa".split())
+COUNTRY_LANG = {"BR": "pt-BR", "TW": "zh-TW", "HK": "zh-TW", "PH": "tl"}
+
+
+def _page_lang(code: Optional[str], country: Optional[str]) -> str:
+    c = COUNTRY_LANG.get(country or "") or LANG_ALIASES.get(code or "en", code or "en")
+    return c if c in SUPPORTED_LANGS else "en"
 
 
 async def _stats_for_city(db, city_doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -381,18 +467,56 @@ def create_router(
     r = APIRouter(prefix="/api", tags=["recruit"])
 
     @r.get("/recruit/cities")
-    async def list_cities():
-        cursor = db.recruit_cities.find({"is_active": True}, {"_id": 0}).sort("city", 1)
-        docs = await cursor.to_list(length=500)
-        # Attach signup progress
-        return {"items": [await _stats_for_city(db, d) for d in docs]}
+    async def list_cities(country: Optional[str] = None, continent: Optional[str] = None,
+                          q: Optional[str] = None, limit: int = 2000):
+        mq: Dict[str, Any] = {"is_active": True}
+        if country:
+            mq["country"] = country.upper()
+        if continent:
+            mq["continent"] = continent.upper()
+        if q:
+            rx = re.compile(re.escape(q.strip()), re.I)
+            mq["$or"] = [{"city": rx}, {"local_name": rx}, {"country_name": rx}, {"state_full": rx}]
+        return {"items": await _light_list(db, mq, min(int(limit), 2000))}
+
+    @r.get("/recruit/world")
+    async def world():
+        rows = await db.recruit_cities.aggregate([
+            {"$match": {"is_active": True}},
+            {"$group": {"_id": {"cc": "$country", "name": "$country_name", "ct": "$continent"},
+                        "cities": {"$sum": 1}, "pop": {"$sum": "$population"}}},
+            {"$sort": {"pop": -1}},
+        ]).to_list(None)
+        signups = await db.users.aggregate([
+            {"$match": {"role": "provider", "recruit_city_slug": {"$exists": True}}},
+            {"$lookup": {"from": "recruit_cities", "localField": "recruit_city_slug", "foreignField": "slug", "as": "c"}},
+            {"$unwind": "$c"}, {"$group": {"_id": "$c.country", "n": {"$sum": 1}}},
+        ]).to_list(None)
+        sc = {x["_id"]: x["n"] for x in signups}
+        continents: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            ct = row["_id"].get("ct") or "NA"
+            bucket = continents.setdefault(ct, {"code": ct, "name": CONTINENTS.get(ct, ct), "countries": [], "cities": 0, "signups": 0})
+            cc = row["_id"]["cc"]
+            bucket["countries"].append({"code": cc, "name": row["_id"].get("name") or cc,
+                                        "cities": row["cities"], "signups": sc.get(cc, 0)})
+            bucket["cities"] += row["cities"]
+            bucket["signups"] += sc.get(cc, 0)
+        out = sorted(continents.values(), key=lambda c: -c["cities"])
+        return {"continents": out, "total_cities": sum(c["cities"] for c in out),
+                "total_countries": sum(len(c["countries"]) for c in out), "total_signups": sum(sc.values())}
 
     @r.get("/recruit/cities/{slug}")
     async def get_city(slug: str):
         doc = await db.recruit_cities.find_one({"slug": slug}, {"_id": 0})
         if not doc or not doc.get("is_active"):
             raise HTTPException(404, "City not found")
-        return await _stats_for_city(db, doc)
+        out = await _stats_for_city(db, doc)
+        out["page_lang"] = _page_lang(doc.get("lang"), doc.get("country"))
+        out["continent_name"] = CONTINENTS.get(doc.get("continent") or "", "")
+        out["nearby"] = [c for c in await _light_list(db, {"is_active": True, "country": doc.get("country", "US")}, 9)
+                         if c["slug"] != slug][:8]
+        return out
 
     @r.post("/recruit/cities/{slug}/click")
     async def record_click(slug: str):
@@ -404,10 +528,27 @@ def create_router(
 
     # ── Admin ──────────────────────────────────────────────────────
     @r.get("/admin/recruit/stats")
-    async def admin_stats(_admin=Depends(require_admin)):
-        cursor = db.recruit_cities.find({}, {"_id": 0}).sort("city", 1)
-        docs = await cursor.to_list(length=200)
-        return {"items": [await _stats_for_city(db, d) for d in docs]}
+    async def admin_stats(country: Optional[str] = None, continent: Optional[str] = None,
+                          q: Optional[str] = None, limit: int = 300, _admin=Depends(require_admin)):
+        mq: Dict[str, Any] = {}
+        if country:
+            mq["country"] = country.upper()
+        if continent:
+            mq["continent"] = continent.upper()
+        if q:
+            rx = re.compile(re.escape(q.strip()), re.I)
+            mq["$or"] = [{"city": rx}, {"country_name": rx}, {"slug": rx}]
+        docs = await db.recruit_cities.find(mq, {"_id": 0}).sort("population", -1).limit(min(int(limit), 2000)).to_list(None)
+        slugs = [d["slug"] for d in docs]
+        counts = await _signup_counts(db, slugs)
+        week = await _signup_counts(db, slugs, _iso_days_ago(7))
+        for d in docs:
+            n = counts.get(d["slug"], 0)
+            goal = int(d.get("goal_workers") or 300)
+            d.update(signups_total=n, signups_last_7d=week.get(d["slug"], 0), spots_remaining=max(0, goal - n),
+                     progress_pct=round(min(100, n / goal * 100)) if goal else 0)
+        total = await db.recruit_cities.count_documents(mq)
+        return {"items": docs, "total": total}
 
     @r.post("/admin/recruit/cities")
     async def create_city(payload: RecruitCityIn, _admin=Depends(require_admin)):
@@ -477,14 +618,21 @@ RECRUIT_COPY_TEMPLATES = [
 ]
 
 
+BROADCAST_BATCH = 25
+
+
 async def broadcast_recruit_post(db, publish_fn, *, base_url: str = "") -> Dict[str, Any]:
     """Compose and publish one recruitment post per active city to every
     enabled social channel. Rotates copy templates so posts look fresh."""
     import random
     from ai_copy_rotator import rewrite_copy as _rewrite_copy  # noqa: WPS433
-    cursor = db.recruit_cities.find({"is_active": True}, {"_id": 0})
+    # Rotate through cities (least-recently broadcast first) so a 1,700-city
+    # catalog doesn't spam every channel in one run.
+    cursor = db.recruit_cities.find({"is_active": True}, {"_id": 0}).sort(
+        [("last_broadcast_at", 1), ("population", -1)]).limit(BROADCAST_BATCH)
     fired: List[Dict[str, Any]] = []
     async for city in cursor:
+        await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"last_broadcast_at": _now_iso()}})
         tpl_title, tpl_body = random.choice(RECRUIT_COPY_TEMPLATES)
         fmt = {
             "city": city["city"], "state": city["state"],

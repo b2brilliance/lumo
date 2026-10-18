@@ -126,6 +126,15 @@ export default function PersonaSplit() {
             })}
           </div>
 
+          <Link
+            to="/join"
+            className="mt-6 flex items-center justify-between gap-3 rounded-full border border-slate-200 hover:border-slate-900 px-5 py-3 text-sm transition-colors"
+            data-testid="persona-join-world"
+          >
+            <span><b>Hiring in 1,700+ cities worldwide.</b> Find your city and start earning.</span>
+            <ArrowRight className="w-4 h-4 shrink-0" />
+          </Link>
+
           {/* Secondary row — sign-in / help */}
           <div className="mt-10 pt-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
             {isSignedIn ? (

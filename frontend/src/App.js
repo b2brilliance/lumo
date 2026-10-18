@@ -58,6 +58,7 @@ import ChatsInbox from "@/pages/ChatsInbox";
 import Orders from "@/pages/Orders";
 import Help from "@/pages/Help";
 import Recruiter from "@/pages/Recruiter";
+import JoinCountry from "@/pages/JoinCountry";
 import AvailableJobs from "@/pages/AvailableJobs";
 import GlobalHub from "@/pages/GlobalHub";
 import CountryHub from "@/pages/CountryHub";
@@ -203,6 +204,8 @@ function App() {
             <Route path="/marketplace/new" element={<Marketplace />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/join" element={<CityRecruitIndex />} />
+            <Route path="/join/continent/:continent" element={<CityRecruitIndex />} />
+            <Route path="/join/country/:cc" element={<JoinCountry />} />
             <Route path="/join/:slug" element={<CityRecruit />} />
             <Route path="/reset" element={<Reset />} />
             <Route path="/map" element={<MapPage />} />

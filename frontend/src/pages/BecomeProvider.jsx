@@ -57,6 +57,9 @@ export default function BecomeProvider() {
             <Link to="/map" className="text-sm font-mono uppercase tracking-wider text-slate-600 hover:text-slate-900 underline">
               See jobs near me first →
             </Link>
+            <Link to="/join" className="text-sm font-mono uppercase tracking-wider text-teal-700 hover:text-teal-900 underline" data-testid="become-provider-find-city">
+              Find your city (1,700+ worldwide) →
+            </Link>
           </div>
         </div>
       </section>

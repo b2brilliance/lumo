@@ -8,6 +8,8 @@ import {
 import { api } from "@/lib/api";
 import AdSense from "@/components/AdSense";
 import WeatherBadge from "@/components/WeatherBadge";
+import { useLocale } from "@/lib/locale";
+import { RecruitLangToggle, NearbyRecruitCities, RecruitShareBar } from "@/components/recruit/RecruitExtras";
 
 /* CityRecruit — /join/:slug
  *
@@ -22,6 +24,16 @@ export default function CityRecruit() {
   const [city, setCity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { formatPrice, setPageLang } = useLocale();
+  const [langPref, setLangPref] = useState(() => localStorage.getItem("lumo_recruit_lang") || "local");
+
+  useEffect(() => {
+    if (!city) return undefined;
+    setPageLang(langPref === "en" ? "en" : city.page_lang || "en");
+    return () => setPageLang(null);
+  }, [city, langPref, setPageLang]);
+
+  const chooseLang = (v) => { localStorage.setItem("lumo_recruit_lang", v); setLangPref(v); };
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +65,7 @@ export default function CityRecruit() {
         </div>
         <h1 className="font-display text-2xl font-bold mt-4">City not on Lumo yet.</h1>
         <p className="text-sm text-neutral-500 mt-2">Try one of our active cities or check back soon.</p>
-        <Link to="/for-providers" className="btn-lumo btn-lumo-primary btn-lumo-sm mt-6">See all cities</Link>
+        <Link to="/join" className="btn-lumo btn-lumo-primary btn-lumo-sm mt-6">See all cities</Link>
       </div>
     );
   }
@@ -61,11 +73,13 @@ export default function CityRecruit() {
 
   const pct = Number(city.progress_pct || 0);
   const bonusEligible = (city.signups_total || 0) < (city.bonus_first_n || 100);
-  const displayName = `${city.city}, ${city.state_full || city.state}`;
+  const isUS = (city.country || "US") === "US";
+  const displayName = isUS ? `${city.city}, ${city.state_full || city.state}` : `${city.city}, ${city.country_name}`;
+  const bonus = formatPrice(Number(city.bonus_amount || 0), { currency: city.currency || "USD" });
   const hoods = Array.isArray(city.neighborhoods) ? city.neighborhoods : [];
   const localSeoBlurb = hoods.length
-    ? `Drive with Lumo in ${city.city} — serving ${hoods.slice(0, 4).join(", ")}. Keep 90%, same-day payouts, $${city.bonus_amount} bonus after your 100th job.`
-    : city.hero_subhead || `Lumo is hiring ${city.goal_workers} providers in ${displayName}. Keep 90% of every job, same-day payouts, $${city.bonus_amount} bonus.`;
+    ? `Drive with Lumo in ${city.city} — serving ${hoods.slice(0, 4).join(", ")}. Keep 90%, same-day payouts, $${bonus} bonus after your 100th job.`
+    : city.hero_subhead || `Lumo is hiring ${city.goal_workers} providers in ${displayName}. Keep 90% of every job, same-day payouts, ${bonus} bonus.`;
 
   return (
     <div className="bg-white min-h-screen" data-testid={`page-city-recruit-${slug}`}>
@@ -91,6 +105,7 @@ export default function CityRecruit() {
               <MapPin className="w-3.5 h-3.5" /> {displayName}
             </div>
             <WeatherBadge slug={slug} testId="city-hero-weather" />
+            <RecruitLangToggle pageLang={city.page_lang} pref={langPref} onChange={chooseLang} />
           </div>
           <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight max-w-3xl" data-testid="city-hero-headline">
             {city.hero_headline || `Drive with Lumo in ${city.city}.`}
@@ -117,7 +132,7 @@ export default function CityRecruit() {
           {bonusEligible && (
             <div className="mt-6 inline-flex items-center gap-3 px-4 py-3 rounded-full bg-amber-500 text-black font-semibold text-sm shadow-lg" data-testid="city-hero-bonus">
               <Zap className="w-4 h-4" />
-              <span>${Number(city.bonus_amount).toFixed(0)} loyalty bonus after your first {city.bonus_job_count || 100} jobs — reserved for the first {city.bonus_first_n}, only {Math.max(0, city.bonus_first_n - (city.signups_total || 0))} spots left</span>
+              <span>{bonus} loyalty bonus after your first {city.bonus_job_count || 100} jobs — reserved for the first {city.bonus_first_n}, only {Math.max(0, city.bonus_first_n - (city.signups_total || 0))} spots left</span>
             </div>
           )}
 
@@ -197,10 +212,10 @@ export default function CityRecruit() {
                 <DollarSign className="w-3.5 h-3.5" /> Loyalty bonus
               </div>
               <h2 className="font-display text-3xl sm:text-4xl font-bold text-black tracking-tight">
-                ${Number(city.bonus_amount).toFixed(0)} after job #{city.bonus_job_count || 100}.
+                {bonus} after job #{city.bonus_job_count || 100}.
               </h2>
               <p className="mt-4 text-neutral-600 leading-relaxed">
-                Complete {city.bonus_job_count || 100} paid jobs on Lumo in {city.city} and we drop a flat <b className="text-black">${Number(city.bonus_amount).toFixed(0)}</b> into your wallet — on top of your normal earnings. Reserved for the <b>first {city.bonus_first_n}</b> providers who sign up in {city.city}.
+                Complete {city.bonus_job_count || 100} paid jobs on Lumo in {city.city} and we drop a flat <b className="text-black">{bonus}</b> into your wallet — on top of your normal earnings. Reserved for the <b>first {city.bonus_first_n}</b> providers who sign up in {city.city}.
               </p>
               <button onClick={startSignup} className="btn-lumo btn-lumo-primary btn-lumo-lg mt-6" data-testid="city-milestone-cta">
                 Claim my spot <ArrowRight className="w-4 h-4" />
@@ -229,6 +244,9 @@ export default function CityRecruit() {
           </div>
         </div>
       </section>
+
+      <RecruitShareBar slug={slug} cityName={city.city} />
+      <NearbyRecruitCities city={city} />
 
       {/* Final CTA */}
       <div className="max-w-4xl mx-auto px-4 sm:px-8">
