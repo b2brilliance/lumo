@@ -126,9 +126,9 @@ export default function Autos() {
         <Input data-testid="auto-filter-max-year" placeholder="Year max" type="number" defaultValue={f.max_year} onBlur={(e) => set("max_year", e.target.value)} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-6 text-xs">
-        <Input data-testid="auto-filter-min-price" placeholder="Min $" type="number" defaultValue={f.min_price} onBlur={(e) => set("min_price", e.target.value)} />
-        <Input data-testid="auto-filter-max-price" placeholder="Max $" type="number" defaultValue={f.max_price} onBlur={(e) => set("max_price", e.target.value)} />
-        <Input data-testid="auto-filter-max-mileage" placeholder="Max miles" type="number" defaultValue={f.max_mileage} onBlur={(e) => set("max_mileage", e.target.value)} />
+        <Input data-testid="auto-filter-min-price" placeholder="Min price" type="number" defaultValue={f.min_price} onBlur={(e) => set("min_price", e.target.value)} />
+        <Input data-testid="auto-filter-max-price" placeholder="Max price" type="number" defaultValue={f.max_price} onBlur={(e) => set("max_price", e.target.value)} />
+        <Input data-testid="auto-filter-max-mileage" placeholder="Max mileage" type="number" defaultValue={f.max_mileage} onBlur={(e) => set("max_mileage", e.target.value)} />
         <Input data-testid="auto-filter-city" placeholder="City" defaultValue={f.city} onBlur={(e) => set("city", e.target.value)} />
         <Select value={f.condition || "any"} onValueChange={(v) => set("condition", v === "any" ? "" : v)}>
           <SelectTrigger data-testid="auto-filter-cond"><SelectValue placeholder="Condition" /></SelectTrigger>

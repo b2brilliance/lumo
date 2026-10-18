@@ -30,8 +30,8 @@ export function FilterRow({ params, set }) {
   const kind = params.get("kind") || "all";
   return (
     <div className="flex flex-wrap gap-2 text-xs">
-      <Input className="w-24 h-9" type="number" placeholder="Min $" defaultValue={params.get("min_price") || ""} onBlur={(e) => set("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-min-price" />
-      <Input className="w-24 h-9" type="number" placeholder="Max $" defaultValue={params.get("max_price") || ""} onBlur={(e) => set("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-max-price" />
+      <Input className="w-24 h-9" type="number" placeholder="Min price" defaultValue={params.get("min_price") || ""} onBlur={(e) => set("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-min-price" />
+      <Input className="w-24 h-9" type="number" placeholder="Max price" defaultValue={params.get("max_price") || ""} onBlur={(e) => set("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} data-testid="re-filter-max-price" />
       <Select value={params.get("min_beds") || "any"} onValueChange={(v) => set("min_beds", v === "any" ? "" : v)}>
         <SelectTrigger className="w-28 h-9" data-testid="re-filter-beds"><SelectValue placeholder="Beds" /></SelectTrigger>
         <SelectContent>

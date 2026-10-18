@@ -14,7 +14,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from demo_filter import hide_demo
-from global_markets import COUNTRIES, MARKETPLACES, markets_payload
+from global_markets import COUNTRIES, MARKETPLACES, markets_payload, slugify
 
 
 def _origin() -> str:
@@ -23,7 +23,7 @@ def _origin() -> str:
 
 def _abs(url: Optional[str]) -> str:
     if not url:
-        return f"{_origin()}/og-image.png"
+        return f"{_origin()}/og-image.jpg"
     return url if url.startswith("http") else f"{_origin()}{url}"
 
 
@@ -131,8 +131,8 @@ def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
                 f"<listing><vehicle_id>{_x(d['id'])}</vehicle_id><title>{_x(d.get('title'))}</title>"
                 f"<description>{_x(d.get('description') or d.get('title'))}</description><url>{_origin()}/autos/{_x(d['id'])}</url>"
                 f"<make>{_x(d.get('make'))}</make><model>{_x(d.get('model'))}</model><year>{_x(d.get('year'))}</year>"
-                f"<mileage><value>{_x(d.get('mileage'))}</value><unit>MI</unit></mileage>{imgs}"
-                f"<price>{float(d.get('price') or 0):.2f} USD</price><state_of_vehicle>used</state_of_vehicle>"
+                f"<mileage><value>{_x(d.get('mileage'))}</value><unit>{'MI' if (d.get('country') or 'US').upper() in ('US', 'GB') else 'KM'}</unit></mileage>{imgs}"
+                f"<price>{float(d.get('price') or 0):.2f} {(d.get('currency') or 'USD').upper()}</price><state_of_vehicle>used</state_of_vehicle>"
                 f"<body_style>{_x(d.get('body_style'))}</body_style>"
                 f"<address format=\"simple\"><component name=\"city\">{_x(d.get('city'))}</component>"
                 f"<component name=\"region\">{_x(d.get('state'))}</component><component name=\"country\">{_x(d.get('country') or 'US')}</component></address></listing>")
@@ -164,7 +164,9 @@ def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
 
     @router.delete("/admin/ad-kits/{kit_id}")
     async def delete_kit(kit_id: str, _: dict = Depends(require_admin)):
-        await db.ad_kits.delete_one({"id": kit_id})
+        res = await db.ad_kits.delete_one({"id": kit_id})
+        if not res.deleted_count:
+            raise HTTPException(404, "Ad kit not found")
         return {"ok": True}
 
     @router.post("/admin/ad-kits/generate")
@@ -176,7 +178,7 @@ def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
         mname, _cs, post_url = MARKETPLACES[body.marketplace]
         cname, _region, lang, cur, cities = COUNTRIES[body.country]
         city = body.city or cities[0]
-        image, link, brief = None, f"{_origin()}/in/{cname.lower().replace(' ', '-')}", SUBJECT_BRIEF.get(body.subject)
+        image, link, brief = None, f"{_origin()}/in/{slugify(cname)}", SUBJECT_BRIEF.get(body.subject)
         if body.subject in ("listing", "real_estate", "auto"):
             coll = {"listing": "listings", "real_estate": "real_estate", "auto": "autos"}[body.subject]
             item = await db[coll].find_one({"id": body.item_id}, {"_id": 0}) if body.item_id else None
@@ -207,7 +209,7 @@ def create_router(*, db, require_admin, llm_key: Optional[str]) -> APIRouter:
                "country": body.country, "country_name": cname, "city": city, "lang": lang, "subject": body.subject,
                "item_id": body.item_id, "title": str(parsed["title"])[:120], "body": str(parsed["body"])[:3000],
                "tags": [str(t)[:40] for t in (parsed.get("tags") or [])][:8], "link": link,
-               "image": image or f"{_origin()}/og-image.png", "created_by": admin.get("email"),
+               "image": image or f"{_origin()}/og-image.jpg", "created_by": admin.get("email"),
                "created_at": datetime.now(timezone.utc).isoformat()}
         await db.ad_kits.insert_one(dict(kit))
         return kit

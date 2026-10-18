@@ -1,0 +1,43 @@
+{
+  "summary": "Tested the Global Growth release end to end. Backend: 15 of 15 pytest tests pass (test_iter65_global_growth.py). GET /api/global/markets returns 7 regions, 5 verticals, 50 countries and 51 marketplaces. All 5 feeds are well-formed (RSS 2.0 with the g: namespace, the expected CSV header, and <listings> XML). With no content they return 0 items. I created a marketplace listing, a real-estate rental and an auto as a fresh qa_ user, each with '&' and '<' in the title. Each one appeared in its feed with the special characters escaped correctly (parsed back by an XML parser), absolute links, and prices like '120.00 USD', '1500.00 USD' and '9000.00 USD'. After cleanup (PATCH inactive, then DELETE real-estate and auto) all three were gone from the feeds. GET /api/admin/feeds returns 5 feeds with counts; guests and customers get 401/403. Ad kits: an unknown marketplace or country returns 400, and a bad item_id returns 404 for listing, real_estate and auto. Live LLM generation worked in the right language for KE/jiji_ke (Swahili), BR/olx_br (Portuguese) and AE/dubizzle_ae (Arabic). List and delete work and no _id is returned. The sitemap has /global, /in/nigeria, /in/nigeria/lagos/rentals and 1150 /in/ URLs. Frontend: /global shows 50 country tiles with flags and the top 2 cities; the global-my-country pill works. /in/nigeria shows 'Lumo Nigeria', 5 vertical tiles and 6 city chips; country-set-default sets lumo_country_override=NG, then hides itself and changes the navbar to NG. The city hub /in/nigeria/lagos shows 'Lumo Lagos'. The city-vertical page shows 'Rentals in Lagos'; cta-0 goes to /real-estate?kind=rent&q=Lagos&place=Lagos, and there are 4 links to the other verticals plus other cities. Bad slugs redirect correctly to /global or the country hub. Home persona-country-pill and footer-link-global both point to /global. The LocaleSwitcher has 50 countries. Egypt and Israel set dir=rtl, the AutoTranslator translated the page into Arabic (it takes about 6–20 seconds), and choosing US again resets dir=ltr. Locale sw-KE is detected as Kenya. Admin Ad Studio: the feeds panel shows 5 feeds and feed-copy copies the URL. The composer filters marketplaces by country (KE shows FB Marketplace, FB Groups, Reddit, Locanto and Jiji Kenya). Generating a Kenya / Mombasa / Recruit kit produced a Swahili card. 'Copy & open Jiji Kenya' copied the text and opened https://jiji.co.ke/add-advert in a new tab; copy text and delete also work. I made 4 LLM ad-kit calls in total.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/feeds/* and /api/admin/ad-kits/generate", "issue": "The fallback image https://golumo.app/og-image.png does not exist. /app/frontend/public has no og-image.png, so the URL returns the SPA index.html (text/html). Every feed item without a photo will have an image_link that is not an image, and Google Merchant Center and Meta reject those items. Ad-kit cards also show a broken image."},
+      {"endpoint": "/api/admin/ad-kits/generate", "issue": "The kit link is built with cname.lower().replace(' ', '-') instead of slugify(). For Côte d'Ivoire it gives /in/côte-d'ivoire and for Türkiye /in/türkiye, which do not match the real slugs cote-d-ivoire and turkiye, so the frontend redirects those links to /global. Use slugify(cname). Found by code review; I did not run it, to save LLM calls."},
+      {"endpoint": "/api/feeds/meta-vehicles.xml", "issue": "The price is always written as 'USD' and the mileage unit is always 'MI', whatever the auto's country or currency."},
+      {"endpoint": "DELETE /api/admin/ad-kits/{id}", "issue": "Returns {ok:true} even when the id does not exist; it should return 404."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "GlobalAdKits KitCard", "issue": "The thumbnail is broken when the kit has no item image, because og-image.png is missing (see backend minor issue).", "selector": "[data-testid^='ad-kit-'] img", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Locale detection", "issue": "A browser with timezone Africa/Nairobi but locale en-US (the default for many Chrome users in Kenya) is detected as US, because the navigator region is checked before the timezone. Kenya is only detected with locale sw-KE, or with no region and the Nairobi timezone. Consider preferring the timezone when the navigator region is US and the timezone maps to another country.", "affected_selectors": ["[data-testid='global-my-country']"]}
+    ],
+    "design_issues": [
+      {"screen": "Home in Arabic (EG) and any RTL language", "issues": ["Headings and overlines that use letter-spacing classes (tracking-widest, tracking-tighter, overline/font-mono) break up the joined Arabic letters ('ا ل ذ ي'). Use letter-spacing: normal when dir=rtl, for example [dir=rtl] * { letter-spacing: 0 !important }."]},
+      {"screen": "/autos with the NG country set", "issues": ["The filter placeholders 'Min $', 'Max $' and 'Max miles' are hardcoded and do not follow the chosen country's currency."]},
+      {"screen": "Price display", "issues": ["I could not confirm the ₦ symbol in the UI: with demo content hidden, no public page shows a price. COUNTRY_PROFILES.NG has symbol ₦ and locale en-NG."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter65_global_growth.py", "/app/test_reports/pytest/pytest_iter65.xml"],
+  "action_items": [
+    "Add /app/frontend/public/og-image.png (a real 1200x630 image), or point the fallback image in global_growth._abs at an existing image. The feed image_link currently resolves to HTML.",
+    "In generate_kit, build the link with slugify(cname) (from global_markets) instead of lower().replace(' ', '-').",
+    "Optional: turn off letter-spacing for RTL/Arabic text; prefer the timezone over the en-US navigator region for detection; use the auto's currency in the vehicles feed; return 404 when deleting a missing ad kit."
+  ],
+  "critical_code_review_comments": [
+    "global_growth._origin() falls back to the hardcoded 'https://golumo.app' when PUBLIC_BASE_URL is not set, which goes against the env-only rule. On preview, the feed URLs and links point to production.",
+    "_active() loads up to 5000 docs per feed on every request, and admin_feeds calls it 3 times. Consider caching, or using count_documents for the admin counts.",
+    "FeedsPanel and GlobalAdKits swallow API errors (catch(() => {})), so there is no error state. KitCard.post assumes the Clipboard API exists, and on http or in browsers without permission it throws before window.open runs.",
+    "CountryHub and CityVertical hardcode the canonical host https://golumo.app."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter65_global_growth.py"],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "95% (all requested flows pass; ₦ display could not be verified because no priced content is public)"},
+  "seed_data_creation": "Created one user, qa_<rand>@gmail.com (customer). Its listing was set to inactive, and its real-estate and auto items were deleted. All test ad kits were deleted; the kits that already existed were left as they were.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Regression: pytest /app/backend/tests/test_iter65_global_growth.py (makes 3 live LLM calls). Admin login is julius.a.mason@gmail.com / Mason0123. Radix Select options in the ad-kit composer must be picked with scroll_into_view, focus and Enter (a normal click fails with 'outside of viewport'). The AutoTranslator needs about 10–20 seconds. Never call the demo purge endpoint."
+}

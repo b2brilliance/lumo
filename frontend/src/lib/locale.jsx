@@ -130,6 +130,9 @@ function detectCountry() {
     const parts = navLang.split("-");
     if (parts.length >= 2) {
       const c = parts[parts.length - 1].toUpperCase();
+      let tzCountry = null;
+      try { tzCountry = TIMEZONE_TO_COUNTRY[Intl.DateTimeFormat().resolvedOptions().timeZone]; } catch { /* ignore */ }
+      if (c === "US" && tzCountry && tzCountry !== "US") return { country: tzCountry, source: "timezone" };
       if (COUNTRY_PROFILES[c]) return { country: c, source: "navigator" };
     }
   }

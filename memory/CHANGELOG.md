@@ -37,3 +37,12 @@
 - Admin Content → "Help FAQs" type (question, answer, topic, position, is_active) for add/edit/reorder/hide/delete.
 - Help links: desktop nav (all roles), footer, Settings, 5th mobile tab. Customer "My orders" → /orders. Nav container testid renamed nav-links-<role>.
 - Tested: iteration_64 (backend 10/10, frontend all pass); minor polish fixed after.
+
+## 2026-06 — Global growth
+- backend/global_markets.py: 50 countries (7 regions, lang, currency, top cities) + 51 regional marketplaces with post URLs; GET /api/global/markets.
+- SEO hubs: /global, /in/:country, /in/:country/:city, /in/:country/:city/:vertical (services|jobs|rentals|homes|marketplace); ~1150 URLs added to /api/sitemap.xml. Home "Lumo in <country> · 50 countries" pill; footer "Lumo worldwide".
+- Locale: 50 country profiles (currency, tax, timezone detection; tz beats en-US navigator), RTL dir for ar/he/fa/ur + letter-spacing reset; existing AutoTranslator (34 languages) handles translation.
+- Feeds (public, demo-filtered): /api/feeds/google-products.xml, tiktok-products.xml, meta-products.csv, meta-home-listings.xml, meta-vehicles.xml; admin GET /api/admin/feeds.
+- AI ad kits: POST /api/admin/ad-kits/generate (native-language ad per marketplace/country/city/subject), list/delete; Ad Studio "Global ad kits" panel with Copy & open.
+- og-image.jpg share image + OG/Twitter tags; removed "Workers keep 90%" from meta description.
+- Tested: iteration_65 (15/15 backend, frontend pass) + minor fixes self-verified.

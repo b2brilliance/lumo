@@ -17,3 +17,6 @@
 }
 .re-pin-active { background: #e11d48; transform: translate(-50%, -100%) scale(1.12); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* RTL scripts join letters — never letter-space them */
+[dir="rtl"] * { letter-spacing: 0 !important; }
