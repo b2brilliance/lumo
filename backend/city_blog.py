@@ -218,6 +218,23 @@ async def share_post(db, post: Dict[str, Any], base_url: str, platforms: Optiona
     }, platforms=platforms)
 
 
+async def share_city_template(db, city: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+    from social_publisher import publish_to_all
+    from recruit_cities import RECRUIT_COPY_TEMPLATES
+    tpl_title, tpl_body = random.choice(RECRUIT_COPY_TEMPLATES)
+    fmt = {"city": city["city"], "goal": city.get("goal_workers") or 300, "first_n": city.get("bonus_first_n") or 100,
+           "jobs": city.get("bonus_job_count") or 100, "bonus": float(city.get("bonus_amount") or 100)}
+    res = (await publish_to_all(db, {
+        "title": tpl_title.format(**fmt), "body": tpl_body.format(**fmt),
+        "url": utm_url(f"{base_url}/join/{city['slug']}", source="__PLATFORM__", campaign="recruit_page", content=city["slug"]),
+        "image_url": f"{base_url}/api/img/city/{city['slug']}.jpg", "hashtags": ["lumo", "hiring", city["city"].replace(" ", "")],
+        "source_type": "recruit_page", "source_id": city["slug"],
+    }, platforms=["facebook"])).get("facebook") or {}
+    if res.get("ok"):
+        await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"fb_page_shared_at": _now().isoformat()}})
+    return res
+
+
 async def run_batch(db, llm_key: str, get_fx, base_url: str, limit: Optional[int] = None) -> int:
     cfg = await get_cfg(db)
     fx = await get_fx()
@@ -370,7 +387,20 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
                 cities = await _due_cities(db, await get_cfg(db), count - len(posts))
                 posts += [p for p in await asyncio.gather(*(write(c) for c in cities)) if p]
             out = []
-            for p in posts[:count]:
+            if len(posts) < count:
+                # AI unavailable (e.g. budget exhausted) → template posts linking to city hiring pages.
+                for c in await _due_cities(db, await get_cfg(db), count - len(posts) + 5):
+                    if len(posts) >= count:
+                        break
+                    if not await db.recruit_cities.find_one({"slug": c["slug"], "fb_page_shared_at": {"$exists": False}}, {"_id": 1}):
+                        continue
+                    res = await share_city_template(db, c, base_url)
+                    out.append({"slug": c["slug"], "city_slug": c["slug"], "city": c["city"],
+                                "ok": bool(res.get("ok")), "error": res.get("error"), "kind": "template"})
+                    posts.append({"_template": True})
+                    await db.city_blog_config.update_one(job, {"$set": {"results": out}})
+                posts = [p for p in posts if not p.get("_template")]
+            for p in posts[:count - len(out)]:
                 res = (await share_post(db, p, base_url, ["facebook"])).get("facebook") or {}
                 if res.get("ok"):
                     await db.city_blog_posts.update_one({"id": p["id"]}, {"$set": {"fb_shared_at": _now().isoformat()}})

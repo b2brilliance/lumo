@@ -936,3 +936,7 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - backend/admin_identity.py, with env ADMIN_EMAILS and ADMIN_PHONES. A Google exchange with an allowlisted email creates or promotes the user to admin. SMS verify on the admin phone (+33615652014) logs into that admin account; real Twilio is required (no 123456 dev fallback for that number).
 - Protected routes redirect to /signin?next=<path>. SignIn shows "Admin sign in / Admin dashboard." when next=/admin.
 - Verified: unit-simulated Google exchange (admin email → admin token; another email → customer), the /admin redirect screenshot, and the SMS admin path through real Twilio.
+
+## 2026-06 — FB publish debugging (prod RCA)
+- Root cause: Meta returned "Can't load URL", so /api/social/facebook/callback was never hit and no Page token was saved; the Recruit tab then said "Connect Facebook first". This is a Meta app config fix on the user's side (App domains golumo.app, Website platform, Valid OAuth Redirect URI). A secondary problem: the EMERGENT_LLM_KEY budget was exhausted in prod.
+- Added: optional META_LOGIN_CONFIG_ID (Facebook Login for Business uses config_id instead of scope). The publish-facebook job falls back to template-copy posts linking to /join/{city} (tracked by recruit_cities.fb_page_shared_at, utm_campaign=recruit_page) when the AI can't write posts.
