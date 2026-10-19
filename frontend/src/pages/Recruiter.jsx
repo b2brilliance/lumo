@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import ReferralCard from "@/components/ReferralCard";
-import { RecruiterLeaderboard } from "@/components/recruiter/RecruiterLeaderboard";
+import { RecruiterLeaderboard, MyBadges } from "@/components/recruiter/RecruiterLeaderboard";
 import { RecruiterShareKit } from "@/components/recruiter/RecruiterShareKit";
 import { Users, Share2, TrendingUp, Gift } from "lucide-react";
 
@@ -71,6 +71,7 @@ export default function Recruiter() {
         {user ? (
           <>
             <ReferralCard />
+            <MyBadges />
             <RecruiterShareKit />
           </>
         ) : (

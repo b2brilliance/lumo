@@ -971,3 +971,7 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## 2026-06 — Recruiter credit for Google/SMS sign-ups
 - referrals.apply_signup_attribution(): sets referred_by_user_id/code, signup_source and recruit_city (falling back to landing_path /join/{slug}) on brand-new user docs. Used by /auth/google/exchange and /auth/sms/verify, which now accept ref_code, signup_source and recruit_city_slug. The frontend SignIn sends signupExtras() (stored ref code, UTM attribution, next's recruit_city_slug) and clears the ref after a new signup. Existing accounts are never re-attributed.
+
+## 2026-06 — Monthly recruiter badges
+- referrals.py: the _board() refactor plus award_month(), which lazily and idempotently awards gold/silver/bronze to the top 3 of each finished month when the leaderboard is viewed. Stored in db.recruiter_badges (unique month+rank; prize_amount=None reserved for future cash prizes), with a notification for each winner. The leaderboard rows include badges (all-time counts) + month_badge, and there's a hall_of_fame (last 9). GET /api/referrals/my-badges.
+- UI: BadgePill on leaderboard rows, a "Badge winners" strip, and a MyBadges card on /recruiter for logged-in users.

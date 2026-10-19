@@ -21,7 +21,7 @@ import os
 import secrets
 import string
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -225,6 +225,7 @@ async def credit_referrer(
 # per-job commission split above. Fires at most once per referred
 # provider — tracked by setting `milestone_10_awarded_at` on their user
 # record before crediting.
+BADGE_TIERS = ("gold", "silver", "bronze")
 PROVIDER_MILESTONE_JOBS = 10
 PROVIDER_MILESTONE_BONUS = 25.00
 
@@ -328,16 +329,16 @@ class ProgramUpdate(BaseModel):
 def create_router(*, db, get_current_user, require_admin=None):
     r = APIRouter(prefix="/referrals", tags=["referrals"])
 
-    @r.get("/leaderboard")
-    async def public_leaderboard(month: Optional[str] = None, limit: int = 20):
-        """Public monthly board: recruit jobs completed + new recruits this month. Names are masked."""
+    def _month_range(month: Optional[str]):
         now = datetime.now(timezone.utc)
         try:
             y, m = (int(x) for x in (month or now.strftime("%Y-%m")).split("-"))
             start = datetime(y, m, 1, tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(400, "month must be YYYY-MM")
-        end = datetime(y + (m == 12), m % 12 + 1, 1, tzinfo=timezone.utc)
+        return start, datetime(y + (m == 12), m % 12 + 1, 1, tzinfo=timezone.utc)
+
+    async def _board(start: datetime, end: datetime) -> list:
         rng = {"$gte": start.isoformat(), "$lt": end.isoformat()}
         jobs = {x["_id"]: x["n"] for x in await db.referral_earnings.aggregate([
             {"$match": {"created_at": rng}}, {"$group": {"_id": "$referrer_user_id", "n": {"$sum": 1}}}]).to_list(None)}
@@ -347,22 +348,82 @@ def create_router(*, db, get_current_user, require_admin=None):
         ids = list(set(jobs) | set(recs))
         users = {u["id"]: u async for u in db.users.find(
             {"id": {"$in": ids}, "is_demo": {"$ne": True}, "role": {"$ne": "admin"}},
-            {"_id": 0, "id": 1, "name": 1, "location": 1, "recruit_city_slug": 1})}
+            {"_id": 0, "id": 1, "name": 1, "location": 1})}
         rows = []
         for uid in ids:
             u = users.get(uid)
             if not u:
                 continue
             parts = (u.get("name") or "").split() or ["Lumo", "recruiter"]
-            shown = parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else "")
-            rows.append({"name": shown, "jobs": jobs.get(uid, 0), "recruits": recs.get(uid, 0),
-                         "city": ((u.get("location") or {}).get("city") if isinstance(u.get("location"), dict) else None),
+            rows.append({"name": parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else ""),
+                         "jobs": jobs.get(uid, 0), "recruits": recs.get(uid, 0),
+                         "city": (u.get("location") or {}).get("city") if isinstance(u.get("location"), dict) else None,
                          "_uid": uid})
         rows.sort(key=lambda x: (-x["jobs"], -x["recruits"]))
-        for i, row in enumerate(rows):
-            row["rank"] = i + 1
-        top = [{k: v for k, v in row.items() if k != "_uid"} for row in rows[:max(1, min(limit, 100))]]
-        return {"month": start.strftime("%Y-%m"), "rows": top, "total_recruiters": len(rows)}
+        for n, row in enumerate(rows):
+            row["rank"] = n + 1
+        return rows
+
+    async def award_month(month: str) -> int:
+        """Idempotently award gold/silver/bronze badges for a finished month."""
+        start, end = _month_range(month)
+        if end > datetime.now(timezone.utc) or await db.recruiter_badges.count_documents({"month": month}):
+            return 0
+        top = (await _board(start, end))[:3]
+        for row in top:
+            tier = BADGE_TIERS[row["rank"] - 1]
+            try:
+                await db.recruiter_badges.insert_one({
+                    "id": str(uuid.uuid4()), "user_id": row["_uid"], "month": month, "rank": row["rank"],
+                    "tier": tier, "jobs": row["jobs"], "recruits": row["recruits"], "prize_amount": None,
+                    "created_at": _now_iso()})
+            except Exception:  # noqa: BLE001 — unique (month, rank) already awarded
+                continue
+            await db.notifications.insert_one({
+                "id": str(uuid.uuid4()), "user_id": row["_uid"], "type": "recruiter_badge",
+                "title": f"You earned a {tier.title()} recruiter badge!",
+                "body": f"You finished #{row['rank']} on the {start.strftime('%B %Y')} recruiter leaderboard.",
+                "link": "/recruiter", "read": False, "created_at": _now_iso()})
+        return len(top)
+
+    async def _badge_counts(uids: list) -> dict:
+        out: dict = {}
+        async for b in db.recruiter_badges.find({"user_id": {"$in": uids}}, {"_id": 0, "user_id": 1, "tier": 1}):
+            out.setdefault(b["user_id"], {"gold": 0, "silver": 0, "bronze": 0})[b["tier"]] += 1
+        return out
+
+    @r.on_event("startup")
+    async def _badge_index():
+        await db.recruiter_badges.create_index([("month", 1), ("rank", 1)], unique=True)
+
+    @r.get("/leaderboard")
+    async def public_leaderboard(month: Optional[str] = None, limit: int = 20):
+        """Public monthly board: recruit jobs completed + new recruits this month. Names are masked."""
+        start, end = _month_range(month)
+        now = datetime.now(timezone.utc)
+        prev = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+        await award_month(prev)  # lazy month-end awarding
+        if end <= now:
+            await award_month(start.strftime("%Y-%m"))
+        rows = await _board(start, end)
+        top_rows = rows[:max(1, min(limit, 100))]
+        counts = await _badge_counts([x["_uid"] for x in top_rows])
+        month_badges = {b["user_id"]: b["tier"] async for b in db.recruiter_badges.find(
+            {"month": start.strftime("%Y-%m")}, {"_id": 0, "user_id": 1, "tier": 1})}
+        top = [{**{k: v for k, v in row.items() if k != "_uid"},
+                "badges": counts.get(row["_uid"], {"gold": 0, "silver": 0, "bronze": 0}),
+                "month_badge": month_badges.get(row["_uid"])} for row in top_rows]
+        hall = []
+        async for b in db.recruiter_badges.find({}, {"_id": 0}).sort([("month", -1), ("rank", 1)]).limit(9):
+            u = await db.users.find_one({"id": b["user_id"]}, {"_id": 0, "name": 1}) or {}
+            parts = (u.get("name") or "").split() or ["Lumo", "recruiter"]
+            hall.append({"month": b["month"], "rank": b["rank"], "tier": b["tier"],
+                         "name": parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else "")})
+        return {"month": start.strftime("%Y-%m"), "rows": top, "total_recruiters": len(rows), "hall_of_fame": hall}
+
+    @r.get("/my-badges")
+    async def my_badges(user: dict = Depends(get_current_user)):
+        return await db.recruiter_badges.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).sort("month", -1).to_list(100)
 
     @r.get("/share-kit")
     async def share_kit(city: Optional[str] = None, user: dict = Depends(get_current_user)):

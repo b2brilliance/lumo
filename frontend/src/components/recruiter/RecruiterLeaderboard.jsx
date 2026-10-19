@@ -10,6 +10,33 @@ const prevMonth = (m) => {
   return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, "0")}`;
 };
 const RANK_STYLE = ["bg-amber-400 text-black", "bg-slate-300 text-black", "bg-orange-300 text-black"];
+const TIER = {
+  gold: { cls: "bg-amber-400 text-black", label: "Gold" },
+  silver: { cls: "bg-slate-300 text-black", label: "Silver" },
+  bronze: { cls: "bg-orange-300 text-black", label: "Bronze" },
+};
+
+export const BadgePill = ({ tier, count, testid }) => (
+  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${TIER[tier].cls}`} data-testid={testid}>
+    <Medal className="w-3 h-3" />{TIER[tier].label}{count > 1 ? ` ×${count}` : ""}
+  </span>
+);
+
+const HallOfFame = ({ rows }) => {
+  if (!rows?.length) return null;
+  return (
+    <div className="p-4 border-t border-slate-200 bg-slate-50" data-testid="leaderboard-hall-of-fame">
+      <div className="overline mb-2">Badge winners</div>
+      <div className="flex flex-wrap gap-2">
+        {rows.map((h) => (
+          <span key={`${h.month}-${h.rank}`} className="inline-flex items-center gap-1.5 text-xs border border-slate-200 bg-white rounded-full pl-1 pr-3 py-0.5" data-testid={`hall-${h.month}-${h.rank}`}>
+            <BadgePill tier={h.tier} count={1} /> <span data-no-i18n="true">{h.name}</span> <span className="text-slate-400">{monthLabel(h.month)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const RecruiterLeaderboard = () => {
   const [data, setData] = useState(null);
@@ -45,8 +72,17 @@ export const RecruiterLeaderboard = () => {
               {r.rank <= 3 ? <Medal className="w-4 h-4" /> : r.rank}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="font-bold truncate" data-no-i18n="true">{r.name}</div>
-              {r.city && <div className="text-xs text-slate-500">{r.city}</div>}
+              <div className="font-bold truncate flex items-center gap-2" data-no-i18n="true">
+                {r.name}
+                {r.month_badge && <BadgePill tier={r.month_badge} count={1} testid={`leaderboard-month-badge-${r.rank}`} />}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                {r.city && <span className="text-xs text-slate-500 mr-1">{r.city}</span>}
+                {["gold", "silver", "bronze"].map((t) => [t, (r.badges?.[t] || 0) - (r.month_badge === t ? 1 : 0)])
+                  .filter(([, n]) => n > 0).map(([t, n]) => (
+                    <BadgePill key={t} tier={t} count={n} testid={`leaderboard-badges-${r.rank}-${t}`} />
+                  ))}
+              </div>
             </div>
             <div className="text-right">
               <div className="font-display text-xl font-black">{r.jobs.toLocaleString()}</div>
@@ -59,6 +95,30 @@ export const RecruiterLeaderboard = () => {
           </li>
         ))}
       </ol>
+      <p className="px-4 pb-3 text-[11px] text-slate-500">The top 3 each month earn a Gold, Silver or Bronze recruiter badge.</p>
+      <HallOfFame rows={data?.hall_of_fame} />
     </section>
+  );
+};
+
+export const MyBadges = () => {
+  const [badges, setBadges] = useState(null);
+  useEffect(() => { api.get("/referrals/my-badges").then((r) => setBadges(r.data)).catch(() => setBadges([])); }, []);
+  if (!badges) return null;
+  return (
+    <div className="mt-6 border border-slate-200 p-4" data-testid="my-recruiter-badges">
+      <div className="overline mb-2">My badges</div>
+      {badges.length === 0 ? (
+        <p className="text-sm text-slate-500" data-testid="my-badges-empty">Finish in the top 3 this month to earn your first badge.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {badges.map((b) => (
+            <span key={b.id} className="inline-flex items-center gap-1.5 text-xs" data-testid={`my-badge-${b.month}`}>
+              <BadgePill tier={b.tier} count={1} /> #{b.rank} · {monthLabel(b.month)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
