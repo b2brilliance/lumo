@@ -90,8 +90,14 @@ def create_router(*, db, require_admin: Callable) -> APIRouter:
             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
             "created_at_dt": datetime.now(timezone.utc),
         })
-        q = urlencode({"client_id": _env("META_APP_ID"), "redirect_uri": _env("META_REDIRECT_URI"),
-                       "state": state, "response_type": "code", "scope": SCOPES})
+        params = {"client_id": _env("META_APP_ID"), "redirect_uri": _env("META_REDIRECT_URI"),
+                  "state": state, "response_type": "code"}
+        # "Facebook Login for Business" apps use a configuration ID instead of scopes.
+        if _env("META_LOGIN_CONFIG_ID"):
+            params["config_id"] = _env("META_LOGIN_CONFIG_ID")
+        else:
+            params["scope"] = SCOPES
+        q = urlencode(params)
         return {"url": f"https://www.facebook.com/{_env('META_GRAPH_VERSION')}/dialog/oauth?{q}"}
 
     @r.get("/social/facebook/callback")
