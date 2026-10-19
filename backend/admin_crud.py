@@ -84,6 +84,12 @@ CONTENT_TYPES = {
                    "employment_type": "select:on_demand|temp|employee|w2|remote", "is_remote": "bool",
                    "apply_url": "text", "status": "select:open|accepted|in_progress|completed|cancelled"},
     },
+    "business_lead": {
+        "collection": "business_leads", "title_field": "business_name", "label": "Business lead",
+        "fields": {"business_name": "text", "category": "text", "contact_name": "text", "phone": "text", "email": "text",
+                   "city": "text", "city_slug": "text", "utm_campaign": "text",
+                   "status": "select:new|contacted|signed_up|lost"},
+    },
     "shop_product": {
         "collection": "shop_products", "title_field": "title", "label": "Shop product",
         "fields": {"title": "text", "description": "textarea", "image_url": "text", "price": "number",

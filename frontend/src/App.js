@@ -37,6 +37,7 @@ import StoreProfile from "@/pages/StoreProfile";
 import Marketplace from "@/pages/Marketplace";
 import Shop from "@/pages/Shop";
 import CityRecruit from "@/pages/CityRecruit";
+import BusinessLanding from "@/pages/BusinessLanding";
 import CityRecruitIndex from "@/pages/CityRecruitIndex";
 import Reset from "@/pages/Reset";
 import MapPage from "@/pages/MapPage";
@@ -208,6 +209,7 @@ function App() {
             <Route path="/join/continent/:continent" element={<CityRecruitIndex />} />
             <Route path="/join/country/:cc" element={<JoinCountry />} />
             <Route path="/join/:slug" element={<CityRecruit />} />
+            <Route path="/business/:slug" element={<BusinessLanding />} />
             <Route path="/join/:slug/blog" element={<CityBlogList />} />
             <Route path="/join/:slug/blog/:postSlug" element={<CityBlogPost />} />
             <Route path="/reset" element={<Reset />} />

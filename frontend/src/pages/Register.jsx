@@ -68,7 +68,8 @@ export default function Register() {
   const [step, setStep] = useState(presetRole ? 2 : 1); // 1 role, 2 basics, 3 details
   const [form, setForm] = useState({
     role: presetRole || "customer",
-    name: "", email: "", password: "", phone: "",
+    name: searchParams.get("name") || "", email: searchParams.get("email") || "", password: "",
+    phone: searchParams.get("phone") || "",
     avatar_url: null,
     employment_types: [],
     primary_category: "",  // dropdown-selected primary job type (drives qual UI)
