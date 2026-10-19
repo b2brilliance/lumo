@@ -10,7 +10,7 @@ import re
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("lumo.city_ads")
@@ -406,12 +406,16 @@ def create_router(*, db, require_admin, base_url: str) -> APIRouter:
                 "businesses_joined": await db.business_leads.count_documents({"city_slug": slug})}
 
     @r.post("/business/leads")
-    async def create_lead(body: LeadIn):
+    async def create_lead(body: LeadIn, request: Request):
+        from rate_limit import throttle
+        throttle(request, key="business.lead", limit=5, window_sec=3600)
+        if body.category not in CATEGORIES:
+            raise HTTPException(422, "Pick a service category")
         if not (body.phone.strip() or body.email.strip()):
             raise HTTPException(422, "Add a phone number or email")
         if body.email and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", body.email.strip()):
             raise HTTPException(422, "Invalid email")
-        city = await db.recruit_cities.find_one({"slug": body.city_slug}, {"_id": 0, "city": 1})
+        city = await db.recruit_cities.find_one({"slug": body.city_slug, "is_active": {"$ne": False}}, {"_id": 0, "city": 1})
         if not city:
             raise HTTPException(404, "City not found")
         doc = {"id": str(uuid.uuid4()), **{k: v.strip() for k, v in body.model_dump().items()},

@@ -1,0 +1,33 @@
+{
+  "summary": "Tested the per-city business landing (/business/{slug}), the lead capture API, admin visibility of leads, city-ads status, and the build_posts unit. Backend: 17/17 pytest pass. A sweep of all 81 campaign slugs (27 top + 54 wave2) found the business city API and the hero/job images resolving for every one. Frontend: Riyadh page renders the hero image, the Arabic RTL line (dir=rtl), the headline 'Get more local customers in Riyadh.', 4 benefit cards and the form. Client-side errors work (missing category, then missing phone/email). Submitting saves the lead with UTMs and navigates to /register?role=provider&recruit_city_slug=riyadh-sa&name&email&phone, and the register name/email/phone fields are prefilled. Not-found state works; London has no local line; Tokyo on mobile shows no horizontal overflow. POST /api/admin/city-ads/run was NOT called. All TEST_ business_leads deleted.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/business/leads", "issue": "Public, unauthenticated insert with no rate limit or captcha, so it can be spammed and inflate the public 'businesses_joined' counter."},
+      {"endpoint": "POST /api/business/leads", "issue": "category is not validated against CATEGORIES (any string up to 60 chars is accepted). The city lookup ignores is_active, while GET /business/cities/{slug} does filter on it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/register?role=provider (after lead submit)", "issues": ["The prefilled register form sits ~1339px down the page (top of [data-testid=register-name]) under the 'Product tour' video block. A business owner arriving from the lead form sees a video, not the form they were just sent to. Consider scrolling to the form or hiding the tour when recruit_city_slug/name is present."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter72_business_landing.py", "/app/backend/tests/check_iter72_all_cities.py", "/app/test_reports/pytest/pytest_iter72.xml"],
+  "action_items": [
+    "(Optional) Add rate limiting or a honeypot to POST /api/business/leads",
+    "(Optional) Validate category against CATEGORIES; filter is_active in the lead city lookup",
+    "(Optional) On /register, scroll to or show the form first when arriving from /business/{slug}"
+  ],
+  "critical_code_review_comments": [
+    "businesses_joined counts every raw lead (including spam or duplicates). Consider deduping by email/phone per city.",
+    "No duplicate-lead guard: the same business can be submitted many times."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter72_business_landing.py", "/app/backend/tests/check_iter72_all_cities.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persisted. Created TEST_ business_leads (API + UI) and deleted them; business_leads collection count is 0.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Business landing at /business/:slug is backed by city_ads.py (GET /api/business/cities/{slug}, POST /api/business/leads). Admin leads: GET /api/admin/content?type=business_lead. Never call POST /api/admin/city-ads/run (it posts to Facebook). Admin: julius.a.mason@gmail.com / Mason0123. Teardown in the test file deletes business_leads with business_name ^TEST_."
+}

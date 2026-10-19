@@ -79,6 +79,11 @@ export default function Register() {
     qualifications: {},    // { <category_key>: { answers: {}, documents: {} } }
   });
   const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!searchParams.get("name")) return undefined;
+    const t = setTimeout(() => document.querySelector('[data-testid="register-name"]')?.scrollIntoView({ behavior: "smooth", block: "center" }), 600);
+    return () => clearTimeout(t);
+  }, [searchParams]);
   const [busy, setBusy] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));

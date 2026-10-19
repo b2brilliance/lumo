@@ -982,3 +982,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Local-language lead line (hand-written, no LLM) + English body, 9-10 hashtags, UTM campaign city_ads_jobs / city_ads_business
 - Auto-runs once on startup where FB is connected (production), 25s gap between posts, idempotent via `city_ad_posts`
 - Admin: GET /api/admin/city-ads/status, POST /api/admin/city-ads/run
+
+## 2026-06 Wave 2 (54 more metros) + Business Owner Landing
+- city_ads.py: WAVE2 (54 cities, 108 posts, local AI photos), CAMPAIGNS run sequentially on production startup (top27_v1 then wave2_v1), then relinks already-published top-27 business posts to /business/{slug} via Graph API edit
+- Business posts now link to /business/{slug}; jobseeker posts to /register?role=provider
+- New page /business/:slug (BusinessLanding.jsx): city shop photo hero, local-language line (RTL aware), benefits, lead form -> POST /api/business/leads (rate-limited 5/hr/IP, category validated) -> /register prefilled (name/email/phone) with auto-scroll to form
+- Leads in Admin omni-CRUD as content type `business_lead` (collection business_leads)
+- Backlog: recruiter cash prizes, campaign results board (signups per city/post), vertical landing pages (CDL, notary, cinematic)
