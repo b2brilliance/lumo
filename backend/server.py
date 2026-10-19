@@ -7748,6 +7748,10 @@ start_blog_loop(app, db)
 from city_blog import create_router as _create_city_blog_router  # noqa: E402
 app.include_router(_create_city_blog_router(db=db, require_admin=_require_admin(), llm_key=EMERGENT_LLM_KEY,
                                             get_fx=_fetch_fx_rates, base_url=os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")))
+from city_ads import create_router as _create_city_ads_router  # noqa: E402
+app.include_router(_create_city_ads_router(db=db, require_admin=_require_admin(),
+                                           base_url=os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")))
+
 start_email_loop(app, db)
 
 

@@ -975,3 +975,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 ## 2026-06 — Monthly recruiter badges
 - referrals.py: the _board() refactor plus award_month(), which lazily and idempotently awards gold/silver/bronze to the top 3 of each finished month when the leaderboard is viewed. Stored in db.recruiter_badges (unique month+rank; prize_amount=None reserved for future cash prizes), with a notification for each winner. The leaderboard rows include badges (all-time counts) + month_badge, and there's a hall_of_fame (last 9). GET /api/referrals/my-badges.
 - UI: BadgePill on leaderboard rows, a "Badge winners" strip, and a MyBadges card on /recruiter for logged-in users.
+
+## 2026-06 Top-27 Metro FB Campaign (city_ads.py)
+- 27 biggest job-market metros x 2 organic FB Page posts (jobseeker + small-business owner) = 54 posts
+- Custom AI-generated local service photos per city/post (hosted on static.prod-images CDN, hardcoded in city_ads.py)
+- Local-language lead line (hand-written, no LLM) + English body, 9-10 hashtags, UTM campaign city_ads_jobs / city_ads_business
+- Auto-runs once on startup where FB is connected (production), 25s gap between posts, idempotent via `city_ad_posts`
+- Admin: GET /api/admin/city-ads/status, POST /api/admin/city-ads/run
