@@ -17,6 +17,7 @@ wallet fallback).
 """
 from __future__ import annotations
 
+import os
 import secrets
 import string
 import uuid
@@ -304,6 +305,69 @@ class ProgramUpdate(BaseModel):
 # ── Router ─────────────────────────────────────────────────────────────
 def create_router(*, db, get_current_user, require_admin=None):
     r = APIRouter(prefix="/referrals", tags=["referrals"])
+
+    @r.get("/leaderboard")
+    async def public_leaderboard(month: Optional[str] = None, limit: int = 20):
+        """Public monthly board: recruit jobs completed + new recruits this month. Names are masked."""
+        now = datetime.now(timezone.utc)
+        try:
+            y, m = (int(x) for x in (month or now.strftime("%Y-%m")).split("-"))
+            start = datetime(y, m, 1, tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(400, "month must be YYYY-MM")
+        end = datetime(y + (m == 12), m % 12 + 1, 1, tzinfo=timezone.utc)
+        rng = {"$gte": start.isoformat(), "$lt": end.isoformat()}
+        jobs = {x["_id"]: x["n"] for x in await db.referral_earnings.aggregate([
+            {"$match": {"created_at": rng}}, {"$group": {"_id": "$referrer_user_id", "n": {"$sum": 1}}}]).to_list(None)}
+        recs = {x["_id"]: x["n"] for x in await db.users.aggregate([
+            {"$match": {"referred_by_user_id": {"$exists": True, "$ne": None}, "created_at": rng, "is_demo": {"$ne": True}}},
+            {"$group": {"_id": "$referred_by_user_id", "n": {"$sum": 1}}}]).to_list(None)}
+        ids = list(set(jobs) | set(recs))
+        users = {u["id"]: u async for u in db.users.find(
+            {"id": {"$in": ids}, "is_demo": {"$ne": True}, "role": {"$ne": "admin"}},
+            {"_id": 0, "id": 1, "name": 1, "location": 1, "recruit_city_slug": 1})}
+        rows = []
+        for uid in ids:
+            u = users.get(uid)
+            if not u:
+                continue
+            parts = (u.get("name") or "Lumo recruiter").split()
+            shown = parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else "")
+            rows.append({"name": shown, "jobs": jobs.get(uid, 0), "recruits": recs.get(uid, 0),
+                         "city": ((u.get("location") or {}).get("city") if isinstance(u.get("location"), dict) else None),
+                         "_uid": uid})
+        rows.sort(key=lambda x: (-x["jobs"], -x["recruits"]))
+        for i, row in enumerate(rows):
+            row["rank"] = i + 1
+        top = [{k: v for k, v in row.items() if k != "_uid"} for row in rows[:max(1, min(limit, 100))]]
+        return {"month": start.strftime("%Y-%m"), "rows": top, "total_recruiters": len(rows)}
+
+    @r.get("/share-kit")
+    async def share_kit(city: Optional[str] = None, user: dict = Depends(get_current_user)):
+        code = await ensure_referral_code(db, user["id"])
+        slug = city or user.get("recruit_city_slug")
+        c = await db.recruit_cities.find_one({"slug": slug, "is_active": True}, {"_id": 0}) if slug else None
+        if not c:
+            c = await db.recruit_cities.find_one({"is_active": True}, {"_id": 0}, sort=[("population", -1)])
+        origin = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+        url = f"{origin}/join/{c['slug']}?ref={code}"
+        name, bonus = c["city"], float(c.get("bonus_amount") or 100)
+        posts = [
+            {"key": "facebook", "label": "Facebook / LinkedIn",
+             "text": (f"Looking for work in {name}? Lumo is signing up delivery drivers and local pros right now. "
+                      f"Pick the jobs you want, keep 90% of every job, get paid the same day, and earn a ${bonus:.0f} "
+                      f"loyalty bonus after your 100th job. Sign up with my link: {url}")},
+            {"key": "whatsapp", "label": "WhatsApp / text",
+             "text": f"Hey! Lumo is hiring drivers & helpers in {name}. Same-day pay, keep 90%. Join with my link: {url}"},
+            {"key": "x", "label": "X / Threads",
+             "text": f"Need extra income in {name}? Deliveries + local jobs on @golumo. Keep 90%, paid same day. {url}"},
+            {"key": "instagram", "label": "Instagram caption",
+             "text": (f"Your skills are worth more than you're being paid. 💪 Lumo is hiring in {name}: delivery, "
+                      f"moving, cleaning, handyman and more. Keep 90%, same-day pay. Link in bio or DM me for my invite "
+                      f"code: {code}\n\n#{name.replace(' ', '')} #hiring #sidehustle #lumo")},
+        ]
+        return {"code": code, "city": {"slug": c["slug"], "name": name, "country": c.get("country_name")},
+                "share_url": url, "photo_url": f"{origin}/api/img/city/{c['slug']}.jpg", "posts": posts}
 
     @r.get("/program")
     async def program():

@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import ReferralCard from "@/components/ReferralCard";
+import { RecruiterLeaderboard } from "@/components/recruiter/RecruiterLeaderboard";
+import { RecruiterShareKit } from "@/components/recruiter/RecruiterShareKit";
 import { Users, Share2, TrendingUp, Gift } from "lucide-react";
 
 const STEPS = [
@@ -67,7 +69,10 @@ export default function Recruiter() {
 
       <section className="mt-12">
         {user ? (
-          <ReferralCard />
+          <>
+            <ReferralCard />
+            <RecruiterShareKit />
+          </>
         ) : (
           <div className="border border-slate-900 p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="font-display text-2xl font-bold">Get your recruit link</div>
@@ -75,6 +80,8 @@ export default function Recruiter() {
           </div>
         )}
       </section>
+
+      <RecruiterLeaderboard />
     </div>
   );
 }
