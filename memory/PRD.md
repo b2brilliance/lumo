@@ -956,3 +956,5 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## 2026-06 — Job types in every recruiting post
 - city_blog.py: DELIVERY_JOB + 12 EXTRA_JOBS; pick_jobs() = delivery + 2 random others per post; jobs_block() is a bulleted "Jobs you can start picking up in {city}" list. Used in FB rollout template posts and recruit broadcasts (which now also link straight to /register?role=provider). The city blog AI prompt (COPY_VERSION=3) must describe each of the 3 job types.
+- Local job mix: city_blog.local_jobs() = Delivery + the top-2 job types from real (non-demo) jobs in the last 180 days within 50 km (bounding box on pickup_location), mapped via CATEGORY_TO_JOB, with a random fill. Used by the FB rollout, broadcasts and the city blog AI.
+- Refresh old posts: city_photos.refresh_old_format_posts deletes Lumo Page posts missing "Jobs you can start picking up" and re-queues their cities. Runs automatically ~10 min after startup until db.city_blog_config refresh_v3.deleted exists; also POST /api/admin/fb-page/refresh-old?dry_run= and the "Replace old-format posts" button.

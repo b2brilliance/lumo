@@ -70,6 +70,37 @@ def pick_jobs(n_extra: int = 2) -> List[tuple]:
     return [DELIVERY_JOB, *random.sample(EXTRA_JOBS, n_extra)]
 
 
+CATEGORY_TO_JOB = {
+    "cleaning": "Home cleaning", "handyman": "Handyman repairs", "pet_care": "Pet care", "moving": "Moving help",
+    "landscaping": "Yard work", "digital_tech": "Tech help", "auto": "Roadside assistance", "towing": "Roadside assistance",
+    "roadside": "Roadside assistance", "errand": "Errands", "errands": "Errands", "laundry": "Laundry pickup",
+    "assembly": "Furniture assembly", "rides": "Rides", "driver": "Rides", "detailing": "Mobile car detailing",
+}
+EXTRA_BY_NAME = dict(EXTRA_JOBS)
+
+
+async def local_jobs(db, city: Dict[str, Any], km: float = 50) -> List[tuple]:
+    """Delivery + the 2 job types customers book most near this city (random fill when there's no data)."""
+    import math
+    lat, lng = city.get("lat"), city.get("lng")
+    ranked: List[str] = []
+    if lat is not None and lng is not None:
+        since = (_now() - timedelta(days=180)).isoformat()
+        dlat, dlng = km / 111, km / (111 * max(0.2, math.cos(math.radians(lat))))
+        counts: Dict[str, int] = {}
+        async for j in db.jobs.find({
+            "is_demo": {"$ne": True}, "created_at": {"$gte": since},
+            "pickup_location.lat": {"$gte": lat - dlat, "$lte": lat + dlat},
+            "pickup_location.lng": {"$gte": lng - dlng, "$lte": lng + dlng},
+        }, {"_id": 0, "category": 1}):
+            name = CATEGORY_TO_JOB.get((j.get("category") or "").lower())
+            if name:
+                counts[name] = counts.get(name, 0) + 1
+        ranked = [n for n, _ in sorted(counts.items(), key=lambda kv: -kv[1])][:2]
+    rest = [j for j in EXTRA_JOBS if j[0] not in ranked]
+    return [DELIVERY_JOB, *[(n, EXTRA_BY_NAME[n]) for n in ranked], *random.sample(rest, 2 - len(ranked))]
+
+
 def jobs_block(city: str, jobs: List[tuple]) -> str:
     lines = "\n".join(f"• {name}: {desc}" for name, desc in jobs)
     return f"Jobs you can start picking up in {city}:\n{lines}"
@@ -160,7 +191,7 @@ def _page_lang(city: Dict[str, Any]) -> str:
 
 
 async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx: Dict[str, float],
-                 nearby: List[str]) -> Dict[str, Any]:
+                 nearby: List[str], jobs: List[tuple]) -> Dict[str, Any]:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     first_n = int(city.get("bonus_first_n") or 100)
     facts = {
@@ -169,7 +200,7 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx
         "bonus_after_jobs": int(city.get("bonus_job_count") or 100), "bonus_spots_left": max(0, first_n - signups),
         "workers_wanted": int(city.get("goal_workers") or 300), "signed_up_so_far": signups,
         "date": _now().strftime("%B %d, %Y"), "angle": random.choice(ANGLES),
-        "job_types": [f"{n}: {d}" for n, d in pick_jobs()],
+        "job_types": [f"{n}: {d}" for n, d in jobs],
         "region": city.get("state_full") if (city.get("country") or "US") == "US" else city.get("country_name"),
         "local_city_name": city.get("local_name") or city["city"],
         "neighborhoods": (city.get("neighborhoods") or [])[:5],
@@ -216,7 +247,7 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool,
     lang = _page_lang(city)
     signups = await _signups(db, city["slug"])
     nearby = await _nearby(db, city)
-    out = await _write(city, lang, signups, llm_key, fx, nearby)
+    out = await _write(city, lang, signups, llm_key, fx, nearby, await local_jobs(db, city))
     post = {
         "id": str(uuid.uuid4()), "slug": slug, "city_slug": city["slug"], "city": city["city"],
         "country": city.get("country") or "US", "country_name": city.get("country_name"), "lang": lang,
@@ -258,7 +289,7 @@ async def share_city_template(db, city: Dict[str, Any], base_url: str) -> Dict[s
     tpl_title, tpl_body = random.choice(RECRUIT_COPY_TEMPLATES)
     fmt = {"city": city["city"], "goal": city.get("goal_workers") or 300, "first_n": city.get("bonus_first_n") or 100,
            "jobs": city.get("bonus_job_count") or 100, "bonus": float(city.get("bonus_amount") or 100)}
-    body = (f"{tpl_body.format(**fmt)}\n\n{jobs_block(city['city'], pick_jobs())}\n\n"
+    body = (f"{tpl_body.format(**fmt)}\n\n{jobs_block(city['city'], await local_jobs(db, city))}\n\n"
             "Pick only the jobs you want, work when it suits you, and get paid the same day.\n"
             "Sign up as a Lumo contractor here:")
     res = (await publish_to_all(db, {
@@ -470,6 +501,35 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
         t.add_done_callback(_TASKS.discard)
         return {"ok": True}
 
+    @r.post("/admin/fb-page/refresh-old")
+    async def refresh_old(dry_run: bool = Query(True), _a: dict = Depends(require_admin)):
+        from city_photos import refresh_old_format_posts
+        try:
+            res = await refresh_old_format_posts(db, dry_run=dry_run)
+        except RuntimeError as e:
+            raise HTTPException(502, f"Facebook: {e}")
+        if not dry_run and "skipped" not in res:
+            await db.city_blog_config.update_one({"id": "refresh_v3"}, {"$set": {**res, "at": _now().isoformat()}}, upsert=True)
+        return res
+
+    @r.on_event("startup")
+    async def _auto_refresh_old():
+        # One-time: replace pre-job-types posts. Waits for the photo job so the two don't overlap.
+        if await db.city_blog_config.find_one({"id": "refresh_v3", "deleted": {"$exists": True}}, {"_id": 1}):
+            return
+        async def later():
+            from city_photos import refresh_old_format_posts
+            await asyncio.sleep(600)
+            try:
+                res = await refresh_old_format_posts(db)
+                if "skipped" not in res:
+                    await db.city_blog_config.update_one({"id": "refresh_v3"}, {"$set": {**res, "at": _now().isoformat()}}, upsert=True)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[photos] auto refresh-old failed: {e}")
+        t = asyncio.create_task(later())
+        _TASKS.add(t)
+        t.add_done_callback(_TASKS.discard)
+
     @r.post("/admin/fb-page/clean-duplicates")
     async def clean_dupes(dry_run: bool = Query(True), _a: dict = Depends(require_admin)):
         from city_photos import clean_page_duplicates
@@ -483,6 +543,7 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
         from city_photos import bad_cities
         doc = await db.city_blog_config.find_one({"id": "photo_job"}, {"_id": 0}) or {"state": "idle"}
         doc["bad_now"] = len(await bad_cities(db))
+        doc["refresh_v3"] = await db.city_blog_config.find_one({"id": "refresh_v3"}, {"_id": 0, "id": 0})
         return doc
 
     @r.get("/img/city/{slug}.jpg")

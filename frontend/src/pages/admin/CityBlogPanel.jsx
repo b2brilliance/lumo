@@ -19,6 +19,14 @@ export default function CityBlogPanel() {
     const t = setInterval(loadPhoto, 5000);
     return () => clearInterval(t);
   }, [photo?.state]);
+  const refreshOld = async () => {
+    if (!window.confirm("Delete Lumo's older Facebook posts (without the job list) and re-post those cities?")) return;
+    try {
+      const { data } = await api.post("/admin/fb-page/refresh-old?dry_run=false");
+      toast.success(data.skipped ? data.skipped : `Deleted ${data.deleted} old posts · ${data.requeued} cities re-queued`);
+      loadPhoto();
+    } catch (e) { toast.error(formatApiError(e)); }
+  };
   const fixPhotos = async () => {
     try { await api.post("/admin/city-photos/fix"); setPhoto((p) => ({ ...p, state: "running" })); toast.success("Finding real photos for each city…"); }
     catch (e) { toast.error(formatApiError(e)); }
@@ -104,12 +112,18 @@ export default function CityBlogPanel() {
                 : `${photo.bad_now} cities still share a photo`}
               {photo.refresh && ` · last run fixed ${photo.refresh.fixed}`}
               {photo.redo && ` · ${photo.redo.fb_deleted} old FB posts deleted, ${photo.redo.cities_requeued} cities re-queued`}
+              {photo.refresh_v3 && ` · Old-format posts: ${photo.refresh_v3.deleted} deleted, ${photo.refresh_v3.requeued} re-queued`}
               {photo.page && photo.page.page_posts != null && ` · Page scan: ${photo.page.duplicates} duplicate-photo posts found, ${photo.page.deleted} deleted`}
             </div>
           </div>
+          <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={refreshOld} data-testid="admin-fb-refresh-old">
+            Replace old-format posts
+          </Button>
           <Button size="sm" variant="outline" onClick={fixPhotos} disabled={["running", "reposting"].includes(photo.state)} data-testid="admin-city-photos-fix">
             Fix duplicate photos
           </Button>
+          </div>
         </div>
       )}
       {roll && (

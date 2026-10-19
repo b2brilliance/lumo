@@ -194,7 +194,8 @@ def _ahash(data: bytes) -> Optional[int]:
     return sum(1 << i for i, p in enumerate(px) if p > avg)
 
 
-async def _page_items(client: httpx.AsyncClient, ver: str, page_id: str, token: str) -> List[Dict[str, Any]]:
+async def _page_items(client: httpx.AsyncClient, ver: str, page_id: str, token: str,
+                      include_text_only: bool = False) -> List[Dict[str, Any]]:
     """Every Lumo-made post on the Page with its picture URL (photo posts + link posts)."""
     items: List[Dict[str, Any]] = []
     url = f"https://graph.facebook.com/{ver}/{page_id}/published_posts"
@@ -206,8 +207,8 @@ async def _page_items(client: httpx.AsyncClient, ver: str, page_id: str, token: 
             raise RuntimeError(d["error"].get("message"))
         for p in d.get("data", []):
             msg = p.get("message") or ""
-            if "golumo.app" in msg and p.get("full_picture"):
-                items.append({"id": p["id"], "picture": p["full_picture"], "created": p.get("created_time"),
+            if "golumo.app" in msg and (p.get("full_picture") or include_text_only):
+                items.append({"id": p["id"], "picture": p["full_picture"], "created": p.get("created_time"), "message": msg,
                               "slug": (SLUG_RX.search(msg) or [None, None])[1]})
         nxt = (d.get("paging") or {}).get("next")
         if not nxt:
@@ -255,3 +256,36 @@ async def clean_page_duplicates(db, dry_run: bool = False) -> Dict[str, Any]:
     logger.info(f"[photos] page scan: {len(items)} Lumo posts, {len(dupes)} duplicates, deleted {deleted}, failed {failed}")
     return {"page_posts": len(items), "duplicates": len(dupes), "groups": sum(1 for g in groups if len(g) > 1),
             "deleted": deleted, "failed": failed, "requeued": len(slugs), "dry_run": dry_run}
+
+
+NEW_FORMAT_MARK = "Jobs you can start picking up"
+
+
+async def refresh_old_format_posts(db, dry_run: bool = False) -> Dict[str, Any]:
+    """Delete Lumo posts that predate the job-types format and re-queue their cities."""
+    fb = await db.social_channels.find_one({"platform": "facebook"}, {"_id": 0}) or {}
+    token, page_id = fb.get("access_token"), fb.get("page_id")
+    if not (fb.get("enabled") and token and page_id):
+        return {"skipped": "facebook not connected"}
+    ver = os.environ["META_GRAPH_VERSION"]
+    deleted, failed, slugs = 0, 0, set()
+    async with httpx.AsyncClient(timeout=30) as client:
+        items = await _page_items(client, ver, page_id, token, include_text_only=True)
+        old = [i for i in items if NEW_FORMAT_MARK not in i["message"]]
+        if not dry_run:
+            for it in old:
+                r = await client.delete(f"https://graph.facebook.com/{ver}/{it['id']}", params={"access_token": token})
+                if r.status_code < 300 or "does not exist" in r.text:
+                    deleted += 1
+                    if it["slug"]:
+                        slugs.add(it["slug"])
+                else:
+                    failed += 1
+                    logger.warning(f"[photos] old-format delete {it['id']} failed: {r.text[:160]}")
+    if slugs:
+        await db.recruit_cities.update_many({"slug": {"$in": list(slugs)}}, {
+            "$unset": {"fb_page_shared_at": "", "fb_rollout_attempts": "", "fb_rollout_error": ""}})
+        await db.city_blog_posts.update_many({"city_slug": {"$in": list(slugs)}}, {"$unset": {"fb_shared_at": ""}})
+    logger.info(f"[photos] old-format: {len(old)} of {len(items)} Lumo posts, deleted {deleted}, failed {failed}")
+    return {"page_posts": len(items), "old_format": len(old), "deleted": deleted, "failed": failed,
+            "requeued": len(slugs), "dry_run": dry_run}

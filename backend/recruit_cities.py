@@ -684,10 +684,10 @@ async def broadcast_recruit_post(db, publish_fn, *, base_url: str = "") -> Dict[
                 "core_message": "finding work is hard; their skills are worth real money; earn what their labor is actually worth",
             },
         )
-        from city_blog import jobs_block as _jobs_block, pick_jobs as _pick_jobs, signup_url as _signup_url
+        from city_blog import jobs_block as _jobs_block, local_jobs as _local_jobs, signup_url as _signup_url
         content = {
             "title": rewritten.get("title") or base_title,
-            "body": f"{rewritten.get('body') or base_body}\n\n{_jobs_block(city['city'], _pick_jobs())}",
+            "body": f"{rewritten.get('body') or base_body}\n\n{_jobs_block(city['city'], await _local_jobs(db, city))}",
             "url": _signup_url(base_url.rstrip('/'), city["slug"], campaign="recruit_broadcast", content=city["slug"]),
             "image_url": f"{base_url.rstrip('/')}/api/img/city/{city['slug']}.jpg" if base_url else city.get("hero_image"),
             "hashtags": ["lumo", "gigwork", city["city"].replace(" ", "")],
