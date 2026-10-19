@@ -7,8 +7,8 @@ crons:
     method: POST
     enabled: true
   - name: fb-city-rollout
-    description: "Posts one city recruiting post to the Facebook Page every 20 minutes (daily cap 60) until every city has one"
-    cron: "*/20 * * * *"
+    description: "Every 10 minutes posts the next Facebook post: a recruiter post for a city already posted, else the next city agent post (60 agent + 60 recruiter per day)"
+    cron: "*/10 * * * *"
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     endpoint: "{{BASE_URL}}/api/cron/fb-city-rollout"
     method: POST

@@ -132,6 +132,7 @@ export default function CityBlogPanel() {
             <div className="font-semibold flex items-center gap-2"><Facebook className="w-4 h-4 text-[#1877F2]" /> Every-city Facebook rollout</div>
             <div className="text-xs text-slate-500 mt-1" data-testid="admin-fb-rollout-progress">
               {roll.shared} of {roll.total} cities posted · {roll.today}/{roll.daily_cap} today
+              {" · "}{roll.recruiter_shared} recruiter posts ({roll.recruiter_today} today)
               {roll.failed ? ` · ${roll.failed} failed` : ""}{!roll.connected && " · Facebook not connected"}
             </div>
             <div className="h-1.5 bg-slate-100 mt-2"><div className="h-full bg-[#1877F2]" style={{ width: `${roll.total ? (roll.shared / roll.total) * 100 : 0}%` }} /></div>

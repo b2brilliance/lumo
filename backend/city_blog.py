@@ -307,6 +307,69 @@ async def share_city_template(db, city: Dict[str, Any], base_url: str) -> Dict[s
     return res
 
 
+AVG_JOB_USD = 25.0
+RECRUITER_HOOKS = [
+    "Know people in {city} who need work? Get paid for every job they do.",
+    "Build a crew in {city} and earn on every job they complete.",
+    "Turn your network in {city} into income that grows every day.",
+    "Become a Lumo recruiter in {city}. No selling, no fees, just your link.",
+]
+
+
+def recruiter_math(cfg: Dict[str, Any], agents: int, jobs_per_day: int, days: int) -> Dict[str, float]:
+    """Daily recruiter commission after `days`, from `agents` each doing `jobs_per_day` jobs at AVG_JOB_USD."""
+    from referrals import rate_for
+    daily_jobs = agents * jobs_per_day
+    rate = rate_for(daily_jobs * days, cfg)
+    return {"daily_jobs": daily_jobs, "rate_pct": rate, "per_day": daily_jobs * AVG_JOB_USD * rate / 100}
+
+
+def recruiter_copy(city: str, cfg: Dict[str, Any]) -> Dict[str, str]:
+    from referrals import PROVIDER_MILESTONE_BONUS as BONUS, PROVIDER_MILESTONE_JOBS as GOAL
+    step, base, cap = cfg["step_jobs"], cfg["base_pct"], cfg["max_pct"]
+    s10, s10m = recruiter_math(cfg, 10, 10, 0), recruiter_math(cfg, 10, 10, 365)
+    s100, s100m, s100x = recruiter_math(cfg, 100, 10, 0), recruiter_math(cfg, 100, 10, 30), recruiter_math(cfg, 100, 10, 365)
+    days_to_cap = int(((cap - base) / cfg["step_pct"]) * step / s100["daily_jobs"]) + 1
+    body = (
+        "Lumo pays recruiters a share of every job the people they bring in complete, for as long as they keep working.\n\n"
+        "How the pay scale works:\n"
+        f"• You start at {base:.2f}% of every job your recruits complete\n"
+        f"• Your rate goes up +{cfg['step_pct']:.2f}% for every {step:,} jobs your recruits finish, up to {cap:.2f}%\n"
+        f"• Plus a ${BONUS:.0f} bonus each time a recruit completes their {GOAL}th job\n"
+        "• Earnings land in your Lumo wallet automatically\n\n"
+        f"What that can look like (average job ${AVG_JOB_USD:.0f}, each agent doing 10 jobs a day):\n"
+        f"• Recruit 10 agents → {s10['daily_jobs']:,} jobs a day → about ${s10['per_day']:.2f}/day to start, "
+        f"rising to about ${s10m['per_day']:.2f}/day after a year ({s10m['rate_pct']:.2f}%), plus ${10 * BONUS:,.0f} in bonuses\n"
+        f"• Recruit 100 agents → {s100['daily_jobs']:,} jobs a day → about ${s100['per_day']:.2f}/day on day one, "
+        f"about ${s100m['per_day']:.2f}/day after 30 days, and about ${s100x['per_day']:.2f}/day "
+        f"(≈${s100x['per_day'] * 365:,.0f}/year) once you hit the top rate in about {days_to_cap} days, "
+        f"plus ${100 * BONUS:,.0f} in bonuses\n\n"
+        "Examples only, not a guarantee; real earnings depend on how many jobs your recruits complete.\n"
+        f"Free to join. Get your recruit link and start building your {city} crew here:"
+    )
+    return {"title": random.choice(RECRUITER_HOOKS).format(city=city), "body": body}
+
+
+async def share_recruiter_post(db, city: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+    from social_publisher import publish_to_all
+    from referrals import get_program
+    copy = recruiter_copy(city["city"], await get_program(db))
+    res = (await publish_to_all(db, {
+        **copy,
+        "url": (f"{base_url}/recruiter?utm_source=__PLATFORM__&utm_medium=social"
+                f"&utm_campaign=recruiter_post&utm_content={city['slug']}"),
+        "image_url": f"{base_url}/api/img/city/{city['slug']}.jpg",
+        "hashtags": ["lumo", "recruiters", "earnmore", city["city"].replace(" ", "")],
+        "source_type": "recruiter_post", "source_id": city["slug"], "require_photo": True,
+    }, platforms=["facebook"])).get("facebook") or {}
+    key = "fb_recruiter_shared_at" if res.get("ok") else None
+    if key:
+        await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {key: _now().isoformat()}})
+    elif "OAuthException" not in str(res.get("error")):
+        await db.recruit_cities.update_one({"slug": city["slug"]}, {"$inc": {"fb_recruiter_attempts": 1}})
+    return res
+
+
 async def _fb_connected(db) -> bool:
     fb = await db.social_channels.find_one({"platform": "facebook"}, {"_id": 0}) or {}
     return bool(fb.get("enabled") and fb.get("access_token") and fb.get("page_id"))
@@ -324,6 +387,8 @@ async def rollout_status(db) -> Dict[str, Any]:
         "shared": await db.recruit_cities.count_documents({**active, "$or": [
             {"fb_page_shared_at": {"$exists": True}}, {"slug": {"$in": blog_shared}}]}),
         "today": await db.recruit_cities.count_documents({"fb_page_shared_at": {"$gte": day0}}),
+        "recruiter_shared": await db.recruit_cities.count_documents({"fb_recruiter_shared_at": {"$exists": True}}),
+        "recruiter_today": await db.recruit_cities.count_documents({"fb_recruiter_shared_at": {"$gte": day0}}),
         "failed": await db.recruit_cities.count_documents({"fb_rollout_attempts": {"$gte": 3}}),
     }
 
@@ -331,7 +396,21 @@ async def rollout_status(db) -> Dict[str, Any]:
 async def run_rollout_step(db, base_url: str) -> Optional[Dict[str, Any]]:
     """Post the next un-posted city (largest first), respecting the daily cap."""
     st = await rollout_status(db)
-    if not (st["enabled"] and st["connected"]) or st["today"] >= st["daily_cap"]:
+    if not (st["enabled"] and st["connected"]):
+        return None
+    # One recruiter post for every agent post: pair each posted city with its recruiter post first.
+    day0 = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    rec_today = await db.recruit_cities.count_documents({"fb_recruiter_shared_at": {"$gte": day0}})
+    if rec_today < st["daily_cap"]:
+        rc = await db.recruit_cities.find_one(
+            {"fb_page_shared_at": {"$exists": True}, "fb_recruiter_shared_at": {"$exists": False},
+             "$or": [{"fb_recruiter_attempts": {"$exists": False}}, {"fb_recruiter_attempts": {"$lt": 3}}]},
+            {"_id": 0}, sort=[("fb_page_shared_at", 1)])
+        if rc:
+            res = await share_recruiter_post(db, rc, base_url)
+            logger.info(f"[fb_rollout] recruiter {rc['slug']} ok={res.get('ok')} {str(res.get('error') or '')[:120]}")
+            return {"city": rc["slug"], "ok": bool(res.get("ok")), "kind": "recruiter"}
+    if st["today"] >= st["daily_cap"]:
         return None
     blog_shared = await db.city_blog_posts.distinct("city_slug", {"fb_shared_at": {"$exists": True}})
     city = await db.recruit_cities.find_one(

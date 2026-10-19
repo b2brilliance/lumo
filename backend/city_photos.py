@@ -179,7 +179,7 @@ async def redo_facebook_posts(db) -> Dict[str, Any]:
 
 
 # ── Page-wide duplicate cleanup ─────────────────────────────────────
-SLUG_RX = re.compile(r"recruit_city_slug=([a-z0-9-]+)")
+SLUG_RX = re.compile(r"(?:recruit_city_slug|utm_content)=([a-z0-9-]+)")
 
 
 def _ahash(data: bytes) -> Optional[int]:
@@ -208,7 +208,8 @@ async def _page_items(client: httpx.AsyncClient, ver: str, page_id: str, token: 
         for p in d.get("data", []):
             msg = p.get("message") or ""
             if "golumo.app" in msg and (p.get("full_picture") or include_text_only):
-                items.append({"id": p["id"], "picture": p["full_picture"], "created": p.get("created_time"), "message": msg,
+                items.append({"id": p["id"], "picture": p.get("full_picture"), "created": p.get("created_time"), "message": msg,
+                              "kind": "recruiter" if "/recruiter?" in msg else "agent",
                               "slug": (SLUG_RX.search(msg) or [None, None])[1]})
         nxt = (d.get("paging") or {}).get("next")
         if not nxt:
@@ -235,7 +236,16 @@ async def clean_page_duplicates(db, dry_run: bool = False) -> Dict[str, Any]:
         for it in (i for i in items if i["hash"] is not None):
             g = next((g for g in groups if bin(g[0]["hash"] ^ it["hash"]).count("1") <= 10), None)
             (g.append(it) if g else groups.append([it]))
-        dupes = [it for g in groups if len(g) > 1 for it in g]
+        dupes = []
+        for g in groups:
+            if len({i["slug"] for i in g}) > 1:
+                dupes += g  # same photo used for different cities
+            else:
+                seen = set()  # same city: its agent + recruiter post may share a photo; drop repeats only
+                for i in sorted(g, key=lambda x: x.get("created") or "", reverse=True):
+                    if i["kind"] in seen:
+                        dupes.append(i)
+                    seen.add(i["kind"])
         deleted, failed, slugs = 0, 0, set()
         if not dry_run:
             for it in dupes:
@@ -249,7 +259,8 @@ async def clean_page_duplicates(db, dry_run: bool = False) -> Dict[str, Any]:
                     logger.warning(f"[photos] page delete {it['id']} failed: {r.text[:160]}")
     if slugs:
         await db.recruit_cities.update_many({"slug": {"$in": list(slugs)}}, {
-            "$unset": {"fb_page_shared_at": "", "fb_rollout_attempts": "", "fb_rollout_error": ""}})
+            "$unset": {"fb_page_shared_at": "", "fb_rollout_attempts": "", "fb_rollout_error": "",
+                       "fb_recruiter_shared_at": "", "fb_recruiter_attempts": ""}})
         await db.city_blog_posts.update_many({"city_slug": {"$in": list(slugs)}}, {"$unset": {"fb_shared_at": ""}})
         await db.social_posts.update_many({"platform": "facebook", "source_id": {"$in": list(slugs)}},
                                           {"$set": {"deleted_at": _now()}})
@@ -271,7 +282,7 @@ async def refresh_old_format_posts(db, dry_run: bool = False) -> Dict[str, Any]:
     deleted, failed, slugs = 0, 0, set()
     async with httpx.AsyncClient(timeout=30) as client:
         items = await _page_items(client, ver, page_id, token, include_text_only=True)
-        old = [i for i in items if NEW_FORMAT_MARK not in i["message"]]
+        old = [i for i in items if NEW_FORMAT_MARK not in i["message"] and i["kind"] != "recruiter"]
         if not dry_run:
             for it in old:
                 r = await client.delete(f"https://graph.facebook.com/{ver}/{it['id']}", params={"access_token": token})
