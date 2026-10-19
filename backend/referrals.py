@@ -331,7 +331,7 @@ def create_router(*, db, get_current_user, require_admin=None):
             u = users.get(uid)
             if not u:
                 continue
-            parts = (u.get("name") or "Lumo recruiter").split()
+            parts = (u.get("name") or "").split() or ["Lumo", "recruiter"]
             shown = parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else "")
             rows.append({"name": shown, "jobs": jobs.get(uid, 0), "recruits": recs.get(uid, 0),
                          "city": ((u.get("location") or {}).get("city") if isinstance(u.get("location"), dict) else None),
@@ -349,6 +349,8 @@ def create_router(*, db, get_current_user, require_admin=None):
         c = await db.recruit_cities.find_one({"slug": slug, "is_active": True}, {"_id": 0}) if slug else None
         if not c:
             c = await db.recruit_cities.find_one({"is_active": True}, {"_id": 0}, sort=[("population", -1)])
+        if not c:
+            raise HTTPException(404, "No recruiting cities available")
         origin = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
         url = f"{origin}/join/{c['slug']}?ref={code}"
         name, bonus = c["city"], float(c.get("bonus_amount") or 100)

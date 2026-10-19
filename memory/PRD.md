@@ -963,3 +963,8 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - city_blog.recruiter_copy / share_recruiter_post: a city-targeted recruiter post with the pay scale (0.10% base, +0.01% per 1,000 recruit jobs, 0.99% cap, $25 bonus per recruit at 10 jobs) and worked examples (10 and 100 agents × 10 jobs/day at a $25 average job, computed from the live program config), with an "examples only" disclaimer. It links to /recruiter?utm_campaign=recruiter_post&utm_content={slug} and uses the city photo.
 - Rollout: each step first posts the recruiter post for the oldest city that has an agent post but no recruiter post (fb_recruiter_shared_at), otherwise the next agent post. Each type is capped at 60/day. The cron now runs */10.
 - The duplicate cleaner allows one agent + one recruiter post per city with the same photo. The old-format refresh skips recruiter posts.
+
+## 2026-06 — Recruiter leaderboard + share kit
+- GET /api/referrals/leaderboard?month=YYYY-MM (public): crew jobs (referral_earnings) + new recruits per recruiter, masked names, demo and admin users excluded. RecruiterLeaderboard component on /recruiter, with previous/current month navigation.
+- GET /api/referrals/share-kit?city= (auth): city-specific invite link /join/{slug}?ref=CODE, the city photo, and 4 ready-made posts (FB/LinkedIn, WhatsApp/text, X/Threads, Instagram). RecruiterShareKit: city picker, photo download, QR (qrcode.react 4.2.0) PNG download, copy/share buttons.
+- Tested: iteration_71 (100%/100%); its minor issues are fixed.

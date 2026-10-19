@@ -1,0 +1,32 @@
+{
+  "summary": "Tested the public Recruiter Leaderboard (GET /api/referrals/leaderboard + /recruiter UI) and the Recruiter Share Kit (GET /api/referrals/share-kit + UI). Backend: 7/7 pytest pass using seeded data (ordering jobs desc then recruits desc, name masking, is_demo/admin excluded, no ids/emails leak, out-of-month rows excluded, ?month works, bad months abc/2026-13/2026/2026-00/2026-06-01 give 400, limit works, share-kit 401 without auth, default city = largest (shanghai-cn) when user has no recruit_city_slug, ?city switches, unknown slug falls back, 4 posts mention city + link/code, photo endpoint returns image). Frontend: logged out, leaderboard shows with month label, Previous/This month navigation works (Oct->Sep->Aug->Oct), empty state shows, seeded rows render as leaderboard-row-1/2. Logged in as provider, share kit shows city name, photo loads (naturalWidth 1280), link, QR canvas, QR download (lumo-recruit-shanghai-cn.png), copy link writes the correct URL to the clipboard with a toast, fb/wa/x share hrefs are correct, instagram has copy only. Picking a city (Paris -> share-kit-city-paris-fr) updates the name, link (paris-fr?ref=TEPY3V), photo and posts. Note: the review request's slug 'lumo-bundle-checkout' isn't a real city (it's the app's hostname), so real slugs were used. Pod month = 2026-10.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/referrals/leaderboard", "issue": "Name masking: a user whose name is whitespace only (e.g. '  ') is truthy, so split() returns [] and parts[0] raises IndexError (500). Use (u.get('name') or '').split() or ['Lumo recruiter']."},
+      {"endpoint": "GET /api/referrals/share-kit", "issue": "If there are no active recruit_cities, c is None and c['slug'] raises 500. This is unlikely, since 1725 cities are active."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/recruiter leaderboard header", "issues": ["The 'TOP RECRUITERS' overline is almost invisible on the slate-900 header. The .overline class in index.css sets color: muted-foreground and overrides text-amber-300. Use !text-amber-300 or an inline style."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter71_leaderboard_sharekit.py", "/app/test_reports/pytest/iter71.xml"],
+  "action_items": [
+    "Optional: fix the overline contrast in the leaderboard header",
+    "Optional: guard against whitespace-only names in public_leaderboard masking"
+  ],
+  "critical_code_review_comments": [
+    "Share kit: the frontend builds the photo URL from REACT_APP_BACKEND_URL and ignores kit.photo_url (golumo.app). This is fine for the preview, but it differs from the API's photo_url.",
+    "Leaderboard date filtering depends on created_at being an ISO string, which is true for users and referral_earnings today. Datetime-typed docs would be silently excluded."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter71_leaderboard_sharekit.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Seeded TEST_iter71* users/referral_earnings (pytest fixture) and TEST_iter71ui* (UI check). Both were cleaned up and verified 0 remaining.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Provider provider@lumo.test has referral code TEPY3V and no recruit_city_slug, so the share kit defaults to shanghai-cn. Cities search: /api/recruit/cities?q=. For the UI login, POST /api/auth/login and set localStorage lumo_token."
+}

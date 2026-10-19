@@ -23,7 +23,7 @@ export const RecruiterLeaderboard = () => {
     <section className="mt-12 border border-slate-900" data-testid="recruiter-leaderboard-public">
       <div className="p-5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="overline text-amber-300 flex items-center gap-2"><Trophy className="w-4 h-4" /> Top recruiters</div>
+          <div className="overline !text-amber-300 flex items-center gap-2"><Trophy className="w-4 h-4" /> Top recruiters</div>
           <div className="font-display text-2xl font-black mt-1" data-testid="leaderboard-month">{current ? monthLabel(current) : "…"}</div>
         </div>
         {current && (
