@@ -234,7 +234,7 @@ async def share_city_template(db, city: Dict[str, Any], base_url: str) -> Dict[s
         "title": tpl_title.format(**fmt), "body": tpl_body.format(**fmt),
         "url": signup_url(base_url, city["slug"], campaign="recruit_page", content=city["slug"]),
         "image_url": f"{base_url}/api/img/city/{city['slug']}.jpg", "hashtags": ["lumo", "hiring", city["city"].replace(" ", "")],
-        "source_type": "recruit_page", "source_id": city["slug"],
+        "source_type": "recruit_page", "source_id": city["slug"], "require_photo": True,
     }, platforms=["facebook"])).get("facebook") or {}
     if res.get("ok"):
         await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"fb_page_shared_at": _now().isoformat()}})
@@ -407,7 +407,10 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
             await db.city_blog_config.update_one(job, {"$set": {"refresh": {**res, "missing": res["missing"][:200]},
                                                                 "state": "reposting"}})
             redo = await redo_facebook_posts(db)
-            await db.city_blog_config.update_one(job, {"$set": {"redo": redo, "state": "done", "finished_at": _now().isoformat()}})
+            await db.city_blog_config.update_one(job, {"$set": {"redo": redo}})
+            from city_photos import clean_page_duplicates
+            page = await clean_page_duplicates(db)
+            await db.city_blog_config.update_one(job, {"$set": {"page": page, "state": "done", "finished_at": _now().isoformat()}})
         except Exception as e:  # noqa: BLE001
             logger.exception("[photos] job failed")
             await db.city_blog_config.update_one(job, {"$set": {"state": "error", "error": str(e)[:300]}})
@@ -415,8 +418,8 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
     @r.on_event("startup")
     async def _auto_photo_fix():
         # One-time on each environment: replace shared/fallback photos and redo affected FB posts.
-        if not await db.city_blog_config.find_one({"id": "photo_job"}, {"_id": 1}):
-            await db.city_blog_config.insert_one({"id": "photo_job", "state": "running", "started_at": _now().isoformat()})
+        if not await db.city_blog_config.find_one({"id": "photo_job", "page": {"$exists": True}}, {"_id": 1}):
+            await db.city_blog_config.update_one({"id": "photo_job"}, {"$set": {"state": "running", "started_at": _now().isoformat()}}, upsert=True)
             async def later():
                 await asyncio.sleep(90)
                 await _photo_job()
@@ -435,6 +438,14 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
         _TASKS.add(t)
         t.add_done_callback(_TASKS.discard)
         return {"ok": True}
+
+    @r.post("/admin/fb-page/clean-duplicates")
+    async def clean_dupes(dry_run: bool = Query(True), _a: dict = Depends(require_admin)):
+        from city_photos import clean_page_duplicates
+        try:
+            return await clean_page_duplicates(db, dry_run=dry_run)
+        except RuntimeError as e:
+            raise HTTPException(502, f"Facebook: {e}")
 
     @r.get("/admin/city-photos/fix")
     async def fix_photos_status(_a: dict = Depends(require_admin)):

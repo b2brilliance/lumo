@@ -176,3 +176,82 @@ async def redo_facebook_posts(db) -> Dict[str, Any]:
         "$unset": {"fb_page_shared_at": "", "fb_rollout_attempts": "", "fb_rollout_error": "", "fb_needs_repost": ""}})
     await db.city_blog_posts.update_many({"city_slug": {"$in": slugs}}, {"$unset": {"fb_shared_at": ""}})
     return {"cities_requeued": len(slugs), "fb_deleted": deleted, "fb_delete_failed": failed}
+
+
+# ── Page-wide duplicate cleanup ─────────────────────────────────────
+SLUG_RX = re.compile(r"recruit_city_slug=([a-z0-9-]+)")
+
+
+def _ahash(data: bytes) -> Optional[int]:
+    from io import BytesIO
+    from PIL import Image
+    try:
+        img = Image.open(BytesIO(data)).convert("L").resize((16, 16))
+    except Exception:  # noqa: BLE001
+        return None
+    px = list(img.getdata())
+    avg = sum(px) / len(px)
+    return sum(1 << i for i, p in enumerate(px) if p > avg)
+
+
+async def _page_items(client: httpx.AsyncClient, ver: str, page_id: str, token: str) -> List[Dict[str, Any]]:
+    """Every Lumo-made post on the Page with its picture URL (photo posts + link posts)."""
+    items: List[Dict[str, Any]] = []
+    url = f"https://graph.facebook.com/{ver}/{page_id}/published_posts"
+    params = {"fields": "id,message,full_picture,created_time", "limit": 100, "access_token": token}
+    for _ in range(60):
+        r = await client.get(url, params=params)
+        d = r.json()
+        if "error" in d:
+            raise RuntimeError(d["error"].get("message"))
+        for p in d.get("data", []):
+            msg = p.get("message") or ""
+            if "golumo.app" in msg and p.get("full_picture"):
+                items.append({"id": p["id"], "picture": p["full_picture"], "created": p.get("created_time"),
+                              "slug": (SLUG_RX.search(msg) or [None, None])[1]})
+        nxt = (d.get("paging") or {}).get("next")
+        if not nxt:
+            break
+        url, params = nxt, None
+    return items
+
+
+async def clean_page_duplicates(db, dry_run: bool = False) -> Dict[str, Any]:
+    """Delete every Lumo post whose picture matches another post's picture, then re-queue those cities."""
+    fb = await db.social_channels.find_one({"platform": "facebook"}, {"_id": 0}) or {}
+    token, page_id = fb.get("access_token"), fb.get("page_id")
+    if not (fb.get("enabled") and token and page_id):
+        return {"skipped": "facebook not connected"}
+    ver = os.environ["META_GRAPH_VERSION"]
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers={"User-Agent": UA}) as client:
+        items = await _page_items(client, ver, page_id, token)
+        for it in items:
+            try:
+                it["hash"] = _ahash((await client.get(it["picture"])).content)
+            except Exception:  # noqa: BLE001
+                it["hash"] = None
+        groups: List[List[Dict[str, Any]]] = []
+        for it in (i for i in items if i["hash"] is not None):
+            g = next((g for g in groups if bin(g[0]["hash"] ^ it["hash"]).count("1") <= 10), None)
+            (g.append(it) if g else groups.append([it]))
+        dupes = [it for g in groups if len(g) > 1 for it in g]
+        deleted, failed, slugs = 0, 0, set()
+        if not dry_run:
+            for it in dupes:
+                r = await client.delete(f"https://graph.facebook.com/{ver}/{it['id']}", params={"access_token": token})
+                if r.status_code < 300 or "does not exist" in r.text:
+                    deleted += 1
+                    if it["slug"]:
+                        slugs.add(it["slug"])
+                else:
+                    failed += 1
+                    logger.warning(f"[photos] page delete {it['id']} failed: {r.text[:160]}")
+    if slugs:
+        await db.recruit_cities.update_many({"slug": {"$in": list(slugs)}}, {
+            "$unset": {"fb_page_shared_at": "", "fb_rollout_attempts": "", "fb_rollout_error": ""}})
+        await db.city_blog_posts.update_many({"city_slug": {"$in": list(slugs)}}, {"$unset": {"fb_shared_at": ""}})
+        await db.social_posts.update_many({"platform": "facebook", "source_id": {"$in": list(slugs)}},
+                                          {"$set": {"deleted_at": _now()}})
+    logger.info(f"[photos] page scan: {len(items)} Lumo posts, {len(dupes)} duplicates, deleted {deleted}, failed {failed}")
+    return {"page_posts": len(items), "duplicates": len(dupes), "groups": sum(1 for g in groups if len(g) > 1),
+            "deleted": deleted, "failed": failed, "requeued": len(slugs), "dry_run": dry_run}

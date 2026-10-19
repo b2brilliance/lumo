@@ -104,6 +104,7 @@ export default function CityBlogPanel() {
                 : `${photo.bad_now} cities still share a photo`}
               {photo.refresh && ` · last run fixed ${photo.refresh.fixed}`}
               {photo.redo && ` · ${photo.redo.fb_deleted} old FB posts deleted, ${photo.redo.cities_requeued} cities re-queued`}
+              {photo.page && photo.page.page_posts != null && ` · Page scan: ${photo.page.duplicates} duplicate-photo posts found, ${photo.page.deleted} deleted`}
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={fixPhotos} disabled={["running", "reposting"].includes(photo.state)} data-testid="admin-city-photos-fix">

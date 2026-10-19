@@ -75,6 +75,9 @@ async def _post_facebook(cfg: dict, content: dict) -> dict:
             if r.status_code < 300:
                 pid = r.json().get("post_id") or r.json().get("id", "")
                 return {"ok": True, "external_id": pid, "url": f"https://facebook.com/{pid}", "kind": "photo"}
+            if content.get("require_photo"):
+                # A link post would show the site-wide preview image (identical on every post).
+                return {"ok": False, "error": f"FB photo {r.status_code}: {r.text[:300]}"}
             logger.warning(f"[social] FB photo post failed, falling back to link post: {r.text[:200]}")
         body: dict = {"message": caption, "access_token": token}
         if link:
