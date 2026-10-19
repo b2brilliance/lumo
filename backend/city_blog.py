@@ -39,7 +39,14 @@ def _sized(url: str) -> str:
     if not m or m.group(4).lower().endswith((".svg", ".tif", ".tiff")):
         return url
     return f"https://upload.wikimedia.org/wikipedia/{m.group(1)}/thumb/{m.group(2)}/{m.group(3)}/{m.group(4)}/1280px-{m.group(4)}"
-DEFAULT_CFG = {"enabled": True, "daily_top_n": 300, "batch_size": 15, "share_social": True}
+DEFAULT_CFG = {"enabled": True, "daily_top_n": 300, "batch_size": 15, "share_social": True,
+               "rollout_enabled": True, "rollout_daily_cap": 60}
+
+
+def signup_url(base_url: str, city_slug: str, *, campaign: str, content: str) -> str:
+    """Direct contractor sign-up link (pre-selects provider + credits the city)."""
+    return (f"{base_url}/register?role=provider&recruit_city_slug={city_slug}"
+            f"&utm_source=__PLATFORM__&utm_medium=social&utm_campaign={campaign}&utm_content={content}")
 COPY_VERSION = 2
 CORE_MESSAGE = (
     "Core message (every post): finding good work is hard right now, and too many people are underpaid for what "
@@ -199,9 +206,9 @@ async def publish_for_city(db, city: Dict[str, Any], llm_key: str, share: bool,
     post.pop("_id", None)
     if share:
         try:
-            res = await share_post(db, post, base_url)
-            if (res.get("facebook") or {}).get("ok"):
-                await db.city_blog_posts.update_one({"id": post["id"]}, {"$set": {"fb_shared_at": _now().isoformat()}})
+            # Facebook is paced separately by the FB city rollout (daily cap) to avoid spam flags.
+            from social_publisher import PLATFORMS
+            await share_post(db, post, base_url, [p for p in PLATFORMS if p != "facebook"])
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[city_blog] share failed for {slug}: {e}")
     return post
@@ -211,8 +218,7 @@ async def share_post(db, post: Dict[str, Any], base_url: str, platforms: Optiona
     from social_publisher import publish_to_all
     return await publish_to_all(db, {
         "title": post["title"], "body": post["excerpt"],
-        "url": utm_url(f"{base_url}/join/{post['city_slug']}/blog/{post['slug']}",
-                       source="__PLATFORM__", campaign="city_blog", content=post["slug"]),
+        "url": signup_url(base_url, post["city_slug"], campaign="city_blog", content=post["slug"]),
         "image_url": f"{base_url}/api/img/city/{post['city_slug']}.jpg", "hashtags": ["lumo", "hiring", post["city"].replace(" ", "")],
         "source_type": "city_blog", "source_id": post["id"],
     }, platforms=platforms)
@@ -226,13 +232,55 @@ async def share_city_template(db, city: Dict[str, Any], base_url: str) -> Dict[s
            "jobs": city.get("bonus_job_count") or 100, "bonus": float(city.get("bonus_amount") or 100)}
     res = (await publish_to_all(db, {
         "title": tpl_title.format(**fmt), "body": tpl_body.format(**fmt),
-        "url": utm_url(f"{base_url}/join/{city['slug']}", source="__PLATFORM__", campaign="recruit_page", content=city["slug"]),
+        "url": signup_url(base_url, city["slug"], campaign="recruit_page", content=city["slug"]),
         "image_url": f"{base_url}/api/img/city/{city['slug']}.jpg", "hashtags": ["lumo", "hiring", city["city"].replace(" ", "")],
         "source_type": "recruit_page", "source_id": city["slug"],
     }, platforms=["facebook"])).get("facebook") or {}
     if res.get("ok"):
         await db.recruit_cities.update_one({"slug": city["slug"]}, {"$set": {"fb_page_shared_at": _now().isoformat()}})
+    elif "OAuthException" not in str(res.get("error")):
+        # Only count city-specific failures; a broken Page token shouldn't burn every city's retries.
+        await db.recruit_cities.update_one({"slug": city["slug"]}, {
+            "$inc": {"fb_rollout_attempts": 1}, "$set": {"fb_rollout_error": str(res.get("error"))[:300]}})
     return res
+
+
+async def _fb_connected(db) -> bool:
+    fb = await db.social_channels.find_one({"platform": "facebook"}, {"_id": 0}) or {}
+    return bool(fb.get("enabled") and fb.get("access_token") and fb.get("page_id"))
+
+
+async def rollout_status(db) -> Dict[str, Any]:
+    cfg = await get_cfg(db)
+    day0 = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    active = {"is_active": True}
+    blog_shared = await db.city_blog_posts.distinct("city_slug", {"fb_shared_at": {"$exists": True}})
+    return {
+        "enabled": cfg["rollout_enabled"], "daily_cap": cfg["rollout_daily_cap"],
+        "connected": await _fb_connected(db),
+        "total": await db.recruit_cities.count_documents(active),
+        "shared": await db.recruit_cities.count_documents({**active, "$or": [
+            {"fb_page_shared_at": {"$exists": True}}, {"slug": {"$in": blog_shared}}]}),
+        "today": await db.recruit_cities.count_documents({"fb_page_shared_at": {"$gte": day0}}),
+        "failed": await db.recruit_cities.count_documents({"fb_rollout_attempts": {"$gte": 3}}),
+    }
+
+
+async def run_rollout_step(db, base_url: str) -> Optional[Dict[str, Any]]:
+    """Post the next un-posted city (largest first), respecting the daily cap."""
+    st = await rollout_status(db)
+    if not (st["enabled"] and st["connected"]) or st["today"] >= st["daily_cap"]:
+        return None
+    blog_shared = await db.city_blog_posts.distinct("city_slug", {"fb_shared_at": {"$exists": True}})
+    city = await db.recruit_cities.find_one(
+        {"is_active": True, "fb_page_shared_at": {"$exists": False}, "slug": {"$nin": blog_shared},
+         "$or": [{"fb_rollout_attempts": {"$exists": False}}, {"fb_rollout_attempts": {"$lt": 3}}]},
+        {"_id": 0}, sort=[("population", -1)])
+    if not city:
+        return None
+    res = await share_city_template(db, city, base_url)
+    logger.info(f"[fb_rollout] {city['slug']} ok={res.get('ok')} {str(res.get('error') or '')[:120]}")
+    return {"city": city["slug"], "ok": bool(res.get("ok"))}
 
 
 async def run_batch(db, llm_key: str, get_fx, base_url: str, limit: Optional[int] = None) -> int:
@@ -310,6 +358,45 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
         if queued:
             spawn()
         return {"ok": True, "queued": queued}
+
+    @r.post("/cron/fb-city-rollout")
+    async def cron_fb_rollout(request: Request):
+        # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+        secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
+        auth = request.headers.get("authorization", "")
+        token = auth[7:] if auth.lower().startswith("bearer ") else ""
+        if not secret or not token or not hmac.compare_digest(token, secret):
+            raise HTTPException(401, "Unauthorized")
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        run_id = request.headers.get("x-webhook-id") or (body.get("run_id") if isinstance(body, dict) else None) or str(uuid.uuid4())
+        try:
+            await db.cron_runs.insert_one({"_id": f"fb-rollout:{run_id}", "at": _now().isoformat()})
+        except Exception:
+            return {"ok": True, "duplicate": True}
+        t = asyncio.create_task(run_rollout_step(db, base_url))
+        _TASKS.add(t)
+        t.add_done_callback(_TASKS.discard)
+        return {"ok": True, "queued": True}
+
+    @r.get("/admin/fb-rollout")
+    async def admin_rollout(_a: dict = Depends(require_admin)):
+        return await rollout_status(db)
+
+    @r.put("/admin/fb-rollout")
+    async def admin_rollout_set(body: Dict[str, Any], _a: dict = Depends(require_admin)):
+        upd = {}
+        if "enabled" in body:
+            upd["rollout_enabled"] = bool(body["enabled"])
+        if "daily_cap" in body:
+            cap = int(body["daily_cap"])
+            if not 1 <= cap <= 200:
+                raise HTTPException(400, "daily_cap must be 1-200")
+            upd["rollout_daily_cap"] = cap
+        await db.city_blog_config.update_one({"id": "config"}, {"$set": upd}, upsert=True)
+        return await rollout_status(db)
 
     @r.get("/img/city/{slug}.jpg")
     async def city_image(slug: str):

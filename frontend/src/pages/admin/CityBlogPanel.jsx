@@ -10,6 +10,12 @@ export default function CityBlogPanel() {
   const [cfg, setCfg] = useState(null);
   const [posts, setPosts] = useState([]);
   const [fbJob, setFbJob] = useState(null);
+  const [roll, setRoll] = useState(null);
+  useEffect(() => { api.get("/admin/fb-rollout").then((r) => setRoll(r.data)).catch(() => {}); }, []);
+  const setRollout = async (patch) => {
+    try { const { data } = await api.put("/admin/fb-rollout", patch); setRoll(data); toast.success("Facebook rollout updated"); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   const pollFb = () => api.get("/admin/city-blog/publish-facebook").then((r) => setFbJob(r.data)).catch(() => {});
   useEffect(() => {
     pollFb();
@@ -77,6 +83,26 @@ export default function CityBlogPanel() {
           Publish first 10 to Facebook
         </Button>
       </div>
+      {roll && (
+        <div className="p-4 border-b border-slate-200 flex flex-wrap items-center gap-4 text-sm" data-testid="admin-fb-rollout">
+          <div className="flex-1 min-w-[220px]">
+            <div className="font-semibold flex items-center gap-2"><Facebook className="w-4 h-4 text-[#1877F2]" /> Every-city Facebook rollout</div>
+            <div className="text-xs text-slate-500 mt-1" data-testid="admin-fb-rollout-progress">
+              {roll.shared} of {roll.total} cities posted · {roll.today}/{roll.daily_cap} today
+              {roll.failed ? ` · ${roll.failed} failed` : ""}{!roll.connected && " · Facebook not connected"}
+            </div>
+            <div className="h-1.5 bg-slate-100 mt-2"><div className="h-full bg-[#1877F2]" style={{ width: `${roll.total ? (roll.shared / roll.total) * 100 : 0}%` }} /></div>
+          </div>
+          <label className="flex items-center gap-2 text-xs">Per day
+            <Input type="number" className="h-8 w-20" defaultValue={roll.daily_cap}
+              onBlur={(e) => Number(e.target.value) !== roll.daily_cap && setRollout({ daily_cap: Number(e.target.value) })}
+              data-testid="admin-fb-rollout-cap" />
+          </label>
+          <label className="flex items-center gap-2 text-xs">On
+            <Switch checked={!!roll.enabled} onCheckedChange={(v) => setRollout({ enabled: v })} data-testid="admin-fb-rollout-enabled" />
+          </label>
+        </div>
+      )}
       {fbJob && fbJob.state !== "idle" && (
         <div className="p-4 border-b border-slate-200 text-sm" data-testid="admin-city-blog-fb-status">
           <div className="font-semibold">

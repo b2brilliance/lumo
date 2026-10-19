@@ -940,3 +940,9 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 ## 2026-06 — FB publish debugging (prod RCA)
 - Root cause: Meta returned "Can't load URL", so /api/social/facebook/callback was never hit and no Page token was saved; the Recruit tab then said "Connect Facebook first". This is a Meta app config fix on the user's side (App domains golumo.app, Website platform, Valid OAuth Redirect URI). A secondary problem: the EMERGENT_LLM_KEY budget was exhausted in prod.
 - Added: optional META_LOGIN_CONFIG_ID (Facebook Login for Business uses config_id instead of scope). The publish-facebook job falls back to template-copy posts linking to /join/{city} (tracked by recruit_cities.fb_page_shared_at, utm_campaign=recruit_page) when the AI can't write posts.
+
+## 2026-06 — Every-city Facebook rollout
+- Cron `fb-city-rollout` (*/20) → POST /api/cron/fb-city-rollout. Each run posts 1 city (largest first) using template copy + the self-hosted city photo, capped at rollout_daily_cap (60/day) and skipping cities already posted (fb_page_shared_at, or a blog post with fb_shared_at). Up to 3 retries per city; OAuth/token errors aren't counted against cities.
+- Every recruiting FB link now goes straight to sign-up: /register?role=provider&recruit_city_slug={slug}&utm_*.
+- City blog auto-share no longer posts to Facebook (to avoid ~500/day spam). FB gets only the paced rollout and the manual "first 10" button.
+- Admin: GET/PUT /api/admin/fb-rollout. The "Every-city Facebook rollout" card in the Recruit → City blog panel shows progress, a per-day cap (1-200) and an on/off switch.
