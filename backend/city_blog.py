@@ -47,7 +47,32 @@ def signup_url(base_url: str, city_slug: str, *, campaign: str, content: str) ->
     """Direct contractor sign-up link (pre-selects provider + credits the city)."""
     return (f"{base_url}/register?role=provider&recruit_city_slug={city_slug}"
             f"&utm_source=__PLATFORM__&utm_medium=social&utm_campaign={campaign}&utm_content={content}")
-COPY_VERSION = 2
+COPY_VERSION = 3
+DELIVERY_JOB = ("Delivery", "food, groceries and packages across town by car, bike or scooter")
+EXTRA_JOBS = [
+    ("Roadside assistance", "jump-starts, flat-tire changes, lockouts and fuel drop-offs"),
+    ("Laundry pickup", "collect, wash, fold and return laundry for busy neighbors"),
+    ("Home cleaning", "apartments, homes and move-out cleans"),
+    ("Moving help", "loading trucks, carrying furniture and small moves"),
+    ("Handyman repairs", "mounting TVs, fixing doors, patching walls and small repairs"),
+    ("Errands", "pharmacy runs, returns, waiting in line and shopping trips"),
+    ("Pet care", "dog walking, pet sitting and drop-in visits"),
+    ("Mobile car detailing", "washing and detailing cars right in the customer's driveway"),
+    ("Furniture assembly", "putting together beds, desks, shelves and flat-pack furniture"),
+    ("Yard work", "mowing, raking, hedge trimming and garden clean-ups"),
+    ("Tech help", "setting up Wi-Fi, TVs, printers and phones"),
+    ("Rides", "driving neighbors to work, appointments and the airport"),
+]
+
+
+def pick_jobs(n_extra: int = 2) -> List[tuple]:
+    """Delivery + a different random mix of other job types on every post."""
+    return [DELIVERY_JOB, *random.sample(EXTRA_JOBS, n_extra)]
+
+
+def jobs_block(city: str, jobs: List[tuple]) -> str:
+    lines = "\n".join(f"• {name}: {desc}" for name, desc in jobs)
+    return f"Jobs you can start picking up in {city}:\n{lines}"
 CORE_MESSAGE = (
     "Core message (every post): finding good work is hard right now, and too many people are underpaid for what "
     "they can do. The skills readers already have (driving, lifting, fixing things, cleaning, errands, caring for "
@@ -144,6 +169,7 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx
         "bonus_after_jobs": int(city.get("bonus_job_count") or 100), "bonus_spots_left": max(0, first_n - signups),
         "workers_wanted": int(city.get("goal_workers") or 300), "signed_up_so_far": signups,
         "date": _now().strftime("%B %d, %Y"), "angle": random.choice(ANGLES),
+        "job_types": [f"{n}: {d}" for n, d in pick_jobs()],
         "region": city.get("state_full") if (city.get("country") or "US") == "US" else city.get("country_name"),
         "local_city_name": city.get("local_name") or city["city"],
         "neighborhoods": (city.get("neighborhoods") or [])[:5],
@@ -158,6 +184,8 @@ async def _write(city: Dict[str, Any], lang: str, signups: int, llm_key: str, fx
         "local jobs (deliveries, rides, moving, errands, handyman). Goal: get people in the given city to sign up "
         "now as contractors so they're ready when jobs open. Focus on job openings and the loyalty bonus. "
         + CORE_MESSAGE + " Today's angle is in the facts. "
+        "Give the post real substance: include a section describing each of the 3 job_types (what the work is, "
+        "who it suits, that they choose which jobs to accept); delivery is always one of them. "
         "Personalize it to the area: speak directly to people who live there, use the city's name (and local name), "
         "you MUST name 2-3 real neighborhoods or districts of the city (use the given list, or well-known ones you "
         "are certain exist), mention nearby_cities only if given, and local everyday realities (commutes, seasons, the kind of "
@@ -230,8 +258,11 @@ async def share_city_template(db, city: Dict[str, Any], base_url: str) -> Dict[s
     tpl_title, tpl_body = random.choice(RECRUIT_COPY_TEMPLATES)
     fmt = {"city": city["city"], "goal": city.get("goal_workers") or 300, "first_n": city.get("bonus_first_n") or 100,
            "jobs": city.get("bonus_job_count") or 100, "bonus": float(city.get("bonus_amount") or 100)}
+    body = (f"{tpl_body.format(**fmt)}\n\n{jobs_block(city['city'], pick_jobs())}\n\n"
+            "Pick only the jobs you want, work when it suits you, and get paid the same day.\n"
+            "Sign up as a Lumo contractor here:")
     res = (await publish_to_all(db, {
-        "title": tpl_title.format(**fmt), "body": tpl_body.format(**fmt),
+        "title": tpl_title.format(**fmt), "body": body,
         "url": signup_url(base_url, city["slug"], campaign="recruit_page", content=city["slug"]),
         "image_url": f"{base_url}/api/img/city/{city['slug']}.jpg", "hashtags": ["lumo", "hiring", city["city"].replace(" ", "")],
         "source_type": "recruit_page", "source_id": city["slug"], "require_photo": True,
