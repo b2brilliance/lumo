@@ -63,6 +63,7 @@ class RecruitCity(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     population: int = 0
+    geonameid: Optional[str] = None
     is_active: bool = True
     click_count: int = 0
     view_count: int = 0
@@ -379,13 +380,17 @@ async def seed_world_cities(db) -> int:
     """Idempotent: insert top-1000 world cities + top-5 per country, and
     backfill geo/country fields on existing rows (incl. US seeds)."""
     rows = json.loads(WORLD_FILE.read_text(encoding="utf-8"))
-    existing = {d["slug"]: d async for d in db.recruit_cities.find({}, {"_id": 0, "slug": 1, "lat": 1, "population": 1})}
+    existing = {d["slug"]: d async for d in db.recruit_cities.find({}, {"_id": 0, "slug": 1, "lat": 1, "population": 1, "geonameid": 1})}
     new_docs, inserted = [], 0
     for r in rows:
-        geo = {k: r[k] for k in ("country", "country_name", "continent", "currency", "lang", "local_name", "lat", "lng", "population")}
+        geo = {k: r.get(k) for k in ("country", "country_name", "continent", "currency", "lang", "local_name", "lat", "lng",
+                                     "population", "geonameid")}
         if r["slug"] in existing:
-            if not existing[r["slug"]].get("population"):
+            ex = existing[r["slug"]]
+            if not ex.get("population"):
                 await db.recruit_cities.update_one({"slug": r["slug"]}, {"$set": geo})
+            elif not ex.get("geonameid") and r.get("geonameid"):
+                await db.recruit_cities.update_one({"slug": r["slug"]}, {"$set": {"geonameid": r["geonameid"]}})
             continue
         name = r["city"]
         new_docs.append(RecruitCity(

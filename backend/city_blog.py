@@ -274,6 +274,7 @@ async def run_rollout_step(db, base_url: str) -> Optional[Dict[str, Any]]:
     blog_shared = await db.city_blog_posts.distinct("city_slug", {"fb_shared_at": {"$exists": True}})
     city = await db.recruit_cities.find_one(
         {"is_active": True, "fb_page_shared_at": {"$exists": False}, "slug": {"$nin": blog_shared},
+         "hero_image": {"$not": {"$regex": "photo-1477959858617"}},
          "$or": [{"fb_rollout_attempts": {"$exists": False}}, {"fb_rollout_attempts": {"$lt": 3}}]},
         {"_id": 0}, sort=[("population", -1)])
     if not city:
@@ -397,6 +398,50 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
             upd["rollout_daily_cap"] = cap
         await db.city_blog_config.update_one({"id": "config"}, {"$set": upd}, upsert=True)
         return await rollout_status(db)
+
+    async def _photo_job():
+        from city_photos import refresh_photos, redo_facebook_posts
+        job = {"id": "photo_job"}
+        try:
+            res = await refresh_photos(db)
+            await db.city_blog_config.update_one(job, {"$set": {"refresh": {**res, "missing": res["missing"][:200]},
+                                                                "state": "reposting"}})
+            redo = await redo_facebook_posts(db)
+            await db.city_blog_config.update_one(job, {"$set": {"redo": redo, "state": "done", "finished_at": _now().isoformat()}})
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[photos] job failed")
+            await db.city_blog_config.update_one(job, {"$set": {"state": "error", "error": str(e)[:300]}})
+
+    @r.on_event("startup")
+    async def _auto_photo_fix():
+        # One-time on each environment: replace shared/fallback photos and redo affected FB posts.
+        if not await db.city_blog_config.find_one({"id": "photo_job"}, {"_id": 1}):
+            await db.city_blog_config.insert_one({"id": "photo_job", "state": "running", "started_at": _now().isoformat()})
+            async def later():
+                await asyncio.sleep(90)
+                await _photo_job()
+            t = asyncio.create_task(later())
+            _TASKS.add(t)
+            t.add_done_callback(_TASKS.discard)
+
+    @r.post("/admin/city-photos/fix")
+    async def fix_photos(_a: dict = Depends(require_admin)):
+        cur = await db.city_blog_config.find_one({"id": "photo_job"}, {"_id": 0}) or {}
+        if cur.get("state") in ("running", "reposting") and cur.get("started_at", "") > (_now() - timedelta(minutes=30)).isoformat():
+            raise HTTPException(409, "Photo fix already running")
+        await db.city_blog_config.update_one({"id": "photo_job"}, {"$set": {
+            "state": "running", "started_at": _now().isoformat(), "refresh": None, "redo": None, "error": None}}, upsert=True)
+        t = asyncio.create_task(_photo_job())
+        _TASKS.add(t)
+        t.add_done_callback(_TASKS.discard)
+        return {"ok": True}
+
+    @r.get("/admin/city-photos/fix")
+    async def fix_photos_status(_a: dict = Depends(require_admin)):
+        from city_photos import bad_cities
+        doc = await db.city_blog_config.find_one({"id": "photo_job"}, {"_id": 0}) or {"state": "idle"}
+        doc["bad_now"] = len(await bad_cities(db))
+        return doc
 
     @r.get("/img/city/{slug}.jpg")
     async def city_image(slug: str):

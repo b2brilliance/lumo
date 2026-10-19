@@ -11,6 +11,18 @@ export default function CityBlogPanel() {
   const [posts, setPosts] = useState([]);
   const [fbJob, setFbJob] = useState(null);
   const [roll, setRoll] = useState(null);
+  const [photo, setPhoto] = useState(null);
+  const loadPhoto = () => api.get("/admin/city-photos/fix").then((r) => setPhoto(r.data)).catch(() => {});
+  useEffect(() => { loadPhoto(); }, []);
+  useEffect(() => {
+    if (!["running", "reposting"].includes(photo?.state)) return undefined;
+    const t = setInterval(loadPhoto, 5000);
+    return () => clearInterval(t);
+  }, [photo?.state]);
+  const fixPhotos = async () => {
+    try { await api.post("/admin/city-photos/fix"); setPhoto((p) => ({ ...p, state: "running" })); toast.success("Finding real photos for each city…"); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
   useEffect(() => { api.get("/admin/fb-rollout").then((r) => setRoll(r.data)).catch(() => {}); }, []);
   const setRollout = async (patch) => {
     try { const { data } = await api.put("/admin/fb-rollout", patch); setRoll(data); toast.success("Facebook rollout updated"); }
@@ -83,6 +95,22 @@ export default function CityBlogPanel() {
           Publish first 10 to Facebook
         </Button>
       </div>
+      {photo && (
+        <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-sm" data-testid="admin-city-photos">
+          <div>
+            <div className="font-semibold">City photos</div>
+            <div className="text-xs text-slate-500 mt-1" data-testid="admin-city-photos-status">
+              {["running", "reposting"].includes(photo.state) ? (photo.state === "running" ? "Finding real photos…" : "Removing old Facebook posts…")
+                : `${photo.bad_now} cities still share a photo`}
+              {photo.refresh && ` · last run fixed ${photo.refresh.fixed}`}
+              {photo.redo && ` · ${photo.redo.fb_deleted} old FB posts deleted, ${photo.redo.cities_requeued} cities re-queued`}
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={fixPhotos} disabled={["running", "reposting"].includes(photo.state)} data-testid="admin-city-photos-fix">
+            Fix duplicate photos
+          </Button>
+        </div>
+      )}
       {roll && (
         <div className="p-4 border-b border-slate-200 flex flex-wrap items-center gap-4 text-sm" data-testid="admin-fb-rollout">
           <div className="flex-1 min-w-[220px]">

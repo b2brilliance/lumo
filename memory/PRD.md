@@ -946,3 +946,8 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Every recruiting FB link now goes straight to sign-up: /register?role=provider&recruit_city_slug={slug}&utm_*.
 - City blog auto-share no longer posts to Facebook (to avoid ~500/day spam). FB gets only the paced rollout and the manual "first 10" button.
 - Admin: GET/PUT /api/admin/fb-rollout. The "Every-city Facebook rollout" card in the Recruit → City blog panel shows progress, a per-day cap (1-200) and an on/off switch.
+
+## 2026-06 — Real city photos + FB redo
+- backend/city_photos.py: finds cities on the fallback stock photo, a duplicate photo (the largest city keeps a shared one), or a bad image (svg, map, flag, seal...). Replacements are free: Wikidata P18/P948/P2716 via GeoNames ID (geonameid was added to world_recruit_cities.json and backfilled on seed), then the Wikipedia lead image (within 40 km), then a Wikipedia geosearch landmark within 10 km. Preview: 690 → 9 left.
+- redo_facebook_posts: Graph DELETE of old FB posts for re-photoed cities (social_posts.result.external_id), then unsets fb_page_shared_at so the rollout re-posts them with the new photo. The rollout skips cities still on the fallback photo.
+- Runs once automatically ~90s after startup on each environment (when no photo_job doc exists); also via admin POST/GET /api/admin/city-photos/fix and the "Fix duplicate photos" button in the Recruit → City blog panel.
