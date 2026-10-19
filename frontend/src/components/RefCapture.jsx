@@ -56,6 +56,19 @@ export function readAttribution() {
   } catch { return null; }
 }
 
+// Extra fields for Google / SMS sign-in so new accounts are still credited to their recruiter.
+export function signupExtras(next = "") {
+  let ref = null;
+  try { ref = localStorage.getItem("lumo_ref_code") || null; } catch { /* private mode */ }
+  const attr = readAttribution();
+  const city = new URLSearchParams((next.split("?")[1]) || "").get("recruit_city_slug");
+  return { ...(ref ? { ref_code: ref } : {}), ...(attr ? { signup_source: attr } : {}), ...(city ? { recruit_city_slug: city } : {}) };
+}
+
+export function clearRedeemedRef() {
+  try { localStorage.removeItem("lumo_ref_code"); localStorage.removeItem("lumo_ref_code_ts"); } catch { /* noop */ }
+}
+
 export default function RefCapture() {
   const { search } = useLocation();
 

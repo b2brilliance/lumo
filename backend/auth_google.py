@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from typing import Optional
+
 from pydantic import BaseModel
 
 logger = logging.getLogger("lumo.auth_google")
@@ -27,6 +29,9 @@ EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/
 
 class GoogleExchange(BaseModel):
     session_id: str
+    ref_code: Optional[str] = None
+    signup_source: Optional[dict] = None
+    recruit_city_slug: Optional[str] = None
 
 
 def create_router(*, db, create_access_token, now_iso) -> APIRouter:
@@ -97,6 +102,9 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
                 "storefront": None,
                 "created_at": now_iso(),
             }
+            from referrals import apply_signup_attribution
+            await apply_signup_attribution(db, user_doc, ref_code=body.ref_code, signup_source=body.signup_source,
+                                           recruit_city_slug=body.recruit_city_slug)
             await db.users.insert_one(user_doc)
             logger.info(f"Google signup: {email} → {uid}")
 

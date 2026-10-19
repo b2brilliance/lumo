@@ -968,3 +968,6 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - GET /api/referrals/leaderboard?month=YYYY-MM (public): crew jobs (referral_earnings) + new recruits per recruiter, masked names, demo and admin users excluded. RecruiterLeaderboard component on /recruiter, with previous/current month navigation.
 - GET /api/referrals/share-kit?city= (auth): city-specific invite link /join/{slug}?ref=CODE, the city photo, and 4 ready-made posts (FB/LinkedIn, WhatsApp/text, X/Threads, Instagram). RecruiterShareKit: city picker, photo download, QR (qrcode.react 4.2.0) PNG download, copy/share buttons.
 - Tested: iteration_71 (100%/100%); its minor issues are fixed.
+
+## 2026-06 — Recruiter credit for Google/SMS sign-ups
+- referrals.apply_signup_attribution(): sets referred_by_user_id/code, signup_source and recruit_city (falling back to landing_path /join/{slug}) on brand-new user docs. Used by /auth/google/exchange and /auth/sms/verify, which now accept ref_code, signup_source and recruit_city_slug. The frontend SignIn sends signupExtras() (stored ref code, UTM attribution, next's recruit_city_slug) and clears the ref after a new signup. Existing accounts are never re-attributed.

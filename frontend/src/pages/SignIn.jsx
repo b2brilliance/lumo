@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { signupExtras, clearRedeemedRef } from "@/components/RefCapture";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -68,8 +69,9 @@ export default function SignIn() {
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     (async () => {
       try {
-        const { data } = await api.post("/auth/google/exchange", { session_id: sessionId });
+        const { data } = await api.post("/auth/google/exchange", { session_id: sessionId, ...signupExtras(next) });
         const r = loginWithSmsResult(data); // same shape, reuses helper
+        if (r.is_new) clearRedeemedRef();
         toast.success(r.is_new ? "Welcome to Lumo!" : "Welcome back!");
         smartReturn(r.user);
       } catch (err) {
@@ -135,8 +137,9 @@ export default function SignIn() {
     }
     setBusy(true);
     try {
-      const { data } = await api.post("/auth/sms/verify", { phone, code });
+      const { data } = await api.post("/auth/sms/verify", { phone, code, ...signupExtras(next) });
       const r = loginWithSmsResult(data);
+      if (r.is_new) clearRedeemedRef();
       toast.success(r.is_new ? "Welcome to Lumo!" : "Welcome back!");
       smartReturn(r.user);
     } catch (err) {

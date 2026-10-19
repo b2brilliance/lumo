@@ -61,6 +61,28 @@ async def ensure_referral_code(db, user_id: str) -> str:
     return code
 
 
+async def apply_signup_attribution(db, user_doc: dict, *, ref_code: Optional[str] = None,
+                                   signup_source: Optional[dict] = None, recruit_city_slug: Optional[str] = None) -> None:
+    """Tag a brand-new user doc (before insert) with recruiter, UTM source and recruit city."""
+    from attribution import clean_source
+    referred_by = await resolve_ref_code(db, ref_code)
+    if referred_by and referred_by != user_doc.get("id"):
+        user_doc["referred_by_user_id"] = referred_by
+        user_doc["referred_by_code"] = (ref_code or "").strip().upper()
+    src = clean_source(signup_source)
+    if src:
+        user_doc["signup_source"] = src
+    slug = (recruit_city_slug or "").strip().lower()
+    if not slug and src and (src.get("landing_path") or "").startswith("/join/"):
+        slug = src["landing_path"].split("/")[2]
+    if slug:
+        city = await db.recruit_cities.find_one({"slug": slug}, {"_id": 0, "slug": 1, "state": 1, "country": 1})
+        if city:
+            user_doc["recruit_city_slug"] = city["slug"]
+            user_doc["recruit_state"] = city.get("state")
+            user_doc["recruit_country"] = city.get("country") or "US"
+
+
 async def resolve_ref_code(db, ref_code: Optional[str]) -> Optional[str]:
     """Return the user_id whose referral_code matches, or None."""
     if not ref_code:

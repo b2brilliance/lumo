@@ -59,6 +59,9 @@ class SmsVerify(BaseModel):
     phone: str = Field(min_length=4, max_length=24)
     code: str = Field(min_length=4, max_length=10)
     name: Optional[str] = Field(default=None, max_length=120)
+    ref_code: Optional[str] = Field(default=None, max_length=32)
+    signup_source: Optional[dict] = None
+    recruit_city_slug: Optional[str] = Field(default=None, max_length=120)
 
 
 def _twilio_client() -> Optional[object]:
@@ -177,6 +180,9 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
                 "storefront": None,
                 "created_at": now_iso(),
             }
+            from referrals import apply_signup_attribution
+            await apply_signup_attribution(db, user_doc, ref_code=body.ref_code, signup_source=body.signup_source,
+                                           recruit_city_slug=body.recruit_city_slug)
             await db.users.insert_one(user_doc)
             logger.info(f"Passwordless signup: {phone} → {uid}")
 
