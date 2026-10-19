@@ -20,7 +20,8 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger("lumo.fb_oauth")
-SCOPES = "pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,business_management"
+FB_SCOPES = "pages_manage_posts,pages_read_engagement,pages_show_list,business_management"
+IG_SCOPES = ",instagram_basic,instagram_content_publish"
 
 
 def _env(k: str) -> str:
@@ -96,7 +97,8 @@ def create_router(*, db, require_admin: Callable) -> APIRouter:
         if _env("META_LOGIN_CONFIG_ID"):
             params["config_id"] = _env("META_LOGIN_CONFIG_ID")
         else:
-            params["scope"] = SCOPES
+            # Instagram scopes only once the Instagram use case is added in the Meta app (META_INSTAGRAM=1).
+            params["scope"] = FB_SCOPES + (IG_SCOPES if _env("META_INSTAGRAM") == "1" else "")
         q = urlencode(params)
         return {"url": f"https://www.facebook.com/{_env('META_GRAPH_VERSION')}/dialog/oauth?{q}"}
 
