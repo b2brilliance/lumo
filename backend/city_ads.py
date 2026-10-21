@@ -427,6 +427,11 @@ def create_router(*, db, require_admin, base_url: str) -> APIRouter:
     @r.on_event("startup")
     async def _auto():
         # Fires where the Facebook Page is connected (production); finished campaigns are skipped.
+        from daily_recruit import seed_us_cities
+        try:
+            logger.info(f"[daily_recruit] seeded {await seed_us_cities(db)} US cities")
+        except Exception:  # noqa: BLE001
+            logger.exception("[daily_recruit] seed failed")
         fb = await db.social_channels.find_one({"platform": "facebook"}, {"_id": 0}) or {}
         if fb.get("enabled") and fb.get("access_token") and fb.get("page_id"):
             _start(delay=120)

@@ -518,10 +518,25 @@ def create_router(*, db, require_admin, llm_key: Optional[str], get_fx, base_url
             await db.cron_runs.insert_one({"_id": f"fb-rollout:{run_id}", "at": _now().isoformat()})
         except Exception:
             return {"ok": True, "duplicate": True}
-        t = asyncio.create_task(run_rollout_step(db, base_url))
+        import daily_recruit
+        t = asyncio.create_task(daily_recruit.run_step(db, base_url, get_fx))
         _TASKS.add(t)
         t.add_done_callback(_TASKS.discard)
         return {"ok": True, "queued": True}
+
+    @r.get("/admin/daily-recruit/status")
+    async def daily_recruit_status(_a: dict = Depends(require_admin)):
+        import daily_recruit
+        return await daily_recruit.status(db)
+
+    @r.get("/admin/daily-recruit/preview")
+    async def daily_recruit_preview(slug: str, seq: int = 0, _a: dict = Depends(require_admin)):
+        import daily_recruit
+        city = await db.recruit_cities.find_one({"slug": slug}, {"_id": 0})
+        if not city:
+            raise HTTPException(404, "City not found")
+        city, local_line = daily_recruit.intl_extras(city)
+        return await daily_recruit.build_post(db, city, seq, await get_fx(), base_url, local_line)
 
     @r.get("/admin/fb-rollout")
     async def admin_rollout(_a: dict = Depends(require_admin)):

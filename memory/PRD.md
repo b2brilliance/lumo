@@ -989,3 +989,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - New page /business/:slug (BusinessLanding.jsx): city shop photo hero, local-language line (RTL aware), benefits, lead form -> POST /api/business/leads (rate-limited 5/hr/IP, category validated) -> /register prefilled (name/email/phone) with auto-scroll to form
 - Leads in Admin omni-CRUD as content type `business_lead` (collection business_leads)
 - Backlog: recruiter cash prizes, campaign results board (signups per city/post), vertical landing pages (CDL, notary, cinematic)
+
+## 2026-06 Daily Recruiting Posts (daily_recruit.py) — replaces old 60/day FB rollout
+- Cron /api/cron/fb-city-rollout (every 10 min) now calls daily_recruit.run_step: evenly paced 40 US + 2 international posts/day
+- US: top 3 most-populated cities per state + DC (151, data/us_top3.py), rotating oldest-first (~every 4 days); each has its own AI local service photo; missing cities auto-seeded on startup
+- International: rotates the 81 campaign cities (city_ads BY_SLUG), alternating their 2 photos, with local-language opener
+- Each post: Delivery + 2 rotating categories, 3 example jobs each with pay ranges (live GoLumo median when >=3 live jobs in country, else US reference x cost-of-living PRICE_LEVEL x FX in local currency) + requirements, hashtags, UTM campaign daily_recruit
+- Admin: GET /api/admin/daily-recruit/status, GET /api/admin/daily-recruit/preview?slug=&seq=
