@@ -21,6 +21,9 @@ import {
 const ROLES = [
   { value: "customer",   label: "Customer",   icon: UserIcon,        desc: "Post requests, book services, shop & order." },
   { value: "provider",   label: "Service provider", icon: Briefcase, desc: "Individuals & businesses offering services to customers. On-demand gigs · staffing shifts · remote contracts." },
+  { value: "restaurant", label: "Restaurant owner", icon: Briefcase, desc: "Sell your menu for pickup and delivery." },
+  { value: "retailer",   label: "Shop owner", icon: Briefcase, desc: "Sell your products to local customers." },
+  { value: "real_estate", label: "Real estate", icon: UserIcon, desc: "Buy, rent, sell or rent out a place." },
 ];
 
 // Employment-type catalog (providers only).
@@ -126,6 +129,7 @@ export default function Register() {
     if (recruitSlug) payload.recruit_city_slug = recruitSlug;
     const refCode = searchParams.get("ref");
     if (refCode) payload.ref_code = refCode;
+    if (form.role === "real_estate") payload.re_mode = searchParams.get("re_mode") === "listing" ? "listing" : "seeking";
     if (isProvider) {
       payload.employment_types = form.employment_types;
       payload.primary_category = form.primary_category || null;
@@ -138,7 +142,10 @@ export default function Register() {
     setBusy(false);
     if (r.ok) {
       toast.success("Welcome to Lumo");
-      const dest = { customer: "/customer", provider: "/provider" }[r.user.role] || "/";
+      const dest = {
+        customer: "/for-you", provider: "/provider", retailer: "/seller", restaurant: "/seller",
+        real_estate: payload.re_mode === "listing" ? "/real-estate/mine" : "/real-estate",
+      }[r.user.role] || "/";
       nav(dest);
     } else setErr(r.error);
   };

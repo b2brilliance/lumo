@@ -44,9 +44,10 @@ export default function SignIn() {
   const smartReturn = (u) => {
     if (next) { nav(next); return; }
     if (u?.role === "provider") nav("/provider");
-    else if (u?.role === "retailer") nav("/retailer");
-    else if (u?.role === "restaurant") nav("/restaurant");
+    else if (u?.role === "retailer" || u?.role === "restaurant") nav("/seller");
+    else if (u?.role === "real_estate") nav(u.re_mode === "listing" ? "/real-estate/mine" : "/real-estate");
     else if (u?.role === "admin") nav("/admin");
+    else if (window.matchMedia("(max-width: 767px)").matches || window.Capacitor?.isNativePlatform?.()) nav("/for-you");
     // Customers land on the homepage — they can pick a service directly
     // from the tiled service grid, no separate "hub" page.
     else nav("/");

@@ -165,8 +165,8 @@ def clean_doc(doc: dict) -> dict:
 # NOTE: retailer + restaurant were removed as PUBLIC roles (Lumo is P2P-only
 # now). We keep them in the Literal so existing legacy accounts in Mongo still
 # validate on read, but the /auth/register endpoint rejects them.
-Role = Literal["customer", "provider", "retailer", "restaurant", "admin"]
-BUSINESS_ROLES_DISABLED = {"retailer", "restaurant"}
+Role = Literal["customer", "provider", "retailer", "restaurant", "real_estate", "admin"]
+BUSINESS_ROLES_DISABLED: set = set()
 PayUnit = Literal["hour", "day", "week", "flat"]
 PaymentMethod = Literal["app", "cash", "card"]
 
@@ -187,6 +187,7 @@ class UserCreate(BaseModel):
     ref_code: Optional[str] = None                # Referral code — captured from `?ref=XXX` in frontend
     recruit_city_slug: Optional[str] = None        # City recruitment attribution — /join/{slug}
     signup_source: Optional[dict] = None           # First-touch UTM attribution {utm_source, utm_campaign, utm_content, landing_path}
+    re_mode: Optional[Literal["seeking", "listing"]] = None  # real_estate role: buy/rent vs sell/rent-out
 
 class UserLogin(BaseModel):
     email: str
@@ -229,6 +230,7 @@ class UserUpdate(BaseModel):
     resume_url: Optional[str] = None
     portfolio: Optional[List[dict]] = None            # replace-in-full portfolio array
     social_links: Optional[dict] = None               # {x, facebook, instagram, tiktok, youtube}
+    re_mode: Optional[Literal["seeking", "listing"]] = None
 
 class JobCreate(BaseModel):
     title: str
@@ -619,6 +621,7 @@ async def register(body: UserCreate, request: Request):
         "email": email,
         "name": body.name,
         "role": body.role,
+        **({"re_mode": body.re_mode or "seeking"} if body.role == "real_estate" else {}),
         "phone": body.phone,
         "avatar_url": body.avatar_url,
         "password_hash": hash_password(body.password),
@@ -7802,19 +7805,14 @@ async def _ensure_owner_admin():
 
 
 @app.on_event("startup")
-async def _deactivate_business_accounts():
-    """Lumo pivoted to P2P-only — existing retailer / restaurant accounts
-    can still log in but their storefronts / catalogs are hidden. On next
-    login they get a banner telling them to re-register as a provider."""
+async def _reactivate_business_accounts():
+    """Seller accounts (retailer / restaurant) are back — lift the old P2P-pivot pause."""
     res = await db.users.update_many(
-        {"role": {"$in": list(BUSINESS_ROLES_DISABLED)}, "deactivated_at": {"$exists": False}},
-        {"$set": {
-            "deactivated_at": now_iso(),
-            "deactivated_reason": "business_accounts_paused_p2p_pivot",
-        }},
+        {"deactivated_reason": "business_accounts_paused_p2p_pivot"},
+        {"$unset": {"deactivated_at": "", "deactivated_reason": ""}},
     )
     if res.modified_count:
-        logger.info(f"Deactivated {res.modified_count} legacy business accounts (retailer/restaurant)")
+        logger.info(f"Reactivated {res.modified_count} business accounts (retailer/restaurant)")
 
 app.add_middleware(
     CORSMiddleware,

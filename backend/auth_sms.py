@@ -62,6 +62,7 @@ class SmsVerify(BaseModel):
     ref_code: Optional[str] = Field(default=None, max_length=32)
     signup_source: Optional[dict] = None
     recruit_city_slug: Optional[str] = Field(default=None, max_length=120)
+    role: Optional[str] = Field(default=None, max_length=20)
 
 
 def _twilio_client() -> Optional[object]:
@@ -168,7 +169,7 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
                 "id": uid,
                 "email": synthetic_email,
                 "name": display_name,
-                "role": "customer",
+                "role": body.role if body.role in ("customer", "retailer", "restaurant", "real_estate") else "customer",
                 "phone": phone,
                 "phone_verified_at": now_iso(),
                 "password_hash": None,  # passwordless

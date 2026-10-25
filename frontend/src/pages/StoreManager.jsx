@@ -9,7 +9,7 @@ import MediaUpload from "@/components/MediaUpload";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
-export default function StoreManager({ role }) {
+export default function StoreManager({ role, section = "all" }) {
   const { user, updateMe } = useAuth();
   const sf = user.storefront || {};
   const [storeForm, setStoreForm] = useState({
@@ -78,12 +78,24 @@ export default function StoreManager({ role }) {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 py-8">
-      <div className="overline">{role === "restaurant" ? "Restaurant Hub" : "Retailer Hub"}</div>
+    <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8" data-testid={`seller-${section}`}>
+      <div className="overline">{role === "restaurant" ? "Restaurant Hub" : "Shop Hub"}</div>
       <h1 className="font-display text-4xl font-black tracking-tighter mt-2">{storeForm.name || "Your storefront"}</h1>
 
+      {section === "dashboard" && (
+        <div className="grid grid-cols-2 gap-3 mt-6" data-testid="seller-stats">
+          <div className="border border-slate-200 rounded-2xl p-4" data-testid="seller-stat-items">
+            <div className="overline">{role === "restaurant" ? "Menu items" : "Products"}</div>
+            <div className="font-display text-3xl font-black mt-1">{items.length}</div>
+          </div>
+          <div className="border border-slate-200 rounded-2xl p-4" data-testid="seller-stat-status">
+            <div className="overline">Storefront</div>
+            <div className="font-display text-lg font-bold mt-2">{sf.name ? "Live" : "Not set up"}</div>
+          </div>
+        </div>
+      )}
       <div className="grid lg:grid-cols-12 gap-8 mt-8">
-        <form onSubmit={saveStore} className="lg:col-span-5 border border-slate-200 p-6 space-y-4" data-testid="storefront-form">
+        {section !== "products" && <form onSubmit={saveStore} className="lg:col-span-5 border border-slate-200 p-6 space-y-4" data-testid="storefront-form">
           <div className="overline">Storefront profile</div>
           <div>
             <Label className="overline">Store name</Label>
@@ -117,11 +129,11 @@ export default function StoreManager({ role }) {
             <Textarea value={storeForm.description} onChange={(e) => setStoreForm({ ...storeForm, description: e.target.value })} data-testid="store-description" className="mt-1" />
           </div>
           <Button type="submit" className={`w-full ${accent} hover:opacity-90`} data-testid="storefront-save">Save storefront</Button>
-        </form>
+        </form>}
 
-        <div className="lg:col-span-7 space-y-8">
+        {section !== "dashboard" && <div className={`${section === "products" ? "lg:col-span-12" : "lg:col-span-7"} space-y-8`}>
           <form onSubmit={addItem} className="border border-slate-200 p-6 space-y-4" data-testid="item-form">
-            <div className="overline">Add inventory item</div>
+            <div className="overline">{role === "restaurant" ? "Add menu item" : "Add product"}</div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="overline">Name</Label>
@@ -172,7 +184,7 @@ export default function StoreManager({ role }) {
               })}
             </div>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

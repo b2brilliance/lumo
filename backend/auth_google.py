@@ -32,6 +32,7 @@ class GoogleExchange(BaseModel):
     ref_code: Optional[str] = None
     signup_source: Optional[dict] = None
     recruit_city_slug: Optional[str] = None
+    role: Optional[str] = None
 
 
 def create_router(*, db, create_access_token, now_iso) -> APIRouter:
@@ -89,7 +90,7 @@ def create_router(*, db, create_access_token, now_iso) -> APIRouter:
                 "id": uid,
                 "email": email,
                 "name": name,
-                "role": "customer",
+                "role": body.role if body.role in ("customer", "retailer", "restaurant", "real_estate") else "customer",
                 "phone": None,
                 "password_hash": None,  # OAuth-only account
                 "auth_provider": "google",

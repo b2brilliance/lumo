@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
+import { signupRole } from "@/lib/persona";
 
 const REF_KEY = "lumo_ref_code";
 const REF_TS_KEY = "lumo_ref_code_ts";
@@ -62,7 +63,8 @@ export function signupExtras(next = "") {
   try { ref = localStorage.getItem("lumo_ref_code") || null; } catch { /* private mode */ }
   const attr = readAttribution();
   const city = new URLSearchParams((next.split("?")[1]) || "").get("recruit_city_slug");
-  return { ...(ref ? { ref_code: ref } : {}), ...(attr ? { signup_source: attr } : {}), ...(city ? { recruit_city_slug: city } : {}) };
+  const role = signupRole();
+  return { ...(ref ? { ref_code: ref } : {}), ...(attr ? { signup_source: attr } : {}), ...(city ? { recruit_city_slug: city } : {}), ...(role ? { role } : {}) };
 }
 
 export function clearRedeemedRef() {

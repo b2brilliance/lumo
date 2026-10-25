@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAppMode } from "@/lib/persona";
 import { Sparkles, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import GuidePanel from "@/components/guide/GuidePanel";
@@ -28,7 +29,8 @@ export default function AssistantWidget() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(null);
-  const hidden = HIDDEN_ON.some((p) => pathname.startsWith(p));
+  const app = useAppMode();
+  const hidden = HIDDEN_ON.some((p) => pathname.startsWith(p)) || (app && (pathname === "/" || pathname.startsWith("/start") || pathname === "/signin" || pathname === "/register"));
 
   useEffect(() => {
     const onOpen = () => { setPrompt(null); setOpen(true); };
@@ -37,17 +39,17 @@ export default function AssistantWidget() {
   }, []);
 
   useEffect(() => {
-    if (loading || hidden || pathname.startsWith("/help") || localStorage.getItem(CHOICE_KEY)) return undefined;
+    if (app || loading || hidden || pathname.startsWith("/help") || localStorage.getItem(CHOICE_KEY)) return undefined;
     const t = setTimeout(() => setPrompt((p) => p || "first"), 2500);
     return () => clearTimeout(t);
-  }, [loading, hidden, pathname]);
+  }, [app, loading, hidden, pathname]);
 
   const onExit = useCallback(() => {
     if (sessionStorage.getItem(EXIT_KEY)) return;
     sessionStorage.setItem(EXIT_KEY, "1");
     setPrompt("exit");
   }, []);
-  useExitIntent(onExit, { enabled: !hidden && !open && !prompt && !pathname.startsWith("/help") });
+  useExitIntent(onExit, { enabled: !app && !hidden && !open && !prompt && !pathname.startsWith("/help") });
 
   if (hidden) return null;
 

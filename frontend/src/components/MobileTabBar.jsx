@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, ClipboardList, MessageCircle, User, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
-
-const HOME_FOR_ROLE = { provider: "/provider", admin: "/admin", retailer: "/retailer", restaurant: "/restaurant" };
+import { personaFor } from "@/lib/persona";
 
 function useUnreadMessages(user, pathname) {
   const [n, setN] = useState(0);
@@ -19,43 +17,50 @@ function useUnreadMessages(user, pathname) {
   return n;
 }
 
+function isActive(tab, pathname, tabs) {
+  if (pathname === tab.to) return true;
+  // Longest matching prefix wins so /seller/orders doesn't light up /seller too.
+  const matches = tabs.filter((t) => t.to !== "/" && pathname.startsWith(t.to + "/"));
+  const best = matches.sort((a, b) => b.to.length - a.to.length)[0];
+  return best?.key === tab.key && !tabs.some((t) => t.to === pathname);
+}
+
 export default function MobileTabBar() {
   const { pathname } = useLocation();
   const { user } = useAuth();
   const unread = useUnreadMessages(user, pathname);
-  const home = (user && HOME_FOR_ROLE[user.role]) || "/";
-  const gate = (to) => (user ? to : "/signin");
-
-  const tabs = [
-    { key: "home", label: "Home", to: home, Icon: Home, active: pathname === "/" || pathname === home },
-    { key: "orders", label: "Orders", to: gate("/orders"), Icon: ClipboardList, active: pathname.startsWith("/orders") },
-    { key: "messages", label: "Messages", to: gate("/messages"), Icon: MessageCircle, active: ["/messages", "/chats", "/inquiries"].some((p) => pathname.startsWith(p)), badge: unread },
-    { key: "help", label: "Help", to: "/help", Icon: LifeBuoy, active: pathname.startsWith("/help") },
-    { key: "profile", label: "Profile", to: gate("/settings"), Icon: User, active: pathname.startsWith("/settings") },
-  ];
+  const persona = personaFor(user);
+  if (!user && (pathname === "/" || pathname.startsWith("/start"))) return null;
+  const isRestaurant = user?.role === "restaurant";
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white/95 backdrop-blur border-t border-slate-200 pb-[env(safe-area-inset-bottom)]" data-testid="mobile-tab-bar">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white/90 backdrop-blur-xl border-t border-slate-200 pb-[env(safe-area-inset-bottom)]" data-testid="mobile-tab-bar">
       <div className="grid grid-cols-5">
-        {tabs.map(({ key, label, to, Icon, active, badge }) => (
-          <Link
-            key={key}
-            to={to}
-            className={`relative flex flex-col items-center justify-center py-2 text-[10px] font-mono uppercase tracking-wider transition-colors active:bg-slate-100 ${active ? "text-slate-900" : "text-slate-500"}`}
-            data-testid={`tabbar-${key}`}
-          >
-            <span className="relative">
-              <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
-              {badge > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center" data-testid="tabbar-messages-badge">
-                  {badge > 99 ? "99+" : badge}
-                </span>
-              )}
-            </span>
-            <span className="mt-0.5">{label}</span>
-            {active && <span className="absolute top-0 inset-x-6 h-0.5 bg-slate-900" />}
-          </Link>
-        ))}
+        {persona.tabs.map((tab) => {
+          const active = isActive(tab, pathname, persona.tabs);
+          const Icon = (isRestaurant && tab.RestaurantIcon) || tab.Icon;
+          const label = (isRestaurant && tab.restaurantLabel) || tab.label;
+          const to = tab.auth && !user ? `/signin?next=${encodeURIComponent(tab.to)}` : tab.to;
+          const badge = tab.key === "messages" ? unread : 0;
+          return (
+            <Link
+              key={tab.key}
+              to={to}
+              className={`relative flex flex-col items-center justify-center pt-2 pb-1.5 text-[10px] font-medium transition-colors active:scale-95 ${active ? "text-slate-900" : "text-slate-400"}`}
+              data-testid={`tabbar-${tab.key}`}
+            >
+              <span className={`relative flex items-center justify-center w-12 h-7 rounded-full transition-colors ${active ? "bg-slate-900/10" : ""}`}>
+                <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
+                {badge > 0 && (
+                  <span className="absolute -top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center" data-testid="tabbar-messages-badge">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
+              </span>
+              <span className="mt-0.5 leading-none">{label}</span>
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );

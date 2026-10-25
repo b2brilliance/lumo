@@ -265,6 +265,15 @@ html {
     html, body {
         overscroll-behavior-x: none;
     }
+    /* App feel on phones: no grey tap flash, no long-press callouts on nav. */
+    body {
+        -webkit-tap-highlight-color: transparent;
+    }
+    [data-testid="mobile-tab-bar"], [data-testid="app-top-bar"] {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
 }
 
 /* ── Google Places Autocomplete (new PlaceAutocompleteElement) ─────────

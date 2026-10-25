@@ -7,6 +7,12 @@ import { LocaleProvider } from "@/lib/locale";
 import { CartProvider } from "@/lib/cart";
 import NavBar from "@/components/NavBar";
 import MobileTabBar from "@/components/MobileTabBar";
+import AppTopBar from "@/components/app/AppTopBar";
+import AppWelcome from "@/pages/AppWelcome";
+import AppStart from "@/pages/AppStart";
+import RealEstateMine from "@/pages/RealEstateMine";
+import SellerOrders from "@/pages/SellerOrders";
+import { useAppMode, homeForRole } from "@/lib/persona";
 import CacheBuster from "@/components/CacheBuster";
 import RefCapture from "@/components/RefCapture";
 import ScrollToTop from "@/components/ScrollToTop";
@@ -98,15 +104,28 @@ if (typeof window !== "undefined") {
 
 // Where each role considers "home". Wrong-role hits any siloed route
 // get silently punted here (P2P pivot: no cross-role UX bleed).
-const HOME_FOR_ROLE = {
-  customer: "/",
-  provider: "/provider",
-  admin: "/admin",
-};
-
 function homeFor(user) {
   if (!user || user === false) return "/";
-  return HOME_FOR_ROLE[user.role] || "/";
+  return user.role === "customer" ? "/" : homeForRole(user.role);
+}
+
+function TopChrome() {
+  return useAppMode() ? <AppTopBar /> : <NavBar />;
+}
+
+function FooterChrome() {
+  const app = useAppMode();
+  return app ? <div className="h-[calc(64px+env(safe-area-inset-bottom))]" aria-hidden /> : (
+    <>
+      <SiteFooter />
+      <div className="md:hidden h-14" aria-hidden />
+    </>
+  );
+}
+
+function SellerPage({ section }) {
+  const { user } = useAuth();
+  return <StoreManager role={user.role} section={section} />;
 }
 
 // CustomerOnly — allows guests + customers, silently redirects
@@ -134,11 +153,12 @@ function Protected({ children, roles }) {
 // to their own dashboard. Guests + customers see the marketing landing.
 function RoleAwareLanding() {
   const { user, loading } = useAuth();
+  const app = useAppMode();
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
-  if (user && user !== false && user.role !== "customer") {
-    return <Navigate to={homeFor(user)} replace />;
+  if (user && user !== false && (user.role !== "customer" || app)) {
+    return <Navigate to={app && user.role === "customer" ? "/for-you" : homeFor(user)} replace />;
   }
-  return <PersonaSplit />;
+  return app ? <AppWelcome /> : <PersonaSplit />;
 }
 
 function App() {
@@ -150,7 +170,7 @@ function App() {
         <LocaleProvider>
           <AuthProvider>
             <CartProvider>
-              <NavBar />
+              <TopChrome />
               <ScrollToTop />
               <RefCapture />
               <NotificationsBridge />
@@ -168,6 +188,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/start/:persona" element={<AppStart />} />
 
             {/* /customer → redirect to homepage. Customers now start on the
                 service grid (no separate hub page). */}
@@ -180,8 +201,11 @@ function App() {
             <Route path="/training" element={<Training />} />
             <Route path="/services" element={<Services />} />
             <Route path="/provider" element={<Protected roles={["provider"]}><ProviderHub /></Protected>} />
-            <Route path="/retailer" element={<Navigate to="/services" replace />} />
-            <Route path="/restaurant" element={<Navigate to="/services" replace />} />
+            <Route path="/retailer" element={<Navigate to="/seller" replace />} />
+            <Route path="/restaurant" element={<Navigate to="/seller" replace />} />
+            <Route path="/seller" element={<Protected roles={["retailer", "restaurant"]}><SellerPage section="dashboard" /></Protected>} />
+            <Route path="/seller/products" element={<Protected roles={["retailer", "restaurant"]}><SellerPage section="products" /></Protected>} />
+            <Route path="/seller/orders" element={<Protected roles={["retailer", "restaurant"]}><SellerOrders /></Protected>} />
             {/* Legacy business-storefront routes — Lumo is P2P-only now.
              * Redirect to /services so nobody hits a broken page from a
              * bookmark or shared link. */}
@@ -200,6 +224,7 @@ function App() {
             <Route path="/real-estate" element={<RealEstate />} />
             <Route path="/real-estate/list" element={<Protected><RealEstateList /></Protected>} />
             <Route path="/real-estate/saved" element={<RealEstateSaved />} />
+            <Route path="/real-estate/mine" element={<Protected><RealEstateMine /></Protected>} />
             <Route path="/real-estate/:id" element={<RealEstateDetail />} />
 
             <Route path="/marketplace" element={<Marketplace />} />
@@ -283,9 +308,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
               </ErrorBoundary>
-          <SiteFooter />
-          {/* Bottom padding for mobile so the fixed tab bar doesn't hide the footer */}
-          <div className="md:hidden h-14" aria-hidden />
+          <FooterChrome />
           <MobileTabBar />
           <Toaster position="top-right" richColors />
             <AssistantWidget />

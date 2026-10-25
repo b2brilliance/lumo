@@ -11,6 +11,7 @@ import PlaceSearch from "@/components/realestate/PlaceSearch";
 import SaveSearchButton from "@/components/realestate/SaveSearchButton";
 import { KindTabs, FilterRow } from "@/components/realestate/ReFilters";
 import { apiParamsFrom, useReFavorites } from "@/components/realestate/reUtils";
+import ReModeSwitch from "@/components/app/ReModeSwitch";
 
 const BOUND_KEYS = ["north", "south", "east", "west"];
 
@@ -86,6 +87,7 @@ export default function RealEstate() {
       <Helmet><title>Homes for sale, rent & short stays worldwide · Lumo Real Estate</title></Helmet>
 
       <div className="border-b border-slate-200 px-4 sm:px-6 py-3 space-y-3">
+        <ReModeSwitch />
         <div className="flex flex-wrap items-center gap-2">
           <div className="w-full sm:w-auto sm:flex-1 flex"><PlaceSearch key={params.get("place") || "none"} initial={params.get("place") || ""} onPick={onPlace} /></div>
           <SaveSearchButton params={params} />
