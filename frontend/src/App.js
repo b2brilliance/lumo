@@ -106,6 +106,7 @@ if (typeof window !== "undefined") {
 // get silently punted here (P2P pivot: no cross-role UX bleed).
 function homeFor(user) {
   if (!user || user === false) return "/";
+  if (user.role === "real_estate" && user.re_mode === "listing") return "/real-estate/mine";
   return user.role === "customer" ? "/" : homeForRole(user.role);
 }
 
@@ -121,6 +122,11 @@ function FooterChrome() {
       <div className="md:hidden h-14" aria-hidden />
     </>
   );
+}
+
+function AppToaster() {
+  const app = useAppMode();
+  return <Toaster position={app ? "top-center" : "top-right"} richColors offset={app ? 64 : undefined} />;
 }
 
 function SellerPage({ section }) {
@@ -310,7 +316,7 @@ function App() {
               </ErrorBoundary>
           <FooterChrome />
           <MobileTabBar />
-          <Toaster position="top-right" richColors />
+          <AppToaster />
             <AssistantWidget />
             <InstallPrompt />
             </CartProvider>

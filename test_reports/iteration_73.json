@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 73: tested the app-mode personas (Capacitor/mobile layout) on the backend and frontend. Backend: 14 of 15 pytest tests pass. Logins for all 5 seeded personas work, including retailer and restaurant. Register works for the restaurant, retailer and real_estate roles. re_mode is saved on register, defaults to seeking, and rejects bad values with 422. PATCH /api/auth/me toggles re_mode. The one failure is a security hole that already existed before this change: public /api/auth/register accepts role=admin. Frontend at 390x844 logged out: the welcome screen has 4 persona cards, with no NavBar, footer, tab bar or top bar. The /start/{persona} pages, the seller and real-estate choices, the Create-account deep links and the sign-in link all work. UI registration as restaurant, retailer and real_estate (listing) landed on /seller, /seller and /real-estate/mine. Logged in, the top bar shows the logo on tab roots and a working back button elsewhere. The persona tabs and active highlight are correct, and restaurant users see the 'Menu' tab and title. The seller dashboard, products and orders pages render. The re-mode switch PATCHes and navigates both ways. Customer lands on /for-you and provider on /provider with the correct tabs. Desktop at 1920x800: the PersonaSplit page shows with NavBar and footer, and there is no top bar or tab bar. One integration bug: the SellerOrders page does not show order items or totals.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/auth/register", "issue": "SECURITY (existed before this change): the Role Literal includes 'admin' and register has no guard, so anyone can self-register as admin. Verified: role=admin returns 200 with user.role='admin' (the test user was deleted afterwards). Fix: reject role=='admin' in register, e.g. with a separate SignupRole Literal or a 403.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "PATCH /api/auth/me", "issue": "re_mode is accepted for any role, not only real_estate. Harmless but sloppy."},
+      {"endpoint": "GET /api/real-estate?owner_id=", "issue": "Always forces status=active, so the RealEstateMine page hides the owner's pending, sold or inactive listings."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SellerOrders.jsx", "issue": "Uses o.items and o.total, but the order docs use `lines` (name, quantity, subtotal_usd) and `item_total`, `deposit_total` and `remaining_total`. Each card shows only the customer name and ' · <date>', with no items and no amount. Seen on desktop with retailer@lumo.test (many orders).", "selector": "[data-testid^='seller-order-']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Real-estate listing-mode user opens '/'", "issue": "RoleAwareLanding uses homeForRole, which always returns /real-estate and ignores re_mode='listing'. SignIn smartReturn and Register send listing users to /real-estate/mine, so the behaviour is inconsistent.", "affected_selectors": ["[data-testid='re-mine-page']"]},
+      {"flow": "Seller orders", "issue": "The seller cannot act on orders (no accept or status buttons). The page is read-only.", "affected_selectors": ["[data-testid='seller-orders-page']"]}
+    ],
+    "design_issues": [
+      {"screen": "Mobile app mode (all logged-in pages)", "issues": ["The 'Ask Lumi' floating button sits just above the tab bar and covers content, for example form fields on /seller and next to the MAP button on /real-estate. Consider hiding it or making it smaller in app mode.", "/for-you still shows the website '← BACK' link under the app top bar, which duplicates the top bar's navigation on a tab-root page.", "The 'Welcome to Lumo' toast is positioned top-right and covers the app top bar on mobile."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter73_app_personas.py", "/app/test_reports/pytest/pytest_iter73.xml"],
+  "action_items": [
+    "CRITICAL: block role='admin' (and any non-signup role) in POST /api/auth/register",
+    "Fix SellerOrders.jsx to render o.lines (name x quantity) and the correct total (item_total plus fees, or deposit_total + remaining_total)",
+    "Make RoleAwareLanding/homeFor send real_estate users with re_mode='listing' to /real-estate/mine",
+    "Optional: let RealEstateMine show non-active listings for the owner",
+    "Optional: hide or reposition the AssistantWidget FAB and the /for-you back link in app mode"
+  ],
+  "critical_code_review_comments": [
+    "server.py: UserCreate.role uses the Role Literal, which includes 'admin'. This is a privilege-escalation hole.",
+    "SellerOrders.jsx filters /api/orders on the client side by store_id. That works, but it uses the wrong field names for items and total.",
+    "AppTopBar back button: window.history.length > 1 is almost always true in a browser, so the persona-home fallback rarely runs. Acceptable.",
+    "MobileTabBar on logged-out pages uses the persona stored in localStorage. That works, but tab links to auth-only routes send the user to /signin?next=..., which is fine."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter73_app_personas.py"],
+  "success_rate": {"backend": "93% (14/15; the 1 failure is the admin-register security hole)", "frontend": "~92% (all requested flows pass; SellerOrders shows incomplete data)"},
+  "seed_data_creation": "Created test_iter73_* and test_iter73ui_* users and deleted all of them with DELETE /api/admin/users/{id}. None remain. Temporarily toggled real_estate@lumo.test re_mode and restored it to 'listing'.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "App mode = width <=767px. Logging in by injecting localStorage lumo_token works (POST /api/auth/login, then setItem, then goto). Tabbar active tab = 'a.text-slate-900' inside [data-testid=mobile-tab-bar]. Delete test users with admin julius.a.mason@gmail.com/Mason0123 via DELETE /api/admin/users/{id}. Do not touch CacheBuster, service workers or the FB posting endpoints.",
+  "rca of the issue": "SellerOrders: the order schema (server.py cart checkout) stores `lines` and `item_total`, while the new page reads `items` and `total`. Admin register: the Role Literal is shared between UserCreate and the internal role list, so 'admin' passes validation."
+}

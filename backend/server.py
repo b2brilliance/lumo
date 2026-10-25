@@ -594,9 +594,8 @@ from referrals import (  # noqa: E402
 @api.post("/auth/register")
 async def register(body: UserCreate, request: Request):
     email = body.email.lower()
-    # Business-account signups are disabled — Lumo is P2P-only until we
-    # expand back to storefronts. Anyone signing up as a retailer or
-    # restaurant is redirected to become a service provider instead.
+    if body.role == "admin":
+        raise HTTPException(status_code=403, detail="This account type can't be created here.")
     if body.role in BUSINESS_ROLES_DISABLED:
         raise HTTPException(
             status_code=400,

@@ -30,7 +30,7 @@ export default function AssistantWidget() {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(null);
   const app = useAppMode();
-  const hidden = HIDDEN_ON.some((p) => pathname.startsWith(p)) || (app && (pathname === "/" || pathname.startsWith("/start") || pathname === "/signin" || pathname === "/register"));
+  const hidden = app || HIDDEN_ON.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
     const onOpen = () => { setPrompt(null); setOpen(true); };

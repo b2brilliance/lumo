@@ -274,6 +274,8 @@ def create_router(*, db, get_current_user, get_optional_user) -> APIRouter:
         f: dict = {"status": "active"}
         if owner_id:
             f["owner_id"] = owner_id
+            if viewer and viewer.get("id") == owner_id:
+                f.pop("status")
         if property_type:
             types = [t for t in property_type.split(",") if t]
             f["property_type"] = {"$in": types}

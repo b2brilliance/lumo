@@ -175,7 +175,7 @@ export default function ForYou() {
       </Helmet>
       <div className="min-h-[calc(100vh-56px)] bg-white" data-testid="for-you">
         <div className="max-w-5xl mx-auto px-5 pt-8 pb-24">
-          <Link to="/" className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-widest text-slate-500 hover:text-slate-900" data-testid="fy-back">
+          <Link to="/" className="hidden md:inline-flex items-center gap-1 text-xs font-mono uppercase tracking-widest text-slate-500 hover:text-slate-900" data-testid="fy-back">
             <ArrowLeft className="w-3 h-3" /> Back
           </Link>
           <div className="overline text-slate-500 mt-4">For you</div>

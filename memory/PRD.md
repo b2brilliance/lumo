@@ -996,3 +996,11 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - International: rotates the 81 campaign cities (city_ads BY_SLUG), alternating their 2 photos, with local-language opener
 - Each post: Delivery + 2 rotating categories, 3 example jobs each with pay ranges (live GoLumo median when >=3 live jobs in country, else US reference x cost-of-living PRICE_LEVEL x FX in local currency) + requirements, hashtags, UTM campaign daily_recruit
 - Admin: GET /api/admin/daily-recruit/status, GET /api/admin/daily-recruit/preview?slug=&seq=
+
+## 2026-06 Mobile App Mode + 4 Login Types
+- App mode (Capacitor native OR width <= 767px): AppTopBar replaces NavBar, no SiteFooter, persona tab bar (lib/persona.js PERSONAS), Ask Lumi + guide prompt hidden, toasts top-center. Desktop unchanged.
+- Logged-out phone "/" = AppWelcome (4 personas) -> /start/:persona (seller: restaurant|retailer; real estate: seeking|listing) -> /register?role=.. or /signin. Chosen persona stored in localStorage lumo_persona; Google/SMS new users get role via signupExtras().role
+- Roles: customer, provider, retailer, restaurant (re-enabled, startup un-pauses old accounts), real_estate (re_mode seeking|listing, switch via ReModeSwitch -> PATCH /auth/me). Admin self-registration now blocked (403).
+- New pages: /seller (dashboard), /seller/products, /seller/orders (SellerOrders), /real-estate/mine (RealEstateMine, owner sees all statuses)
+- Store builds: cd frontend && yarn build && npx cap add ios/android && npx cap sync, then Xcode / Android Studio (appId app.golumo.lumo, appName Lumo). REACT_APP_BACKEND_URL must be https://golumo.app for store builds.
+- Backlog: seller order actions (accept/ready/complete), app icons/splash art, push notification setup in stores

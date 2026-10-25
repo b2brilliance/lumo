@@ -27,10 +27,10 @@ export default function SellerOrders() {
           <div key={o.id} className="p-4 rounded-2xl border border-slate-200" data-testid={`seller-order-${o.id}`}>
             <div className="flex items-center justify-between">
               <div className="font-semibold">{o.customer_name || "Customer"}</div>
-              <span className="text-xs font-mono uppercase px-2 py-1 rounded-full bg-slate-100">{o.status || "new"}</span>
+              <span className="text-xs font-mono uppercase px-2 py-1 rounded-full bg-slate-100">{(o.status || "new").replace(/_/g, " ")}</span>
             </div>
-            <div className="text-sm text-slate-500 mt-1">{(o.items || []).map((i) => `${i.quantity || 1}× ${i.name}`).join(", ")}</div>
-            <div className="text-sm font-mono mt-1">{o.total != null ? `$${Number(o.total).toFixed(2)}` : ""} · {o.created_at ? new Date(o.created_at).toLocaleString() : ""}</div>
+            <div className="text-sm text-slate-500 mt-1">{(o.lines || o.items || []).map((i) => `${i.quantity || 1}× ${i.name}`).join(", ")}</div>
+            <div className="text-sm font-mono mt-1">{(o.item_total ?? o.total) != null ? `$${Number(o.item_total ?? o.total).toFixed(2)}` : ""} · {o.created_at ? new Date(o.created_at).toLocaleString() : ""}</div>
           </div>
         ))}
       </div>
