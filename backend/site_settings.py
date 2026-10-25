@@ -47,6 +47,18 @@ class SocialLinksBody(BaseModel):
     ads_enabled: Optional[bool] = Field(
         None, description="Master kill-switch for AdSense. When False, ads are hidden across the site even if a publisher ID is configured."
     )
+    ios_app_url: Optional[str] = None
+    android_app_url: Optional[str] = None
+
+
+ANDROID_DEFAULT_URL = "https://play.google.com/store/apps/details?id=app.golumo.mobile"
+
+
+def _app_links(doc: dict) -> dict:
+    return {
+        "ios_app_url": doc.get("ios_app_url") or "",
+        "android_app_url": doc.get("android_app_url") if doc.get("android_app_url") is not None else ANDROID_DEFAULT_URL,
+    }
 
 
 def _validate_url(url: str) -> str:
@@ -96,6 +108,7 @@ def create_router(*, db, require_admin) -> APIRouter:
             "ads_enabled": bool(doc.get("ads_enabled", True)),
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
+            **_app_links(doc),
         }
 
     @router.get("/api/admin/site/social")
@@ -110,6 +123,7 @@ def create_router(*, db, require_admin) -> APIRouter:
             "ads_enabled": bool(doc.get("ads_enabled", True)),
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
+            **_app_links(doc),
         }
 
     @router.put("/api/admin/site/social")
@@ -136,6 +150,10 @@ def create_router(*, db, require_admin) -> APIRouter:
             update_doc["adsense_client"] = ad
         if body.ads_enabled is not None:
             update_doc["ads_enabled"] = bool(body.ads_enabled)
+        if body.ios_app_url is not None:
+            update_doc["ios_app_url"] = _validate_url(body.ios_app_url)
+        if body.android_app_url is not None:
+            update_doc["android_app_url"] = _validate_url(body.android_app_url)
 
         await db.site_settings.update_one(
             {"_id": "social"}, {"$set": update_doc}, upsert=True
@@ -148,6 +166,7 @@ def create_router(*, db, require_admin) -> APIRouter:
             "ads_enabled": bool(doc.get("ads_enabled", True)),
             "platforms_supported": list(DEFAULT_PLATFORMS),
             "updated_at": doc.get("updated_at"),
+            **_app_links(doc),
             "ok": True,
         }
 

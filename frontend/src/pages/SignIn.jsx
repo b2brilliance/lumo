@@ -184,7 +184,7 @@ export default function SignIn() {
             {/* Official Google-brand-guideline sign-in button — white surface,
                 Roboto text, 40px height min, 4px radius. Matches what users
                 see on other well-known sites. */}
-            <button
+            {!window.Capacitor?.isNativePlatform?.() && <button
               onClick={startGoogle}
               type="button"
               className="w-full h-12 flex items-center justify-center gap-3 bg-white border border-[#dadce0] hover:bg-[#f8f9fa] hover:border-[#d2e3fc] active:bg-[#e8f0fe] transition-colors shadow-sm text-[#3c4043] font-medium text-[15px] rounded"
@@ -193,7 +193,7 @@ export default function SignIn() {
             >
               <GoogleIcon />
               <span>Sign in with Google</span>
-            </button>
+            </button>}
             <Button
               onClick={() => setMode("phone-input")}
               className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-base"

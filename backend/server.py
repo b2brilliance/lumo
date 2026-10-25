@@ -687,6 +687,18 @@ async def login(body: UserLogin, request: Request):
 async def me(user: dict = Depends(get_current_user)):
     return user
 
+@api.delete("/auth/me")
+async def delete_me(user: dict = Depends(get_current_user)):
+    if user.get("role") == "admin":
+        raise HTTPException(400, "Admin accounts can't be deleted from the app.")
+    uid = user["id"]
+    await db.users.delete_one({"id": uid})
+    await db.user_sessions.delete_many({"user_id": uid})
+    await db.storefronts.delete_many({"owner_id": uid})
+    await db.inventory_items.delete_many({"owner_id": uid})
+    await db.account_deletions.insert_one({"user_id": uid, "role": user.get("role"), "deleted_at": datetime.now(timezone.utc).isoformat()})
+    return {"ok": True}
+
 @api.patch("/auth/me")
 async def update_me(body: UserUpdate, user: dict = Depends(get_current_user)):
     # Use exclude_unset so explicit `null` from the client (e.g. clearing a

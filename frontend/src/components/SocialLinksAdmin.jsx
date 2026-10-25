@@ -18,6 +18,7 @@ export default function SocialLinksAdmin() {
   const [draft, setDraft] = useState({});
   const [tagline, setTagline] = useState("");
   const [adsense, setAdsense] = useState("");
+  const [apps, setApps] = useState({ ios_app_url: "", android_app_url: "" });
   const [savingKey, setSavingKey] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,6 +29,7 @@ export default function SocialLinksAdmin() {
       setDraft(data.links || {});
       setTagline(data.tagline || "");
       setAdsense(data.adsense_client || "");
+      setApps({ ios_app_url: data.ios_app_url || "", android_app_url: data.android_app_url || "" });
     } catch (e) {
       toast.error(formatApiError(e));
     } finally {
@@ -69,6 +71,18 @@ export default function SocialLinksAdmin() {
       const { data } = await api.put("/admin/site/social", { adsense_client: adsense });
       setDoc(data);
       toast.success(adsense ? "AdSense client saved — ads will appear on visitor pages" : "AdSense disabled");
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  };
+
+  const saveApp = async (key) => {
+    if ((doc?.[key] || "") === apps[key]) return;
+    try {
+      const { data } = await api.put("/admin/site/social", { [key]: apps[key] });
+      setDoc(data);
+      setApps({ ios_app_url: data.ios_app_url || "", android_app_url: data.android_app_url || "" });
+      toast.success("Download link saved — the homepage button is live");
     } catch (e) {
       toast.error(formatApiError(e));
     }
@@ -127,6 +141,19 @@ export default function SocialLinksAdmin() {
           Leave empty to disable ads entirely. You'll need an approved AdSense account from{" "}
           <a href="https://adsense.google.com/start" target="_blank" rel="noopener noreferrer" className="underline">adsense.google.com</a>.
         </p>
+      </div>
+
+      {/* App store download links */}
+      <div className="mb-6 border border-slate-200 p-4 space-y-3" data-testid="admin-app-links-block">
+        <label className="overline block">App download links (homepage buttons)</label>
+        {[["ios_app_url", "App Store link", "https://apps.apple.com/app/lumo/id1234567890"], ["android_app_url", "Google Play link", "https://play.google.com/store/apps/details?id=app.golumo.mobile"]].map(([key, label, ph]) => (
+          <div key={key}>
+            <div className="text-xs text-slate-500 mb-1">{label}</div>
+            <Input value={apps[key]} onChange={(e) => setApps((a) => ({ ...a, [key]: e.target.value.trim() }))} onBlur={() => saveApp(key)}
+              placeholder={ph} className="rounded-none font-mono text-sm" data-testid={`admin-${key.replace(/_/g, "-")}`} />
+          </div>
+        ))}
+        <p className="text-[11px] text-slate-500">Find your App Store link in App Store Connect → your app → App Information → "View on App Store". Leave empty to show the button as coming soon.</p>
       </div>
 
       {/* Links grid */}

@@ -353,6 +353,7 @@ export default function Settings() {
           </Button>
         </div>
         {pwOpen && <ChangePasswordCard onClose={() => setPwOpen(false)} />}
+        {user.role !== "admin" && <DeleteAccount onDone={() => { logout(); nav("/"); }} />}
       </SettingsSection>
 
       {/* ── Sticky save bar ────────────────────────────────────────────────── */}
@@ -442,6 +443,40 @@ function ChangePasswordCard({ onClose }) {
         <Button onClick={submit} disabled={busy} className="bg-slate-900 hover:bg-slate-800" data-testid="pw-submit">
           {busy ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}{busy ? "Saving…" : "Update password"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function DeleteAccount({ onDone }) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      await api.delete("/auth/me");
+      toast.success("Your account has been deleted");
+      onDone();
+    } catch (e) {
+      toast.error(formatApiError(e));
+      setBusy(false);
+    }
+  };
+  if (!confirm) {
+    return (
+      <button onClick={() => setConfirm(true)} className="mt-5 text-sm text-red-600 underline" data-testid="settings-delete-account">
+        Delete account
+      </button>
+    );
+  }
+  return (
+    <div className="mt-5 border border-red-200 bg-red-50 p-4" data-testid="settings-delete-confirm">
+      <div className="text-sm text-red-800">This permanently deletes your profile, login, shop and listings. This can&apos;t be undone.</div>
+      <div className="mt-3 flex gap-2">
+        <Button onClick={run} disabled={busy} className="bg-red-600 hover:bg-red-700" data-testid="settings-delete-confirm-btn">
+          {busy ? "Deleting…" : "Yes, delete my account"}
+        </Button>
+        <Button variant="outline" onClick={() => setConfirm(false)} data-testid="settings-delete-cancel">Cancel</Button>
       </div>
     </div>
   );

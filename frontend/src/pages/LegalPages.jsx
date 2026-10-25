@@ -188,8 +188,57 @@ export function PrivacyPage() {
       <p>To match you with providers/customers, process payments, send notifications, and prevent abuse.</p>
       <h2>Sharing</h2>
       <p>We share data with Stripe (payments), Twilio (SMS), Google (sign-in), and our analytics provider. We never sell your personal data.</p>
+      <h2>Mobile app permissions</h2>
+      <ul>
+        <li><strong>Camera and photos</strong> — only when you choose to add a profile photo, ID photo, product photo or listing photo</li>
+        <li><strong>Location</strong> — to show nearby stores, jobs and homes, calculate delivery distance and guide drivers during an active delivery</li>
+        <li><strong>Notifications</strong> — order, job and message updates. You can turn them off in your phone settings</li>
+      </ul>
+      <p>We don&apos;t use your data to track you across other companies&apos; apps or websites.</p>
       <h2>Your rights</h2>
-      <p>You can request a copy of your data or deletion at any time by emailing <a href="mailto:privacy@golumo.app">privacy@golumo.app</a>.</p>
+      <p>You can request a copy of your data at any time by emailing <a href="mailto:privacy@golumo.app">privacy@golumo.app</a>. You can delete your account yourself in the app under Settings → Account → Delete account, or see <a href="/delete-account">golumo.app/delete-account</a>.</p>
+    </Page>
+  );
+}
+
+const FAQ = [
+  ["How do I place an order?", "Open the app, choose Customer, pick a store or service near you and check out. You'll see the delivery fee before you pay."],
+  ["How do workers get paid?", "Workers keep 90% of every job and delivery fee, paid out the same day once the job is marked complete."],
+  ["How do I open a shop?", "Choose Seller on the welcome screen, pick your shop type and add your menu or products. Listing is free; a 5% fee applies to orders."],
+  ["Something went wrong with my order", "Use the contact form below with your order number and we'll fix it within 24 hours."],
+  ["How do I delete my account?", "In the app go to Settings → Account → Delete account. You can also follow the steps on our account deletion page."],
+];
+
+export function SupportPage() {
+  return (
+    <Page title="Support" testId="page-support">
+      <p>Help for customers, workers, sellers and real estate users of the Lumo app.</p>
+      {FAQ.map(([q, a], i) => (
+        <div key={q} data-testid={`support-faq-${i}`}>
+          <h2>{q}</h2>
+          <p>{a}</p>
+        </div>
+      ))}
+      <h2>Contact us</h2>
+      <p>Email <a href="mailto:support@golumo.app" data-testid="support-email">support@golumo.app</a> or use our <Link to="/contact" data-testid="support-contact-link">contact form</Link>. We reply within 24 hours.</p>
+    </Page>
+  );
+}
+
+export function DeleteAccountPage() {
+  return (
+    <Page title="Delete your Lumo account" testId="page-delete-account">
+      <p>You can permanently delete your Lumo account and the personal data tied to it at any time.</p>
+      <h2>In the app</h2>
+      <ol>
+        <li>Open Lumo and log in.</li>
+        <li>Go to <strong>Settings → Account</strong>.</li>
+        <li>Tap <strong>Delete account</strong> and confirm.</li>
+      </ol>
+      <h2>Without the app</h2>
+      <p>Email <a href="mailto:privacy@golumo.app?subject=Delete%20my%20account" data-testid="delete-account-email">privacy@golumo.app</a> from the email on your account with the subject &quot;Delete my account&quot;. We&apos;ll confirm within 7 days.</p>
+      <h2>What gets deleted</h2>
+      <p>Your profile, login, shop and product listings are removed right away. Records of completed orders and payments are kept for up to 7 years where tax and payment laws require it, with no link to your profile.</p>
     </Page>
   );
 }

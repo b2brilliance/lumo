@@ -98,7 +98,7 @@ import Inquiries from "@/pages/Inquiries";
 import PageviewPinger from "@/components/PageviewPinger";
 import SignIn from "@/pages/SignIn";
 import SiteFooter from "@/components/SiteFooter";
-import { AboutPage, ContactPage, TermsPage, PrivacyPage } from "@/pages/LegalPages";
+import { AboutPage, ContactPage, TermsPage, PrivacyPage, SupportPage, DeleteAccountPage } from "@/pages/LegalPages";
 import BlogIndex from "@/pages/BlogIndex";
 import BlogPost from "@/pages/BlogPost";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -326,6 +326,8 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/support" element={<SupportPage />} />
+            <Route path="/delete-account" element={<DeleteAccountPage />} />
             <Route path="/blog" element={<BlogIndex />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
             {/* Catch-all: admin subpaths → /admin, everything else → home.

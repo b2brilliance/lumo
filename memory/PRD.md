@@ -1014,3 +1014,13 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Real estate: listing form note (5% short-stay commission, others free); str_commission_pct stored but no STR payment flow reads it yet
 - Desktop "/" = WebsiteHome (program info + App Store/Google Play badges via REACT_APP_IOS_APP_URL / REACT_APP_ANDROID_APP_URL, "coming soon" until set); old PersonaSplit at /explore
 - Known: seeded store item categories don't match new chip categories; seeded items lack photos
+
+## 2026-06 — App store packaging
+- Capacitor config moved to `frontend/capacitor.config.json`; appId `app.golumo.mobile`; native shell loads live `https://golumo.app` (offline fallback `frontend/native-shell/`)
+- Generated `frontend/ios` (Swift Package Manager, no CocoaPods) and `frontend/android` projects; icons + splash generated from `frontend/assets/`
+- iOS Info.plist camera/photos/location strings; Android location/camera/media/notification permissions
+- Store copy + Play icon/feature graphic + publishing steps in `frontend/store-listing/` (LISTING.md, README.md)
+- New public pages `/support`, `/delete-account`; privacy policy updated with app permissions
+- In-app account deletion: `DELETE /api/auth/me` (admins blocked) + Settings → Account → Delete account
+- Homepage store buttons read `ios_app_url` / `android_app_url` from `/api/site/social`; Android defaults to Play link; admin edits both in Admin → Social links
+- Google + (mocked) Apple sign-in buttons hidden inside native apps (Google blocks in-app webview sign-in; Apple guideline 4.8)

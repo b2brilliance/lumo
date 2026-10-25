@@ -30,6 +30,9 @@ const AppleLogo = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden><path d="M16.4 12.7c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z" /></svg>
 );
 
+// Google blocks sign-in inside in-app web views and Apple keys are pending, so the store apps use phone/email.
+const NATIVE = typeof window !== "undefined" && !!window.Capacitor?.isNativePlatform?.();
+
 export default function AppStart() {
   const { persona } = useParams();
   const nav = useNavigate();
@@ -82,12 +85,16 @@ export default function AppStart() {
       )}
       <div className="flex-1" />
       <div className="space-y-2.5 mt-8" data-testid="app-start-auth">
-        <button onClick={() => toast("Sign in with Apple is coming soon. Use Google, phone or email for now.")} className={`${btn} bg-black text-white`} data-testid="app-start-apple">
-          <AppleLogo /> Continue with Apple
-        </button>
-        <button onClick={google} className={`${btn} bg-white text-slate-900`} data-testid="app-start-google">
-          <GoogleG /> Continue with Google
-        </button>
+        {!NATIVE && (
+          <>
+            <button onClick={() => toast("Sign in with Apple is coming soon. Use Google, phone or email for now.")} className={`${btn} bg-black text-white`} data-testid="app-start-apple">
+              <AppleLogo /> Continue with Apple
+            </button>
+            <button onClick={google} className={`${btn} bg-white text-slate-900`} data-testid="app-start-google">
+              <GoogleG /> Continue with Google
+            </button>
+          </>
+        )}
         <button onClick={() => { remember(); nav("/signin?method=phone"); }} className={`${btn} bg-white/15 text-white`} data-testid="app-start-phone">
           <Phone className="w-5 h-5" /> Continue with phone number
         </button>
