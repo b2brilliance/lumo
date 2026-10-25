@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import {
   LogOut, MapPin, Sparkles, ShoppingBag, Briefcase, User,
-  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy,
+  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy, Building2, BookOpen, Download,
 } from "lucide-react";
 const HELP_LINK = { to: "/help", label: "Help", icon: LifeBuoy, testId: "nav-help" };
 import LocaleSwitcher from "@/components/LocaleSwitcher";
@@ -26,11 +26,12 @@ import LocaleSwitcher from "@/components/LocaleSwitcher";
 // Nav-link definitions per role. Keys must match the `user.role` values.
 const NAV_BY_ROLE = {
   guest: [
-    { to: "/services",   label: "Services",   icon: Sparkles, testId: "nav-services" },
-    { to: "/marketplace",label: "Marketplace",icon: ShoppingBag, testId: "nav-marketplace" },
-    { to: "/shop",       label: "Shop",       icon: Store, testId: "nav-shop" },
-    { to: "/for-providers", label: "Earn",    icon: HardHat, testId: "nav-earn" },
-    HELP_LINK,
+    { to: "/app/customers",   label: "Customers",    icon: ShoppingBag, testId: "nav-link-customers" },
+    { to: "/app/workers",     label: "Workers",      icon: HardHat, testId: "nav-link-workers" },
+    { to: "/app/sellers",     label: "Sellers",      icon: Store, testId: "nav-link-sellers" },
+    { to: "/app/real-estate", label: "Real Estate",  icon: Building2, testId: "nav-link-real-estate" },
+    { to: "/how-it-works",    label: "How it works", icon: Sparkles, testId: "nav-link-how-it-works" },
+    { to: "/blog",            label: "Blog",         icon: BookOpen, testId: "nav-link-blog" },
   ],
   customer: [
     { to: "/services",   label: "Services",   icon: Sparkles, testId: "nav-services" },
@@ -73,7 +74,7 @@ export default function NavBar() {
     <header className="sticky top-0 z-40 nav-glass border-b border-neutral-200" data-testid="nav-bar">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-3 sm:gap-6 h-16">
         <Link to="/" className="flex items-center gap-2 flex-shrink-0" data-testid="nav-logo">
-          <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-display font-bold text-base rounded-full">L</div>
+          <img src="/logo192.png" alt="" className="w-8 h-8 rounded-[10px]" />
           <span className="font-display font-bold text-xl tracking-tight text-black">Lumo</span>
         </Link>
 
@@ -124,8 +125,8 @@ export default function NavBar() {
           ) : (
             <>
               <Link to="/login" data-testid="nav-login" className="btn-lumo btn-lumo-ghost">Sign in</Link>
-              <Link to="/register" className="hidden sm:block" data-testid="nav-register">
-                <span className="btn-lumo btn-lumo-primary btn-lumo-sm">Get started</span>
+              <Link to="/download" className="hidden sm:inline-flex items-center gap-2 h-10 px-5 rounded-full bg-slate-950 text-white text-sm font-semibold hover:bg-slate-800 transition-colors" data-testid="nav-action-download">
+                <Download className="w-4 h-4" /> Get the app
               </Link>
             </>
           )}

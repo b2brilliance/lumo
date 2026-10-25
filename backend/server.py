@@ -692,6 +692,9 @@ async def delete_me(user: dict = Depends(get_current_user)):
     if user.get("role") == "admin":
         raise HTTPException(400, "Admin accounts can't be deleted from the app.")
     uid = user["id"]
+    from auth_apple import revoke_apple
+    await revoke_apple(await db.users.find_one({"id": uid}) or {})
+    await db.device_tokens.delete_many({"user_id": uid})
     await db.users.delete_one({"id": uid})
     await db.user_sessions.delete_many({"user_id": uid})
     await db.storefronts.delete_many({"owner_id": uid})
@@ -4456,6 +4459,17 @@ async def checkout_status(session_id: str, req: Request):
                 st = "deposit_paid" if order.get("fulfillment") == "delivery" else "paid"
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": st, "paid_at": now_iso()}})
                 await db.cart_items.delete_many({"user_id": order["customer_id"], "store_id": order["store_id"]})
+                n_items = sum(int(ln.get("quantity") or 1) for ln in order.get("lines") or [])
+                how = "delivery" if order.get("fulfillment") == "delivery" else "pickup"
+                for uid_, title_, body_, link_ in (
+                    (order.get("store_id"), "New order received", f"{order.get('customer_name', 'A customer')} ordered {n_items} item(s) for {how}.", "/seller"),
+                    (order["customer_id"], "Order confirmed", f"Your payment went through. We'll let you know when your {how} order is on the way." if how == "delivery" else "Your payment went through. We'll let you know when it's ready for pickup.", "/orders"),
+                ):
+                    if uid_:
+                        await db.notifications.insert_one({
+                            "id": str(uuid.uuid4()), "user_id": uid_, "type": "order_paid", "title": title_,
+                            "body": body_, "link": link_, "order_id": order["id"], "read": False, "created_at": now_iso(),
+                        })
             elif tx["type"] == "final":
                 # Credit provider wallet with the final amount (minus 10% platform cut already kept as deposit)
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "completed", "final_paid_at": now_iso()}})
@@ -7407,6 +7421,8 @@ app.include_router(_create_sms_auth_router(db=db, create_access_token=create_acc
 # Emergent-managed Google sign-in (one-tap OAuth → Lumo JWT)
 from auth_google import create_router as _create_google_auth_router  # noqa: E402
 app.include_router(_create_google_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
+from auth_apple import create_router as _create_apple_auth_router  # noqa: E402
+app.include_router(_create_apple_auth_router(db=db, create_access_token=create_access_token, now_iso=now_iso))
 
 # Affiliate / referral offer engine — surfaces partner offers per category.
 from affiliates import create_affiliates_router as _create_affiliates_router  # noqa: E402
@@ -7721,6 +7737,14 @@ async def _recruit_autopost_startup():
     import asyncio
     from recruit_cities import recruit_autopost_loop as _recruit_loop
     asyncio.create_task(_recruit_loop(db, _social_publish, lambda: REACT_APP_BASE_URL))
+
+from native_push import create_router as _create_native_push_router, push_loop as _native_push_loop  # noqa: E402
+app.include_router(_create_native_push_router(db=db, get_current_user=get_current_user))
+
+@app.on_event("startup")
+async def _native_push_startup():
+    import asyncio
+    asyncio.create_task(_native_push_loop(db))
 
 @app.on_event("startup")
 async def _seed_recruit_cities_on_boot():

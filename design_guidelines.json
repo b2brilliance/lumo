@@ -1,155 +1,196 @@
 {
-  "design_system_tokens": {
-    "theme": "Uber-inspired High-Contrast Modern Tech & Creative (Light Base with Stark Obsidian Dark Accents)",
-    "colors": {
-      "background": "#FFFFFF",
-      "surface": "#F6F6F6",
-      "surface_subtle": "#EEEEEE",
-      "surface_dark": "#000000",
-      "card": "#FFFFFF",
-      "border": "#E2E2E2",
-      "border_dark": "#222222",
-      "foreground": "#000000",
-      "foreground_muted": "#545454",
-      "foreground_subtle": "#757575",
-      "primary": {
-        "DEFAULT": "#000000",
-        "foreground": "#FFFFFF",
-        "hover": "#1F1F1F",
-        "active": "#333333"
+  "project_name": "Lumo Marketing Platform (golumo.app)",
+  "app_type": "marketing_site",
+  "design_philosophy": {
+    "archetype": "Clean & Premium (Apple / Uber Obsidian Hybrid)",
+    "description": "Mostly crisp white with generous breathability, deep obsidian structure (#000000 / #0F172A), and glowing amber-to-rose-to-indigo gradient accents representing the signature Lumo app identity. High contrast, precise layout typography, interactive CSS phone mockups, and persona-driven conversion paths.",
+    "core_principles": [
+      "Generous negative space with 2x-3x standard padding (py-24, gap-12)",
+      "Persona-first navigation & discovery (Customers, Workers, Sellers, Real Estate)",
+      "High-impact conversion focus: Download app badges, desktop QR floating drawer, and direct app store deep-linking",
+      "Tactile CSS Phone frames containing interactive state mockups instead of plain screenshots",
+      "Stark contrast with surgical use of color accents: Slate neutrals + Lumo signature gradient (#F59E0B → #EC4899 → #6366F1)"
+    ]
+  },
+  "typography": {
+    "heading_font": "Space Grotesk, sans-serif",
+    "body_font": "IBM Plex Sans, sans-serif",
+    "mono_font": "IBM Plex Mono, monospace",
+    "hierarchy": {
+      "h1_hero": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] font-display",
+      "h2_section": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-950 font-display",
+      "h3_card": "text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 font-display",
+      "h4_label": "text-lg font-medium text-slate-900 font-display",
+      "body_lead": "text-lg sm:text-xl text-slate-600 leading-relaxed font-normal",
+      "body_standard": "text-base text-slate-600 leading-relaxed",
+      "caption_mono": "font-mono text-xs uppercase tracking-[0.2em] font-medium text-amber-600"
+    }
+  },
+  "colors": {
+    "mode": "light_primary_with_dark_accents",
+    "palette": {
+      "background_canvas": "#FFFFFF",
+      "surface_muted": "#F8FAFC",
+      "surface_subtle": "#F1F5F9",
+      "border_subtle": "#E2E8F0",
+      "border_active": "#000000",
+      "text_main": "#09090B",
+      "text_muted": "#475569",
+      "text_subtle": "#64748B",
+      "primary_action": "#000000",
+      "primary_action_hover": "#18181B",
+      "brand_gradient": "bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-600",
+      "brand_glow": "shadow-[0_0_40px_rgba(236,72,153,0.25)]",
+      "accents": {
+        "customer_blue": "#2563EB",
+        "worker_emerald": "#059669",
+        "seller_amber": "#D97706",
+        "realestate_violet": "#7C3AED"
+      }
+    }
+  },
+  "navigation_and_header": {
+    "desktop_top_nav": {
+      "container_class": "sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-xl transition-all duration-200",
+      "left_brand": {
+        "logo_icon": "amber-rose-indigo gradient square icon (rounded-2xl) with glowing white inline SVG 'l'",
+        "title": "Lumo",
+        "badge": "golumo.app"
       },
-      "secondary": {
-        "DEFAULT": "#F3F3F3",
-        "foreground": "#000000",
-        "hover": "#E5E5E5"
+      "center_links": [
+        { "label": "Customers", "path": "/app/customers", "data_testid": "nav-link-customers" },
+        { "label": "Workers", "path": "/app/workers", "data_testid": "nav-link-workers" },
+        { "label": "Sellers", "path": "/app/sellers", "data_testid": "nav-link-sellers" },
+        { "label": "Real Estate", "path": "/app/real-estate", "data_testid": "nav-link-real-estate" },
+        { "label": "How It Works", "path": "/how-it-works", "data_testid": "nav-link-how-it-works" },
+        { "label": "Blog", "path": "/blog", "data_testid": "nav-link-blog" }
+      ],
+      "right_actions": [
+        { "label": "Web App Sign In", "path": "/signin", "variant": "ghost", "data_testid": "nav-action-signin" },
+        { "label": "Download App", "action": "open_download_modal", "variant": "primary_pill", "data_testid": "nav-action-download" }
+      ]
+    }
+  },
+  "phone_mockup_css": {
+    "wrapper_class": "relative mx-auto w-full max-w-[310px] sm:max-w-[340px] aspect-[9/19] rounded-[48px] border-[10px] border-slate-900 bg-slate-950 p-2 shadow-2xl shadow-slate-900/40 ring-1 ring-white/10 overflow-hidden",
+    "camera_notch_class": "absolute top-4 left-1/2 -translate-x-1/2 z-30 h-4 w-28 bg-slate-900 rounded-full flex items-center justify-center gap-2",
+    "screen_container_class": "relative w-full h-full rounded-[38px] bg-white overflow-hidden flex flex-col font-sans select-none text-slate-900",
+    "glow_backdrop_class": "absolute -inset-4 bg-gradient-to-tr from-amber-500/20 via-rose-500/20 to-indigo-500/20 rounded-[56px] blur-2xl -z-10"
+  },
+  "homepage_layout_sections": [
+    {
+      "section_id": "hero",
+      "bg_class": "relative bg-gradient-to-b from-slate-50 via-white to-white pt-16 pb-24 lg:pt-24 lg:pb-32 overflow-hidden",
+      "layout": "2-column grid lg:grid-cols-12 gap-12 lg:gap-8 items-center max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+      "left_column": {
+        "span": "lg:col-span-7 space-y-8",
+        "elements": [
+          "Overline pill: 'EVERYTHING LOCAL. ONE APP. 15+ LANGUAGES'",
+          "H1 Heading: 'Order food, book local pros, run deliveries & rent homes.'",
+          "Subheading: 'The all-in-one local network for Customers, Workers, Local Stores & Real Estate.'",
+          "CTA Button Cluster: App Store Badge + Google Play Badge + Smart QR Code button",
+          "Metrics row: 90% payout for workers | 5% seller fee | 0% real estate listing fee"
+        ]
       },
-      "accent": {
-        "DEFAULT": "#276EF1",
-        "foreground": "#FFFFFF",
-        "hover": "#1E58C8",
-        "subtle": "#EFF4FE"
-      },
-      "success": {
-        "DEFAULT": "#05A357",
-        "foreground": "#FFFFFF",
-        "subtle": "#E8F8F0"
-      },
-      "warning": {
-        "DEFAULT": "#E18308",
-        "foreground": "#FFFFFF",
-        "subtle": "#FEF5E7"
-      },
-      "destructive": {
-        "DEFAULT": "#E11900",
-        "foreground": "#FFFFFF",
-        "subtle": "#FDEAE8"
+      "right_column": {
+        "span": "lg:col-span-5 relative flex justify-center",
+        "elements": [
+          "Interactive CSS Phone Mockup with tab switching between Customer / Worker / Seller / Real Estate live UI simulations",
+          "Floating QR code pill card with interactive preview hover"
+        ]
       }
     },
-    "typography": {
-      "font_family": {
-        "heading": "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
-        "body": "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-        "mono": "'IBM Plex Mono', monospace"
+    {
+      "section_id": "persona_split_tabs",
+      "title": "Built for everyone in your city",
+      "subtitle": "Switch persona to see how Lumo turns your local neighborhood into an instant digital engine.",
+      "tab_options": [
+        { "id": "customers", "label": "For Customers", "icon": "ShoppingBag", "color": "blue" },
+        { "id": "workers", "label": "For Delivery & Pros", "icon": "Zap", "color": "emerald" },
+        { "id": "sellers", "label": "For Local Stores", "icon": "Store", "color": "amber" },
+        { "id": "real-estate", "label": "For Real Estate", "icon": "Building", "color": "violet" }
+      ]
+    },
+    {
+      "section_id": "delivery_pricing_calculator",
+      "title": "Transparent & Fair Delivery Pricing",
+      "description": "No hidden platform markups. Delivery fee = Base fee + per-mile distance + order size scaling.",
+      "interactive_tool": "Real-time interactive slider (Distance in miles + Order size in $) rendering exact transparent fee breakdown vs traditional apps."
+    },
+    {
+      "section_id": "global_footprint",
+      "title": "Worldwide Cities & 15+ Languages",
+      "description": "Available globally across North America, Europe, Asia, Latin America, and Africa with automated local translation."
+    },
+    {
+      "section_id": "app_download_cta_banner",
+      "title": "Get Lumo on iOS & Android today",
+      "bg": "bg-slate-950 text-white rounded-3xl p-8 sm:p-14 relative overflow-hidden my-16 max-w-7xl mx-auto",
+      "elements": [
+        "Amber-rose glow background particle effects",
+        "App Store & Google Play download badges",
+        "Instant SMS / Email app link sender input",
+        "Desktop QR Code popover drawer"
+      ]
+    }
+  ],
+  "category_page_template": {
+    "applicable_routes": ["/app/customers", "/app/workers", "/app/sellers", "/app/real-estate"],
+    "sections": [
+      {
+        "id": "hero",
+        "layout": "Split Hero: Left value prop & key numbers, Right category-tailored CSS Phone frame",
+        "customer_focus": "Order food, groceries, home repair pros & local shopping with real-time tracking.",
+        "worker_focus": "Keep 90% of order earnings, flexible delivery runs, same-day pay out.",
+        "seller_focus": "Free digital storefront, only 5% order fee, complete inventory control.",
+        "real_estate_focus": "Free sales & long-term rental listings, 5% fee on short stays."
       },
-      "scale": {
-        "display": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]",
-        "h1": "text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1]",
-        "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-[1.15]",
-        "h3": "text-xl sm:text-2xl font-semibold tracking-tight leading-[1.2]",
-        "h4": "text-lg sm:text-xl font-semibold tracking-tight leading-[1.25]",
-        "body_large": "text-lg font-normal leading-relaxed",
-        "body_main": "text-base font-normal leading-normal",
-        "body_small": "text-sm font-normal leading-normal",
-        "caption": "text-xs font-medium text-slate-500",
-        "mono_label": "overline font-mono text-[11px] uppercase tracking-[0.2em] font-semibold text-slate-500"
+      {
+        "id": "step_by_step",
+        "title": "How it works step-by-step",
+        "layout": "3-card sequential step grid (Step 01, Step 02, Step 03) with high-contrast numbers and micro-animated line connector."
+      },
+      {
+        "id": "pricing_and_fees",
+        "title": "Transparent Fee Structure",
+        "layout": "High-density fee breakdown grid with comparison checkmarks against legacy platforms."
+      },
+      {
+        "id": "faq_accordion",
+        "title": "Frequently Asked Questions",
+        "layout": "Shadcn Accordion with explicit data-testid and high contrast hover states."
+      },
+      {
+        "id": "download_cta",
+        "layout": "Dark obsidian banner with iOS & Android download triggers."
       }
-    },
-    "border_radii": {
-      "pill": "rounded-full (9999px for interactive primary buttons, search chips, category badges)",
-      "card": "rounded-xl (12px or 16px for service cards, job feeds, dialogs)",
-      "input": "rounded-lg (8px for form fields, select triggers)",
-      "sharp": "rounded-none (for brutalist layout frames and split bars)"
-    },
-    "shadows": {
-      "none": "shadow-none",
-      "subtle": "shadow-[0_2px_8px_rgba(0,0,0,0.06)]",
-      "card_hover": "shadow-[0_12px_32px_rgba(0,0,0,0.12)]",
-      "floating_widget": "shadow-[0_20px_50px_rgba(0,0,0,0.18)]"
-    },
-    "spacing": {
-      "container_padding": "px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto",
-      "section_gap": "py-16 sm:py-24 lg:py-32",
-      "grid_gap": "gap-6 sm:gap-8 lg:gap-10"
-    }
+    ]
   },
-  "component_guidelines": {
-    "buttons": {
-      "primary": "bg-black text-white hover:bg-neutral-800 rounded-full px-6 py-3.5 font-medium transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center gap-2 text-base",
-      "secondary": "bg-neutral-100 text-black hover:bg-neutral-200 rounded-full px-6 py-3.5 font-medium transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2 text-base",
-      "accent": "bg-[#276EF1] text-white hover:bg-[#1E58C8] rounded-full px-6 py-3.5 font-medium transition-all duration-200 shadow-sm flex items-center justify-center gap-2 text-base",
-      "ghost": "bg-transparent text-black hover:bg-neutral-100 rounded-full px-4 py-2.5 font-medium transition-colors text-sm"
-    },
-    "inputs": {
-      "default": "w-full bg-neutral-50 border border-neutral-300 focus:border-black focus:bg-white focus:ring-1 focus:ring-black rounded-lg px-4 py-3 text-base text-black placeholder:text-neutral-400 transition-all outline-none"
-    },
-    "cards": {
-      "service_tile": "group relative bg-white border border-neutral-200 rounded-xl p-5 hover:border-black hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden",
-      "dashboard_widget": "bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:border-neutral-300 transition-all",
-      "dark_banner": "bg-black text-white rounded-2xl p-8 sm:p-12 relative overflow-hidden"
-    }
-  },
-  "key_page_redesigns": {
-    "homepage": {
-      "hero_structure": "Uber-style split screen: Left side floating request card (Service picker + Address input + Instant Dispatch CTA), Right side dynamic hero imagery (curated courier/mechanic/handyman photo with high contrast black gradient vignette).",
-      "service_grid": "30+ Categories categorized under 4 primary pillars (Road & Auto, Home Maintenance, Logistics & Moving, Personal & Professional). Displayed as clean high-density tiles with bold mono badges and subtle hover lift.",
-      "how_it_works": "3-step visual narrative (1. Pick & Detail -> 2. Instant Match & Live GPS -> 3. Complete & Rate). Clean numeric steps with high legibility monospace counters.",
-      "trust_markers": "P2P Verified Providers, Upfront 10% Deposit Protection, Real-time GPS Tracking, 4.9/5 Average Rating."
-    },
-    "order_flow": {
-      "step_1_category": "Visual service grid with price estimates & speed tags ('Under 20 min dispatch').",
-      "step_2_details": "Category-specific questions in neat stacked inputs with clear label hierarchy and image attachment option.",
-      "step_3_dispatch": "Uber-style address auto-complete + date/time picker (Instant or Scheduled) + clear 10% deposit breakdown.",
-      "step_4_live_tracker": "Full-bleed interactive map layout with provider avatar, ETA counter, live status bar (Dispatched -> En Route -> Arrived -> In Progress), and instant call/chat drawer."
-    },
-    "provider_dashboard": {
-      "job_feed": "Split view: Left list of available jobs sorted by live distance + earnings payout. Right map showing job markers with dispatch radii.",
-      "earnings_summary": "Clean stat widgets displaying Today's Earnings, Active Deposit Balance, Completed Jobs Count, and Stripe Instant Payout button.",
-      "online_toggle": "Uber-style top bar toggle switch ('YOU ARE ONLINE' with animated green indicator pulse)."
-    },
-    "marketing_template": {
-      "hero": "Bold editorial headline (Space Grotesk, 56px) + concise subhead + pill CTAs + high-impact full-width photo or split visual.",
-      "content_sections": "Asymmetrical 2-column feature blocks with clean typography, icon grids, and stat counters.",
-      "final_cta": "Full-bleed Obsidian Black banner with high-contrast White CTA button ('Get Started on Lumo')."
-    }
-  },
-  "nav_and_footer_patterns": {
-    "navbar": {
-      "style": "Sticky top bar with crystal glass blur (backdrop-blur-md bg-white/90 border-b border-neutral-200 z-50 px-4 sm:px-8 py-3.5)",
-      "guest": "Lumo Logo + 'Services', 'How it Works', 'For Providers', 'Marketplace' + 'Log In' (ghost button) + 'Get Started' (black pill button)",
-      "customer": "Lumo Logo + 'Book Service', 'My Orders', 'Marketplace', 'Wallet' + Customer Avatar dropdown",
-      "provider": "Lumo Logo + 'Job Feed', 'Earnings', 'Wallet', 'Community Market' + Online/Offline status badge + Provider Profile",
-      "admin": "Lumo Logo + 'User Management', 'Listings & Jobs', 'Affiliates', 'System Logs' + Admin Badge"
-    },
-    "footer": {
-      "style": "Deep Obsidian Black background (#000000) with stark white text, generous padding (py-20), multi-column links, city index, app download buttons, and copyright statement."
-    }
+  "microinteractions_and_animations": {
+    "hover_effects": "Subtle scale up (scale-102) with subtle lift (-translate-y-1) and crisp border color transition",
+    "transitions": "transition-all duration-200 ease-out (avoid transition-all on continuous transforms)",
+    "tabs_animation": "Framer motion LayoutId pill background slide effect",
+    "phone_screen_swap": "Cross-fade and subtle Y-axis slide up (duration 0.3s)",
+    "qr_modal": "Backdrop blur with scale-in overlay"
   },
   "image_urls": {
-    "hero_delivery": "https://images.unsplash.com/photo-1607130232670-52123ba5be5c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBjaXR5JTIwdXJiYW4lMjBzdHJlZXQlMjBkcml2ZXIlMjBzZXJ2aWNlJTIwY291cmllciUyMHRlY2huaWNpYW4lMjB0YXNrJTIwZGVsaXZlcnl8ZW58MHx8fHwxNzg4ODY1NzIzfDA&ixlib=rb-4.1.0&q=85",
-    "hero_courier": "https://images.unsplash.com/photo-1604605801370-3396f9bd9cf0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBjaXR5JTIwdXJiYW4lMjBzdHJlZXQlMjBkcml2ZXIlMjBzZXJ2aWNlJTIwY291cmllciUyMHRlY2huaWNpYW4lMjB0YXNrJTIwZGVsaXZlcnl8ZW58MHx8fHwxNzg4ODY1NzIzfDA&ixlib=rb-4.1.0&q=85",
-    "provider_handyman": "https://images.unsplash.com/photo-1610259998914-d1b9afe0dc55?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBtZWNoYW5pYyUyMHdvcmtlciUyMGhhbmR5bWFuJTIwdG9vbHMlMjByZXBhaXIlMjBzZXJ2aWNlJTIwdGVjaG5pY2lhbnxlbnwwfHx8fDE3ODg4NjU3Mjd8MA&ixlib=rb-4.1.0&q=85",
-    "provider_mechanic": "https://images.unsplash.com/photo-1615467517177-3157c0cd7ff5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBtZWNoYW5pYyUyMHdvcmtlciUyMGhhbmR5bWFuJTIwdG9vbHMlMjByZXBhaXIlMjBzZXJ2aWNlJTIwdGVjaG5pY2lhbnxlbnwwfHx8fDE3ODg4NjU3Mjd8MA&ixlib=rb-4.1.0&q=85"
+    "app_interface_hand": "https://images.pexels.com/photos/16052344/pexels-photo-16052344.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "grocery_delivery_phone": "https://images.pexels.com/photos/8939510/pexels-photo-8939510.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "scooter_delivery_person": "https://images.pexels.com/photos/35038738/pexels-photo-35038738.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "thermal_bag_courier": "https://images.pexels.com/photos/7706383/pexels-photo-7706383.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "moving_couple": "https://images.unsplash.com/photo-1758523670960-eb5512da12e8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHw0fHxjb3VyaWVyJTIwd29ya2VyJTIwZGVsaXZlcnklMjBzY29vdGVyJTIwcmVhbCUyMGVzdGF0ZSUyMGhvdXNlJTIwYXBhcnRtZW50fGVufDB8fHx8MTc5MjkxODk2OXww&ixlib=rb-4.1.0&q=85",
+    "window_cleaner_pro": "https://images.unsplash.com/photo-1780584447915-3487a6599795?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHszfHxjb3VyaWVyJTIwd29ya2VyJTIwZGVsaXZlcnklMjBzY29vdGVyJTIwcmVhbCUyMGVzdGF0ZSUyMGhvdXNlJTIwYXBhcnRtZW50fGVufDB8fHx8MTc5MjkxODk2OXww&ixlib=rb-4.1.0&q=85"
+  },
+  "testing_and_accessibility": {
+    "data_testid_convention": "kebab-case mandatory on all interactive buttons, inputs, links, tabs, and metric items (e.g. data-testid=\"nav-link-customers\", data-testid=\"download-app-store-button\")",
+    "contrast": "Strict 4.5:1 text-to-background contrast meeting APCA standards",
+    "focus_states": "ring-2 ring-slate-900 ring-offset-2 focus:outline-none"
   },
   "instructions_to_main_agent": [
-    "Strictly follow the Uber-inspired design system: bold black and white palette, minimal blue accent (#276EF1), Space Grotesk headers, IBM Plex Sans body, IBM Plex Mono overlines.",
-    "Implement pill-shaped buttons (rounded-full) for all primary actions and search triggers.",
-    "Preserve all existing routes, React 19 architecture, and data-testid attributes for reliable testing.",
-    "Ensure every page and component is fully mobile-first and responsive.",
-    "Apply subtle hover interactions (active scale 0.98, border-color transitions, light shadow elevations) across all service cards and buttons."
-  ],
-  "UNIVERSAL GUIDELINES FOR MAIN AGENT": {
-    "data_testid": "MUST include data-testid attribute on all interactive buttons, inputs, links, cards, tabs, and modals.",
-    "no_gradients_of_doom": "Avoid bright multi-color background gradients. Stick to solid white, crisp light gray (#F6F6F6), or deep obsidian black (#000000).",
-    "typography_rules": "Headings use Space Grotesk with negative tracking (-0.02em). Micro labels use IBM Plex Mono uppercase overline with letter-spacing 0.2em."
-  }
+    "1. Replace top navigation links in NavBar.js with: Customers (/app/customers), Workers (/app/workers), Sellers (/app/sellers), Real Estate (/app/real-estate), How it works (/how-it-works), Blog (/blog), plus a Download CTA button.",
+    "2. Implement /app/customers, /app/workers, /app/sellers, and /app/real-estate category detail pages using the high-impact template defined above.",
+    "3. Build WebsiteHome.js around the primary goal: getting users to download the app with prominent App Store/Google Play badges, smart link modal, and QR code overlay.",
+    "4. Ensure every single interactive element has a clear data-testid attribute.",
+    "5. Style phone mockups using pure HTML/Tailwind CSS with live rendered app cards."
+  ]
 }

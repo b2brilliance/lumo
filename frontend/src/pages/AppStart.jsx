@@ -1,9 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { ChevronLeft, UtensilsCrossed, Truck, Store, Package, KeyRound, Home, Phone, Mail } from "lucide-react";
 import { PERSONAS, setChosenPersona } from "@/lib/persona";
+import { useAuth } from "@/lib/auth";
+import { appleAvailable, signInWithApple } from "@/lib/appleSignIn";
+import { clearRedeemedRef } from "@/components/RefCapture";
+import { formatApiError } from "@/lib/api";
 
 const CHOICES = {
   seller: { q: "What do you sell?", opts: [
@@ -30,7 +34,7 @@ const AppleLogo = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden><path d="M16.4 12.7c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z" /></svg>
 );
 
-// Google blocks sign-in inside in-app web views and Apple keys are pending, so the store apps use phone/email.
+// Google blocks sign-in inside in-app web views, so the store apps use Apple (iPhone), phone or email.
 const NATIVE = typeof window !== "undefined" && !!window.Capacitor?.isNativePlatform?.();
 
 export default function AppStart() {
@@ -39,6 +43,10 @@ export default function AppStart() {
   const p = PERSONAS[persona];
   const ask = CHOICES[persona];
   const [choice, setChoice] = useState(ask ? ask.opts[0].v : null);
+  const { loginWithSmsResult } = useAuth();
+  const [apple, setApple] = useState(false);
+  const [appleBusy, setAppleBusy] = useState(false);
+  useEffect(() => { appleAvailable().then(setApple); }, []);
   if (!p || persona === "admin") return <Navigate to="/" replace />;
 
   const remember = () => {
@@ -55,6 +63,18 @@ export default function AppStart() {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH.
     const redirectUrl = window.location.origin + "/signin";
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+  const apple_ = async () => {
+    remember();
+    setAppleBusy(true);
+    try {
+      const r = loginWithSmsResult(await signInWithApple());
+      if (r.is_new) clearRedeemedRef();
+      toast.success(r.is_new ? "Welcome to Lumo!" : "Welcome back!");
+      nav("/");
+    } catch (e) {
+      if (!/cancel|1001|popup_closed/i.test(String(e?.message || e?.error || ""))) toast.error(e?.response ? formatApiError(e) : "Apple sign-in didn't finish. Try again.");
+    } finally { setAppleBusy(false); }
   };
   const signupUrl = () => {
     const role = remember();
@@ -85,15 +105,15 @@ export default function AppStart() {
       )}
       <div className="flex-1" />
       <div className="space-y-2.5 mt-8" data-testid="app-start-auth">
+        {apple && (
+          <button onClick={apple_} disabled={appleBusy} className={`${btn} bg-black text-white disabled:opacity-60`} data-testid="app-start-apple">
+            <AppleLogo /> {appleBusy ? "Signing in…" : "Continue with Apple"}
+          </button>
+        )}
         {!NATIVE && (
-          <>
-            <button onClick={() => toast("Sign in with Apple is coming soon. Use Google, phone or email for now.")} className={`${btn} bg-black text-white`} data-testid="app-start-apple">
-              <AppleLogo /> Continue with Apple
-            </button>
-            <button onClick={google} className={`${btn} bg-white text-slate-900`} data-testid="app-start-google">
-              <GoogleG /> Continue with Google
-            </button>
-          </>
+          <button onClick={google} className={`${btn} bg-white text-slate-900`} data-testid="app-start-google">
+            <GoogleG /> Continue with Google
+          </button>
         )}
         <button onClick={() => { remember(); nav("/signin?method=phone"); }} className={`${btn} bg-white/15 text-white`} data-testid="app-start-phone">
           <Phone className="w-5 h-5" /> Continue with phone number

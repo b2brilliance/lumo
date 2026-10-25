@@ -113,17 +113,18 @@ export async function watchPosition(callback, opts = {}) {
   return () => navigator.geolocation.clearWatch(id);
 }
 
-// ── Push notifications ─────────────────────────────────────────────────────
-export async function registerPushNotifications(onToken, onMessage) {
+// ── Push notifications (Firebase Cloud Messaging) ─────────────────────────
+export async function registerPushNotifications(onToken, onTap) {
   if (!(await isNative())) return null;
   try {
-    if (!_push) _push = (await import('@capacitor/push-notifications')).PushNotifications;
+    if (!_push) _push = (await import('@capacitor-firebase/messaging')).FirebaseMessaging;
     const perm = await _push.requestPermissions();
     if (perm.receive !== 'granted') return null;
-    await _push.register();
-    _push.addListener('registration', (token) => onToken?.(token.value));
-    _push.addListener('pushNotificationReceived', (note) => onMessage?.(note));
-    _push.addListener('pushNotificationActionPerformed', (action) => onMessage?.(action?.notification));
+    const { token } = await _push.getToken();
+    if (token) onToken?.(token);
+    await _push.removeAllListeners();
+    _push.addListener('tokenReceived', (e) => onToken?.(e.token));
+    _push.addListener('notificationActionPerformed', (e) => onTap?.(e?.notification?.data?.link));
     return _push;
   } catch (_) { return null; }
 }

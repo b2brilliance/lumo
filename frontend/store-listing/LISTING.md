@@ -51,7 +51,7 @@ Welcome to Lumo! Order, earn, sell and find a home — all in one app.
 ## App review notes (Apple → App Review Information)
 Demo account (customer): customer@lumo.test / password123
 Demo account (worker): provider@lumo.test / password123
-Sign in with "Log in" → email. Location is used to show nearby stores and calculate delivery. Accounts can be deleted in Settings → Account → Delete account.
+Sign in with "Log in" → email, or "Continue with Apple". Location is used to show nearby stores and calculate delivery. Accounts can be deleted in Settings → Account → Delete account.
 
 ## Age rating answers
 No violence, gambling, mature or user-generated sexual content. Users can message each other (choose "Yes" for user-to-user communication). Result: 12+ (Apple) / Teen (Google).
@@ -62,4 +62,5 @@ Collected and linked to the user: name, email, phone, approximate & precise loca
 ## Assets in this folder
 - play-store-icon-512.png — Google Play app icon
 - play-feature-graphic-1024x500.png — Google Play feature graphic
-- Screenshots: take them from the simulator / phone (see steps in README)
+- screenshots/iphone-6.9-*.png — App Store screenshots (1320×2868, iPhone 6.9")
+- screenshots/android-phone-*.png — Google Play phone screenshots (1080×2340)

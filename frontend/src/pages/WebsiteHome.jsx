@@ -1,89 +1,119 @@
-import React, { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ShoppingBag, HardHat, Store, Building2, Play } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Globe2, ShieldCheck, Zap } from "lucide-react";
+import { CATEGORY_LIST } from "@/components/site/siteData";
+import { PhoneFrame } from "@/components/site/PhoneFrame";
+import { StoreBadges } from "@/components/site/DownloadButtons";
+import { DownloadCTA } from "@/components/site/DownloadCTA";
+import { FeeCalculator } from "@/components/site/FeeCalculator";
 
-const Apple = ({ className }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden><path d="M16.4 12.7c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z" /></svg>
-);
+const fade = { initial: { opacity: 0, y: 18 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true } };
 
+function Hero() {
+  const [tab, setTab] = useState(0);
+  const c = CATEGORY_LIST[tab];
+  return (
+    <section className="relative bg-gradient-to-b from-slate-50 via-white to-white overflow-hidden">
+      <div className="absolute -top-40 right-0 w-[640px] h-[640px] rounded-full bg-gradient-to-tr from-amber-300 via-rose-300 to-indigo-300 opacity-30 blur-3xl" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 lg:pt-24 lg:pb-32 grid lg:grid-cols-12 gap-14 items-center">
+        <motion.div className="lg:col-span-7" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}>
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500" /> Free on iPhone and Android
+          </div>
+          <h1 className="font-display font-bold tracking-tight text-4xl sm:text-5xl lg:text-6xl leading-[1.05] mt-6 text-slate-950" data-testid="home-title">
+            Order food, book local pros, earn and find a home. <span className="bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-600 bg-clip-text text-transparent">One app.</span>
+          </h1>
+          <p className="mt-6 text-lg sm:text-xl text-slate-600 max-w-xl leading-relaxed">Lumo connects customers, workers, local sellers and real estate in your city. Everyone gets their own app experience, built for what they came to do.</p>
+          <div className="mt-10"><StoreBadges prefix="home-hero" /></div>
+          <dl className="mt-12 grid grid-cols-3 gap-6 max-w-lg">
+            {[["90%", "workers keep"], ["5%", "seller fee"], ["$0", "to list a home"]].map(([v, l]) => (
+              <div key={l}><dt className="font-display font-bold text-3xl text-slate-950">{v}</dt><dd className="text-sm text-slate-500 mt-1">{l}</dd></div>
+            ))}
+          </dl>
+        </motion.div>
+        <div className="lg:col-span-5">
+          <div className="flex justify-center gap-1 mb-8 p-1 rounded-full bg-slate-100 w-fit mx-auto" data-testid="home-phone-tabs">
+            {CATEGORY_LIST.map((x, i) => (
+              <button key={x.slug} onClick={() => setTab(i)} className="relative px-4 h-9 text-sm font-medium" data-testid={`home-phone-tab-${x.slug}`}>
+                {tab === i && <motion.span layoutId="tabpill" className="absolute inset-0 rounded-full bg-white shadow-sm" />}
+                <span className={`relative ${tab === i ? "text-slate-950" : "text-slate-500"}`}>{x.label}</span>
+              </button>
+            ))}
+          </div>
+          <AnimatePresence mode="wait">
+            <motion.div key={c.slug} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
+              <PhoneFrame screen={c.screen} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-const TYPES = [
-  { Icon: ShoppingBag, t: "Customers", b: "Order from restaurants, food trucks and shops for pickup or delivery, or book a local pro for cleaning, repairs, moving and more." },
-  { Icon: HardHat, t: "Workers", b: "Pick up delivery runs and service jobs near you. Set your own hours, keep 90% of every job and get paid the same day." },
-  { Icon: Store, t: "Sellers", b: "Restaurants, food trucks, stores and people selling their own things get a free shop with photos, a menu or catalog, and orders." },
-  { Icon: Building2, t: "Real estate", b: "List homes for sale and long-term rentals free. Short-term rentals pay a small 5% commission per booking." },
-];
+function Personas() {
+  return (
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24" data-testid="home-personas">
+      <div className="font-mono text-xs uppercase tracking-[0.2em] text-amber-600 font-medium">Four ways to use Lumo</div>
+      <h2 className="font-display font-bold tracking-tight text-2xl sm:text-3xl lg:text-4xl mt-4 max-w-2xl">Choose who you are. The app adapts to you.</h2>
+      <div className="grid sm:grid-cols-2 gap-5 mt-12">
+        {CATEGORY_LIST.map((c, i) => (
+          <motion.div key={c.slug} {...fade} transition={{ delay: i * 0.07 }}>
+            <Link to={`/app/${c.slug}`} className="group block h-full rounded-[28px] border border-slate-200 p-8 hover:border-slate-900 hover:-translate-y-1 transition-[transform,border-color] duration-200" data-testid={`home-persona-${c.slug}`}>
+              <div className="w-12 h-12 rounded-2xl grid place-items-center text-white" style={{ background: c.accent }}><c.Icon className="w-6 h-6" /></div>
+              <h3 className="font-display font-semibold text-2xl mt-6">{c.label}</h3>
+              <p className="text-slate-600 mt-2 leading-relaxed">{c.lead}</p>
+              <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold group-hover:gap-3 transition-[gap]">See how it works <ArrowRight className="w-4 h-4" /></span>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-function StoreBadge({ href, Icon, top, name, testid }) {
-  const cls = "inline-flex items-center gap-3 h-14 px-5 rounded-2xl bg-white text-slate-950 active:scale-95 transition-transform";
-  const body = (<><Icon className="w-6 h-6" /><span className="text-left leading-tight"><span className="block text-[10px] uppercase tracking-wider text-slate-500">{top}</span><span className="block font-semibold">{name}</span></span></>);
-  return href
-    ? <a href={href} target="_blank" rel="noreferrer" className={cls} data-testid={testid}>{body}</a>
-    : <span className={`${cls} opacity-90`} title="Coming soon" data-testid={testid}>{body}</span>;
+function Pricing() {
+  return (
+    <section className="bg-slate-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 grid lg:grid-cols-2 gap-14 items-center">
+        <div>
+          <div className="font-mono text-xs uppercase tracking-[0.2em] text-amber-600 font-medium">Fair, open pricing</div>
+          <h2 className="font-display font-bold tracking-tight text-2xl sm:text-3xl lg:text-4xl mt-4">See the delivery fee before you order.</h2>
+          <p className="text-lg text-slate-600 mt-5 leading-relaxed">No subscriptions and no hidden markups. Delivery is a small base fee plus a per-mile charge, scaled for bigger orders, and drivers keep 90% of it.</p>
+          <ul className="mt-8 space-y-3 text-slate-700">
+            {["Pickup: just a 5% service fee", "Sellers open a shop free and pay 5% per sale", "Homes for sale and long-term rentals list free", "Short stays: 5% per booking"].map((t) => <li key={t} className="flex gap-3"><span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-900 shrink-0" />{t}</li>)}
+          </ul>
+        </div>
+        <FeeCalculator />
+      </div>
+    </section>
+  );
+}
+
+function Trust() {
+  const items = [[Globe2, "Worldwide, in your language", "Available in cities around the world, in 15+ languages and local currencies."], [ShieldCheck, "Verified and secure", "Workers verify their ID, and payments are processed securely by Stripe."], [Zap, "Instant alerts", "Push notifications for every order, job and message, the moment it happens."]];
+  return (
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 grid md:grid-cols-3 gap-10">
+      {items.map(([Icon, t, b], i) => (
+        <motion.div key={t} {...fade} transition={{ delay: i * 0.08 }} data-testid={`home-trust-${i}`}>
+          <Icon className="w-7 h-7" />
+          <h3 className="font-display font-semibold text-xl mt-5">{t}</h3>
+          <p className="text-slate-600 mt-2 leading-relaxed">{b}</p>
+        </motion.div>
+      ))}
+    </section>
+  );
 }
 
 export default function WebsiteHome() {
-  const [links, setLinks] = useState({});
-  useEffect(() => { api.get("/site/social").then(({ data }) => setLinks(data)).catch(() => {}); }, []);
-  const IOS_URL = links.ios_app_url;
-  const ANDROID_URL = links.android_app_url;
   return (
-    <div className="bg-slate-950 text-white" data-testid="website-landing">
-      <section className="relative overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600 opacity-25 blur-3xl" />
-        <div className="relative max-w-6xl mx-auto px-6 sm:px-10 py-24 lg:py-32">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="text-xs uppercase tracking-[0.25em] text-white/50 font-mono">The Lumo app</div>
-            <h1 className="font-display font-black tracking-tight text-4xl sm:text-5xl lg:text-6xl leading-[1.02] mt-5 max-w-3xl">
-              Food, products, local help and places to live. One app.
-            </h1>
-            <p className="mt-6 text-lg text-white/70 max-w-xl">Order, earn, sell or find a home. Everyone gets their own Lumo, built for what they came to do.</p>
-            <div className="mt-10 flex flex-wrap gap-3" data-testid="landing-download">
-              <StoreBadge href={IOS_URL} Icon={Apple} top="Download on the" name="App Store" testid="landing-ios" />
-              <StoreBadge href={ANDROID_URL} Icon={Play} top="Get it on" name="Google Play" testid="landing-android" />
-            </div>
-            {!(IOS_URL && ANDROID_URL) && <p className="mt-3 text-xs text-white/40" data-testid="landing-coming-soon">Coming soon to the App Store and Google Play.</p>}
-          </motion.div>
-        </div>
-      </section>
-      <section className="bg-white text-slate-950">
-        <div className="max-w-6xl mx-auto px-6 sm:px-10 py-20">
-          <div className="text-xs uppercase tracking-[0.25em] text-slate-500 font-mono">Four ways to use Lumo</div>
-          <div className="grid sm:grid-cols-2 gap-5 mt-8">
-            {TYPES.map(({ Icon, t, b }, i) => (
-              <motion.div key={t} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
-                className="p-7 rounded-3xl border border-slate-200" data-testid={`landing-type-${i}`}>
-                <Icon className="w-7 h-7" />
-                <div className="font-display font-bold text-2xl mt-5">{t}</div>
-                <p className="text-slate-600 mt-2 leading-relaxed">{b}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="bg-slate-50 text-slate-950">
-        <div className="max-w-6xl mx-auto px-6 sm:px-10 py-20 grid lg:grid-cols-2 gap-12">
-          <div>
-            <div className="text-xs uppercase tracking-[0.25em] text-slate-500 font-mono">Simple, fair pricing</div>
-            <h2 className="font-display font-bold text-3xl mt-4">No subscriptions. No hidden fees.</h2>
-          </div>
-          <ul className="space-y-4 text-slate-700" data-testid="landing-pricing">
-            <li><b>Pickup orders:</b> a 5% service fee on the items.</li>
-            <li><b>Delivery orders:</b> 5% plus a delivery fee based on distance and how big the order is. Drivers keep 90% of it.</li>
-            <li><b>Workers:</b> keep 90% of every job, paid the same day.</li>
-            <li><b>Real estate:</b> sales and long-term rentals are free to list. Short-term rentals pay 5% per booking.</li>
-          </ul>
-        </div>
-      </section>
-      <section className="max-w-6xl mx-auto px-6 sm:px-10 py-16 flex flex-wrap items-center justify-between gap-6">
-        <div className="font-display text-2xl font-bold">Want to earn with Lumo?</div>
-        <div className="flex gap-3">
-          <Link to="/join" className="h-12 px-6 rounded-full bg-white text-slate-950 font-semibold inline-flex items-center" data-testid="landing-join">Become a worker</Link>
-          <Link to="/recruiter" className="h-12 px-6 rounded-full border border-white/30 font-semibold inline-flex items-center" data-testid="landing-recruit">Recruit and earn</Link>
-        </div>
-      </section>
+    <div className="bg-white text-slate-950" data-testid="website-landing">
+      <Hero />
+      <Personas />
+      <Pricing />
+      <Trust />
+      <DownloadCTA prefix="home-cta" />
     </div>
   );
 }

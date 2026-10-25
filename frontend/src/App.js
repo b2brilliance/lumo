@@ -40,6 +40,9 @@ import ProviderHub from "@/pages/ProviderHub";
 import StoreManager from "@/pages/StoreManager";
 import SplashIntro from "@/components/app/SplashIntro";
 import WebsiteHome from "@/pages/WebsiteHome";
+import CategoryPage from "@/pages/site/CategoryPage";
+import HowItWorksPage from "@/pages/site/HowItWorksPage";
+import DownloadRedirect from "@/pages/site/DownloadRedirect";
 import CustomerHome from "@/pages/app/CustomerHome";
 import Market from "@/pages/app/Market";
 import StorePage from "@/pages/app/StorePage";
@@ -103,6 +106,7 @@ import BlogIndex from "@/pages/BlogIndex";
 import BlogPost from "@/pages/BlogPost";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { initNativeShell } from "@/lib/native";
+import { NativePushBridge } from "@/components/app/NativePushBridge";
 
 if (typeof window !== "undefined") {
   // Boot native bridge once. No-op when running in a regular browser.
@@ -188,6 +192,7 @@ function App() {
           <AuthProvider>
             <CartProvider>
               <AppSplash />
+              <NativePushBridge />
               <TopChrome />
               <ScrollToTop />
               <RefCapture />
@@ -280,7 +285,9 @@ function App() {
             <Route path="/regions" element={<RegionHub />} />
 
             {/* Marketing / SEO pages (recruiting-focused per Feb 2026) */}
-            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/app/:slug" element={<CategoryPage />} />
+            <Route path="/download" element={<DownloadRedirect />} />
             <Route path="/for-providers" element={<ForProviders />} />
             <Route path="/for-customers" element={<ForCustomers />} />
             <Route path="/apply" element={<Apply />} />
