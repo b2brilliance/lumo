@@ -5,8 +5,9 @@ import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import {
   LogOut, MapPin, Sparkles, ShoppingBag, Briefcase, User,
-  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy, Building2, BookOpen, Download,
+  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy, Building2, BookOpen, Download, Menu,
 } from "lucide-react";
+import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const HELP_LINK = { to: "/help", label: "Help", icon: LifeBuoy, testId: "nav-help" };
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 
@@ -52,11 +53,32 @@ const NAV_BY_ROLE = {
 };
 
 function linkClass({ isActive }) {
-  return `px-3 py-2 text-sm font-medium transition-colors ${
+  return `px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
     isActive
       ? "text-black"
       : "text-neutral-500 hover:text-black"
   }`;
+}
+
+function GuestMenu({ links }) {
+  return (
+    <Sheet>
+      <SheetTrigger className="xl:hidden inline-flex items-center gap-2 h-10 px-4 rounded-full border border-neutral-200 text-sm font-medium hover:border-black transition-colors" data-testid="nav-menu-toggle">
+        <Menu className="w-4 h-4" /> Menu
+      </SheetTrigger>
+      <SheetContent side="right" className="w-80" data-testid="nav-menu-sheet">
+        <nav className="mt-8 flex flex-col">
+          {links.map(({ to, label, icon: Icon, testId }) => (
+            <SheetClose asChild key={to}>
+              <Link to={to} className="flex items-center gap-3 py-3.5 border-b border-neutral-100 font-display font-semibold text-lg" data-testid={`menu-${testId}`}>
+                <Icon className="w-5 h-5" /> {label}
+              </Link>
+            </SheetClose>
+          ))}
+        </nav>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 export default function NavBar() {
@@ -82,7 +104,7 @@ export default function NavBar() {
         <div className="flex-shrink-0 hidden lg:block" data-testid="nav-locale-left"><LocaleSwitcher /></div>
 
         {/* Role-siloed primary nav */}
-        <nav className="hidden md:flex items-center gap-1 h-full min-w-0 overflow-hidden" data-testid={`nav-links-${roleForNav}`}>
+        <nav className={`hidden ${roleForNav === "guest" ? "xl:flex" : "md:flex"} items-center gap-1 h-full min-w-0 overflow-hidden`} data-testid={`nav-links-${roleForNav}`}>
           {links.map((l) => {
             const Icon = l.icon;
             return (
@@ -95,6 +117,7 @@ export default function NavBar() {
 
         {/* Right side — session controls */}
         <div className="ml-auto flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {roleForNav === "guest" && <GuestMenu links={links} />}
           {user && user !== false ? (
             <>
               {role === "provider" && (

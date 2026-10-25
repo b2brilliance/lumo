@@ -1024,3 +1024,15 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - In-app account deletion: `DELETE /api/auth/me` (admins blocked) + Settings → Account → Delete account
 - Homepage store buttons read `ios_app_url` / `android_app_url` from `/api/site/social`; Android defaults to Play link; admin edits both in Admin → Social links
 - Google + (mocked) Apple sign-in buttons hidden inside native apps (Google blocks in-app webview sign-in; Apple guideline 4.8)
+
+## 2026-06 — Website redesign, Apple sign-in, native push, store screenshots
+- Marketing site (clean & premium): guest nav = Customers, Workers, Sellers, Real Estate, How it works, Blog + "Get the app" (sheet menu below xl)
+- New pages: /app/:slug (customers|workers|sellers|real-estate) category template, /how-it-works, /download smart link (UA → store, desktop QR)
+- Homepage: hero with tabbed CSS phone mockups, persona cards, live delivery fee calculator (/api/app/pricing), trust row, download CTA
+- Sign in with Apple: backend `auth_apple.py` (POST /api/auth/apple, GET /api/auth/apple/config); iOS native via @capacitor-community/apple-sign-in works without keys (aud = app.golumo.mobile); web button + token revoke need APPLE_TEAM_ID, APPLE_SERVICES_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY (NOT YET SET)
+- Native push: `native_push.py` (POST /api/push/native/register|unregister); 10s loop forwards every new db.notifications doc to FCM; needs FIREBASE_SERVICE_ACCOUNT_JSON (NOT YET SET) + GoogleService-Info.plist / google-services.json in native projects
+- New "order_paid" notifications to seller + customer; Stripe webhook now finalizes checkout server-side
+- Account deletion also clears notifications/push subs and anonymizes orders; revokes Apple token when possible
+- Store screenshots (illustrated) in frontend/store-listing/screenshots (iPhone 6.9" 1320×2868, Android 1080×2340)
+- iOS: App.entitlements (Sign in with Apple + push), iPhone-only, AppDelegate push forwarding
+- Tested: iteration_75 (backend 12/12, frontend flows pass; tablet nav fixed after)

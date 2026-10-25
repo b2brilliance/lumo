@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 75: tested Apple sign-in endpoints, native push register/unregister, DELETE /api/auth/me, the app download links in site settings, and the new marketing website (guest nav, homepage, 4 category pages, /how-it-works, /blog, /download smart link, admin App download links, Apple button hidden on web, logged-in customer nav, mobile app welcome). Backend 12/12 passed. Every frontend flow requested works. Remaining issues: the guest nav doesn't fit at tablet widths, a minor load race in the admin input, and a misleading toast. The iOS URL was set during testing and has been cleared back to '' (verified via GET /api/site/social).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/checkout/status/{id} (order_paid notifications ~L4457)", "issue": "The order_paid notifications (and so the native push) are only created when the customer's browser polls checkout/status. /api/webhook/stripe only logs the event. If the customer closes the tab before polling, the seller gets no 'New order received' push and the order stays unpaid. This existed before this iteration, but it matters more now that the push feature depends on it."},
+      {"endpoint": "DELETE /api/auth/me", "issue": "Deletes the user, sessions, storefronts, inventory and device tokens. Orders, notifications, messages, listings and reviews keep the deleted user's id and name (PII). Consider anonymizing them for App Store guideline 5.1.1(v)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SocialLinksAdmin App download links", "issue": "Race: if the admin types into admin-ios-app-url before GET /admin/site/social returns, load() calls setApps and overwrites the typed value, so nothing is saved (reproduced once in automation). Low impact.", "selector": "[data-testid='admin-ios-app-url']", "priority": "LOW"},
+      {"component": "SocialLinksAdmin saveApp toast", "issue": "Clearing a download link still shows 'Download link saved — the homepage button is live'. It should say the link was cleared (coming soon).", "selector": "[data-testid='admin-app-links-block']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Guest NavBar at tablet widths (768-1024px)", "issues": ["At 768px the 6 nav links plus Sign in and Get the app don't fit. Icons stack above labels, 'How it works' is clipped ('How it worl') and Blog is pushed out of view.", "At 1024px the labels wrap onto 2 lines ('Real / Estate', 'How it / works'), which looks cramped. Collapse to a hamburger/sheet below lg, or hide the icons and use whitespace-nowrap."]},
+      {"screen": "Homepage hero phone tabs at 1024px", "issues": ["The 'Real Estate' tab label wraps onto 2 lines inside the pill. Add whitespace-nowrap."]},
+      {"screen": "/blog", "issues": ["Large empty block (~300px) between the header and the post grid, probably an empty AdSense slot. The 3rd post card image is blank (gray placeholder). This existed before this iteration."]},
+      {"screen": "All site pages", "issues": ["The 'Want a guide?' Lumi popup plus the 'Ask Lumi' FAB cover the bottom-right of the footer and CTA content on desktop. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter75_apple_push_download.py", "/app/test_reports/pytest/pytest_iter75.xml"],
+  "action_items": [
+    "Make the guest NavBar responsive between md and lg (hamburger or no-wrap with hidden icons). It currently overflows at 768px.",
+    "Add whitespace-nowrap to the home phone tabs (home-phone-tab-*).",
+    "SocialLinksAdmin: don't overwrite apps state from load() if the user has already edited the field. Show a 'cleared' toast when the value is empty.",
+    "Optional: finalize paid orders and send the order_paid notifications from /api/webhook/stripe too, so the seller push doesn't depend on the customer's browser polling."
+  ],
+  "critical_code_review_comments": [
+    "DownloadButtons.useStoreLinks caches the /site/social promise at module level (_links), so admin changes only show after a full reload. Acceptable, but be aware of it.",
+    "DownloadRedirect: when the visitor's OS link is missing (e.g. iPhone with no iOS URL) it falls back to the QR/badges view. That is correct. Desktop visitors with no links get 'Opening your app store…' forever. Unlikely, since Android has a default.",
+    "native_push.forward_pending marks notifications native_pushed=false when Firebase isn't configured. Once FIREBASE_SERVICE_ACCOUNT_JSON is set, older notifications won't be sent, which is fine. The loop polls Mongo every 10s with a query on native_pushed and created_at; add an index on notifications {native_pushed:1, created_at:1}.",
+    "auth_apple: the PyJWKClient is created at import time and fetches Apple's JWKS synchronously inside an async handler (get_signing_key_from_jwt blocks the event loop on cache miss). Wrap it in asyncio.to_thread.",
+    "auth_apple, existing-user path: linking by email to an existing password account with no further check is standard for Apple (verified email), but private-relay emails create separate accounts. That is expected."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter75_apple_push_download.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% of requested flows passed; 1 responsive design issue (tablet nav)"},
+  "test_credentials": "Admin julius.a.mason@gmail.com / Mason0123, Customer customer@lumo.test / password123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created and deleted throwaway customers test_del_*@example.com via DELETE /api/auth/me. Device tokens TEST_fcm_* were registered and unregistered. The iOS app URL was set temporarily and restored to ''.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Category slugs are customers, workers, sellers and real-estate (the review request showed 'lumo-bundle-checkout' as a placeholder). Fee calc verified: 3 mi small $8.49 / driver $7.64; medium $12.73, large $21.23, xl $33.96; 10 mi small $18.99. The iPhone UA /download redirect works (verified by routing apps.apple.com to a stub; the real apps.apple.com fails to load in the sandbox). Android UA redirects to Play. Admin users visiting / are redirected to /admin, so check homepage badges logged out. Apple web is disabled (APPLE_SERVICES_ID unset) and Firebase isn't configured (register returns configured:false)."
+}

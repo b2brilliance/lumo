@@ -29,7 +29,7 @@ export default function SocialLinksAdmin() {
       setDraft(data.links || {});
       setTagline(data.tagline || "");
       setAdsense(data.adsense_client || "");
-      setApps({ ios_app_url: data.ios_app_url || "", android_app_url: data.android_app_url || "" });
+      setApps((a) => (a.ios_app_url || a.android_app_url ? a : { ios_app_url: data.ios_app_url || "", android_app_url: data.android_app_url || "" }));
     } catch (e) {
       toast.error(formatApiError(e));
     } finally {
@@ -82,7 +82,7 @@ export default function SocialLinksAdmin() {
       const { data } = await api.put("/admin/site/social", { [key]: apps[key] });
       setDoc(data);
       setApps({ ios_app_url: data.ios_app_url || "", android_app_url: data.android_app_url || "" });
-      toast.success("Download link saved — the homepage button is live");
+      toast.success(apps[key] ? "Download link saved — the homepage button is live" : "Link cleared — the button shows as coming soon");
     } catch (e) {
       toast.error(formatApiError(e));
     }

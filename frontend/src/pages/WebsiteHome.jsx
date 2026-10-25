@@ -35,7 +35,7 @@ function Hero() {
         <div className="lg:col-span-5">
           <div className="flex justify-center gap-1 mb-8 p-1 rounded-full bg-slate-100 w-fit mx-auto" data-testid="home-phone-tabs">
             {CATEGORY_LIST.map((x, i) => (
-              <button key={x.slug} onClick={() => setTab(i)} className="relative px-4 h-9 text-sm font-medium" data-testid={`home-phone-tab-${x.slug}`}>
+              <button key={x.slug} onClick={() => setTab(i)} className="relative px-4 h-9 text-sm font-medium whitespace-nowrap" data-testid={`home-phone-tab-${x.slug}`}>
                 {tab === i && <motion.span layoutId="tabpill" className="absolute inset-0 rounded-full bg-white shadow-sm" />}
                 <span className={`relative ${tab === i ? "text-slate-950" : "text-slate-500"}`}>{x.label}</span>
               </button>

@@ -695,6 +695,9 @@ async def delete_me(user: dict = Depends(get_current_user)):
     from auth_apple import revoke_apple
     await revoke_apple(await db.users.find_one({"id": uid}) or {})
     await db.device_tokens.delete_many({"user_id": uid})
+    await db.notifications.delete_many({"user_id": uid})
+    await db.push_subscriptions.delete_many({"user_id": uid})
+    await db.orders.update_many({"customer_id": uid}, {"$set": {"customer_name": "Deleted user", "delivery_address": None, "notes": None}})
     await db.users.delete_one({"id": uid})
     await db.user_sessions.delete_many({"user_id": uid})
     await db.storefronts.delete_many({"owner_id": uid})
@@ -4527,7 +4530,12 @@ async def stripe_webhook(req: Request):
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         raise HTTPException(400, "Webhook error")
-    # We rely on polling to finalize order; just log and return
+    # Finalize server-side too, so sellers get notified even if the customer closes the tab.
+    if getattr(evt, "session_id", None):
+        try:
+            await checkout_status(evt.session_id, req)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Webhook finalize failed: {e}")
     return {"received": True, "type": evt.event_type}
 
 # ────────────────────────────────────────────────────────────────────────────
