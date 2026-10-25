@@ -276,6 +276,10 @@ class StorefrontUpsert(BaseModel):
     description: Optional[str] = None
     cuisine: Optional[str] = None  # restaurants
     category: Optional[str] = None  # retailers
+    store_type: Optional[Literal["restaurant", "food_truck", "storefront", "personal_shop"]] = None
+    photos: Optional[List[str]] = None
+    offers_pickup: bool = True
+    offers_delivery: bool = True
 
 class InventoryItemCreate(BaseModel):
     name: str
@@ -285,6 +289,7 @@ class InventoryItemCreate(BaseModel):
     media_url: Optional[str] = None
     media_type: Optional[str] = None
     category: Optional[str] = None
+    size_class: Literal["small", "medium", "large", "xl"] = "small"
 
 class CheckoutCreate(BaseModel):
     """Bundled 10% deposit checkout — item + delivery + 100% tax (so Lumo collects full tax upfront)."""
@@ -1630,6 +1635,8 @@ async def create_inventory(body: InventoryItemCreate, user: dict = Depends(requi
         "media_url": body.media_url,
         "media_type": body.media_type,
         "category": body.category,
+        "size_class": body.size_class,
+        "kind": "food" if user["role"] == "restaurant" else "product",
         "status": "active",
         "created_at": now_iso(),
     }
@@ -4432,6 +4439,11 @@ async def checkout_status(session_id: str, req: Request):
         if order:
             if tx["type"] == "deposit":
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "deposit_paid", "deposit_paid_at": now_iso()}})
+            elif tx["type"] == "full":
+                # App orders: paid in full. Delivery orders open to drivers (deposit_paid = dispatchable).
+                st = "deposit_paid" if order.get("fulfillment") == "delivery" else "paid"
+                await db.orders.update_one({"id": order["id"]}, {"$set": {"status": st, "paid_at": now_iso()}})
+                await db.cart_items.delete_many({"user_id": order["customer_id"], "store_id": order["store_id"]})
             elif tx["type"] == "final":
                 # Credit provider wallet with the final amount (minus 10% platform cut already kept as deposit)
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "completed", "final_paid_at": now_iso()}})
@@ -7753,6 +7765,11 @@ app.include_router(_create_city_blog_router(db=db, require_admin=_require_admin(
 from city_ads import create_router as _create_city_ads_router  # noqa: E402
 app.include_router(_create_city_ads_router(db=db, require_admin=_require_admin(),
                                            base_url=os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")))
+from app_commerce import create_router as _create_app_commerce_router  # noqa: E402
+app.include_router(_create_app_commerce_router(
+    db=db, get_current_user=get_current_user, require_admin=_require_admin(), get_stripe=_get_stripe,
+    haversine_miles=haversine_miles, tax_for=tax_for, CheckoutSessionRequest=CheckoutSessionRequest))
+
 
 start_email_loop(app, db)
 

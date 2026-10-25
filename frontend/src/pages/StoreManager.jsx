@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import MediaUpload from "@/components/MediaUpload";
+import AddressInput from "@/components/AddressInput";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
@@ -20,10 +21,19 @@ export default function StoreManager({ role, section = "all" }) {
     description: sf.description || "",
     category: sf.category || "",
     cuisine: sf.cuisine || "",
+    store_type: sf.store_type || (role === "restaurant" ? "restaurant" : "storefront"),
+    photos: sf.photos || [],
+    offers_pickup: sf.offers_pickup !== false,
+    offers_delivery: sf.offers_delivery !== false,
+    location: sf.location || null,
   });
+  const [cats, setCats] = useState([]);
+  useEffect(() => {
+    api.get("/app/pricing").then(({ data }) => setCats(role === "restaurant" ? data.food_categories : data.product_categories)).catch(() => {});
+  }, [role]);
   const [items, setItems] = useState([]);
   const [itemForm, setItemForm] = useState({
-    name: "", price: "", stock: "0", description: "", category: "",
+    name: "", price: "", stock: "0", description: "", category: "", size_class: "small",
     media_url: null, media_type: null,
   });
 
@@ -56,11 +66,12 @@ export default function StoreManager({ role, section = "all" }) {
         price: parseFloat(itemForm.price),
         stock: parseInt(itemForm.stock || "0"),
         category: itemForm.category,
+        size_class: role === "restaurant" ? "small" : itemForm.size_class,
         media_url: itemForm.media_url,
         media_type: itemForm.media_type,
       });
       toast.success("Item added");
-      setItemForm({ name: "", price: "", stock: "0", description: "", category: "", media_url: null, media_type: null });
+      setItemForm({ name: "", price: "", stock: "0", description: "", category: "", size_class: "small", media_url: null, media_type: null });
       load();
     } catch (e) {
       toast.error("Failed to add item");
@@ -102,8 +113,38 @@ export default function StoreManager({ role, section = "all" }) {
             <Input value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} required data-testid="store-name" className="mt-1" />
           </div>
           <div>
+            <Label className="overline">Type of business</Label>
+            <select value={storeForm.store_type} onChange={(e) => setStoreForm({ ...storeForm, store_type: e.target.value })} className="mt-1 w-full h-10 border border-slate-200 rounded-md px-3 text-sm bg-white" data-testid="store-type">
+              {(role === "restaurant"
+                ? [["restaurant", "Restaurant"], ["food_truck", "Food truck / mobile kitchen"]]
+                : [["storefront", "Store or shop"], ["personal_shop", "Personal shop (things I own)"]]
+              ).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div>
             <Label className="overline">Address</Label>
-            <Input value={storeForm.address} onChange={(e) => setStoreForm({ ...storeForm, address: e.target.value })} required data-testid="store-address" className="mt-1" />
+            <AddressInput value={storeForm.address} onChange={(address) => setStoreForm((f) => ({ ...f, address }))} onPlace={(p) => setStoreForm((f) => ({ ...f, address: p.address || f.address, location: p.lat != null ? { lat: p.lat, lng: p.lng } : f.location }))} data-testid="store-address" />
+          </div>
+          <div className="flex gap-4" data-testid="store-fulfillment">
+            {[["offers_pickup", "Pickup"], ["offers_delivery", "Delivery"]].map(([k, l]) => (
+              <label key={k} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={storeForm[k]} onChange={(e) => setStoreForm({ ...storeForm, [k]: e.target.checked })} data-testid={`store-${k}`} /> {l}
+              </label>
+            ))}
+          </div>
+          <div data-testid="store-photos">
+            <Label className="overline">Store photos</Label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {storeForm.photos.map((u) => (
+                <button type="button" key={u} onClick={() => setStoreForm({ ...storeForm, photos: storeForm.photos.filter((x) => x !== u) })} className="w-16 h-16 rounded-lg overflow-hidden border" title="Remove">
+                  <img src={u} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+            {storeForm.photos.length < 6 && (
+              <MediaUpload key={storeForm.photos.length} label="Add a store photo" aiCheck={false} value={null}
+                onChange={(m) => m?.media_url && setStoreForm((f) => ({ ...f, photos: [...f.photos, m.media_url] }))} />
+            )}
           </div>
           <div>
             <Label className="overline">Hours</Label>
@@ -141,8 +182,22 @@ export default function StoreManager({ role, section = "all" }) {
               </div>
               <div>
                 <Label className="overline">Category</Label>
-                <Input value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} data-testid="item-category" className="mt-1" />
+                <select value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} required className="mt-1 w-full h-10 border border-slate-200 rounded-md px-3 text-sm bg-white" data-testid="item-category">
+                  <option value="">Choose…</option>
+                  {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
+              {role !== "restaurant" && (
+                <div className="col-span-2">
+                  <Label className="overline">Delivery size</Label>
+                  <select value={itemForm.size_class} onChange={(e) => setItemForm({ ...itemForm, size_class: e.target.value })} className="mt-1 w-full h-10 border border-slate-200 rounded-md px-3 text-sm bg-white" data-testid="item-size">
+                    <option value="small">Small: fits in a bag</option>
+                    <option value="medium">Medium: needs a car</option>
+                    <option value="large">Large: needs an SUV or van</option>
+                    <option value="xl">Extra large: needs a truck (couch, oversized box)</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <Label className="overline">Price ($)</Label>
                 <Input type="number" step="0.01" value={itemForm.price} onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })} required data-testid="item-price" className="mt-1" />

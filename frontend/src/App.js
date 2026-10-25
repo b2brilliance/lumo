@@ -38,6 +38,13 @@ import Training from "@/pages/Training";
 import Services from "@/pages/Services";
 import ProviderHub from "@/pages/ProviderHub";
 import StoreManager from "@/pages/StoreManager";
+import SplashIntro from "@/components/app/SplashIntro";
+import WebsiteHome from "@/pages/WebsiteHome";
+import CustomerHome from "@/pages/app/CustomerHome";
+import Market from "@/pages/app/Market";
+import StorePage from "@/pages/app/StorePage";
+import AppCheckout from "@/pages/app/AppCheckout";
+import WorkerSetup from "@/pages/app/WorkerSetup";
 import Directory from "@/pages/Directory";
 import StoreProfile from "@/pages/StoreProfile";
 import Marketplace from "@/pages/Marketplace";
@@ -110,6 +117,10 @@ function homeFor(user) {
   return user.role === "customer" ? "/" : homeForRole(user.role);
 }
 
+function AppSplash() {
+  return useAppMode() ? <SplashIntro /> : null;
+}
+
 function TopChrome() {
   return useAppMode() ? <AppTopBar /> : <NavBar />;
 }
@@ -162,9 +173,9 @@ function RoleAwareLanding() {
   const app = useAppMode();
   if (loading) return <div className="p-12 text-slate-500">Loading…</div>;
   if (user && user !== false && (user.role !== "customer" || app)) {
-    return <Navigate to={app && user.role === "customer" ? "/for-you" : homeFor(user)} replace />;
+    return <Navigate to={app && user.role === "customer" ? "/home" : homeFor(user)} replace />;
   }
-  return app ? <AppWelcome /> : <PersonaSplit />;
+  return app ? <AppWelcome /> : <WebsiteHome />;
 }
 
 function App() {
@@ -176,6 +187,7 @@ function App() {
         <LocaleProvider>
           <AuthProvider>
             <CartProvider>
+              <AppSplash />
               <TopChrome />
               <ScrollToTop />
               <RefCapture />
@@ -195,6 +207,14 @@ function App() {
             <Route path="/signin" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
             <Route path="/start/:persona" element={<AppStart />} />
+            <Route path="/explore" element={<PersonaSplit />} />
+            <Route path="/home" element={<Protected roles={["customer", "admin"]}><CustomerHome /></Protected>} />
+            <Route path="/app/search" element={<Market />} />
+            <Route path="/app/market/:kind" element={<Market />} />
+            <Route path="/app/store/:id" element={<StorePage />} />
+            <Route path="/app/checkout/:storeId" element={<Protected><AppCheckout /></Protected>} />
+            <Route path="/provider/setup" element={<Protected roles={["provider"]}><WorkerSetup /></Protected>} />
+            <Route path="/seller/setup" element={<Protected roles={["retailer", "restaurant"]}><SellerPage section="all" /></Protected>} />
 
             {/* /customer → redirect to homepage. Customers now start on the
                 service grid (no separate hub page). */}

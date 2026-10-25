@@ -11,6 +11,7 @@ import Analytics from "@/components/Analytics";
 import SocialLinksAdmin from "@/components/SocialLinksAdmin";
 import DataManagementTab from "@/components/DataManagementTab";
 import PaymentsAdmin from "@/components/PaymentsAdmin";
+import PricingCard from "@/components/admin/PricingCard";
 import BlogAdmin from "@/components/BlogAdmin";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AffiliatesTab from "@/pages/admin/AffiliatesTab";
@@ -466,7 +467,7 @@ export default function AdminConsole() {
           {tab === "distribution" && <Distribution />}
           {tab === "social" && <SocialLinksAdmin />}
           {tab === "data" && <DataManagementTab />}
-          {tab === "payments" && <PaymentsAdmin />}
+          {tab === "payments" && <><PricingCard /><div className="h-6" /><PaymentsAdmin /></>}
           {tab === "users" && <UsersTab />}
           {tab === "content" && <ContentTab />}
           {tab === "shop" && <ShopTab />}

@@ -1,12 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShoppingBag, Bike, Store, Building2, ChevronRight } from "lucide-react";
+import { ShoppingBag, HardHat, Store, Building2, ChevronRight } from "lucide-react";
 import { PERSONAS } from "@/lib/persona";
 
 const CARDS = [
   { key: "customer", Icon: ShoppingBag },
-  { key: "provider", Icon: Bike },
+  { key: "provider", Icon: HardHat },
   { key: "seller", Icon: Store },
   { key: "real_estate", Icon: Building2 },
 ];
@@ -16,10 +16,9 @@ export default function AppWelcome() {
     <div className="min-h-[100dvh] bg-slate-950 text-white px-5 pt-[calc(env(safe-area-inset-top)+40px)] pb-10 flex flex-col" data-testid="app-welcome">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <div className="font-display font-black text-5xl tracking-tighter" data-testid="app-welcome-logo">Lumo</div>
-        <p className="mt-3 text-white/60 text-base leading-snug max-w-xs">Local help, food, products and places. One app.</p>
+        <p className="mt-3 text-white/60 text-base leading-snug">How do you want to use Lumo?</p>
       </motion.div>
-      <div className="mt-10 text-xs uppercase tracking-[0.2em] text-white/40 font-mono">Continue as</div>
-      <div className="mt-3 space-y-3 flex-1">
+      <div className="mt-8 space-y-3 flex-1">
         {CARDS.map(({ key, Icon }, i) => {
           const p = PERSONAS[key];
           return (
@@ -38,9 +37,6 @@ export default function AppWelcome() {
           );
         })}
       </div>
-      <Link to="/signin" className="mt-8 text-center text-sm text-white/60" data-testid="app-welcome-signin">
-        Already have an account? <span className="text-white font-semibold underline">Sign in</span>
-      </Link>
     </div>
   );
 }

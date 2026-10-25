@@ -143,7 +143,7 @@ export default function Register() {
     if (r.ok) {
       toast.success("Welcome to Lumo");
       const dest = {
-        customer: "/for-you", provider: "/provider", retailer: "/seller", restaurant: "/seller",
+        customer: "/home", provider: "/provider/setup", retailer: "/seller/setup", restaurant: "/seller/setup",
         real_estate: payload.re_mode === "listing" ? "/real-estate/mine" : "/real-estate",
       }[r.user.role] || "/";
       nav(dest);

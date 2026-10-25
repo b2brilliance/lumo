@@ -5,7 +5,8 @@ import { useAuth } from "@/lib/auth";
 import { personaFor } from "@/lib/persona";
 
 const TITLES = {
-  "/for-you": "Home", "/services": "Search", "/orders": "Orders", "/messages": "Messages", "/chats": "Messages",
+  "/for-you": "Home", "/home": "Home", "/app/search": "Search", "/services": "Services", "/orders": "Orders", "/messages": "Messages", "/chats": "Messages",
+  "/provider/setup": "Worker profile", "/seller/setup": "Set up your store",
   "/settings": "Profile", "/provider": "Jobs", "/map": "Map", "/wallet": "Earnings", "/seller": "Dashboard",
   "/seller/products": "Products", "/seller/orders": "Orders", "/real-estate": "Explore", "/real-estate/saved": "Saved",
   "/real-estate/mine": "My Listings", "/inquiries": "Messages", "/admin": "Admin", "/help": "Help",

@@ -6,18 +6,18 @@ import {
 
 export const PERSONAS = {
   customer: {
-    key: "customer", label: "Customer", tagline: "Book local pros and order anything.",
-    roles: ["customer"], home: "/for-you", tint: "from-fuchsia-500 via-rose-500 to-amber-500",
+    key: "customer", label: "Customer", tagline: "Order food, shop and book local services.",
+    roles: ["customer"], home: "/home", tint: "from-fuchsia-500 via-rose-500 to-amber-500",
     tabs: [
-      { key: "home", label: "Home", to: "/for-you", Icon: Home },
-      { key: "search", label: "Search", to: "/services", Icon: Search },
+      { key: "home", label: "Home", to: "/home", Icon: Home, auth: true },
+      { key: "search", label: "Search", to: "/app/search", Icon: Search },
       { key: "orders", label: "Orders", to: "/orders", Icon: ClipboardList, auth: true },
       { key: "messages", label: "Messages", to: "/messages", Icon: MessageCircle, auth: true },
       { key: "profile", label: "Profile", to: "/settings", Icon: User, auth: true },
     ],
   },
   provider: {
-    key: "provider", label: "Delivery & service pro", tagline: "Pick up jobs near you. Keep 90%.",
+    key: "provider", label: "Worker", tagline: "Deliveries and service jobs near you. Keep 90%.",
     roles: ["provider"], home: "/provider", tint: "from-emerald-500 via-teal-600 to-cyan-700",
     tabs: [
       { key: "jobs", label: "Jobs", to: "/provider", Icon: Briefcase, auth: true },
@@ -28,7 +28,7 @@ export const PERSONAS = {
     ],
   },
   seller: {
-    key: "seller", label: "Restaurant or shop owner", tagline: "Sell your menu or products to locals.",
+    key: "seller", label: "Seller", tagline: "Restaurants, food trucks, stores and personal shops.",
     roles: ["retailer", "restaurant"], home: "/seller", tint: "from-amber-500 via-orange-600 to-red-700",
     tabs: [
       { key: "dashboard", label: "Dashboard", to: "/seller", Icon: LayoutDashboard, auth: true },

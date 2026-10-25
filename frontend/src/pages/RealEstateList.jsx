@@ -112,6 +112,9 @@ export default function RealEstateList() {
           <div className="col-span-2">
             <Label>{PRICE_HINT[form.listing_kind]}</Label>
             <Input data-testid="re-form-price" required type="number" min="1" value={form.price} onChange={set("price")} placeholder={form.listing_kind === "sale" ? "895000" : form.listing_kind === "short_stay" ? "120" : "2400"} />
+            <p className="text-xs text-slate-500 mt-1" data-testid="re-form-fee-note">
+              {form.listing_kind === "short_stay" ? "Lumo takes a 5% commission on each short-term booking." : "Free to post. No commission."}
+            </p>
           </div>
           <div>
             <Label>Currency</Label>
