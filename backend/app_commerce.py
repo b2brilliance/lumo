@@ -47,16 +47,23 @@ class CheckoutIn(QuoteIn):
     origin_url: str
 
 
+class SizeMultipliers(BaseModel):
+    small: float = Field(..., ge=0.1, le=20)
+    medium: float = Field(..., ge=0.1, le=20)
+    large: float = Field(..., ge=0.1, le=20)
+    xl: float = Field(..., ge=0.1, le=20)
+
+
 class PricingIn(BaseModel):
     service_fee_pct: float = Field(..., ge=0, le=50)
     delivery_base: float = Field(..., ge=0, le=100)
     delivery_per_mile: float = Field(..., ge=0, le=50)
     driver_share_pct: float = Field(..., ge=0, le=100)
-    size_multipliers: dict
+    size_multipliers: SizeMultipliers
     str_commission_pct: float = Field(..., ge=0, le=50)
 
 
-def create_router(*, db, get_current_user, require_admin, get_stripe, haversine_miles, tax_for, CheckoutSessionRequest):
+def create_router(*, db, get_current_user, get_optional_user, require_admin, get_stripe, haversine_miles, tax_for, CheckoutSessionRequest):
     r = APIRouter(prefix="/api")
 
     async def pricing() -> dict:
@@ -65,6 +72,10 @@ def create_router(*, db, get_current_user, require_admin, get_stripe, haversine_
 
     async def quote(user_id: str, body: QuoteIn) -> dict:
         items = await db.cart_items.find({"user_id": user_id, "store_id": body.store_id}, {"_id": 0}).to_list(500)
+        live = {i["id"]: i async for i in db.inventory.find(
+            {"id": {"$in": [c["inventory_item_id"] for c in items]}, "status": "active"}, {"_id": 0})}
+        items = [{**c, "price_usd": float(live[c["inventory_item_id"]]["price"]), "name": live[c["inventory_item_id"]]["name"]}
+                 for c in items if c["inventory_item_id"] in live]
         if not items:
             raise HTTPException(400, "Your cart for this store is empty")
         store = await db.users.find_one({"id": body.store_id}, {"_id": 0, "storefront": 1, "name": 1})
@@ -109,9 +120,12 @@ def create_router(*, db, get_current_user, require_admin, get_stripe, haversine_
         }
 
     @r.get("/app/market")
-    async def market(kind: Literal["food", "products"] = "food", category: Optional[str] = None, q: Optional[str] = None):
+    async def market(kind: Literal["food", "products"] = "food", category: Optional[str] = None, q: Optional[str] = None,
+                     viewer: Optional[dict] = Depends(get_optional_user)):
+        from demo_filter import hide_demo
         role = "restaurant" if kind == "food" else "retailer"
-        sf_q: dict = {"role": role, "storefront": {"$ne": None}, "is_demo": {"$ne": True}, "deactivated_at": {"$exists": False}}
+        sf_q: dict = {"role": role, "storefront": {"$ne": None}, "deactivated_at": {"$exists": False}}
+        sf_q = await hide_demo(db, sf_q, "id", viewer)
         stores = await db.users.find(sf_q, {"_id": 0, "id": 1, "name": 1, "storefront": 1}).to_list(300)
         ids = [s["id"] for s in stores]
         iq: dict = {"owner_id": {"$in": ids}, "status": "active"}

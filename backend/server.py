@@ -7767,7 +7767,7 @@ app.include_router(_create_city_ads_router(db=db, require_admin=_require_admin()
                                            base_url=os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")))
 from app_commerce import create_router as _create_app_commerce_router  # noqa: E402
 app.include_router(_create_app_commerce_router(
-    db=db, get_current_user=get_current_user, require_admin=_require_admin(), get_stripe=_get_stripe,
+    db=db, get_current_user=get_current_user, get_optional_user=get_optional_user, require_admin=_require_admin(), get_stripe=_get_stripe,
     haversine_miles=haversine_miles, tax_for=tax_for, CheckoutSessionRequest=CheckoutSessionRequest))
 
 

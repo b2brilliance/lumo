@@ -1004,3 +1004,13 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - New pages: /seller (dashboard), /seller/products, /seller/orders (SellerOrders), /real-estate/mine (RealEstateMine, owner sees all statuses)
 - Store builds: cd frontend && yarn build && npx cap add ios/android && npx cap sync, then Xcode / Android Studio (appId app.golumo.lumo, appName Lumo). REACT_APP_BACKEND_URL must be https://golumo.app for store builds.
 - Backlog: seller order actions (accept/ready/complete), app icons/splash art, push notification setup in stores
+
+## 2026-06 Simplified App Redesign (iteration 74)
+- Flow: SplashIntro (once/session, app mode) -> AppWelcome (4 types: Customer, Worker, Seller, Real Estate) -> /start/:persona with auth: Apple (PLACEHOLDER toast until user provides Apple keys), Google (Emergent), phone (/signin?method=phone), email signup/login
+- Onboarding: Worker /provider/setup (skills+job types, ID photo -> /credentials kind=drivers_license|passport|state_id category=identity, certifications, Stripe Connect payouts); Seller /seller/setup (StoreManager: store_type restaurant|food_truck|storefront|personal_shop, photos, pickup/delivery toggles, geocoded address, items with category from fixed lists + size_class)
+- Customer: /home (Order food / Shop products / Book a service + global search), /app/search (food+products), /app/market/:kind (category chips, search), /app/store/:id, /app/checkout/:storeId
+- app_commerce.py: GET /api/app/market (hide_demo applied), GET /api/app/pricing, PUT /api/admin/pricing (Admin > Payments PricingCard), POST /api/app/quote, POST /api/app/checkout (Stripe full payment, tx type "full": pickup->paid, delivery->deposit_paid for driver dispatch)
+- Pricing: pickup items+5%; delivery items+5%+(3.99+1.50/mi)*size mult (1/1.5/2.5/4); driver 90% of delivery fee; Lumo 5% + 10% delivery; US sales tax still added on items (confirm with user)
+- Real estate: listing form note (5% short-stay commission, others free); str_commission_pct stored but no STR payment flow reads it yet
+- Desktop "/" = WebsiteHome (program info + App Store/Google Play badges via REACT_APP_IOS_APP_URL / REACT_APP_ANDROID_APP_URL, "coming soon" until set); old PersonaSplit at /explore
+- Known: seeded store item categories don't match new chip categories; seeded items lack photos

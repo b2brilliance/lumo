@@ -30,7 +30,7 @@ export default function MobileTabBar() {
   const { user } = useAuth();
   const unread = useUnreadMessages(user, pathname);
   const persona = personaFor(user);
-  if (!user && (pathname === "/" || pathname.startsWith("/start"))) return null;
+  if (!user && (pathname === "/" || pathname.startsWith("/start") || pathname === "/signin" || pathname === "/register")) return null;
   const isRestaurant = user?.role === "restaurant";
 
   return (

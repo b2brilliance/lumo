@@ -20,7 +20,11 @@ export default function AppTopBar() {
   const persona = personaFor(user);
   const isTabRoot = !!persona?.tabs.some((t) => t.to === pathname);
   const isRestaurant = user?.role === "restaurant";
-  const title = pathname === "/seller/products" && isRestaurant ? "Menu" : TITLES[pathname] || "Lumo";
+  const title = pathname === "/seller/products" && isRestaurant ? "Menu"
+    : pathname.startsWith("/app/market/") ? "Marketplace"
+    : pathname.startsWith("/app/store/") ? "Store"
+    : pathname.startsWith("/app/checkout/") ? "Checkout"
+    : TITLES[pathname] || "Lumo";
   if (pathname === "/" || pathname.startsWith("/start")) return null;
 
   return (

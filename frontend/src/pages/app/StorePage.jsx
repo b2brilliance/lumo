@@ -21,8 +21,8 @@ export default function StorePage() {
   useEffect(() => {
     api.get(`/storefronts/${id}`).then(({ data }) => setStore(data)).catch(() => setStore(false));
     api.get("/inventory", { params: { owner_id: id } }).then(({ data }) => setItems(data || [])).catch(() => {});
-    loadCart();
-  }, [id]); // eslint-disable-line
+  }, [id]);
+  useEffect(() => { loadCart(); }, [id, user]); // eslint-disable-line
 
   const add = async (it) => {
     if (!user) return nav(`/signin?next=${encodeURIComponent(`/app/store/${id}`)}`);

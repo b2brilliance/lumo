@@ -45,8 +45,17 @@ export default function Market() {
 
   useEffect(() => {
     setData(null);
-    api.get("/app/market", { params: { kind, q: q || undefined, category: category || undefined } }).then(({ data: d }) => setData(d)).catch(() => setData({ stores: [], items: [], categories: [] }));
-  }, [kind, q, category]);
+    const get = (k) => api.get("/app/market", { params: { kind: k, q: q || undefined, category: category || undefined } }).then(({ data: d }) => d);
+    const empty = { stores: [], items: [], categories: [] };
+    if (!kindParam && q) {
+      // Global search: food and products together.
+      Promise.all([get("food"), get("products")])
+        .then(([a, b]) => setData({ categories: [], stores: [...a.stores, ...b.stores], items: [...a.items, ...b.items] }))
+        .catch(() => setData(empty));
+    } else {
+      get(kind).then(setData).catch(() => setData(empty));
+    }
+  }, [kind, kindParam, q, category]);
 
   const setParam = (k, v) => { const n = new URLSearchParams(sp); if (v) n.set(k, v); else n.delete(k); setSp(n); };
   const filtering = !!(q || category);
@@ -76,7 +85,7 @@ export default function Market() {
       )}
       {data && (
         <>
-          <div className="mt-6 font-semibold">{kind === "food" ? "Restaurants & food trucks" : "Stores & shops"}</div>
+          <div className="mt-6 font-semibold">{!kindParam && q ? "Stores" : kind === "food" ? "Restaurants & food trucks" : "Stores & shops"}</div>
           <div className="mt-3 grid grid-cols-1 gap-3" data-testid="market-stores">
             {data.stores.map((s) => <StoreCard key={s.id} s={s} />)}
           </div>

@@ -1,0 +1,54 @@
+{
+  "summary": "Iteration 74: tested the new app layout (splash, account-type welcome, per-type onboarding) and the app commerce features (market, quote, checkout, admin pricing). Backend: 17 of 17 pytest tests pass. /api/app/pricing returns the default values. /api/app/market works for food and products, with q and category filters, and returns 422 for a bad kind. PUT /api/admin/pricing returns 401 without a token, 403 for a customer and 200 for the admin. Inventory saves size_class and kind (product). /api/app/quote math is correct: pickup has a 5% service fee and no delivery fee. A large item delivered over the default 3 miles gives (3.99 + 1.5 x 3) x 2.5 = 21.23. The driver gets 90% (19.11) and Lumo gets the service fee plus 10% of the delivery fee. Delivery checkout without an address returns 422. Pickup checkout returns a Stripe test URL and creates an order with is_app_order=true and status payment_pending. Frontend at 390x844: the splash shows once per session and then the welcome screen with 4 personas. On /start/seller, all 4 choices and 5 auth buttons are present. Apple shows the coming-soon toast. Phone goes to /signin?method=phone with a phone input. Create goes to /register?role=restaurant or retailer, and Log in goes to /signin. The customer lands on /home with 3 tiles and a search box, and all 5 tabs route correctly. Market kind switch, chips and search work, and store cards open /app/store/:id. Checkout UI pickup shows $48.00 items, $2.40 fee (5%), $3.84 tax and $54.24 total. Delivery adds $8.49 for 3 mi and a small item. Pay stays disabled until there is an address, the + button updates the subtotal, and Pay redirects to checkout.stripe.com. Restaurant and retailer /seller/setup show the full form; only the retailer has item-size, and an xl item saved with kind=product. The worker 4-step wizard works through the done screen and lands on /provider. A new customer registered in the UI lands on /home. The real-estate fee note is correct for every listing type. Desktop at 1440: '/' shows website-landing with both badges, the coming-soon text and the pricing section, and /explore still shows PersonaSplit. Admin payments tab shows admin-pricing-card, and save works. Two real bugs: (1) every seeded store page shows 'No items listed yet', so customers can't add to cart from the store page; (2) the store page's View cart button does not appear for an existing cart on direct load or refresh.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/inventory?owner_id= (used by StorePage)", "issue": "Applies hide_demo, which hides inventory from any owner whose email matches *.test. /api/app/market does NOT apply this filter, so the market lists these stores and items. When a customer opens a store page, though, it is empty ('No items listed yet'), and there is no store-add button. In this environment every store (all 12 storefront users) is a *.test account, so the store page add-to-cart flow is broken end to end for customers. Fix: use the same visibility rule in both places, for example by adding a /api/app/store/{id} endpoint that uses the market's filter, or by applying hide_demo in the market too.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT /api/admin/pricing", "issue": "size_multipliers is an unvalidated dict. Missing keys, negative values or strings are accepted. Use a typed model with small, medium, large and xl as floats, each >= 0."},
+      {"endpoint": "platform_config pricing.str_commission_pct", "issue": "It is stored and editable but no real-estate booking or payment code reads it. The RealEstateList note hardcodes '5%'."},
+      {"endpoint": "POST /api/app/quote", "issue": "It uses cart_items.price_usd, which is the price at the time the item was added. Later price changes by the seller, and items that have since been deactivated or deleted, are still charged. Re-read the price and status from inventory when quoting."},
+      {"endpoint": "POST /api/app/quote (delivery)", "issue": "When the address has no lat/lng (typed but not picked from Places) or the store has no location, it silently uses default_miles=3. Many seed stores have location=null, for example Ramona's Boutique. This can undercharge long-distance deliveries."},
+      {"endpoint": "Totals", "issue": "The total includes US sales tax at 8% on top of the subtotal, the 5% fee and the delivery fee. The user's formula did not mention tax. Confirm this is intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "StorePage.jsx loadCart", "issue": "loadCart runs once in useEffect([id]) and returns early while `user` is still null during auth hydration. As a result, store-view-cart does not show for an existing cart on direct load or refresh, until the user adds another item. Add `user` to the effect dependencies.", "selector": "[data-testid='store-view-cart']", "priority": "MEDIUM"},
+      {"component": "CustomerHome search -> /app/search", "issue": "The placeholder says 'Search food, products, stores', but /app/search always searches kind=food. Searching 'keyboard', which exists as a product, shows 'Nothing here yet'. Search both kinds, or fall back to products when food has no results.", "selector": "[data-testid='customer-home-search-input']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Market category chips", "issue": "Seed inventory categories (Mains, Dessert, Bowls, Computers, Home, Bakery...) don't match the FOOD/PRODUCT_CATEGORIES chips. Most chips (for example Burgers) return empty, and only a few such as Pizza match. Store page sections use the free-form categories. Migrate the seed data or map the old categories.", "affected_selectors": ["[data-testid^='market-cat-']"]}
+    ],
+    "design_issues": [
+      {"screen": "Market / StorePage item rows", "issues": ["Seed items have no media_url, so grey empty thumbnails show everywhere in search results"]},
+      {"screen": "WebsiteHome desktop", "issues": ["The App Store badge uses the lucide 'Apple' fruit icon, not the Apple logo", "There is a large blank band above the pricing section, likely an un-triggered whileInView animation or extra padding"]},
+      {"screen": "AppStart toast", "issues": ["The Apple coming-soon toast covers the persona title at the top. Acceptable."]},
+      {"screen": "/signin while logged out with persona=seller", "issues": ["The bottom tab bar shows seller tabs (Dashboard, Products...) to a logged-out user on the sign-in page"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter74_app_commerce.py", "/app/test_reports/pytest/pytest_iter74.xml"],
+  "action_items": [
+    "HIGH: make store page inventory visibility match /api/app/market. StorePage calls /api/inventory?owner_id, which hides *.test owners, so every seeded store shows no items and customers can't add to cart.",
+    "Fix StorePage loadCart so it re-runs when `user` loads, so the View cart button shows for an existing cart",
+    "Make /app/search (home search) cover products as well as food, or add a kind toggle defaulting to both",
+    "Align seed item categories with FOOD_CATEGORIES/PRODUCT_CATEGORIES so the category chips return results",
+    "Validate size_multipliers in PricingIn. Re-price cart items from inventory in quote. Consider requiring geocoded lat/lng for delivery.",
+    "Wire str_commission_pct into the short-stay booking logic, or remove it from the admin card",
+    "WorkerSetup and AppCheckout.qty: wrap the updateMe, /credentials and cart PATCH calls in try/catch with toast errors (currently unhandled rejections)"
+  ],
+  "critical_code_review_comments": [
+    "app_commerce.market filters only is_demo, while /api/inventory uses hide_demo with test-email owners. The two views disagree.",
+    "WorkerSetup SkillsStep.save and UploadStep.save have no error handling. A failed API call leaves the user stuck with no message.",
+    "AppCheckout.qty has no try/catch. Decrementing to 0 empties the cart, and the page then only shows the 'cart is empty' error with no link back to the store.",
+    "The ID step in the worker wizard has no skip, but the step bar lets users jump ahead, so the requirement is only soft."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter74_app_commerce.py"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "~88% (store page items and View cart broken for seeded stores; home search is food-only)"},
+  "test_credentials": "Used customer@lumo.test, provider@lumo.test, restaurant@lumo.test, retailer@lumo.test, real_estate@lumo.test (password123) and julius.a.mason@gmail.com / Mason0123",
+  "seed_data_creation": "Created and then deleted TEST_ inventory items on the retailer account. Left behind: 2 payment_pending app orders (is_app_order) for customer@lumo.test, 1 identity credential (passport TEST123) for provider@lumo.test, a registered customer test_cust_<ts>@example.com, and provider skills set to 'TEST_forklift, cleaning'. Admin pricing was re-saved with the same default values.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Set sessionStorage lumo_splash_seen=1 to skip the splash. The fastest way to log in is a page.evaluate fetch to /api/auth/login, then set localStorage lumo_token. /signin now starts with a method chooser (Google / phone / email). Ramona's Boutique id is 16de04c1-7995-4ccc-8d05-1286f0485c0e (retailer@lumo.test). To test checkout, add to the cart via the API and go directly to /app/checkout/:storeId. Stripe is test mode; don't pay.",
+  "rca of the issue": "Store page empty: StorePage.jsx calls GET /api/inventory?owner_id=X. server.list_inventory calls hide_demo(db, q, 'owner_id', viewer, owner_id), which adds owner_id $nin test_owner_ids() (emails matching \\.test$). All seeded storefront owners are @lumo.test, so the result is []. app_commerce.market builds its own query without hide_demo, so the same items show in the market. Reproduce: GET /api/inventory?owner_id=16de04c1-7995-4ccc-8d05-1286f0485c0e returns [], while /api/app/market?kind=products returns 2 items for that owner. View cart missing: StorePage useEffect deps are [id], and loadCart is skipped while useAuth().user is null on first render."
+}
