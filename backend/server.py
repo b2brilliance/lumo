@@ -4584,7 +4584,7 @@ async def accept_order_delivery(order_id: str, user: dict = Depends(require_role
         await db.notifications.insert_one({
             "id": str(uuid.uuid4()), "user_id": o["customer_id"], "type": "order_driver_assigned",
             "title": "A driver is on the way", "body": f"{user['name']} is picking up your order from {o.get('store_name') or 'the store'}.",
-            "link": "/orders", "order_id": order_id, "read": False, "created_at": now_iso()})
+            "link": f"/orders/{order_id}/track", "order_id": order_id, "read": False, "created_at": now_iso()})
     o = await db.orders.find_one({"id": order_id})
     return clean_doc(o)
 

@@ -12,6 +12,8 @@ import CategoryBadge from "@/components/CategoryBadge";
 import QuoteDialog from "@/components/QuoteDialog";
 import DeliveryActions from "@/components/DeliveryActions";
 import DeliveryRuns from "@/components/DeliveryRuns";
+import AlertSettings from "@/components/AlertSettings";
+import BusyMap from "@/components/BusyMap";
 import AddressInput from "@/components/AddressInput";
 import StripeConnectCard from "@/components/StripeConnectCard";
 import { checkCredentialMatch } from "@/lib/credentialMatch";
@@ -275,7 +277,9 @@ export default function ProviderHub() {
         </div>
       </div>
 
+      <AlertSettings />
       <DeliveryRuns />
+      <BusyMap />
 
       <div id="provider-map" className="mt-6">
         <MapView

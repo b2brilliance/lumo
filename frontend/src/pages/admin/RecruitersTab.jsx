@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { PrizeApprovals } from "@/components/admin/PrizeApprovals";
 
 const FIELDS = [
   { key: "base_pct", label: "Starting rate (%)", step: "0.01" },
@@ -52,6 +53,7 @@ export default function RecruitersTab() {
         </div>
         <Button onClick={save} className="mt-4 rounded-none" data-testid="recruiter-config-save">Save</Button>
       </section>
+      <PrizeApprovals />
       <section className="border border-slate-200" data-testid="recruiter-leaderboard">
         <div className="p-4 overline border-b border-slate-200">Top recruiters</div>
         <table className="w-full text-sm">

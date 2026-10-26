@@ -43,6 +43,7 @@ import WebsiteHome from "@/pages/WebsiteHome";
 import CategoryPage from "@/pages/site/CategoryPage";
 import HowItWorksPage from "@/pages/site/HowItWorksPage";
 import DownloadRedirect from "@/pages/site/DownloadRedirect";
+import OrderTrack from "@/pages/app/OrderTrack";
 import CustomerHome from "@/pages/app/CustomerHome";
 import Market from "@/pages/app/Market";
 import StorePage from "@/pages/app/StorePage";
@@ -303,6 +304,7 @@ function App() {
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />
             <Route path="/orders/:id/pay" element={<Protected><OrderFinalPay /></Protected>} />
+            <Route path="/orders/:id/track" element={<Protected><OrderTrack /></Protected>} />
 
             <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
             <Route path="/chats" element={<Protected><ChatsInbox /></Protected>} />

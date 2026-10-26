@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import { Bike, MapPin, Package } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { Link } from "react-router-dom";
+import useProviderLocationPinger from "@/hooks/useProviderLocationPinger";
 
 const RunCard = ({ r, action, label, busy, testid }) => (
   <div className="border border-slate-200 p-4 flex flex-col gap-2" data-testid={testid}>
@@ -19,6 +21,16 @@ const RunCard = ({ r, action, label, busy, testid }) => (
     <button onClick={action} disabled={busy} className="btn-lumo btn-lumo-primary btn-lumo-sm self-start disabled:opacity-50" data-testid={`${testid}-btn`}>{busy ? "…" : label}</button>
   </div>
 );
+
+const ActiveRun = ({ r, busy, onDelivered }) => {
+  useProviderLocationPinger({ jobId: r.id, enabled: true, endpoint: `/orders/${r.id}/location` });
+  return (
+    <div>
+      <RunCard r={r} busy={busy} label="Mark delivered" testid={`my-run-${r.id}`} action={onDelivered} />
+      <Link to={`/orders/${r.id}/track`} className="text-xs underline text-slate-600 mt-1 inline-block" data-testid={`my-run-${r.id}-map`}>Open map · sharing your location with the customer</Link>
+    </div>
+  );
+};
 
 export default function DeliveryRuns() {
   const { user } = useAuth();
@@ -44,7 +56,7 @@ export default function DeliveryRuns() {
       {mine.length > 0 && (<>
         <div className="overline">Your delivery runs</div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-          {mine.map((r) => <RunCard key={r.id} r={r} busy={busy === r.id} label="Mark delivered" testid={`my-run-${r.id}`} action={() => act(r.id, "delivered", "Delivered — payout added to your wallet")} />)}
+          {mine.map((r) => <ActiveRun key={r.id} r={r} busy={busy === r.id} onDelivered={() => act(r.id, "delivered", "Delivered — payout added to your wallet")} />)}
         </div>
       </>)}
       {runs.length > 0 && (<>

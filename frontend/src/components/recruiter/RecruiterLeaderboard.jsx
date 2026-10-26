@@ -50,7 +50,7 @@ export const RecruiterLeaderboard = () => {
     <section className="mt-12 border border-slate-900" data-testid="recruiter-leaderboard-public">
       <div className="p-5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="overline !text-amber-300 flex items-center gap-2"><Trophy className="w-4 h-4" /> Top recruiters</div>
+          <div className="overline !text-amber-300 flex items-center gap-2"><Trophy className="w-4 h-4" /> Top recruiters · win ${(data?.prizes || [100])[0]} this month</div>
           <div className="font-display text-2xl font-black mt-1" data-testid="leaderboard-month">{current ? monthLabel(current) : "…"}</div>
         </div>
         {current && (
@@ -89,13 +89,19 @@ export const RecruiterLeaderboard = () => {
               <div className="text-[11px] text-slate-500 font-mono">crew jobs</div>
             </div>
             <div className="text-right w-20">
+              <div className="font-display text-xl font-black" data-testid={`leaderboard-active-${r.rank}`}>{r.active_recruits ?? 0}</div>
+              <div className="text-[11px] text-slate-500 font-mono">active recruits</div>
+            </div>
+            <div className="text-right w-20 hidden sm:block">
               <div className="font-display text-xl font-black">{r.recruits}</div>
-              <div className="text-[11px] text-slate-500 font-mono">new recruits</div>
+              <div className="text-[11px] text-slate-500 font-mono">new sign-ups</div>
             </div>
           </li>
         ))}
       </ol>
-      <p className="px-4 pb-3 text-[11px] text-slate-500">The top 3 each month earn a Gold, Silver or Bronze recruiter badge.</p>
+      <p className="px-4 pb-3 text-[11px] text-slate-500" data-testid="leaderboard-prize-rules">
+        Each month the top 3 win {(data?.prizes || [100, 50, 25]).map((p) => `$${p}`).join(" / ")} plus a Gold, Silver or Bronze badge. Rank is by active recruits: people you invited who finished their first job or sale that month.
+      </p>
       <HallOfFame rows={data?.hall_of_fame} />
     </section>
   );
@@ -115,6 +121,7 @@ export const MyBadges = () => {
           {badges.map((b) => (
             <span key={b.id} className="inline-flex items-center gap-1.5 text-xs" data-testid={`my-badge-${b.month}`}>
               <BadgePill tier={b.tier} count={1} /> #{b.rank} · {monthLabel(b.month)}
+              {b.prize_amount > 0 && <span className="text-slate-600" data-testid={`my-badge-prize-${b.month}`}>· ${b.prize_amount} {b.prize_status === "paid" ? "paid to wallet" : b.prize_status === "declined" ? "not awarded" : "pending"}</span>}
             </span>
           ))}
         </div>

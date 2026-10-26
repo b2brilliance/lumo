@@ -30,7 +30,7 @@ async function loadAll(user) {
   ]);
   return [
     ...jobs.map((j) => ({ id: `s-${j.id}`, kind: "service", title: j.title, status: j.status, amount: j.final_price ?? (j.pay_rate && j.estimated_units ? j.pay_rate * j.estimated_units : null), at: j.created_at, to: `/jobs/${j.id}` })),
-    ...orders.map((o) => ({ id: `p-${o.id}`, kind: "purchase", title: o.item_title || o.listing_title || "Order", status: o.status, amount: (o.item_total || 0) + (o.delivery_fee || 0), at: o.created_at, to: ["deposit_paid", "in_progress", "accepted"].includes(o.status) ? `/orders/${o.id}/pay` : null })),
+    ...orders.map((o) => ({ id: `p-${o.id}`, kind: "purchase", title: o.store_name || o.item_title || o.listing_title || "Order", status: o.status, amount: o.is_cart_order ? o.total : (o.item_total || 0) + (o.delivery_fee || 0), at: o.created_at, to: o.is_cart_order ? (o.fulfillment === "delivery" && ["deposit_paid", "in_progress", "completed"].includes(o.status) ? `/orders/${o.id}/track` : null) : ["deposit_paid", "in_progress", "accepted"].includes(o.status) ? `/orders/${o.id}/pay` : null })),
     ...[...rentals, ...owned].map((b) => ({ id: `r-${b.id}`, kind: "rental", title: b.rental?.title || "Rental", status: b.status, amount: b.subtotal, at: b.created_at, sub: `${b.start_date} → ${b.end_date}`, to: `/rentals/${b.rental_id}` })),
     ...inq.map((q) => ({ id: `i-${q.id}`, kind: "inquiry", title: q.listing_title || "Inquiry", status: q.listing_kind?.replace("_", " "), amount: q.listing_price, currency: q.listing_currency, at: q.last_message_at || q.created_at, to: `/inquiries/${q.id}` })),
   ].sort((a, b) => (b.at || "").localeCompare(a.at || ""));

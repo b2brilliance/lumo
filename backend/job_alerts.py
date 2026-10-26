@@ -16,17 +16,40 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _within_hours(prefs: dict) -> bool:
+    h = prefs.get("hours") or {}
+    if not h.get("enabled"):
+        return True
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo(h.get("tz") or "UTC")).strftime("%H:%M")
+    except Exception:  # noqa: BLE001
+        now = datetime.now(timezone.utc).strftime("%H:%M")
+    start, end = h.get("start") or "00:00", h.get("end") or "23:59"
+    return start <= now < end if start <= end else (now >= start or now < end)
+
+
+def wants_alert(prefs: Optional[dict], *, delivery: bool, category: Optional[str]) -> bool:
+    prefs = prefs or {}
+    if prefs.get("off_duty") or not _within_hours(prefs):
+        return False
+    if delivery:
+        return prefs.get("delivery_runs", True)
+    cats = prefs.get("categories")
+    return not cats or not category or category in cats
+
+
 async def alert_nearby_workers(db, haversine, *, lat, lng, title: str, body: str, link: str,
                                category: Optional[str] = None, delivery: bool = False,
                                exclude: Optional[str] = None, ref_id: Optional[str] = None) -> int:
-    """Notify every worker whose own travel distance covers (lat, lng) and whose skills match."""
+    """Notify every worker whose own travel distance covers (lat, lng), whose skills match and who is on duty."""
     if lat is None or lng is None:
         return 0
     q = {"role": "provider", "location.lat": {"$ne": None}, "location.lng": {"$ne": None}}
-    cursor = db.users.find(q, {"_id": 0, "id": 1, "location": 1, "service_radius_miles": 1, "categories": 1})
+    cursor = db.users.find(q, {"_id": 0, "id": 1, "location": 1, "service_radius_miles": 1, "categories": 1, "alert_prefs": 1})
     sent = 0
     async for p in cursor:
-        if p["id"] == exclude:
+        if p["id"] == exclude or not wants_alert(p.get("alert_prefs"), delivery=delivery, category=category):
             continue
         cats = set(p.get("categories") or [])
         if delivery and cats and not (cats & DELIVERY_CATS):
@@ -54,6 +77,27 @@ class Feedback(BaseModel):
 
 class PromptAnswer(BaseModel):
     answer: Literal["happy", "unhappy", "later"]
+
+
+class Hours(BaseModel):
+    enabled: bool = False
+    start: str = Field("08:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    end: str = Field("20:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    tz: str = "UTC"
+
+
+class AlertPrefs(BaseModel):
+    off_duty: bool = False
+    delivery_runs: bool = True
+    categories: list[str] = []
+    hours: Hours = Hours()
+
+
+class Ping(BaseModel):
+    lat: float
+    lng: float
+    heading: Optional[float] = None
+    speed: Optional[float] = None
 
 
 def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter:
@@ -107,6 +151,72 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
             "title": "Your order was delivered", "body": f"{user['name']} dropped off your order. Enjoy!",
             "link": "/orders", "order_id": order_id, "read": False, "created_at": _now()})
         return {"ok": True, "payout": payout}
+
+    @r.get("/provider/alert-settings")
+    async def get_alert_settings(user: dict = Depends(require_role("provider"))):
+        return {**AlertPrefs(**(user.get("alert_prefs") or {})).model_dump(), "skills": user.get("categories") or []}
+
+    @r.put("/provider/alert-settings")
+    async def put_alert_settings(body: AlertPrefs, user: dict = Depends(require_role("provider"))):
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(body.hours.tz)
+        except Exception:  # noqa: BLE001
+            raise HTTPException(400, "Unknown time zone")
+        prefs = body.model_dump()
+        await db.users.update_one({"id": user["id"]}, {"$set": {"alert_prefs": prefs}})
+        return {**prefs, "skills": user.get("categories") or []}
+
+    @r.post("/orders/{order_id}/location")
+    async def ping_order_location(order_id: str, body: Ping, user: dict = Depends(require_role("provider"))):
+        payload = {**body.model_dump(), "updated_at": _now()}
+        res = await db.orders.update_one({"id": order_id, "provider_id": user["id"], "status": "in_progress"},
+                                         {"$set": {"provider_live_location": payload}})
+        if not res.matched_count:
+            raise HTTPException(404, "No active delivery")
+        return {"ok": True}
+
+    @r.get("/orders/{order_id}/track")
+    async def track_order(order_id: str, user: dict = Depends(get_current_user)):
+        o = await db.orders.find_one({"id": order_id, "is_cart_order": True}, {"_id": 0})
+        if not o or user["id"] not in (o.get("customer_id"), o.get("provider_id"), o.get("store_id")) and user.get("role") != "admin":
+            raise HTTPException(404, "Order not found")
+        drv, dest = o.get("provider_live_location"), o.get("delivery_address") or {}
+        eta = None
+        if drv and dest.get("lat") is not None and o["status"] == "in_progress":
+            eta = max(1, round(haversine(drv["lat"], drv["lng"], dest["lat"], dest["lng"]) / 20.0 * 60))
+        return {"id": o["id"], "status": o["status"], "store_name": o.get("store_name"), "driver_name": o.get("provider_name"),
+                "pickup": o.get("pickup_location"), "dropoff": dest, "driver": drv, "eta_minutes": eta,
+                "delivered_at": o.get("delivered_at"), "is_driver": user["id"] == o.get("provider_id")}
+
+    @r.get("/provider/busy-map")
+    async def busy_map(tz: str = "UTC", user: dict = Depends(require_role("provider"))):
+        try:
+            from zoneinfo import ZoneInfo
+            local = datetime.now(ZoneInfo(tz))
+        except Exception:  # noqa: BLE001
+            local = datetime.now(timezone.utc)
+        since = local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).isoformat()
+        loc = user.get("location") or {}
+        radius = float(user.get("service_radius_miles") or 25.0)
+        cells: dict = {}
+
+        def add(pt, kind):
+            if not pt or pt.get("lat") is None:
+                return
+            if loc.get("lat") is not None and haversine(loc["lat"], loc["lng"], pt["lat"], pt["lng"]) > radius * 1.5:
+                return
+            key = (round(pt["lat"] * 100) / 100, round(pt["lng"] * 100) / 100)
+            c = cells.setdefault(key, {"lat": key[0], "lng": key[1], "orders": 0, "jobs": 0})
+            c[kind] += 1
+
+        async for o in db.orders.find({"is_cart_order": True, "paid_at": {"$gte": since}}, {"_id": 0, "pickup_location": 1, "delivery_address": 1}):
+            add(o.get("pickup_location") or o.get("delivery_address"), "orders")
+        async for j in db.jobs.find({"created_at": {"$gte": since}, "is_remote": {"$ne": True}}, {"_id": 0, "pickup_location": 1, "dropoff_location": 1}):
+            add(j.get("pickup_location") or j.get("dropoff_location"), "jobs")
+        out = sorted(({**c, "total": c["orders"] + c["jobs"]} for c in cells.values()), key=lambda c: -c["total"])[:200]
+        return {"since": since, "center": loc if loc.get("lat") is not None else None, "radius_miles": radius, "cells": out,
+                "totals": {"orders": sum(c["orders"] for c in out), "jobs": sum(c["jobs"] for c in out)}}
 
     @r.get("/me/rate-prompt")
     async def rate_prompt(user: dict = Depends(get_current_user)):

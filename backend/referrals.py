@@ -226,6 +226,7 @@ async def credit_referrer(
 # provider — tracked by setting `milestone_10_awarded_at` on their user
 # record before crediting.
 BADGE_TIERS = ("gold", "silver", "bronze")
+PRIZES = (100.0, 50.0, 25.0)
 PROVIDER_MILESTONE_JOBS = 10
 PROVIDER_MILESTONE_BONUS = 25.00
 
@@ -338,6 +339,24 @@ def create_router(*, db, get_current_user, require_admin=None):
             raise HTTPException(400, "month must be YYYY-MM")
         return start, datetime(y + (m == 12), m % 12 + 1, 1, tzinfo=timezone.utc)
 
+    async def _activations(start: datetime, end: datetime) -> dict:
+        """Recruits whose FIRST completed job or sale happened in [start, end), counted per recruiter."""
+        first: dict = {}
+        async for x in db.referral_earnings.aggregate([{"$group": {"_id": "$source_user_id", "t": {"$min": "$created_at"}}}]):
+            first[x["_id"]] = x["t"]
+        async for x in db.orders.aggregate([
+                {"$match": {"is_cart_order": True, "status": {"$in": ["paid", "deposit_paid", "in_progress", "completed"]}}},
+                {"$group": {"_id": "$store_id", "t": {"$min": "$paid_at"}}}]):
+            if x["t"] and (x["_id"] not in first or x["t"] < first[x["_id"]]):
+                first[x["_id"]] = x["t"]
+        lo, hi = start.isoformat(), end.isoformat()
+        ids = [uid for uid, t in first.items() if t and lo <= t < hi]
+        out: dict = {}
+        async for u in db.users.find({"id": {"$in": ids}, "referred_by_user_id": {"$ne": None}, "is_demo": {"$ne": True}},
+                                     {"_id": 0, "referred_by_user_id": 1}):
+            out[u["referred_by_user_id"]] = out.get(u["referred_by_user_id"], 0) + 1
+        return out
+
     async def _board(start: datetime, end: datetime) -> list:
         rng = {"$gte": start.isoformat(), "$lt": end.isoformat()}
         jobs = {x["_id"]: x["n"] for x in await db.referral_earnings.aggregate([
@@ -345,7 +364,8 @@ def create_router(*, db, get_current_user, require_admin=None):
         recs = {x["_id"]: x["n"] for x in await db.users.aggregate([
             {"$match": {"referred_by_user_id": {"$exists": True, "$ne": None}, "created_at": rng, "is_demo": {"$ne": True}}},
             {"$group": {"_id": "$referred_by_user_id", "n": {"$sum": 1}}}]).to_list(None)}
-        ids = list(set(jobs) | set(recs))
+        acts = await _activations(start, end)
+        ids = list(set(jobs) | set(recs) | set(acts))
         users = {u["id"]: u async for u in db.users.find(
             {"id": {"$in": ids}, "is_demo": {"$ne": True}, "role": {"$ne": "admin"}},
             {"_id": 0, "id": 1, "name": 1, "location": 1})}
@@ -356,10 +376,10 @@ def create_router(*, db, get_current_user, require_admin=None):
                 continue
             parts = (u.get("name") or "").split() or ["Lumo", "recruiter"]
             rows.append({"name": parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else ""),
-                         "jobs": jobs.get(uid, 0), "recruits": recs.get(uid, 0),
+                         "jobs": jobs.get(uid, 0), "recruits": recs.get(uid, 0), "active_recruits": acts.get(uid, 0),
                          "city": (u.get("location") or {}).get("city") if isinstance(u.get("location"), dict) else None,
                          "_uid": uid})
-        rows.sort(key=lambda x: (-x["jobs"], -x["recruits"]))
+        rows.sort(key=lambda x: (-x["active_recruits"], -x["jobs"], -x["recruits"]))
         for n, row in enumerate(rows):
             row["rank"] = n + 1
         return rows
@@ -369,20 +389,21 @@ def create_router(*, db, get_current_user, require_admin=None):
         start, end = _month_range(month)
         if end > datetime.now(timezone.utc) or await db.recruiter_badges.count_documents({"month": month}):
             return 0
-        top = (await _board(start, end))[:3]
+        top = [x for x in await _board(start, end) if x["active_recruits"] > 0][:3]
         for row in top:
-            tier = BADGE_TIERS[row["rank"] - 1]
+            prize = PRIZES[top.index(row)]
+            tier = BADGE_TIERS[top.index(row)]
             try:
                 await db.recruiter_badges.insert_one({
-                    "id": str(uuid.uuid4()), "user_id": row["_uid"], "month": month, "rank": row["rank"],
-                    "tier": tier, "jobs": row["jobs"], "recruits": row["recruits"], "prize_amount": None,
-                    "created_at": _now_iso()})
+                    "id": str(uuid.uuid4()), "user_id": row["_uid"], "month": month, "rank": top.index(row) + 1,
+                    "tier": tier, "jobs": row["jobs"], "recruits": row["recruits"], "active_recruits": row["active_recruits"],
+                    "prize_amount": prize, "prize_status": "pending_approval", "created_at": _now_iso()})
             except Exception:  # noqa: BLE001 — unique (month, rank) already awarded
                 continue
             await db.notifications.insert_one({
                 "id": str(uuid.uuid4()), "user_id": row["_uid"], "type": "recruiter_badge",
-                "title": f"You earned a {tier.title()} recruiter badge!",
-                "body": f"You finished #{row['rank']} on the {start.strftime('%B %Y')} recruiter leaderboard.",
+                "title": f"You won ${prize:.0f} and a {tier.title()} recruiter badge!",
+                "body": f"You finished #{top.index(row) + 1} on the {start.strftime('%B %Y')} recruiter leaderboard. Your prize lands in your wallet once it's confirmed.",
                 "link": "/recruiter", "read": False, "created_at": _now_iso()})
         return len(top)
 
@@ -419,7 +440,7 @@ def create_router(*, db, get_current_user, require_admin=None):
             parts = (u.get("name") or "").split() or ["Lumo", "recruiter"]
             hall.append({"month": b["month"], "rank": b["rank"], "tier": b["tier"],
                          "name": parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else "")})
-        return {"month": start.strftime("%Y-%m"), "rows": top, "total_recruiters": len(rows), "hall_of_fame": hall}
+        return {"month": start.strftime("%Y-%m"), "rows": top, "total_recruiters": len(rows), "hall_of_fame": hall, "prizes": list(PRIZES)}
 
     @r.get("/my-badges")
     async def my_badges(user: dict = Depends(get_current_user)):
@@ -471,6 +492,39 @@ def create_router(*, db, get_current_user, require_admin=None):
                 raise HTTPException(400, "Starting rate can't exceed max rate")
             await db.recruiter_program.update_one({"id": "config"}, {"$set": upd}, upsert=True)
             return await get_program(db)
+
+        @r.get("/admin/prizes")
+        async def list_prizes(_admin: dict = Depends(require_admin)):
+            now = datetime.now(timezone.utc)
+            await award_month((now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m"))
+            out = []
+            async for b in db.recruiter_badges.find({"prize_amount": {"$gt": 0}}, {"_id": 0}).sort([("month", -1), ("rank", 1)]).limit(60):
+                u = await db.users.find_one({"id": b["user_id"]}, {"_id": 0, "name": 1, "email": 1}) or {}
+                out.append({**b, "name": u.get("name"), "email": u.get("email")})
+            return out
+
+        @r.post("/admin/prizes/{badge_id}/{action}")
+        async def decide_prize(badge_id: str, action: str, admin: dict = Depends(require_admin)):
+            if action not in ("approve", "decline"):
+                raise HTTPException(400, "Action must be approve or decline")
+            new = "paid" if action == "approve" else "declined"
+            b = await db.recruiter_badges.find_one_and_update(
+                {"id": badge_id, "prize_status": "pending_approval"},
+                {"$set": {"prize_status": new, "prize_decided_at": _now_iso(), "prize_decided_by": admin["id"]}})
+            if not b:
+                raise HTTPException(400, "This prize was already handled")
+            if new == "paid":
+                amt = float(b["prize_amount"])
+                await db.users.update_one({"id": b["user_id"]}, {"$inc": {"wallet_balance": amt}})
+                await db.wallet_transactions.insert_one({
+                    "id": str(uuid.uuid4()), "user_id": b["user_id"], "amount": amt, "type": "credit",
+                    "reason": f"Recruiter prize #{b['rank']} ({b['month']})", "ref_id": b["id"], "ref_kind": "recruiter_prize",
+                    "created_at": _now_iso()})
+                await db.notifications.insert_one({
+                    "id": str(uuid.uuid4()), "user_id": b["user_id"], "type": "recruiter_prize_paid",
+                    "title": f"${amt:.0f} recruiter prize paid!", "body": "Your prize is in your Lumo wallet. Thanks for growing Lumo.",
+                    "link": "/wallet", "read": False, "created_at": _now_iso()})
+            return {"ok": True, "prize_status": new}
 
         @r.get("/admin/leaderboard")
         async def leaderboard(_admin: dict = Depends(require_admin)):

@@ -14,7 +14,7 @@ import { watchPosition } from "@/lib/native";
  * Activates only when `enabled` is true (e.g. when provider has an
  * active accepted/on_the_way/arrived/in_progress job).
  */
-export default function useProviderLocationPinger({ jobId, enabled, intervalMs = 12000 }) {
+export default function useProviderLocationPinger({ jobId, enabled, intervalMs = 12000, endpoint = null }) {
   const lastPosRef = useRef(null);
   const lastSentAtRef = useRef(0);
   const clearRef = useRef(null);
@@ -28,7 +28,7 @@ export default function useProviderLocationPinger({ jobId, enabled, intervalMs =
       if (now - lastSentAtRef.current < intervalMs) return;
       lastSentAtRef.current = now;
       try {
-        await api.post(`/jobs/${jobId}/location`, {
+        await api.post(endpoint || `/jobs/${jobId}/location`, {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           heading: pos.coords.heading ?? null,
