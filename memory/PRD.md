@@ -1061,3 +1061,12 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - POST /api/orders/{id}/tip {percent 10/15/20 of order total | amount} → Stripe checkout type "tip"; checkout_status credits 100% to driver wallet + notifies; one tip per order
 - UI: DeliveryRuns active card photo capture (camera), OrderTrack shows photo + TipDriver panel (returns with ?tip_session= and polls status)
 - Tip paid branch verified by code only (needs real Stripe payment)
+
+## 2026-06 — Store build
+- Android release built IN THIS POD (arm64): JDK21 /root/android/jdk-21*, SDK /root/android/sdk, aapt2 via qemu wrapper /root/android/aapt2.
+  Build: cd /app/frontend/android && setsid nohup bash -c 'export JAVA_HOME=$(ls -d /root/android/jdk-21*); export ANDROID_HOME=/root/android/sdk; ./gradlew bundleRelease -Pandroid.aapt2FromMavenOverride=/root/android/aapt2 > /root/android/build.log 2>&1' &
+  (needs: sudo apt-get install qemu-user libc6-amd64-cross libstdc++6-amd64-cross if pod reset). Run detached (setsid) or tool exit kills it.
+- Upload keystore: /app/android-signing/lumo-upload.jks + keystore.properties (password inside). KEEP; used for every update.
+- Firebase files added: android/app/google-services.json, ios/App/App/GoogleService-Info.plist (added to Xcode Resources in pbxproj).
+- AAB v1.0 (versionCode 1) at /app/frontend/public/downloads/lumo-android-1.0.aab (remove after upload).
+- User exposed the Firebase admin service-account JSON as a public chat attachment → told to rotate key and re-save FIREBASE_SERVICE_ACCOUNT_JSON.

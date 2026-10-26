@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "784146351414",
+    "project_id": "lumo-2ff2f",
+    "storage_bucket": "lumo-2ff2f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:784146351414:android:3c725738f60d7709d75f97",
+        "android_client_info": {
+          "package_name": "app.golumo.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBn2S9o4EW88EnG4CoXxjOSH5V9XmkxZsw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
