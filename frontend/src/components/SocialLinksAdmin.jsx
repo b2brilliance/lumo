@@ -146,7 +146,7 @@ export default function SocialLinksAdmin() {
       {/* App store download links */}
       <div className="mb-6 border border-slate-200 p-4 space-y-3" data-testid="admin-app-links-block">
         <label className="overline block">App download links (homepage buttons)</label>
-        {[["ios_app_url", "App Store link", "https://apps.apple.com/app/lumo/id1234567890"], ["android_app_url", "Google Play link", "https://play.google.com/store/apps/details?id=app.golumo.mobile"]].map(([key, label, ph]) => (
+        {[["ios_app_url", "App Store link", "https://apps.apple.com/app/lumo/id1234567890"], ["android_app_url", "Google Play link", "https://play.google.com/store/apps/details?id=com.golumo.app"]].map(([key, label, ph]) => (
           <div key={key}>
             <div className="text-xs text-slate-500 mb-1">{label}</div>
             <Input value={apps[key]} onChange={(e) => setApps((a) => ({ ...a, [key]: e.target.value.trim() }))} onBlur={() => saveApp(key)}

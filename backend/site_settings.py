@@ -51,7 +51,7 @@ class SocialLinksBody(BaseModel):
     android_app_url: Optional[str] = None
 
 
-ANDROID_DEFAULT_URL = "https://play.google.com/store/apps/details?id=app.golumo.mobile"
+ANDROID_DEFAULT_URL = "https://play.google.com/store/apps/details?id=com.golumo.app"
 
 
 def _app_links(doc: dict) -> dict:

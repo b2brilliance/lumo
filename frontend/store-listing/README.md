@@ -6,7 +6,7 @@ The apps load the live site (https://golumo.app), so publish the website first. 
 Push alerts use Firebase. Do this once (about 15 minutes):
 1. Go to https://console.firebase.google.com → **Add project** → name it "Lumo" → you can turn Google Analytics off → Create
 2. **Add an iOS app**: Apple bundle ID `app.golumo.mobile` → Register → download **GoogleService-Info.plist**
-3. **Add an Android app**: package name `app.golumo.mobile` → Register → download **google-services.json**
+3. **Add an Android app**: package name `com.golumo.app` → Register → download **google-services.json**
 4. **Apple push key**: in https://developer.apple.com/account/resources/authkeys/list click **+**, tick **Apple Push Notifications service (APNs)**, continue, download the `.p8` file and note the **Key ID**. In Firebase → Project settings → **Cloud Messaging** → Apple app configuration → **APNs Authentication Key** → upload the `.p8`, enter the Key ID and your Team ID
 5. **Server key for Lumo**: Firebase → Project settings → **Service accounts** → **Generate new private key**. Open the downloaded JSON file, copy everything, and paste it into the `FIREBASE_SERVICE_ACCOUNT_JSON` secret in Emergent
 6. Put the files in the project on your Mac:
@@ -38,7 +38,7 @@ Works in the iPhone app with no keys. For the **website** button and for removin
 - `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — **Keys** → **+** → name "Lumo Sign in" → tick **Sign in with Apple** → Configure → `app.golumo.mobile` → Register → **Download** the `.p8` (only once!). The Key ID is shown on that page. Open the `.p8` in a text editor and paste the whole contents as `APPLE_PRIVATE_KEY`
 
 ## 5. Turn on the homepage buttons
-- Google Play works automatically once the app is live (it links to `app.golumo.mobile`)
+- Google Play works automatically once the app is live (it links to `com.golumo.app`)
 - Apple: copy the link from App Store Connect → App Information → "View on App Store" and paste it into **Admin → Social links → App download links**
 - Share `golumo.app/download` anywhere: it sends iPhones to the App Store and Android phones to Google Play
 
