@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { GoogleMap, useJsApiLoader, MarkerF, PolylineF } from "@react-google-maps/api";
 import { Bike, Store, Home, CheckCircle2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
+import { TipDriver } from "@/components/app/TipDriver";
 
 const LIBRARIES = ["places"];
 const dot = (color, size = 18) => ({
@@ -28,6 +29,7 @@ export default function OrderTrack() {
   const [err, setErr] = useState(null);
   const mapRef = useRef(null);
   const { isLoaded } = useJsApiLoader({ id: "lumo-google-maps", googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "", libraries: LIBRARIES });
+  const reload = () => api.get(`/orders/${id}/track`).then((r) => setT(r.data)).catch(() => {});
   useEffect(() => {
     const load = () => api.get(`/orders/${id}/track`).then((r) => setT(r.data)).catch((e) => setErr(formatApiError(e)));
     load();
@@ -71,7 +73,14 @@ export default function OrderTrack() {
         <div className="flex gap-2 items-start"><Store className="w-4 h-4 mt-0.5 text-amber-600" /><div><div className="font-semibold">Pickup</div><div className="text-slate-500">{t.pickup?.address || t.store_name}</div></div></div>
         <div className="flex gap-2 items-start"><Home className="w-4 h-4 mt-0.5" /><div><div className="font-semibold">Drop-off</div><div className="text-slate-500">{t.dropoff?.address || "—"}</div></div></div>
       </div>
+      {t.dropoff_photo_url && (
+        <figure className="mt-6" data-testid="order-track-photo">
+          <img src={`${process.env.REACT_APP_BACKEND_URL}${t.dropoff_photo_url}`} alt="Drop-off" className="w-full max-h-96 object-cover rounded-3xl border border-slate-200" />
+          <figcaption className="text-xs text-slate-500 mt-2">Drop-off photo from {t.driver_name || "your driver"}</figcaption>
+        </figure>
+      )}
       {t.status === "completed" && <div className="mt-6 flex items-center gap-2 text-emerald-700 font-semibold" data-testid="order-track-delivered"><CheckCircle2 className="w-5 h-5" /> Delivered. Enjoy!</div>}
+      <TipDriver t={t} onPaid={reload} />
       <Link to="/orders" className="mt-8 inline-block text-sm underline text-slate-600" data-testid="order-track-back">Back to orders</Link>
     </div>
   );

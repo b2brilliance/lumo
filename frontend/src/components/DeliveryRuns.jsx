@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bike, MapPin, Package } from "lucide-react";
+import { Bike, MapPin, Package, Camera } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Link } from "react-router-dom";
@@ -22,11 +22,34 @@ const RunCard = ({ r, action, label, busy, testid }) => (
   </div>
 );
 
-const ActiveRun = ({ r, busy, onDelivered }) => {
+const ActiveRun = ({ r, busy, onDelivered, onPhoto }) => {
   useProviderLocationPinger({ jobId: r.id, enabled: true, endpoint: `/orders/${r.id}/location` });
+  const [uploading, setUploading] = useState(false);
+  const upload = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      await api.post(`/orders/${r.id}/dropoff-photo`, fd);
+      toast.success("Photo saved — the customer can see it");
+      onPhoto();
+    } catch (err) { toast.error(formatApiError(err)); }
+    finally { setUploading(false); }
+  };
   return (
     <div>
-      <RunCard r={r} busy={busy} label="Mark delivered" testid={`my-run-${r.id}`} action={onDelivered} />
+      {r.dropoff_photo_url ? (
+        <img src={`${process.env.REACT_APP_BACKEND_URL}${r.dropoff_photo_url}`} alt="Drop-off" className="w-full h-28 object-cover mb-2" data-testid={`my-run-${r.id}-photo`} />
+      ) : (
+        <label className="flex items-center justify-center gap-2 h-12 mb-2 border border-dashed border-slate-400 text-sm font-semibold cursor-pointer hover:bg-slate-50" data-testid={`my-run-${r.id}-photo-btn`}>
+          <Camera className="w-4 h-4" /> {uploading ? "Uploading…" : "Take drop-off photo (required)"}
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={upload} disabled={uploading} data-testid={`my-run-${r.id}-photo-input`} />
+        </label>
+      )}
+      <RunCard r={r} busy={busy || !r.dropoff_photo_url} label={r.dropoff_photo_url ? "Mark delivered" : "Photo needed first"} testid={`my-run-${r.id}`} action={onDelivered} />
       <Link to={`/orders/${r.id}/track`} className="text-xs underline text-slate-600 mt-1 inline-block" data-testid={`my-run-${r.id}-map`}>Open map · sharing your location with the customer</Link>
     </div>
   );
@@ -41,7 +64,7 @@ export default function DeliveryRuns() {
     const [a, b] = await Promise.all([api.get("/provider/delivery-runs"), api.get("/orders")]).catch(() => [{ data: [] }, { data: [] }]);
     setRuns(a.data || []);
     setMine((b.data || []).filter((o) => o.is_cart_order && o.status === "in_progress" && o.provider_id === user?.id)
-      .map((o) => ({ id: o.id, store_name: o.store_name, payout: o.split?.driver, delivery_miles: o.delivery_miles, items: (o.lines || []).reduce((s, l) => s + (l.quantity || 1), 0), size_class: o.size_class, dropoff_address: o.delivery_address?.address })));
+      .map((o) => ({ id: o.id, store_name: o.store_name, payout: o.split?.driver, delivery_miles: o.delivery_miles, items: (o.lines || []).reduce((s, l) => s + (l.quantity || 1), 0), size_class: o.size_class, dropoff_address: o.delivery_address?.address, dropoff_photo_url: o.dropoff_photo_url })));
   };
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []); // eslint-disable-line
   const act = async (id, path, msg) => {
@@ -56,7 +79,7 @@ export default function DeliveryRuns() {
       {mine.length > 0 && (<>
         <div className="overline">Your delivery runs</div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-          {mine.map((r) => <ActiveRun key={r.id} r={r} busy={busy === r.id} onDelivered={() => act(r.id, "delivered", "Delivered — payout added to your wallet")} />)}
+          {mine.map((r) => <ActiveRun key={r.id} r={r} onPhoto={load} busy={busy === r.id} onDelivered={() => act(r.id, "delivered", "Delivered — payout added to your wallet")} />)}
         </div>
       </>)}
       {runs.length > 0 && (<>

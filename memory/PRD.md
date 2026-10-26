@@ -1055,3 +1055,9 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Busy map: GET /api/provider/busy-map?tz= (today since local midnight; paid cart orders + non-cancelled jobs, 0.01° cells, within 1.5x radius); UI BusyMap circles
 - Recruiter prizes: rank by active_recruits (first job/sale in month); award_month creates badges with prize_amount 100/50/25, prize_status pending_approval; admin GET /api/referrals/admin/prizes, POST /api/referrals/admin/prizes/{id}/approve|decline (atomic, credits wallet); UI PrizeApprovals in admin Recruiters tab; leaderboard shows prize rules + active recruits
 - Backlog: switch prizes to automatic payout once user confirms (user said later)
+
+## 2026-06 — Driver tips + drop-off photo proof
+- POST /api/orders/{id}/dropoff-photo (assigned driver, in_progress, image ≤10MB → object storage, /api/media/{id}); /delivered now REQUIRES the photo
+- POST /api/orders/{id}/tip {percent 10/15/20 of order total | amount} → Stripe checkout type "tip"; checkout_status credits 100% to driver wallet + notifies; one tip per order
+- UI: DeliveryRuns active card photo capture (camera), OrderTrack shows photo + TipDriver panel (returns with ?tip_session= and polls status)
+- Tip paid branch verified by code only (needs real Stripe payment)

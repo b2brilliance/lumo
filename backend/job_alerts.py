@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 DELIVERY_CATS = {"delivery", "courier", "errand", "moving", "ride_share", "towing"}
@@ -93,6 +93,12 @@ class AlertPrefs(BaseModel):
     hours: Hours = Hours()
 
 
+class TipIn(BaseModel):
+    percent: Optional[float] = Field(None, ge=1, le=100)
+    amount: Optional[float] = Field(None, ge=1, le=500)
+    origin_url: str
+
+
 class Ping(BaseModel):
     lat: float
     lng: float
@@ -100,8 +106,53 @@ class Ping(BaseModel):
     speed: Optional[float] = None
 
 
-def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter:
+def create_router(*, db, get_current_user, require_role, haversine, put_object=None, app_name="lumo", get_stripe=None) -> APIRouter:
     r = APIRouter(prefix="/api")
+
+    @r.post("/orders/{order_id}/dropoff-photo")
+    async def dropoff_photo(order_id: str, file: UploadFile = File(...), user: dict = Depends(require_role("provider"))):
+        o = await db.orders.find_one({"id": order_id, "provider_id": user["id"], "status": "in_progress"}, {"_id": 0, "id": 1})
+        if not o:
+            raise HTTPException(404, "No active delivery")
+        ctype = file.content_type or ""
+        if not ctype.startswith("image/"):
+            raise HTTPException(400, "Please upload a photo")
+        data = await file.read()
+        if len(data) > 10 * 1024 * 1024:
+            raise HTTPException(413, "Photo too large (10MB max)")
+        ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()[:5] or "jpg"
+        res = put_object(f"{app_name}/dropoffs/{order_id}/{uuid.uuid4()}.{ext}", data, ctype)
+        mid = str(uuid.uuid4())
+        await db.media.insert_one({"id": mid, "storage_path": res["path"], "media_type": ctype, "size": len(data),
+                                   "owner_id": user["id"], "is_deleted": False, "created_at": _now()})
+        url = f"/api/media/{mid}"
+        await db.orders.update_one({"id": order_id}, {"$set": {"dropoff_photo_url": url, "dropoff_photo_at": _now()}})
+        return {"photo_url": url}
+
+    @r.post("/orders/{order_id}/tip")
+    async def tip_driver(order_id: str, body: TipIn, req: Request, user: dict = Depends(get_current_user)):
+        from emergentintegrations.payments.stripe.checkout import CheckoutSessionRequest
+        o = await db.orders.find_one({"id": order_id, "customer_id": user["id"], "is_cart_order": True}, {"_id": 0})
+        if not o or o.get("status") != "completed" or not o.get("provider_id"):
+            raise HTTPException(400, "You can tip once your order is delivered")
+        if o.get("tip_paid_at"):
+            raise HTTPException(400, "You already tipped for this order. Thank you!")
+        base = float(o.get("total") or o.get("subtotal") or 0)
+        amt = round(base * body.percent / 100, 2) if body.percent else round(float(body.amount or 0), 2)
+        amt = max(amt, 1.0)
+        if amt > 500:
+            raise HTTPException(400, "Tips are limited to $500")
+        stripe = await get_stripe(req)
+        meta = {"order_id": order_id, "customer_id": user["id"], "type": "tip"}
+        s = await stripe.create_checkout_session(CheckoutSessionRequest(
+            amount=amt, currency="usd", metadata=meta,
+            success_url=f"{body.origin_url}/orders/{order_id}/track?tip_session={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{body.origin_url}/orders/{order_id}/track"))
+        await db.payment_transactions.insert_one({
+            "id": str(uuid.uuid4()), "session_id": s.session_id, "order_id": order_id, "user_id": user["id"],
+            "amount": amt, "currency": "usd", "type": "tip", "status": "initiated", "payment_status": "unpaid",
+            "metadata": meta, "created_at": _now()})
+        return {"url": s.url, "amount": amt}
 
     @r.get("/provider/delivery-runs")
     async def delivery_runs(user: dict = Depends(require_role("provider"))):
@@ -136,6 +187,8 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
             raise HTTPException(404, "Order not found")
         if o.get("status") != "in_progress":
             raise HTTPException(400, "This delivery isn't in progress")
+        if not o.get("dropoff_photo_url"):
+            raise HTTPException(400, "Take a drop-off photo first")
         payout = float((o.get("split") or {}).get("driver") or 0)
         res = await db.orders.update_one({"id": order_id, "provider_id": user["id"], "status": "in_progress"},
                                          {"$set": {"status": "completed", "delivered_at": _now()}})
@@ -148,8 +201,8 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
                 "reason": f"Delivery from {o.get('store_name') or 'store'}", "ref_id": order_id, "created_at": _now()})
         await db.notifications.insert_one({
             "id": str(uuid.uuid4()), "user_id": o["customer_id"], "type": "order_delivered",
-            "title": "Your order was delivered", "body": f"{user['name']} dropped off your order. Enjoy!",
-            "link": "/orders", "order_id": order_id, "read": False, "created_at": _now()})
+            "title": "Your order was delivered", "body": f"{user['name']} dropped off your order. See the photo and add a tip if you like.",
+            "link": f"/orders/{order_id}/track", "order_id": order_id, "read": False, "created_at": _now()})
         return {"ok": True, "payout": payout}
 
     @r.get("/provider/alert-settings")
@@ -187,7 +240,9 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
             eta = max(1, round(haversine(drv["lat"], drv["lng"], dest["lat"], dest["lng"]) / 20.0 * 60))
         return {"id": o["id"], "status": o["status"], "store_name": o.get("store_name"), "driver_name": o.get("provider_name"),
                 "pickup": o.get("pickup_location"), "dropoff": dest, "driver": drv, "eta_minutes": eta,
-                "delivered_at": o.get("delivered_at"), "is_driver": user["id"] == o.get("provider_id")}
+                "delivered_at": o.get("delivered_at"), "is_driver": user["id"] == o.get("provider_id"),
+                "dropoff_photo_url": o.get("dropoff_photo_url"), "tip_amount": o.get("tip_amount"),
+                "total": o.get("total"), "can_tip": user["id"] == o.get("customer_id") and o["status"] == "completed" and not o.get("tip_paid_at")}
 
     @r.get("/provider/busy-map")
     async def busy_map(tz: str = "UTC", user: dict = Depends(require_role("provider"))):

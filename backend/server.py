@@ -4488,6 +4488,19 @@ async def checkout_status(session_id: str, req: Request):
                         db, haversine_miles, lat=pl.get("lat"), lng=pl.get("lng"), delivery=True, ref_id=order["id"],
                         title=f"New delivery run: {order.get('store_name') or 'local store'}"[:80],
                         body=f"Earn ${pay:.2f} · {order.get('delivery_miles') or '?'} mi trip", link="/provider#delivery-runs")
+            elif tx["type"] == "tip":
+                driver_id = order.get("provider_id")
+                amt = float(tx["amount"])
+                await db.orders.update_one({"id": order["id"]}, {"$set": {"tip_amount": amt, "tip_paid_at": now_iso()}})
+                if driver_id:
+                    await db.users.update_one({"id": driver_id}, {"$inc": {"wallet_balance": amt}})
+                    await db.wallet_transactions.insert_one({
+                        "id": str(uuid.uuid4()), "user_id": driver_id, "amount": amt, "type": "credit",
+                        "reason": f"Tip from {order.get('customer_name') or 'a customer'}", "order_id": order["id"], "created_at": now_iso()})
+                    await db.notifications.insert_one({
+                        "id": str(uuid.uuid4()), "user_id": driver_id, "type": "tip_received",
+                        "title": f"You got a ${amt:.2f} tip!", "body": f"{order.get('customer_name') or 'A customer'} tipped you for the {order.get('store_name') or ''} delivery. It's in your wallet.",
+                        "link": "/wallet", "order_id": order["id"], "read": False, "created_at": now_iso()})
             elif tx["type"] == "final":
                 # Credit provider wallet with the final amount (minus 10% platform cut already kept as deposit)
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "completed", "final_paid_at": now_iso()}})
@@ -7772,7 +7785,8 @@ async def _recruit_autopost_startup():
 from native_push import create_router as _create_native_push_router, push_loop as _native_push_loop  # noqa: E402
 app.include_router(_create_native_push_router(db=db, get_current_user=get_current_user))
 from job_alerts import create_router as _create_job_alerts_router  # noqa: E402
-app.include_router(_create_job_alerts_router(db=db, get_current_user=get_current_user, require_role=require_role, haversine=haversine_miles))
+app.include_router(_create_job_alerts_router(db=db, get_current_user=get_current_user, require_role=require_role, haversine=haversine_miles,
+                                             put_object=put_object, app_name=APP_NAME, get_stripe=_get_stripe))
 
 @app.on_event("startup")
 async def _native_push_startup():
