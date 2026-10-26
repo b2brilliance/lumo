@@ -107,6 +107,7 @@ import BlogPost from "@/pages/BlogPost";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { initNativeShell } from "@/lib/native";
 import { NativePushBridge } from "@/components/app/NativePushBridge";
+import { RatePrompt } from "@/components/app/RatePrompt";
 
 if (typeof window !== "undefined") {
   // Boot native bridge once. No-op when running in a regular browser.
@@ -193,6 +194,7 @@ function App() {
             <CartProvider>
               <AppSplash />
               <NativePushBridge />
+              <RatePrompt />
               <TopChrome />
               <ScrollToTop />
               <RefCapture />

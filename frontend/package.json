@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7",
+    "@capacitor-community/in-app-review": "7.1.0",
     "@capacitor-firebase/messaging": "^7",
     "@capacitor/android": "^7",
     "@capacitor/app": "^7",

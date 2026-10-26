@@ -872,6 +872,13 @@ async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
         "created_at": now_iso(),
     }
     await db.jobs.insert_one(job)
+    if not is_remote:
+        pl = body.pickup_location or body.dropoff_location or {}
+        from job_alerts import alert_nearby_workers
+        pay = (f"Pays ${body.pay_rate:g}" + ("" if body.pay_unit == "flat" else f"/{body.pay_unit}")) if body.pay_rate else "New job"
+        asyncio.create_task(alert_nearby_workers(
+            db, haversine_miles, lat=pl.get("lat"), lng=pl.get("lng"), title=f"New job near you: {body.title}"[:80],
+            body=pay, link=f"/jobs/{job['id']}", category=body.category, exclude=user["id"], ref_id=job["id"]))
     return clean_doc(job)
 
 @api.get("/jobs")
@@ -4473,6 +4480,14 @@ async def checkout_status(session_id: str, req: Request):
                             "id": str(uuid.uuid4()), "user_id": uid_, "type": "order_paid", "title": title_,
                             "body": body_, "link": link_, "order_id": order["id"], "read": False, "created_at": now_iso(),
                         })
+                if how == "delivery":
+                    from job_alerts import alert_nearby_workers
+                    pl = order.get("pickup_location") or {}
+                    pay = (order.get("split") or {}).get("driver") or 0
+                    await alert_nearby_workers(
+                        db, haversine_miles, lat=pl.get("lat"), lng=pl.get("lng"), delivery=True, ref_id=order["id"],
+                        title=f"New delivery run: {order.get('store_name') or 'local store'}"[:80],
+                        body=f"Earn ${pay:.2f} · {order.get('delivery_miles') or '?'} mi trip", link="/provider#delivery-runs")
             elif tx["type"] == "final":
                 # Credit provider wallet with the final amount (minus 10% platform cut already kept as deposit)
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "completed", "final_paid_at": now_iso()}})
@@ -4562,6 +4577,11 @@ async def accept_order_delivery(order_id: str, user: dict = Depends(require_role
     if o["status"] != "deposit_paid" or o.get("provider_id"):
         raise HTTPException(400, "Order not available")
     await db.orders.update_one({"id": order_id}, {"$set": {"provider_id": user["id"], "provider_name": user["name"], "status": "in_progress"}})
+    if o.get("is_cart_order"):
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()), "user_id": o["customer_id"], "type": "order_driver_assigned",
+            "title": "A driver is on the way", "body": f"{user['name']} is picking up your order from {o.get('store_name') or 'the store'}.",
+            "link": "/orders", "order_id": order_id, "read": False, "created_at": now_iso()})
     o = await db.orders.find_one({"id": order_id})
     return clean_doc(o)
 
@@ -7748,6 +7768,8 @@ async def _recruit_autopost_startup():
 
 from native_push import create_router as _create_native_push_router, push_loop as _native_push_loop  # noqa: E402
 app.include_router(_create_native_push_router(db=db, get_current_user=get_current_user))
+from job_alerts import create_router as _create_job_alerts_router  # noqa: E402
+app.include_router(_create_job_alerts_router(db=db, get_current_user=get_current_user, require_role=require_role, haversine=haversine_miles))
 
 @app.on_event("startup")
 async def _native_push_startup():

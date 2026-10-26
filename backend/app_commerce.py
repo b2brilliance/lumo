@@ -110,6 +110,7 @@ def create_router(*, db, get_current_user, get_optional_user, require_admin, get
         driver_payout = round(delivery_fee * p["driver_share_pct"] / 100, 2)
         return {
             "store_id": body.store_id, "store_name": sf.get("name") or store.get("name"),
+            "store_location": {"lat": loc.get("lat"), "lng": loc.get("lng"), "address": loc.get("address") or sf.get("address")} if body.fulfillment == "delivery" else None,
             "fulfillment": body.fulfillment, "items": items, "subtotal": subtotal,
             "service_fee": service_fee, "service_fee_pct": p["service_fee_pct"],
             "delivery_fee": delivery_fee, "miles": miles, "size_class": size, "size_label": SIZE_LABELS[size],
@@ -168,6 +169,7 @@ def create_router(*, db, get_current_user, get_optional_user, require_admin, get
         order_id = str(uuid.uuid4())
         await db.orders.insert_one({
             "id": order_id, "customer_id": user["id"], "customer_name": user["name"], "store_id": body.store_id,
+            "store_name": qt["store_name"], "pickup_location": qt["store_location"],
             "lines": [{"inventory_item_id": i["inventory_item_id"], "name": i["name"], "price_usd": float(i["price_usd"]),
                        "quantity": int(i["quantity"]), "media_url": i.get("media_url")} for i in qt["items"]],
             "fulfillment": body.fulfillment, "item_total": qt["subtotal"], "service_fee": qt["service_fee"],
