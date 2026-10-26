@@ -1068,5 +1068,5 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
   (needs: sudo apt-get install qemu-user libc6-amd64-cross libstdc++6-amd64-cross if pod reset). Run detached (setsid) or tool exit kills it.
 - Upload keystore: /app/android-signing/lumo-upload.jks + keystore.properties (password inside). KEEP; used for every update.
 - Firebase files added: android/app/google-services.json, ios/App/App/GoogleService-Info.plist (added to Xcode Resources in pbxproj).
-- AAB v1.0 (versionCode 1) at /app/frontend/public/downloads/lumo-android-1.0.aab (remove after upload).
+- AAB v1.0 (versionCode 1) at /app/frontend/public/downloads/lumo-android-1.0-b2.aab (minSdk 24, versionCode 2; remove after upload).
 - User exposed the Firebase admin service-account JSON as a public chat attachment → told to rotate key and re-save FIREBASE_SERVICE_ACCOUNT_JSON.
