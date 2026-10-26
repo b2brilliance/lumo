@@ -4,7 +4,7 @@ Paste these into App Store Connect and Google Play Console.
 
 ## Both stores
 - **App name:** Lumo: Local Delivery & Jobs
-- **iOS bundle ID:** app.golumo.mobile
+- **iOS bundle ID:** com.golumo.app
 - **Android package name:** com.golumo.app
 - **Category:** Shopping (secondary: Lifestyle)
 - **Privacy policy URL:** https://golumo.app/privacy

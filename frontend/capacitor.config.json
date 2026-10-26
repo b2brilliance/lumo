@@ -1,5 +1,5 @@
 {
-  "appId": "app.golumo.mobile",
+  "appId": "com.golumo.app",
   "appName": "Lumo",
   "webDir": "native-shell",
   "server": {

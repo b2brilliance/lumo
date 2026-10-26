@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:784146351414:android:3c725738f60d7709d75f97",
+        "mobilesdk_app_id": "1:784146351414:android:3040a6169ff54fefd75f97",
         "android_client_info": {
-          "package_name": "app.golumo.mobile"
+          "package_name": "com.golumo.app"
         }
       },
       "oauth_client": [],

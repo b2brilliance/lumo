@@ -5,7 +5,7 @@ The apps load the live site (https://golumo.app), so publish the website first. 
 ## 0. Before your first build (both required, or the app will close on launch)
 Push alerts use Firebase. Do this once (about 15 minutes):
 1. Go to https://console.firebase.google.com → **Add project** → name it "Lumo" → you can turn Google Analytics off → Create
-2. **Add an iOS app**: Apple bundle ID `app.golumo.mobile` → Register → download **GoogleService-Info.plist**
+2. **Add an iOS app**: Apple bundle ID `com.golumo.app` → Register → download **GoogleService-Info.plist**
 3. **Add an Android app**: package name `com.golumo.app` → Register → download **google-services.json**
 4. **Apple push key**: in https://developer.apple.com/account/resources/authkeys/list click **+**, tick **Apple Push Notifications service (APNs)**, continue, download the `.p8` file and note the **Key ID**. In Firebase → Project settings → **Cloud Messaging** → Apple app configuration → **APNs Authentication Key** → upload the `.p8`, enter the Key ID and your Team ID
 5. **Server key for Lumo**: Firebase → Project settings → **Service accounts** → **Generate new private key**. Open the downloaded JSON file, copy everything, and paste it into the `FIREBASE_SERVICE_ACCOUNT_JSON` secret in Emergent
@@ -19,8 +19,8 @@ Push alerts use Firebase. Do this once (about 15 minutes):
 
 ## 2. iOS (Xcode 16+)
 1. `npx cap open ios`
-2. Select the **App** target → **Signing & Capabilities** → choose your Apple team. The bundle ID is already `app.golumo.mobile`. **Sign in with Apple** and **Push Notifications** are already listed; if Xcode shows a warning, click "Try again" so it updates your App ID
-3. In App Store Connect → **My Apps → +** → New App, using bundle ID `app.golumo.mobile`
+2. Select the **App** target → **Signing & Capabilities** → choose your Apple team. The bundle ID is already `com.golumo.app`. **Sign in with Apple** and **Push Notifications** are already listed; if Xcode shows a warning, click "Try again" so it updates your App ID
+3. In App Store Connect → **My Apps → +** → New App, using bundle ID `com.golumo.app`
 4. In Xcode pick **Any iOS Device (arm64)** → **Product → Archive** → **Distribute App → App Store Connect → Upload**
 5. In App Store Connect: fill in the listing from `store-listing/LISTING.md`, upload the four `screenshots/iphone-6.9-*.png` files, pick the uploaded build, then **Submit for Review**
 
@@ -34,8 +34,8 @@ Push alerts use Firebase. Do this once (about 15 minutes):
 ## 4. Sign in with Apple
 Works in the iPhone app with no keys. For the **website** button and for removing Apple access when someone deletes their account, add these secrets in Emergent:
 - `APPLE_TEAM_ID` — developer.apple.com/account → **Membership details** → Team ID (10 characters)
-- `APPLE_SERVICES_ID` — Certificates, IDs & Profiles → **Identifiers** → **+** → **Services IDs** → identifier `app.golumo.web` → Register. Open it, tick **Sign in with Apple** → Configure → Primary App ID `app.golumo.mobile`, Domains `golumo.app`, Return URL `https://golumo.app/signin` → Save. The value is `app.golumo.web`
-- `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — **Keys** → **+** → name "Lumo Sign in" → tick **Sign in with Apple** → Configure → `app.golumo.mobile` → Register → **Download** the `.p8` (only once!). The Key ID is shown on that page. Open the `.p8` in a text editor and paste the whole contents as `APPLE_PRIVATE_KEY`
+- `APPLE_SERVICES_ID` — Certificates, IDs & Profiles → **Identifiers** → **+** → **Services IDs** → identifier `app.golumo.web` → Register. Open it, tick **Sign in with Apple** → Configure → Primary App ID `com.golumo.app` (Sign in with Apple enabled), Domains `golumo.app`, Return URL `https://golumo.app/signin` → Save. The value is `app.golumo.web`
+- `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — **Keys** → **+** → name "Lumo Sign in" → tick **Sign in with Apple** → Configure → `com.golumo.app` → Register → **Download** the `.p8` (only once!). The Key ID is shown on that page. Open the `.p8` in a text editor and paste the whole contents as `APPLE_PRIVATE_KEY`
 
 ## 5. Turn on the homepage buttons
 - Google Play works automatically once the app is live (it links to `com.golumo.app`)

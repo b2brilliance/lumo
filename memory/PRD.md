@@ -1071,3 +1071,5 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - AAB v1.0 (versionCode 1) at /app/frontend/public/downloads/lumo-android-1.0-b2.aab (minSdk 24, versionCode 2; remove after upload).
 - User exposed the Firebase admin service-account JSON as a public chat attachment → told to rotate key and re-save FIREBASE_SERVICE_ACCOUNT_JSON.
 - 2026-06: Android applicationId changed to com.golumo.app (new Play app; namespace stays app.golumo.mobile). iOS bundle stays app.golumo.mobile. versionCode reset to 1, minSdk 24. Waiting on google-services.json for com.golumo.app before rebuilding. Play link default updated.
+- 2026-06: iOS bundle ID ALSO switched to com.golumo.app (pbxproj, capacitor.config.json appId, GoogleService-Info.plist for com.golumo.app, appleSignIn clientId). auth_apple accepts audiences com.golumo.app + app.golumo.mobile + Services ID; Apple key check with com.golumo.app returns invalid_grant (= creds accepted).
+- Android AAB com.golumo.app v1 (versionCode 1, minSdk 24) at /app/frontend/public/downloads/lumo-android-com.golumo.app-1.0.aab

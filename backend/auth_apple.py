@@ -21,7 +21,7 @@ from pydantic import BaseModel
 logger = logging.getLogger("lumo.auth_apple")
 
 APPLE_ISSUER = "https://appleid.apple.com"
-BUNDLE_ID = "app.golumo.mobile"
+BUNDLE_IDS = ["com.golumo.app", "app.golumo.mobile"]
 _jwks = jwt.PyJWKClient(f"{APPLE_ISSUER}/auth/keys")
 ROLES = ("customer", "provider", "retailer", "restaurant", "real_estate")
 
@@ -59,7 +59,7 @@ def _client_secret(client_id: str) -> str:
 
 
 def verify_identity_token(token: str, nonce: Optional[str]) -> dict:
-    audiences = [BUNDLE_ID] + ([_services_id()] if _services_id() else [])
+    audiences = BUNDLE_IDS + ([_services_id()] if _services_id() else [])
     try:
         key = _jwks.get_signing_key_from_jwt(token).key
         claims = jwt.decode(token, key, algorithms=["RS256"], issuer=APPLE_ISSUER, audience=audiences, leeway=60)

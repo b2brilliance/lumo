@@ -31,7 +31,7 @@ async function authorize(nonce) {
   if (isIOSApp()) {
     const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
     const { response: r } = await SignInWithApple.authorize({
-      clientId: "app.golumo.mobile", redirectURI: "https://golumo.app/signin", scopes: "email name", state: randomNonce(), nonce,
+      clientId: "com.golumo.app", redirectURI: "https://golumo.app/signin", scopes: "email name", state: randomNonce(), nonce,
     });
     return { identity_token: r.identityToken, authorization_code: r.authorizationCode, first_name: r.givenName, last_name: r.familyName };
   }
