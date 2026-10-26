@@ -7397,6 +7397,11 @@ async def on_startup():
         await seed()
     except Exception as e:
         logger.error(f"Seed failed: {e}")
+    try:
+        from review_accounts import seed_review_accounts
+        await seed_review_accounts(db, hash_password, logger)
+    except Exception as e:
+        logger.error(f"Reviewer account seed failed: {e}")
     # Kick off background scheduler for Distribution drips
     global _scheduler_task
     _scheduler_task = asyncio.create_task(_scheduler_loop())

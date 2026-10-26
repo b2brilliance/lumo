@@ -1075,3 +1075,8 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Android AAB com.golumo.app v1 (versionCode 1, minSdk 24) at /app/frontend/public/downloads/lumo-android-com.golumo.app-1.0.aab
 - 2026-06: Store kit finalized: LISTING.md (release notes, all field values), 6 screenshots per store (added tracking + worker alerts), app-icon-1024.png; zip at /app/frontend/public/downloads/lumo-store-kit.zip. Recruiter-prize line kept OUT of store description (Apple 5.3 contest rules).
 - 2026-06: Play requires targetSdk 36 → AGP 8.10.1, compile/target 36 (platform 36 installed), versionCode 3 (2 was used in Play). AAB at /app/frontend/public/downloads/lumo-android-1.0-v3.aab — next build must use versionCode 4+ (aapt2 35 via qemu still works).
+- 2026-06: Created reviewer demo accounts IN PRODUCTION via golumo.app register API: customer@lumo.test / provider@lumo.test (password123; provider NYC radius 50, delivery). APPLE_SERVICES_ID secret holds a JWT (wrong) → web Apple sign-in disabled by stricter validation; native iPhone Apple sign-in unaffected. Need real Services ID (e.g. com.golumo.web). Redeployed.
+
+
+## 2026-06 — Reviewer demo logins
+- Added 4 empty store-reviewer accounts (customer/worker/seller/real estate) with shared password, auto-seeded idempotently on startup (backend/review_accounts.py). See test_credentials.md.

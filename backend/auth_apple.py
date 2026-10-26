@@ -32,7 +32,7 @@ def _env(k: str) -> str:
 
 def _services_id() -> str:
     v = _env("APPLE_SERVICES_ID")
-    return v if re.fullmatch(r"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+", v) else ""
+    return v if len(v) <= 100 and re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*(\.[A-Za-z0-9-]+)+", v) else ""
 
 
 def _private_key() -> str:
