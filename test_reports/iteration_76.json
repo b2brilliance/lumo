@@ -1,0 +1,41 @@
+{
+  "summary": "Tested Nearby Job Alerts, Delivery Runs (list/accept/delivered and payout), the 'Enjoying Lumo?' rate prompt and app feedback, end to end on the backend and the UI. Backend pytest: 14/14 passed. Provider hub UI flow (Accept run -> Your active deliveries -> Mark delivered) passed. Rate prompt UI passed on web using lumo_force_rate_prompt: the 'Not really' path showed the feedback box, sent the feedback, showed the toast and saved it as contact_submissions topic app_feedback; the 'Yes' path closed the dialog, and show:false afterwards. Regression passed: the native push loop sets native_pushed, and website pages / /workers /sellers /real-estate /help /about load with no JS errors. The paid-checkout branch (checkout_status alert) was only code-reviewed because it needs Stripe.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders/{id}/delivered", "issue": "Not atomic: it reads status and then updates without a status condition. Two calls at the same time (double tap or retry) could both credit wallet_balance. Use find_one_and_update({id, provider_id, status:'in_progress'}, {$set:{status:'completed'}}) and credit only if a document came back. accept_order_delivery has the same race: two drivers could both accept."},
+      {"endpoint": "checkout_status (server.py ~4458)", "issue": "Finalizing is not atomic: the webhook and the client polling can both see payment_status != 'paid' and both run. This can send duplicate seller/customer notifications and duplicate nearby_job delivery alerts. This race existed before, but the new alerts make it worse. Use a conditional update_one on payment_status != 'paid' and check modified_count."},
+      {"endpoint": "POST /api/me/rate-prompt", "issue": "answer is a free string with no validation. Use Literal['happy','unhappy','later']."},
+      {"endpoint": "GET /api/provider/delivery-runs", "issue": "A worker with no location sees every run (no radius filter). The list also doesn't check that the worker has delivery skills, unlike alert_nearby_workers."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "RatePrompt send feedback", "issue": "The 'Thanks' toast shows even when the feedback text is empty or the /me/app-feedback call fails (errors are swallowed).", "affected_selectors": ["[data-testid='rate-prompt-send']"]}
+    ],
+    "design_issues": [
+      {"screen": "/provider hub", "issues": ["The new 'Your active deliveries' heading (DeliveryRuns) duplicates an existing 'Your active deliveries (3)' section lower on the page. Rename one of them, e.g. 'Active delivery runs'.", "The 'Available jobs' tab button has low contrast: dark text on a dark background."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter76_job_alerts_rate.py", "/app/test_reports/pytest/iter76.xml"],
+  "action_items": [
+    "Make /orders/{id}/delivered and /orders/{id}/accept_delivery atomic with a conditional find_one_and_update, to prevent double payout or double accept",
+    "Make checkout_status finalize idempotent at the database level, to prevent duplicate delivery-run alerts and notifications",
+    "Validate the rate-prompt answer with Literal",
+    "Only show the RatePrompt feedback toast on success; disable Send when the text is empty",
+    "Rename the duplicated 'Your active deliveries' heading on /provider"
+  ],
+  "critical_code_review_comments": [
+    "delivered/accept_delivery: read-then-write race, so the wallet can be credited twice",
+    "checkout_status is not idempotent when the webhook and client polling run at the same time, so delivery alerts can be duplicated",
+    "alert_nearby_workers scans every provider with a location (Python-side haversine, capped at 300). That's fine for now; use a 2dsphere index later",
+    "PromptAnswer.answer is not validated"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter76_job_alerts_rate.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100%"},
+  "seed_data_creation": "Created TEST_ jobs, TEST- orders, notifications and contact submissions. All were cleaned up. Provider wallet restored to 0.0 and the customer's rate_prompt fields were unset.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "provider@lumo.test is at NYC 40.7128,-74.006, radius 50mi, categories ['delivery']. To test delivery runs without Stripe, insert orders directly with is_cart_order:true, fulfillment:'delivery', status:'deposit_paid', provider_id:null. customer@lumo.test has no completed orders by default, so rate-prompt show is false unless you complete one. The admin contact inbox is GET /api/admin/contact. The checkout_status paid-alert branch is untested live (needs Stripe)."
+}

@@ -1041,3 +1041,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Apple keys VERIFIED (Team ID, Key ID, Services ID valid; .p8 accepted by Apple — body without header is auto-wrapped in auth_apple._private_key). Website Apple button now enabled (works only on golumo.app domain registered in the Services ID, not preview)
 - FIREBASE_SERVICE_ACCOUNT_JSON still WRONG (user saved the Firebase web API key "AIza..."); push to phones stays off until the service-account JSON is saved. App ignores the invalid value safely.
 - 2026-06: FIREBASE_SERVICE_ACCOUNT_JSON now VALID (project lumo-2ff2f); FCM API reachable (dry-run OK); /api/push/native/register returns configured:true. Real device delivery untested until app is built with GoogleService-Info.plist / google-services.json from the same project.
+
+## 2026-06 — Nearby job alerts + rating prompt (iteration_76, 14/14 backend, UI pass)
+- `backend/job_alerts.py`: alert_nearby_workers (each worker's service_radius_miles, skill match; delivery runs → delivery-skilled workers) → db.notifications type nearby_job → native push loop
+- Hooks: POST /api/jobs (non-remote), paid cart delivery order (checkout_status, now atomic), orders store pickup_location
+- Workers: GET /api/provider/delivery-runs, POST /api/orders/{id}/accept_delivery (atomic, notifies customer), POST /api/orders/{id}/delivered (atomic, credits split.driver to wallet, notifies customer); UI DeliveryRuns in ProviderHub
+- Rating: GET/POST /api/me/rate-prompt (120-day cooldown, happy = never again), POST /api/me/app-feedback → contact_submissions topic app_feedback; RatePrompt dialog native-only (web test hook localStorage lumo_force_rate_prompt), native sheet via @capacitor-community/in-app-review
+- Text-me-the-app: declined by user for now

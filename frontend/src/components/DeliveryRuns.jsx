@@ -42,7 +42,7 @@ export default function DeliveryRuns() {
   return (
     <section id="delivery-runs" className="mt-6" data-testid="delivery-runs">
       {mine.length > 0 && (<>
-        <div className="overline">Your active deliveries</div>
+        <div className="overline">Your delivery runs</div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
           {mine.map((r) => <RunCard key={r.id} r={r} busy={busy === r.id} label="Mark delivered" testid={`my-run-${r.id}`} action={() => act(r.id, "delivered", "Delivered — payout added to your wallet")} />)}
         </div>

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -53,7 +53,7 @@ class Feedback(BaseModel):
 
 
 class PromptAnswer(BaseModel):
-    answer: str  # happy | unhappy | later
+    answer: Literal["happy", "unhappy", "later"]
 
 
 def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter:
@@ -63,6 +63,9 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
     async def delivery_runs(user: dict = Depends(require_role("provider"))):
         loc = user.get("location") or {}
         radius = float(user.get("service_radius_miles") or 25.0)
+        cats = set(user.get("categories") or [])
+        if loc.get("lat") is None or (cats and not (cats & DELIVERY_CATS)):
+            return []
         out = []
         async for o in db.orders.find({"is_cart_order": True, "fulfillment": "delivery", "status": "deposit_paid",
                                        "provider_id": None}, {"_id": 0}).sort("created_at", -1).limit(200):
@@ -90,7 +93,10 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
         if o.get("status") != "in_progress":
             raise HTTPException(400, "This delivery isn't in progress")
         payout = float((o.get("split") or {}).get("driver") or 0)
-        await db.orders.update_one({"id": order_id}, {"$set": {"status": "completed", "delivered_at": _now()}})
+        res = await db.orders.update_one({"id": order_id, "provider_id": user["id"], "status": "in_progress"},
+                                         {"$set": {"status": "completed", "delivered_at": _now()}})
+        if not res.modified_count:
+            raise HTTPException(400, "This delivery isn't in progress")
         if payout > 0:
             await db.users.update_one({"id": user["id"]}, {"$inc": {"wallet_balance": payout}})
             await db.wallet_transactions.insert_one({

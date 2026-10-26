@@ -26,9 +26,12 @@ export const RatePrompt = () => {
     try { const { InAppReview } = await import("@capacitor-community/in-app-review"); await InAppReview.requestReview(); } catch (_) { /* web */ }
   };
   const send = async () => {
-    if (text.trim().length > 1) await api.post("/me/app-feedback", { message: text }).catch(() => {});
-    toast.success("Thanks — we read every message");
-    setStep(null);
+    if (text.trim().length < 2) { toast.error("Add a few words first"); return; }
+    try {
+      await api.post("/me/app-feedback", { message: text });
+      toast.success("Thanks — we read every message");
+      setStep(null);
+    } catch (_) { toast.error("Couldn't send that. Try again."); }
   };
   const close = () => { if (step === "ask") answer("later"); setStep(null); };
   return (

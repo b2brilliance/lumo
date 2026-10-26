@@ -4456,11 +4456,11 @@ async def checkout_status(session_id: str, req: Request):
         return {"payment_status": status.payment_status, "status": status.status}
     # Idempotent finalize
     if status.payment_status == "paid" and tx["payment_status"] != "paid":
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
+        res = await db.payment_transactions.update_one(
+            {"session_id": session_id, "payment_status": {"$ne": "paid"}},
             {"$set": {"status": status.status, "payment_status": status.payment_status, "paid_at": now_iso()}}
         )
-        order = await db.orders.find_one({"id": tx["order_id"]}) if tx.get("order_id") else None
+        order = await db.orders.find_one({"id": tx["order_id"]}) if res.modified_count and tx.get("order_id") else None
         if order:
             if tx["type"] == "deposit":
                 await db.orders.update_one({"id": order["id"]}, {"$set": {"status": "deposit_paid", "deposit_paid_at": now_iso()}})
@@ -4576,7 +4576,10 @@ async def accept_order_delivery(order_id: str, user: dict = Depends(require_role
         raise HTTPException(404, "Order not found")
     if o["status"] != "deposit_paid" or o.get("provider_id"):
         raise HTTPException(400, "Order not available")
-    await db.orders.update_one({"id": order_id}, {"$set": {"provider_id": user["id"], "provider_name": user["name"], "status": "in_progress"}})
+    res = await db.orders.update_one({"id": order_id, "status": "deposit_paid", "provider_id": None},
+                                     {"$set": {"provider_id": user["id"], "provider_name": user["name"], "status": "in_progress"}})
+    if not res.modified_count:
+        raise HTTPException(400, "Another driver just took this run")
     if o.get("is_cart_order"):
         await db.notifications.insert_one({
             "id": str(uuid.uuid4()), "user_id": o["customer_id"], "type": "order_driver_assigned",
