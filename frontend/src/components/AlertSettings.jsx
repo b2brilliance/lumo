@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BellRing, BellOff } from "lucide-react";
 import { api, formatApiError, ALL_CATEGORIES } from "@/lib/api";
@@ -9,13 +9,17 @@ const label = (v) => ALL_CATEGORIES.find((c) => c.value === v)?.label || v;
 
 export default function AlertSettings() {
   const [p, setP] = useState(null);
+  const timer = useRef(null);
   useEffect(() => { api.get("/provider/alert-settings").then((r) => setP(r.data)).catch(() => {}); }, []);
   if (!p) return null;
-  const save = async (patch) => {
+  const save = async (patch, okMsg) => {
     const next = { ...p, ...patch, hours: { ...p.hours, ...(patch.hours || {}), tz: TZ } };
     setP(next);
-    try { const { skills, ...body } = next; await api.put("/provider/alert-settings", body); }
-    catch (e) { toast.error(formatApiError(e)); }
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      try { const { skills, ...body } = next; await api.put("/provider/alert-settings", body); if (okMsg) toast.success(okMsg); }
+      catch (e) { toast.error(formatApiError(e)); }
+    }, patch.hours?.start || patch.hours?.end ? 600 : 0);
   };
   const skills = p.skills || [];
   const picked = p.categories?.length ? p.categories : skills;
@@ -35,7 +39,7 @@ export default function AlertSettings() {
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm font-medium">Off duty
-          <Switch checked={p.off_duty} onCheckedChange={(v) => { save({ off_duty: v }); toast.success(v ? "Alerts paused" : "Alerts back on"); }} data-testid="alert-off-duty" />
+          <Switch checked={p.off_duty} onCheckedChange={(v) => save({ off_duty: v }, v ? "Alerts paused" : "Alerts back on")} data-testid="alert-off-duty" />
         </label>
       </div>
       <div className={`mt-4 grid md:grid-cols-3 gap-4 text-sm ${p.off_duty ? "opacity-50 pointer-events-none" : ""}`}>

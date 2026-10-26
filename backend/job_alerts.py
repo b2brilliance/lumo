@@ -195,7 +195,7 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
             from zoneinfo import ZoneInfo
             local = datetime.now(ZoneInfo(tz))
         except Exception:  # noqa: BLE001
-            local = datetime.now(timezone.utc)
+            raise HTTPException(400, "Unknown time zone")
         since = local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).isoformat()
         loc = user.get("location") or {}
         radius = float(user.get("service_radius_miles") or 25.0)
@@ -212,7 +212,7 @@ def create_router(*, db, get_current_user, require_role, haversine) -> APIRouter
 
         async for o in db.orders.find({"is_cart_order": True, "paid_at": {"$gte": since}}, {"_id": 0, "pickup_location": 1, "delivery_address": 1}):
             add(o.get("pickup_location") or o.get("delivery_address"), "orders")
-        async for j in db.jobs.find({"created_at": {"$gte": since}, "is_remote": {"$ne": True}}, {"_id": 0, "pickup_location": 1, "dropoff_location": 1}):
+        async for j in db.jobs.find({"created_at": {"$gte": since}, "is_remote": {"$ne": True}, "status": {"$nin": ["cancelled", "deleted"]}}, {"_id": 0, "pickup_location": 1, "dropoff_location": 1}):
             add(j.get("pickup_location") or j.get("dropoff_location"), "jobs")
         out = sorted(({**c, "total": c["orders"] + c["jobs"]} for c in cells.values()), key=lambda c: -c["total"])[:200]
         return {"since": since, "center": loc if loc.get("lat") is not None else None, "radius_miles": radius, "cells": out,

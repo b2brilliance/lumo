@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { GoogleMap, useJsApiLoader, MarkerF, PolylineF } from "@react-google-maps/api";
 import { Bike, Store, Home, CheckCircle2 } from "lucide-react";
@@ -26,6 +26,7 @@ export default function OrderTrack() {
   const { id } = useParams();
   const [t, setT] = useState(null);
   const [err, setErr] = useState(null);
+  const mapRef = useRef(null);
   const { isLoaded } = useJsApiLoader({ id: "lumo-google-maps", googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "", libraries: LIBRARIES });
   useEffect(() => {
     const load = () => api.get(`/orders/${id}/track`).then((r) => setT(r.data)).catch((e) => setErr(formatApiError(e)));
@@ -33,9 +34,19 @@ export default function OrderTrack() {
     const iv = setInterval(load, 5000);
     return () => clearInterval(iv);
   }, [id]);
+  const pickup = ll(t?.pickup), drop = ll(t?.dropoff), drv = ll(t?.driver);
+  const pts = [pickup, drop, t?.status === "in_progress" ? drv : null].filter(Boolean);
+  const fit = () => {
+    const m = mapRef.current;
+    if (!m || pts.length < 2 || !window.google) return;
+    const b = new window.google.maps.LatLngBounds();
+    pts.forEach((p) => b.extend(p));
+    m.fitBounds(b, 60);
+  };
+  const key = pts.map((p) => `${p.lat.toFixed(3)},${p.lng.toFixed(3)}`).join("|");
+  useEffect(() => { fit(); }, [key]); // eslint-disable-line
   if (err) return <div className="p-10 text-center text-slate-500" data-testid="order-track-error">{err}</div>;
   if (!t) return <div className="p-10 text-center text-slate-500">Loading…</div>;
-  const pickup = ll(t.pickup), drop = ll(t.dropoff), drv = ll(t.driver);
   const center = drv || drop || pickup || { lat: 39.8, lng: -98.6 };
   const headline = t.status === "completed" ? "Delivered" : t.status === "in_progress" ? (t.eta_minutes ? `Arriving in about ${t.eta_minutes} min` : "Your driver is on the way") : "Finding a driver near the store";
   return (
@@ -47,6 +58,7 @@ export default function OrderTrack() {
       <div className="mt-6 rounded-3xl overflow-hidden border border-slate-200" data-testid="order-track-map">
         {isLoaded ? (
           <GoogleMap mapContainerStyle={{ width: "100%", height: 440 }} center={center} zoom={drv ? 14 : 12}
+            onLoad={(m) => { mapRef.current = m; fit(); }}
             options={{ mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false }}>
             {pickup && <MarkerF position={pickup} icon={dot("#D97706")} />}
             {drop && <MarkerF position={drop} icon={dot("#0f172a")} />}

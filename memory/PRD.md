@@ -1048,3 +1048,10 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Workers: GET /api/provider/delivery-runs, POST /api/orders/{id}/accept_delivery (atomic, notifies customer), POST /api/orders/{id}/delivered (atomic, credits split.driver to wallet, notifies customer); UI DeliveryRuns in ProviderHub
 - Rating: GET/POST /api/me/rate-prompt (120-day cooldown, happy = never again), POST /api/me/app-feedback → contact_submissions topic app_feedback; RatePrompt dialog native-only (web test hook localStorage lumo_force_rate_prompt), native sheet via @capacitor-community/in-app-review
 - Text-me-the-app: declined by user for now
+
+## 2026-06 — Alert settings, live driver map, busy map, recruiter prizes (iteration_77: 37/37 backend, UI pass)
+- Alert settings: GET/PUT /api/provider/alert-settings (off_duty, delivery_runs, categories, hours{enabled,start,end,tz}); wants_alert() gates alert_nearby_workers; UI AlertSettings in ProviderHub
+- Live driver map: POST /api/orders/{id}/location (driver pings every ~12s from DeliveryRuns active card via useProviderLocationPinger endpoint param), GET /api/orders/{id}/track; page /orders/:id/track (5s refresh, fitBounds, ETA); Orders list + "driver on the way" notification link there
+- Busy map: GET /api/provider/busy-map?tz= (today since local midnight; paid cart orders + non-cancelled jobs, 0.01° cells, within 1.5x radius); UI BusyMap circles
+- Recruiter prizes: rank by active_recruits (first job/sale in month); award_month creates badges with prize_amount 100/50/25, prize_status pending_approval; admin GET /api/referrals/admin/prizes, POST /api/referrals/admin/prizes/{id}/approve|decline (atomic, credits wallet); UI PrizeApprovals in admin Recruiters tab; leaderboard shows prize rules + active recruits
+- Backlog: switch prizes to automatic payout once user confirms (user said later)

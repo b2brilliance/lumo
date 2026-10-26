@@ -334,7 +334,7 @@ export default function ProviderHub() {
                   <div key={`o-${o.id}`} className="p-4" data-testid={`my-delivery-order-${o.id}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="font-display font-bold">Cart order · ${o.item_total.toFixed(2)} + ${o.delivery_fee.toFixed(2)} delivery</div>
+                        <div className="font-display font-bold">Cart order · ${Number(o.item_total || 0).toFixed(2)} + ${Number(o.delivery_fee || 0).toFixed(2)} delivery</div>
                         <div className="text-xs text-slate-500 mt-1 font-mono uppercase">{o.delivery_status || o.status}</div>
                       </div>
                     </div>

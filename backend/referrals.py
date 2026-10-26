@@ -497,11 +497,9 @@ def create_router(*, db, get_current_user, require_admin=None):
         async def list_prizes(_admin: dict = Depends(require_admin)):
             now = datetime.now(timezone.utc)
             await award_month((now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m"))
-            out = []
-            async for b in db.recruiter_badges.find({"prize_amount": {"$gt": 0}}, {"_id": 0}).sort([("month", -1), ("rank", 1)]).limit(60):
-                u = await db.users.find_one({"id": b["user_id"]}, {"_id": 0, "name": 1, "email": 1}) or {}
-                out.append({**b, "name": u.get("name"), "email": u.get("email")})
-            return out
+            badges = await db.recruiter_badges.find({"prize_amount": {"$gt": 0}}, {"_id": 0}).sort([("month", -1), ("rank", 1)]).to_list(60)
+            users = {u["id"]: u async for u in db.users.find({"id": {"$in": [b["user_id"] for b in badges]}}, {"_id": 0, "id": 1, "name": 1, "email": 1})}
+            return [{**b, "name": users.get(b["user_id"], {}).get("name"), "email": users.get(b["user_id"], {}).get("email")} for b in badges]
 
         @r.post("/admin/prizes/{badge_id}/{action}")
         async def decide_prize(badge_id: str, action: str, admin: dict = Depends(require_admin)):

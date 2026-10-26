@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 77: tested Alert Settings (API + filtering + UI), Busy Map, Live Driver Map (location ping/track API + customer/driver UI), Recruiter Prizes (leaderboard active_recruits, admin approve/decline API + UI), plus iter76 regression. Backend 37/37 pytest passed (23 new + 14 iter76 regression). All UI flows worked end to end. No functional bugs found in the new features. One minor robustness issue: ProviderHub crashes on cart orders that have no item_total/delivery_fee. All test data cleaned up, and provider alert_prefs restored (unset).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/provider/busy-map", "issue": "Counts jobs of every status created today, including cancelled or deleted ones. An invalid tz silently falls back to UTC, while alert-settings returns 400 for the same input."},
+      {"endpoint": "GET /api/referrals/admin/prizes", "issue": "Makes one user lookup per badge (N+1 queries). Fine at limit 60."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProviderHub my deliveries (pages/ProviderHub.jsx:337)", "issue": "Calls o.item_total.toFixed and o.delivery_fee.toFixed without a null guard. When an in_progress cart order assigned to the provider lacks these fields, the whole Provider hub crashes into the ErrorBoundary. Seen with seeded orders built from the fields in the review request. Real checkout orders do set these fields, so this is robustness only.", "selector": "[data-testid^=my-delivery-order-]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/orders/:id/track", "issues": ["The map centres on the driver at zoom 14 and does not fit bounds, so the drop-off marker (and pickup) is often off-screen while in progress; the polyline runs off the map. Suggest fitBounds over pickup, driver and drop-off.", "Once delivered, the map centres on the drop-off but the pickup is off-screen."]},
+      {"screen": "AlertSettings", "issues": ["The 'Alerts paused' / 'Alerts back on' success toast shows before the PUT finishes, even if the save fails.", "Every change in a time input sends a PUT (no debounce)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter77_alerts_track_prizes.py", "/app/backend/tests/test_iter76_job_alerts_rate.py", "/app/backend/tests/seed_iter77_ui.py", "/app/test_reports/pytest/pytest_iter77.xml"],
+  "action_items": [
+    "Guard o.item_total / o.delivery_fee with ?? 0 in ProviderHub.jsx line 337 (low priority).",
+    "Optional: fitBounds on the OrderTrack map so the driver and drop-off are both visible.",
+    "Optional: limit busy-map jobs to active statuses (exclude cancelled)."
+  ],
+  "critical_code_review_comments": [
+    "job_alerts.wants_alert: categories=[] means all skills. After a worker narrows categories, any skill they add to their profile later is silently excluded from alerts until they re-select it.",
+    "track_order precedence `not o or A and B` is correct (and binds tighter) but hard to read; add parentheses.",
+    "award_month skips any month that already has a badge doc (count_documents by month). Partial awards are never completed, though the unique (month, rank) index prevents duplicates.",
+    "Delivery-run alerts (delivery=True) are only triggered from the Stripe webhook path. These were verified with wants_alert unit tests, not end to end."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter77_alerts_track_prizes.py", "/app/backend/tests/seed_iter77_ui.py"],
+  "success_rate": {"backend": "100% (37/37)", "frontend": "100% of requested flows (one low-priority crash with incomplete seeded data)"},
+  "seed_data_creation": "Temporary TEST_ cart orders, recruiter_badges (months 2019-01/02), and TEST- users/orders for activations. All removed. Customer wallet reset to 1, provider wallet to 0, provider alert_prefs unset.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_iter77_alerts_track_prizes.py and test_iter76. For UI: python tests/seed_iter77_ui.py seed (prints ACTIVE order id / BADGE id), then cleanup. Seeded cart orders must include item_total and delivery_fee, or ProviderHub crashes. Browser TZ in automation is UTC. Log in by setting localStorage 'lumo_token'.",
+  "rca of the issue": "ProviderHub crash: loadMyDeliveries filters /api/orders for provider_id==me and status in_progress, then renders o.item_total.toFixed(2). Cart orders created outside app_commerce/store checkout (here, seeded) lack item_total, which throws a TypeError and the ErrorBoundary unmounts the hub. Fix: (o.item_total ?? 0).toFixed(2)."
+}
