@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -30,16 +31,27 @@ def _env(k: str) -> str:
 
 
 def _services_id() -> str:
-    return _env("APPLE_SERVICES_ID")
+    v = _env("APPLE_SERVICES_ID")
+    return v if re.fullmatch(r"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+", v) else ""
+
+
+def _private_key() -> str:
+    raw = _env("APPLE_PRIVATE_KEY").replace("\\n", "\n")
+    body = re.sub(r"-----(BEGIN|END) PRIVATE KEY-----|\s", "", raw)
+    if not re.fullmatch(r"[A-Za-z0-9+/=]{100,}", body):
+        return ""
+    lines = "\n".join(body[i:i + 64] for i in range(0, len(body), 64))
+    return f"-----BEGIN PRIVATE KEY-----\n{lines}\n-----END PRIVATE KEY-----\n"
 
 
 def _can_exchange() -> bool:
-    return all(_env(k) for k in ("APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"))
+    return bool(re.fullmatch(r"[A-Z0-9]{10}", _env("APPLE_TEAM_ID")) and re.fullmatch(r"[A-Z0-9]{10}", _env("APPLE_KEY_ID"))
+                and _private_key())
 
 
 def _client_secret(client_id: str) -> str:
     now = int(time.time())
-    key = _env("APPLE_PRIVATE_KEY").replace("\\n", "\n")
+    key = _private_key()
     return jwt.encode(
         {"iss": _env("APPLE_TEAM_ID"), "iat": now, "exp": now + 3600, "aud": APPLE_ISSUER, "sub": client_id},
         key, algorithm="ES256", headers={"kid": _env("APPLE_KEY_ID")},

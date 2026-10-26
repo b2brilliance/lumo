@@ -26,11 +26,15 @@ def _firebase():
     if _app is not None:
         return _app
     raw = (os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON") or "").strip()
-    if not raw:
+    if not raw.startswith("{"):
         return None
     import firebase_admin
     from firebase_admin import credentials
-    _app = firebase_admin.initialize_app(credentials.Certificate(json.loads(raw)), name="lumo-push")
+    try:
+        _app = firebase_admin.initialize_app(credentials.Certificate(json.loads(raw)), name="lumo-push")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"FIREBASE_SERVICE_ACCOUNT_JSON is invalid: {type(exc).__name__}")
+        return None
     return _app
 
 
@@ -99,7 +103,7 @@ def create_router(*, db, get_current_user) -> APIRouter:
             {"$set": {"token": body.token, "user_id": user["id"], "platform": body.platform,
                       "updated_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True)
-        return {"ok": True, "configured": bool(os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"))}
+        return {"ok": True, "configured": _firebase() is not None}
 
     @router.post("/unregister")
     async def unregister(body: DeviceToken, user: dict = Depends(get_current_user)):

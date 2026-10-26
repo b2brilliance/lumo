@@ -1036,3 +1036,8 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 - Store screenshots (illustrated) in frontend/store-listing/screenshots (iPhone 6.9" 1320×2868, Android 1080×2340)
 - iOS: App.entitlements (Sign in with Apple + push), iPhone-only, AppDelegate push forwarding
 - Tested: iteration_75 (backend 12/12, frontend flows pass; tablet nav fixed after)
+
+## 2026-06 — Keys
+- Apple keys VERIFIED (Team ID, Key ID, Services ID valid; .p8 accepted by Apple — body without header is auto-wrapped in auth_apple._private_key). Website Apple button now enabled (works only on golumo.app domain registered in the Services ID, not preview)
+- FIREBASE_SERVICE_ACCOUNT_JSON still WRONG (user saved the Firebase web API key "AIza..."); push to phones stays off until the service-account JSON is saved. App ignores the invalid value safely.
+- 2026-06: FIREBASE_SERVICE_ACCOUNT_JSON now VALID (project lumo-2ff2f); FCM API reachable (dry-run OK); /api/push/native/register returns configured:true. Real device delivery untested until app is built with GoogleService-Info.plist / google-services.json from the same project.
