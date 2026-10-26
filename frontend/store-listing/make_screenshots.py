@@ -5,13 +5,16 @@ SHOTS = [
     ("worker", "Earn on your schedule", "Pick up runs and jobs near you. Keep 90%, paid same day.", "#059669"),
     ("seller", "Your shop, in every pocket", "Free storefront, live orders and stock. Just 5% per sale.", "#D97706"),
     ("estate", "Buy, rent or stay", "Homes near you on the map. Sales and rentals list free.", "#7C3AED"),
+    ("tracking", "Watch it arrive", "Follow your driver live, see the drop-off photo and tip.", "#059669"),
+    ("alerts", "Alerts for nearby work", "On-duty alerts for runs and jobs near you. Your hours.", "#E11D48"),
 ]
+ART = "/app/frontend/store-listing/art"
 W, H = 1320, 2868
 OUT = "/app/frontend/store-listing/screenshots"
 
 
 def font(size, weight):
-    f = ImageFont.truetype("/tmp/fonts/sg.ttf", size)
+    f = ImageFont.truetype(f"{ART}/SpaceGrotesk.ttf", size)
     try:
         f.set_variation_by_axes([weight])
     except Exception:
@@ -32,7 +35,7 @@ def wrap(draw, text, f, maxw):
 
 
 for i, (slug, title, sub, accent) in enumerate(SHOTS, 1):
-    art = Image.open(f"/tmp/shot_{slug}.jpg").convert("RGB")
+    art = Image.open(f"{ART}/shot_{slug}.jpg").convert("RGB")
     art = art.resize((W, int(art.height * W / art.width)), Image.LANCZOS)
     row = art.crop((0, 0, W, 4)).resize((1, 1), Image.LANCZOS)
     bg = row.getpixel((0, 0))
@@ -43,7 +46,7 @@ for i, (slug, title, sub, accent) in enumerate(SHOTS, 1):
         md.line([(0, yy), (W, yy)], fill=int(255 * yy / 400))
     canvas.paste(art, (0, H - art.height), mask)
     d = ImageDraw.Draw(canvas)
-    d.text((110, 190), slug.replace("estate", "real estate").upper(), font=font(44, 600), fill=accent)
+    d.text((110, 190), {"estate": "REAL ESTATE", "tracking": "LIVE TRACKING", "alerts": "FOR WORKERS"}.get(slug, slug.upper()), font=font(44, 600), fill=accent)
     y = 270
     for line in wrap(d, title, font(124, 700), W - 220):
         d.text((110, y), line, font=font(124, 700), fill="#09090B")
