@@ -70,6 +70,13 @@ export default function Recruiter() {
       <section className="mt-12">
         {user ? (
           <>
+            <Link to="/recruiter/hub" className="mb-6 flex items-center justify-between bg-slate-950 text-white p-5 hover:bg-teal-800 transition-colors" data-testid="recruiter-open-hub">
+              <div>
+                <div className="font-display font-bold">Open your Recruiter Hub</div>
+                <div className="text-sm text-white/70">Track everyone you recruited, their jobs, and the leaderboards.</div>
+              </div>
+              <TrendingUp className="w-5 h-5 text-amber-300" />
+            </Link>
             <ReferralCard />
             <MyBadges />
             <RecruiterShareKit />

@@ -76,6 +76,7 @@ import ChatsInbox from "@/pages/ChatsInbox";
 import Orders from "@/pages/Orders";
 import Help from "@/pages/Help";
 import Recruiter from "@/pages/Recruiter";
+import RecruiterHub from "@/pages/RecruiterHub";
 import JoinCountry from "@/pages/JoinCountry";
 import { CityBlogList, CityBlogPost } from "@/pages/CityBlog";
 import AvailableJobs from "@/pages/AvailableJobs";
@@ -312,6 +313,7 @@ function App() {
             <Route path="/orders" element={<Protected><Orders /></Protected>} />
             <Route path="/help" element={<Help />} />
             <Route path="/recruiter" element={<Recruiter />} />
+            <Route path="/recruiter/hub" element={<Protected><RecruiterHub /></Protected>} />
             <Route path="/available-jobs" element={<Protected roles={["provider"]}><AvailableJobs /></Protected>} />
             <Route path="/global" element={<GlobalHub />} />
             <Route path="/in/:country" element={<CountryHub />} />

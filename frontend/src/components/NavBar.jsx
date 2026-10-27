@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import {
   LogOut, MapPin, Sparkles, ShoppingBag, Briefcase, User,
-  Wallet, Settings, MessageSquare, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy, Building2, BookOpen, Download, Menu,
+  Wallet, Settings, MessageSquare, Trophy, ShoppingCart, HardHat, ShieldCheck, Store, LifeBuoy, Building2, BookOpen, Download, Menu,
 } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const HELP_LINK = { to: "/help", label: "Help", icon: LifeBuoy, testId: "nav-help" };
@@ -138,6 +138,11 @@ export default function NavBar() {
                       {cart.total_items}
                     </span>
                   )}
+                </NavLink>
+              )}
+              {!window.Capacitor?.isNativePlatform?.() && role !== "admin" && (
+                <NavLink to="/recruiter/hub" className="text-neutral-500 hover:text-black p-2 rounded-full hover:bg-neutral-100 transition-colors" data-testid="nav-recruiter-hub" title="Recruiter Hub">
+                  <Trophy className="w-4 h-4" />
                 </NavLink>
               )}
               <NavLink to="/settings" className="text-neutral-500 hover:text-black p-2 rounded-full hover:bg-neutral-100 transition-colors" data-testid="nav-settings"><Settings className="w-4 h-4" /></NavLink>

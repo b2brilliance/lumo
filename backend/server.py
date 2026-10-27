@@ -7582,6 +7582,8 @@ app.include_router(_create_stripe_connect_router(db=db, get_current_user=get_cur
 # wired into _credit_provider above so every payout event rewards the
 # referrer of the earning provider).
 app.include_router(_create_referrals_router(db=db, get_current_user=get_current_user, require_admin=_require_admin), prefix="/api")
+from recruiter_hub import create_router as _create_recruiter_hub_router  # noqa: E402
+app.include_router(_create_recruiter_hub_router(db=db, get_current_user=get_current_user))
 
 # Recruit-lead capture — /api/recruits (marketing pages + admin dashboard)
 from recruits import create_router as _create_recruits_router  # noqa: E402
