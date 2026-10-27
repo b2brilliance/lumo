@@ -1083,3 +1083,6 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## 2026-06 — Android v4
 - Built lumo-android-1.0.1-v4.aab (versionCode 4, versionName 1.0.1) to fix Play Console 'no new bundles / users can't upgrade' errors. Build needs -Pandroid.aapt2FromMavenOverride=/root/android/aapt2.
+
+## 2026-06 — Recruiter Hub (website only)
+- /recruiter/hub (any signed-in role): stats (recruited, active, crew jobs, total earned), full-name recruit list with expandable completed-job list, leaderboards (This month w/ prizes, All-time, My city). Backend: recruiter_hub.py (/api/recruiter-hub/me, /leaderboard?scope=alltime|city, 60s cache). Nav trophy icon hidden in native app. Tested iteration_78.

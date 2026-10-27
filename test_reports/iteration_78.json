@@ -1,0 +1,33 @@
+{
+  "summary": "Recruiter Hub feature tested end-to-end. Backend: 10/10 pytest pass (auth 401s, /me summary+recruits+jobs, empty account, alltime/city boards, no-city, invalid scope 422, limit clamp). Frontend (desktop 1920): logged-out /recruiter/hub -> /signin?next=%2Frecruiter%2Fhub; nav trophy nav-recruiter-hub visible and navigates; stats 2/1/1/$0.10; recruits Jamie Worker Smith (Worker, 1 job) and Riley Customer (Customer, 0); expand shows 'Deliver groceries to Park Slope | Oct 20, 2026 | $100.00 | +$0.10'; month tab renders recruiter-leaderboard-public; all-time board shows 'Hub R. YOU' highlighted; city tab shows NEW YORK with own row; /recruiter has recruiter-open-hub link to hub; customer.demo shows hub-recruits-empty and hub-board-no-city. No page errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/recruiter-hub/leaderboard", "issue": "_board loads every referred user + all referral_earnings + orders on each request (no cache/pagination) - will get slow as users grow. Consider caching or a precomputed aggregate."},
+      {"endpoint": "/api/recruiter-hub/leaderboard", "issue": "_jobs_for(all_ids) is called without referrer_id, so if multi-tier referral_earnings rows exist (same source_user_id, different referrer), crew job counts on the board may be inflated vs /me which filters by referrer_id."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Hub leaderboards (all-time/city)", "issues": ["'active recruits' label wraps to two lines in w-20 column, so row heights don't match the other columns", "Ranks 1-3 show only a medal icon, no number; masked names can collide (two 'Customer A.' rows), which makes the board confusing"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_recruiter_hub.py", "/app/test_reports/pytest/pytest_recruiter_hub.xml"],
+  "action_items": [
+    "Optional: cache or precompute leaderboard aggregation",
+    "Optional: filter board earnings by referrer to match /me semantics",
+    "Optional: widen stat columns / show rank number alongside medal"
+  ],
+  "critical_code_review_comments": [
+    "HubLeaderboards receives a city prop from RecruiterHub but ignores it (dead prop)",
+    "RecruiterHub fetch has no retry and swallows the error detail; acceptable"
+  ],
+  "updated_files": ["/app/backend/tests/test_recruiter_hub.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None (used existing hubrec_8359b7 data)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Recruiter hub tests in /app/backend/tests/test_recruiter_hub.py rely on hubrec_8359b7@lumo.test seeded in Mongo (2 recruits, 1 earning $0.10, city New York). Native-app nav hiding (Capacitor) not tested in a native shell; only checked in code (window.Capacitor?.isNativePlatform guard). Mobile viewport not tested."
+}

@@ -74,31 +74,46 @@ def create_router(*, db, get_current_user) -> APIRouter:
                             "total_earned": round(commission + milestones + prizes, 2)},
                 "city": _city(user), "recruits": rows}
 
+    _cache: dict = {}
+
     async def _board(city: Optional[str], me_id: str, limit: int) -> list:
-        groups = await db.users.aggregate([
-            {"$match": {"referred_by_user_id": {"$exists": True, "$ne": None}, "is_demo": {"$ne": True}}},
-            {"$group": {"_id": "$referred_by_user_id", "ids": {"$push": "$id"}}}]).to_list(None)
-        recruiters = {u["id"]: u async for u in db.users.find(
-            {"id": {"$in": [g["_id"] for g in groups]}, "is_demo": {"$ne": True}, "role": {"$ne": "admin"}},
-            {"_id": 0, "id": 1, "name": 1, "location": 1, "recruit_city_slug": 1})}
-        all_ids = [i for g in groups for i in g["ids"]]
-        jobs = await _jobs_for(all_ids)
-        rows = []
-        for g in groups:
-            u = recruiters.get(g["_id"])
-            if not u or (city and (_city(u) or "").lower() != city.lower()):
-                continue
-            counts = [len(jobs.get(i, [])) for i in g["ids"]]
-            rows.append({"name": _mask(u.get("name")), "city": _city(u), "recruits": len(g["ids"]),
-                         "active_recruits": sum(1 for c in counts if c), "jobs": sum(counts), "is_me": u["id"] == me_id})
-        rows.sort(key=lambda x: (-x["active_recruits"], -x["jobs"], -x["recruits"]))
+        import time
+        hit = _cache.get("rows")
+        if not hit or time.time() - hit[0] > 60:
+            hit = (time.time(), await _all_rows())
+            _cache["rows"] = hit
+        rows = [dict(x, is_me=x["_uid"] == me_id) for x in hit[1]
+                if not city or (x["city"] or "").lower() == city.lower()]
         for n, row in enumerate(rows):
             row["rank"] = n + 1
         mine = next((x for x in rows if x["is_me"]), None)
         top = rows[:limit]
         if mine and mine not in top:
             top.append(mine)
-        return top
+        return [{k: v for k, v in x.items() if k != "_uid"} for x in top]
+
+    async def _all_rows() -> list:
+        groups = await db.users.aggregate([
+            {"$match": {"referred_by_user_id": {"$exists": True, "$ne": None}, "is_demo": {"$ne": True}}},
+            {"$group": {"_id": "$referred_by_user_id", "ids": {"$push": "$id"}}}]).to_list(None)
+        recruiters = {u["id"]: u async for u in db.users.find(
+            {"id": {"$in": [g["_id"] for g in groups]}, "is_demo": {"$ne": True}, "role": {"$ne": "admin"}},
+            {"_id": 0, "id": 1, "name": 1, "location": 1, "recruit_city_slug": 1})}
+        paid = {(x["_id"]["r"], x["_id"]["s"]): x["n"] for x in await db.referral_earnings.aggregate([
+            {"$group": {"_id": {"r": "$referrer_user_id", "s": "$source_user_id"}, "n": {"$sum": 1}}}]).to_list(None)}
+        sales = {x["_id"]: x["n"] for x in await db.orders.aggregate([
+            {"$match": {"is_cart_order": True, "status": {"$in": PAID}}},
+            {"$group": {"_id": "$store_id", "n": {"$sum": 1}}}]).to_list(None)}
+        rows = []
+        for g in groups:
+            u = recruiters.get(g["_id"])
+            if not u:
+                continue
+            counts = [paid.get((g["_id"], i), 0) + sales.get(i, 0) for i in g["ids"]]
+            rows.append({"name": _mask(u.get("name")), "city": _city(u), "recruits": len(g["ids"]),
+                         "active_recruits": sum(1 for c in counts if c), "jobs": sum(counts), "_uid": u["id"]})
+        rows.sort(key=lambda x: (-x["active_recruits"], -x["jobs"], -x["recruits"]))
+        return rows
 
     @r.get("/leaderboard")
     async def leaderboard(scope: Literal["alltime", "city"] = "alltime", limit: int = 20,
