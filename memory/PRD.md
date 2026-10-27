@@ -1086,3 +1086,6 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## 2026-06 — Recruiter Hub (website only)
 - /recruiter/hub (any signed-in role): stats (recruited, active, crew jobs, total earned), full-name recruit list with expandable completed-job list, leaderboards (This month w/ prizes, All-time, My city). Backend: recruiter_hub.py (/api/recruiter-hub/me, /leaderboard?scope=alltime|city, 60s cache). Nav trophy icon hidden in native app. Tested iteration_78.
+
+## 2026-06 — Apple Sign-In config fixed
+- APPLE_SERVICES_ID now a valid identifier (app.golumo.mobile); /api/auth/apple/config web_enabled=true. Team 5TM6G9V4SS. Web Apple login only works on golumo.app/www.golumo.app (Apple domain config), not preview.
