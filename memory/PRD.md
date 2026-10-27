@@ -1080,3 +1080,6 @@ Auth, Customer/Provider/Retailer/Restaurant Hubs, Marketplace, Stores/Restaurant
 
 ## 2026-06 — Reviewer demo logins
 - Added 4 empty store-reviewer accounts (customer/worker/seller/real estate) with shared password, auto-seeded idempotently on startup (backend/review_accounts.py). See test_credentials.md.
+
+## 2026-06 — Android v4
+- Built lumo-android-1.0.1-v4.aab (versionCode 4, versionName 1.0.1) to fix Play Console 'no new bundles / users can't upgrade' errors. Build needs -Pandroid.aapt2FromMavenOverride=/root/android/aapt2.
